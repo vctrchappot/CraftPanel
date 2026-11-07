@@ -18,28 +18,88 @@ const LEVEL_CLASS: Record<string, string> = {
   DEBUG: "text-neutral-500",
 };
 
-export function ConsoleLines({ lines, autoScroll, showTime, className }: { lines: ConsoleLine[]; autoScroll: boolean; showTime?: boolean; className?: string }) {
+/** Distance from the bottom (px) within which the view counts as "at the latest output". */
+const STICK_THRESHOLD = 32;
+
+export function ConsoleLines({
+  lines,
+  autoScroll,
+  onAutoScrollChange,
+  showTime,
+  className,
+}: {
+  lines: ConsoleLine[];
+  autoScroll: boolean;
+  /** When given, scrolling up pauses following and scrolling back to the bottom resumes it. */
+  onAutoScrollChange?: (follow: boolean) => void;
+  showTime?: boolean;
+  className?: string;
+}) {
   const ref = React.useRef<HTMLDivElement>(null);
+  // Scroll events caused by our own scrollTop writes must not toggle following.
+  const programmatic = React.useRef(false);
+
+  const scrollToBottom = React.useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    programmatic.current = true;
+    el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => {
+      // Second pass after layout settles (line wrapping, fonts).
+      el.scrollTop = el.scrollHeight;
+      programmatic.current = false;
+    });
+  }, []);
+
   React.useLayoutEffect(() => {
-    if (autoScroll && ref.current) ref.current.scrollTop = ref.current.scrollHeight;
-  }, [lines, autoScroll]);
+    if (autoScroll) scrollToBottom();
+  }, [lines, autoScroll, showTime, scrollToBottom]);
+
+  // Keep following when the container itself resizes (window resize, layout changes).
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el || !autoScroll) return;
+    const ro = new ResizeObserver(() => scrollToBottom());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [autoScroll, scrollToBottom]);
+
+  const onScroll = () => {
+    const el = ref.current;
+    if (!el || programmatic.current || !onAutoScrollChange) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD;
+    if (atBottom !== autoScroll) onAutoScrollChange(atBottom);
+  };
+
   return (
-    <div ref={ref} className={cn("scrollbar-thin overflow-y-auto px-4 py-3 font-mono text-[12px] leading-[1.6] text-console-foreground", className)} role="log" aria-live="off">
-      {lines.length === 0 && <p className="text-neutral-500">No output yet.</p>}
-      {lines.map((l) => (
-        <div
-          key={l.seq}
-          className={cn(
-            "whitespace-pre-wrap break-all [content-visibility:auto]",
-            LEVEL_CLASS[l.level],
-            l.stream === "command" && "text-sky-300",
-            l.stream === "system" && "text-violet-300",
-          )}
+    <div className={cn("relative", className)}>
+      <div ref={ref} onScroll={onScroll} className="scrollbar-thin h-full overflow-y-auto px-4 py-3 font-mono text-[12px] leading-[1.6] text-console-foreground" role="log" aria-live="off">
+        {lines.length === 0 && <p className="text-neutral-500">No output yet.</p>}
+        {lines.map((l) => (
+          <div
+            key={l.seq}
+            className={cn(
+              "whitespace-pre-wrap break-all",
+              LEVEL_CLASS[l.level],
+              l.stream === "command" && "text-sky-300",
+              l.stream === "system" && "text-violet-300",
+            )}
+          >
+            {showTime && <span className="mr-2 select-none text-neutral-500">{formatTime(l.ts)}</span>}
+            {l.text}
+          </div>
+        ))}
+      </div>
+      {!autoScroll && onAutoScrollChange && lines.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onAutoScrollChange(true)}
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/15 bg-neutral-800/95 px-3 py-1 text-xs text-neutral-100 shadow-lg hover:bg-neutral-700"
         >
-          {showTime && <span className="mr-2 select-none text-neutral-500">{formatTime(l.ts)}</span>}
-          {l.text}
-        </div>
-      ))}
+          <ArrowDownToLine className="size-3.5" />
+          Jump to latest
+        </button>
+      )}
     </div>
   );
 }
@@ -157,7 +217,7 @@ export function ConsoleTab({ server: s, stream }: { server: ServerDetail; stream
           </span>
           <span className="ml-auto tabular-nums">{filtered.length} lines</span>
         </div>
-        <ConsoleLines lines={filtered} autoScroll={autoScroll} showTime={showTime} className="h-[min(60vh,560px)]" />
+        <ConsoleLines lines={filtered} autoScroll={autoScroll} onAutoScrollChange={setAutoScroll} showTime={showTime} className="h-[min(60vh,560px)]" />
         <form
           className="flex items-center gap-2 border-t border-white/10 px-4 py-2"
           onSubmit={(e) => {
