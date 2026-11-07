@@ -10,8 +10,29 @@ export const users = sqliteTable(
     disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at").notNull(),
     lastLoginAt: integer("last_login_at"),
+    /** "all": the role applies to every server; "selected": only servers in server_members. */
+    serverScope: text("server_scope", { enum: ["all", "selected"] }).notNull().default("all"),
+    /** Base32 TOTP secret; set while enrolling, active once totpEnabledAt is set. */
+    totpSecret: text("totp_secret"),
+    totpEnabledAt: integer("totp_enabled_at"),
+    /** Last accepted 30-second step, so a code cannot be used twice. */
+    totpLastStep: integer("totp_last_step"),
+    /** JSON array of SHA-256 hashes of unused recovery codes. */
+    recoveryCodes: text("recovery_codes"),
   },
   (t) => [uniqueIndex("users_username_idx").on(t.username)],
+);
+
+/** Per-server roles: extra rights on one server, or the only access for "selected"-scope users. */
+export const serverMembers = sqliteTable(
+  "server_members",
+  {
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    serverId: text("server_id").notNull().references(() => servers.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["admin", "operator", "viewer"] }).notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("server_members_user_server_idx").on(t.userId, t.serverId), index("server_members_server_idx").on(t.serverId)],
 );
 
 export const sessions = sqliteTable(

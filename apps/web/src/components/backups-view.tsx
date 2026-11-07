@@ -20,9 +20,9 @@ import {
   Progress,
   Skeleton,
 } from "@craftpanel/ui";
-import type { BackupInfo, ServerStatus } from "@craftpanel/shared";
+import { canAccess, type BackupInfo, type ServerStatus } from "@craftpanel/shared";
 import { api, downloadUrl, errorMessage } from "@/lib/api";
-import { useCan } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { useAction, useServers } from "@/lib/queries";
 import { useRealtimeEvent } from "@/lib/realtime";
 import { formatBytes, formatDateTime, timeAgo } from "@/lib/format";
@@ -41,8 +41,10 @@ export function BackupTable({ backups, loading, showServer, serverStatus }: { ba
   useRealtimeEvent((m) => {
     if (m.type === "backup") setProgress((p) => ({ ...p, [m.backupId]: { percent: m.percent ?? null, message: m.message, status: m.status } }));
   });
-  const canRestore = useCan("backup.restore");
-  const canDelete = useCan("backup.delete");
+  const { state } = useAuth();
+  // Per row: a user may restore backups of one server but not another. Backups of deleted servers count as application-wide.
+  const may = (permission: "backup.restore" | "backup.delete", b: BackupInfo) =>
+    !!state?.user && (b.serverId ? canAccess(state.user, permission, b.serverId) : state.user.serverScope === "all" && canAccess(state.user, permission));
   const [restoring, setRestoring] = React.useState<BackupInfo | null>(null);
   const [deleting, setDeleting] = React.useState<BackupInfo | null>(null);
   const restore = useAction((id: string) => api.post(`/api/backups/${id}/restore`), { success: "Backup restored", invalidate: [["backups"], ["worlds"], ["server"]] });
@@ -125,7 +127,7 @@ export function BackupTable({ backups, loading, showServer, serverStatus }: { ba
                         >
                           <ShieldCheck /> Verify integrity
                         </DropdownMenuItem>
-                        {canRestore && (
+                        {may("backup.restore", b) && (
                           <>
                             <DropdownMenuItem onSelect={() => downloadUrl(`/api/backups/${b.id}/download`)}>
                               <Download /> Download
@@ -135,7 +137,7 @@ export function BackupTable({ backups, loading, showServer, serverStatus }: { ba
                             </DropdownMenuItem>
                           </>
                         )}
-                        {canDelete && (
+                        {may("backup.delete", b) && (
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem destructive onSelect={() => setDeleting(b)}>

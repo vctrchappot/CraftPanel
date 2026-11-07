@@ -21,6 +21,7 @@ class RealtimeClient {
   private closedByUser = false;
   state: ConnectionState = "closed";
   private stateListeners = new Set<(s: ConnectionState) => void>();
+  private closeListeners = new Set<(code: number) => void>();
 
   connect() {
     this.closedByUser = false;
@@ -47,8 +48,10 @@ class RealtimeClient {
     ws.onclose = (ev) => {
       this.ws = null;
       this.setState("closed");
+      for (const l of this.closeListeners) l(ev.code);
       if (this.closedByUser || ev.code === 4001) return;
-      const delay = Math.min(15000, 500 * 2 ** this.retry++) + Math.random() * 300;
+      // 4002: the user's access changed; reconnect right away to pick up the new one.
+      const delay = ev.code === 4002 ? 200 : Math.min(15000, 500 * 2 ** this.retry++) + Math.random() * 300;
       this.timer = setTimeout(() => this.connect(), delay);
     };
   }
@@ -71,6 +74,10 @@ class RealtimeClient {
 
   send(msg: WsClientMessage) {
     if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(msg));
+  }
+  onClose(l: (code: number) => void) {
+    this.closeListeners.add(l);
+    return () => void this.closeListeners.delete(l);
   }
   on(l: Listener) {
     this.listeners.add(l);
@@ -116,8 +123,13 @@ export function RealtimeProvider({ children, enabled }: { children: React.ReactN
         void qc.invalidateQueries({ queryKey: ["server", msg.progress.serverId] });
       }
     });
+    // Signed out elsewhere (4001) or access changed (4002): reload what the user may see.
+    const offClose = client.onClose((code) => {
+      if (code === 4001 || code === 4002) void qc.invalidateQueries();
+    });
     return () => {
       off();
+      offClose();
       client.disconnect();
     };
   }, [client, enabled, qc]);

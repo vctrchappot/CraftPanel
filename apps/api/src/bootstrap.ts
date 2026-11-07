@@ -33,7 +33,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const activity = new ActivityService(db, hub);
   const settings = new SettingsService(db);
   const updates = new UpdateService(settings, opts.installRoot ?? null);
-  const sessions = new SessionStore(db, config.sessionTtlMs);
+  const sessions = new SessionStore(db, config.sessionTtlMs, async () => (await settings.get()).twoFactorRoles);
   const servers = new ServerService(db, agent, hub, activity, java, config, settings);
   const backups = new BackupService(db, servers, hub, activity, settings, config);
   const schedules = new ScheduleService(db, servers, backups, activity, settings);

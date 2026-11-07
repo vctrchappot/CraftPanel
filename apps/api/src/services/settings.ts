@@ -1,5 +1,6 @@
 import { appSettings, eq, type Database } from "@craftpanel/database";
 import type { AccessPolicy } from "@craftpanel/network";
+import type { Role } from "@craftpanel/shared";
 
 export interface AppSettings {
   backupDirectory: string | null;
@@ -16,6 +17,8 @@ export interface AppSettings {
   allowedNetworks: string[];
   /** Look up the newest CraftPanel release on GitHub and show a notice in the dashboard. */
   updateCheck: boolean;
+  /** Roles that must sign in with a second factor (TOTP). */
+  twoFactorRoles: Role[];
 }
 
 const DEFAULTS: AppSettings = {
@@ -29,6 +32,7 @@ const DEFAULTS: AppSettings = {
   dashboardAccess: "private",
   allowedNetworks: [],
   updateCheck: true,
+  twoFactorRoles: [],
 };
 
 export class SettingsService {

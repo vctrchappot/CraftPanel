@@ -1,5 +1,5 @@
 import type { ActivityEvent } from "@craftpanel/shared";
-import { and, auditLog, desc, eq, events, lt, servers, type Database } from "@craftpanel/database";
+import { and, auditLog, desc, eq, events, inArray, lt, servers, sql, type Database } from "@craftpanel/database";
 import type { Hub } from "../hub";
 
 export interface Actor {
@@ -34,10 +34,12 @@ export class ActivityService {
     });
   }
 
-  async list(opts: { serverId?: string; limit?: number; before?: number }): Promise<ActivityEvent[]> {
+  /** `onlyServers`: restrict to these servers (users limited to selected servers); null for no restriction. */
+  async list(opts: { serverId?: string; onlyServers?: string[] | null; limit?: number; before?: number }): Promise<ActivityEvent[]> {
     const limit = Math.min(opts.limit ?? 100, 500);
     const conds = [];
     if (opts.serverId) conds.push(eq(events.serverId, opts.serverId));
+    if (opts.onlyServers) conds.push(opts.onlyServers.length ? inArray(events.serverId, opts.onlyServers) : sql`0`);
     if (opts.before) conds.push(lt(events.id, opts.before));
     const rows = await this.db
       .select({ e: events, serverName: servers.name })

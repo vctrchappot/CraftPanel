@@ -20,7 +20,7 @@ import {
 } from "@craftpanel/ui";
 import { SOFTWARE_INFO, softwareLabel, type ServerDetail } from "@craftpanel/shared";
 import { api, downloadUrl } from "@/lib/api";
-import { useCan } from "@/lib/auth";
+import { useCan, ServerScope } from "@/lib/auth";
 import { useServerStream } from "@/lib/realtime";
 import { useAction, useServer, useServerLifecycle } from "@/lib/queries";
 import { StatusBadge } from "../status";
@@ -65,39 +65,41 @@ export function ServerWorkspace() {
 
   const s = server.data;
   return (
-    <div className="space-y-6">
-      <Header server={s} />
-      <Banners server={s} stream={stream} />
-      <nav className="scrollbar-thin -mx-1 flex gap-1 overflow-x-auto border-b border-border px-1" aria-label="Server sections">
-        {TABS.map(([t, label]) => (
-          <Link
-            key={t}
-            href={`/server/?id=${id}${t === "overview" ? "" : `&tab=${t}`}`}
-            scroll={false}
-            className={cn(
-              "relative -mb-px whitespace-nowrap border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              tab === t ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-            aria-current={tab === t ? "page" : undefined}
-          >
-            {t === "plugins" && SOFTWARE_INFO[s.software].addons === "mods" ? "Mods" : label}
-            {t === "players" && s.status === "running" && <span className="ml-1.5 text-muted-foreground tabular-nums">{stream.players?.length ?? s.players.length}</span>}
-          </Link>
-        ))}
-      </nav>
-      <div>
-        {tab === "overview" && <OverviewTab server={s} stream={stream} />}
-        {tab === "console" && <ConsoleTab server={s} stream={stream} />}
-        {tab === "players" && <PlayersTab server={s} />}
-        {tab === "worlds" && <WorldsTab server={s} />}
-        {tab === "plugins" && <PluginsTab server={s} />}
-        {tab === "files" && <FilesTab server={s} />}
-        {tab === "backups" && <ServerBackupsTab server={s} />}
-        {tab === "automation" && <AutomationTab server={s} />}
-        {tab === "settings" && <SettingsTab server={s} />}
-        {tab === "network" && <NetworkTab server={s} />}
+    <ServerScope serverId={s.id}>
+      <div className="space-y-6">
+        <Header server={s} />
+        <Banners server={s} stream={stream} />
+        <nav className="scrollbar-thin -mx-1 flex gap-1 overflow-x-auto border-b border-border px-1" aria-label="Server sections">
+          {TABS.map(([t, label]) => (
+            <Link
+              key={t}
+              href={`/server/?id=${id}${t === "overview" ? "" : `&tab=${t}`}`}
+              scroll={false}
+              className={cn(
+                "relative -mb-px whitespace-nowrap border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                tab === t ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+              aria-current={tab === t ? "page" : undefined}
+            >
+              {t === "plugins" && SOFTWARE_INFO[s.software].addons === "mods" ? "Mods" : label}
+              {t === "players" && s.status === "running" && <span className="ml-1.5 text-muted-foreground tabular-nums">{stream.players?.length ?? s.players.length}</span>}
+            </Link>
+          ))}
+        </nav>
+        <div>
+          {tab === "overview" && <OverviewTab server={s} stream={stream} />}
+          {tab === "console" && <ConsoleTab server={s} stream={stream} />}
+          {tab === "players" && <PlayersTab server={s} />}
+          {tab === "worlds" && <WorldsTab server={s} />}
+          {tab === "plugins" && <PluginsTab server={s} />}
+          {tab === "files" && <FilesTab server={s} />}
+          {tab === "backups" && <ServerBackupsTab server={s} />}
+          {tab === "automation" && <AutomationTab server={s} />}
+          {tab === "settings" && <SettingsTab server={s} />}
+          {tab === "network" && <NetworkTab server={s} />}
+        </div>
       </div>
-    </div>
+    </ServerScope>
   );
 }
 

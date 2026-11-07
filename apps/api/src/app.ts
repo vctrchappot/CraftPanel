@@ -58,7 +58,8 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
   });
 
   await app.register(cookie);
-  if (ctx.config.corsOrigins.length) await app.register(cors, { origin: ctx.config.corsOrigins, credentials: true });
+  // Development only (dashboard on another port). The plugin allows just GET/HEAD/POST unless told otherwise.
+  if (ctx.config.corsOrigins.length) await app.register(cors, { origin: ctx.config.corsOrigins, credentials: true, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"] });
   await app.register(rateLimit, { max: 600, timeWindow: "1 minute" });
   await app.register(multipart);
   await app.register(websocket, { options: { maxPayload: 64 * 1024 } });
@@ -71,7 +72,7 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
     reply.header("Referrer-Policy", "same-origin");
     if (!req.url.startsWith("/api/")) return;
     reply.header("Cache-Control", "no-store");
-    req.user = await ctx.sessions.resolve(req.cookies[SESSION_COOKIE]);
+    req.user = await ctx.sessions.resolve(req.cookies[SESSION_COOKIE], { ip: req.ip });
 
     if (UNSAFE.has(req.method)) {
       // Defense in depth: reject cross-site requests by Origin, then require the CSRF token.

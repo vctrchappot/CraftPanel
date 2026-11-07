@@ -2,13 +2,13 @@
 
 import * as React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { can, type Permission, type Role } from "@craftpanel/shared";
+import { canAccess, serverRole, type CurrentUser, type Permission, type Role } from "@craftpanel/shared";
 import { api, setCsrfToken } from "./api";
 
 export interface AuthState {
   setupRequired: boolean;
   setupTokenRequired: boolean;
-  user: { id: string; username: string; role: Role } | null;
+  user: CurrentUser | null;
   csrfToken: string | null;
 }
 
@@ -38,8 +38,25 @@ export function useAuth() {
   return ctx;
 }
 
-/** Client-side permission check for hiding controls. The API enforces the same rules. */
-export function useCan(permission: Permission): boolean {
+/** The server whose pages are shown; permission checks below it use the user's role on that server. */
+const ServerScopeContext = React.createContext<string | null>(null);
+
+export function ServerScope({ serverId, children }: { serverId: string; children: React.ReactNode }) {
+  return <ServerScopeContext.Provider value={serverId}>{children}</ServerScopeContext.Provider>;
+}
+
+/**
+ * Client-side permission check for hiding controls. The API enforces the same
+ * rules. Inside a server's pages the user's role on that server counts.
+ */
+export function useCan(permission: Permission, serverId?: string): boolean {
   const { state } = useAuth();
-  return !!state?.user && can(state.user.role, permission);
+  const scoped = React.useContext(ServerScopeContext);
+  return !!state?.user && canAccess(state.user, permission, serverId ?? scoped);
+}
+
+/** The user's effective role on a server (for labels), or null. */
+export function useServerRole(serverId: string): Role | null {
+  const { state } = useAuth();
+  return state?.user ? serverRole(state.user, serverId) : null;
 }

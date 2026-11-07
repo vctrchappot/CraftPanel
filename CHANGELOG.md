@@ -15,10 +15,15 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Fabric servers with a choice of loader version; Fabric mods from Modrinth (search, install, updates, upload) with dependency checks by mod id.
 - Log4Shell protection for Minecraft 1.7–1.18: CraftPanel adds Mojang's JVM flag or patched logging config on every start and shows it in the wizard and the server's runtime settings.
 
+- Two-factor sign-in with an authenticator app (TOTP) and recovery codes; owners can require it per role and reset it for a user.
+- Signed-in devices: see and sign out your sessions; owners can sign a user out everywhere.
+- Per-server access: give users a role on single servers, or limit them to selected servers (e.g. a moderator for one server).
+
 ### Changed
 - The version lives only in `package.json`.
 
 ### Fixed
+- Development mode (dashboard on its own port) rejected PUT/PATCH/DELETE requests because of the CORS defaults.
 - Invalid HTML nesting in the dashboard (a loading placeholder inside a paragraph) that caused hydration warnings, and a WebSocket warning in development.
 
 ## 0.1.0 – 2026-11-07

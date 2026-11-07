@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ROLES } from "./roles";
+import { ROLES, SERVER_ROLES } from "./roles";
 import { SERVER_SOFTWARE } from "./software";
 
 export const usernameSchema = z
@@ -17,16 +17,29 @@ export const passwordSchema = z
 export const setupSchema = z.object({ username: usernameSchema, password: passwordSchema });
 export const loginSchema = z.object({ username: z.string().trim().min(1).max(64), password: z.string().min(1).max(256) });
 
+const serverRolesSchema = z.record(z.string().uuid(), z.enum(SERVER_ROLES)).refine((r) => Object.keys(r).length <= 500, "Too many servers");
+
 export const createUserSchema = z.object({
   username: usernameSchema,
   password: passwordSchema,
   role: z.enum(ROLES),
+  serverScope: z.enum(["all", "selected"]).default("all"),
+  serverRoles: serverRolesSchema.default({}),
 });
 export const updateUserSchema = z.object({
   role: z.enum(ROLES).optional(),
   disabled: z.boolean().optional(),
   password: passwordSchema.optional(),
+  serverScope: z.enum(["all", "selected"]).optional(),
+  /** Replaces all per-server roles of the user. */
+  serverRoles: serverRolesSchema.optional(),
+  /** Remove the user's two-factor sign-in (e.g. lost phone and recovery codes). */
+  resetTwoFactor: z.literal(true).optional(),
 });
+
+export const totpCodeSchema = z.object({ code: z.string().trim().min(6).max(20) });
+export const loginTotpSchema = z.object({ challenge: z.string().min(16).max(128), code: z.string().trim().min(6).max(20) });
+export const disableTotpSchema = z.object({ password: z.string().min(1).max(256), code: z.string().trim().min(6).max(20) });
 export const changePasswordSchema = z.object({ currentPassword: z.string().min(1), newPassword: passwordSchema });
 
 /** JVM args are passed as an argv array; we reject anything that is not a JVM option. */
@@ -157,6 +170,8 @@ export const appSettingsSchema = z.object({
   dashboardAccess: z.enum(["local", "private", "any"]).optional(),
   allowedNetworks: z.array(z.string().trim().min(1).max(64)).max(50).optional(),
   updateCheck: z.boolean().optional(),
+  /** Roles that must sign in with a second factor. */
+  twoFactorRoles: z.array(z.enum(ROLES)).max(4).optional(),
 });
 
 export const fileWriteSchema = z.object({ path: z.string().max(4096), content: z.string().max(5 * 1024 * 1024) });

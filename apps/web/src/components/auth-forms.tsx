@@ -4,9 +4,10 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { Button, Callout, Field, Input } from "@craftpanel/ui";
-import { api, errorMessage, setCsrfToken } from "@/lib/api";
+import { api, ApiError, errorMessage, setCsrfToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Logo } from "./logo";
+import { TwoFactorEnrollment } from "./account-security";
 
 function AuthLayout({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
@@ -32,11 +33,25 @@ export function LoginForm() {
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  /** Set when the password was right and a second factor is needed. */
+  const [challenge, setChallenge] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (state?.setupRequired) router.replace("/setup/");
     else if (state?.user) router.replace("/");
   }, [state, router]);
+
+  if (challenge)
+    return (
+      <SecondFactor
+        challenge={challenge}
+        onBack={() => (setChallenge(null), setPassword(""))}
+        onSignedIn={async () => {
+          await refresh();
+          router.replace("/");
+        }}
+      />
+    );
 
   return (
     <AuthLayout title="Sign in to CraftPanel" subtitle="Manage your Minecraft servers">
@@ -47,8 +62,9 @@ export function LoginForm() {
           setBusy(true);
           setError(null);
           try {
-            const r = await api.post<{ csrfToken: string }>("/api/auth/login", { username, password });
-            setCsrfToken(r.csrfToken);
+            const r = await api.post<{ csrfToken?: string; twoFactorRequired?: boolean; challenge?: string }>("/api/auth/login", { username, password });
+            if (r.twoFactorRequired && r.challenge) return setChallenge(r.challenge);
+            setCsrfToken(r.csrfToken ?? null);
             await refresh();
             router.replace("/");
           } catch (err) {
@@ -69,6 +85,87 @@ export function LoginForm() {
           Sign in
         </Button>
       </form>
+    </AuthLayout>
+  );
+}
+
+function SecondFactor({ challenge, onBack, onSignedIn }: { challenge: string; onBack: () => void; onSignedIn: () => Promise<void> }) {
+  const [code, setCode] = React.useState("");
+  const [recovery, setRecovery] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  return (
+    <AuthLayout title="Two-factor sign-in" subtitle={recovery ? "Enter one of your recovery codes" : "Enter the 6-digit code from your authenticator app"}>
+      <form
+        className="space-y-4"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setError(null);
+          try {
+            const r = await api.post<{ csrfToken: string }>("/api/auth/login/2fa", { challenge, code });
+            setCsrfToken(r.csrfToken);
+            await onSignedIn();
+          } catch (err) {
+            if (err instanceof ApiError && err.code === "challenge_expired") return onBack();
+            setError(errorMessage(err));
+            setCode("");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <Field label={recovery ? "Recovery code" : "Code"} htmlFor="code">
+          <Input
+            id="code"
+            autoFocus
+            autoComplete="one-time-code"
+            inputMode={recovery ? "text" : "numeric"}
+            maxLength={recovery ? 20 : 7}
+            placeholder={recovery ? "abcd-efgh" : "123456"}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            className="font-mono tracking-widest"
+            required
+          />
+        </Field>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <Button type="submit" className="w-full" loading={busy}>
+          Verify
+        </Button>
+        <div className="flex justify-between text-xs">
+          <button type="button" className="text-muted-foreground hover:text-foreground" onClick={onBack}>
+            Back
+          </button>
+          <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => (setRecovery(!recovery), setCode(""), setError(null))}>
+            {recovery ? "Use the authenticator app" : "Use a recovery code"}
+          </button>
+        </div>
+      </form>
+    </AuthLayout>
+  );
+}
+
+/** Shown instead of the dashboard when the user's role requires two-factor sign-in and it isn't set up yet. */
+export function TwoFactorRequired() {
+  const { refresh } = useAuth();
+  const router = useRouter();
+  return (
+    <AuthLayout title="Set up two-factor sign-in" subtitle="Your role requires a second factor. This takes about a minute.">
+      <div className="rounded-xl border border-border bg-surface p-5">
+        <TwoFactorEnrollment standalone onDone={() => void refresh()} />
+      </div>
+      <button
+        type="button"
+        className="mx-auto block text-xs text-muted-foreground hover:text-foreground"
+        onClick={async () => {
+          await api.post("/api/auth/logout").catch(() => undefined);
+          await refresh();
+          router.replace("/login/");
+        }}
+      >
+        Sign out
+      </button>
     </AuthLayout>
   );
 }

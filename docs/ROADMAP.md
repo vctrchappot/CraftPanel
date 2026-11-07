@@ -36,9 +36,9 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 - [ ] Software switch in the dashboard for every direction (today: Vanilla→Paper; the API already supports all).
 
 ### 3. Teams and security (Phase 2)
-- [ ] Two-factor sign-in (TOTP), optionally required per role.
-- [ ] Per-server permissions (e.g. a moderator who only manages one server).
-- [ ] Session overview: signed-in devices, sign out remotely.
+- [x] Two-factor sign-in (TOTP), optionally required per role.
+- [x] Per-server permissions (e.g. a moderator who only manages one server).
+- [x] Session overview: signed-in devices, sign out remotely.
 - [ ] Notifications via Discord webhook / e-mail: crash, failed backup, update available.
 
 ### 4. More platforms (Phase 3)

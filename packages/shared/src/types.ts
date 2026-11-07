@@ -1,4 +1,4 @@
-import type { Role } from "./roles";
+import type { Access, Role, ServerRole, ServerScope } from "./roles";
 import type { ServerSoftware } from "./software";
 export type { ServerSoftware };
 
@@ -154,6 +154,30 @@ export interface UserInfo {
   role: Role;
   disabled: boolean;
   createdAt: number;
+  lastLoginAt: number | null;
+  serverScope: ServerScope;
+  /** Per-server roles (server id → role). */
+  serverRoles: Record<string, ServerRole>;
+  twoFactorEnabled: boolean;
+}
+
+/** A signed-in browser or device. */
+export interface SessionInfo {
+  /** Short public id (not the session token or its full hash). */
+  id: string;
+  current: boolean;
+  createdAt: number;
+  lastSeenAt: number;
+  ip: string | null;
+  userAgent: string | null;
+}
+
+/** The signed-in user as the dashboard sees it. */
+export interface CurrentUser extends Access {
+  id: string;
+  username: string;
+  twoFactorEnabled: boolean;
+  twoFactorSetupRequired: boolean;
 }
 
 export interface McVersion {

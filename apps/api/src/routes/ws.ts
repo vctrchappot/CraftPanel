@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { can, commandSchema, type WsClientMessage } from "@craftpanel/shared";
+import { canAccess, commandSchema, type WsClientMessage } from "@craftpanel/shared";
 import type { AppContext } from "../context";
 import type { HubClient } from "../hub";
 
@@ -19,7 +19,11 @@ export async function wsRoutes(app: FastifyInstance, ctx: AppContext) {
       socket.close(4003, "Origin not allowed");
       return;
     }
-    const client: HubClient = { socket, userId: user.id, username: user.username, role: user.role, sessionId: user.sessionId, subscriptions: new Map() };
+    if (user.twoFactorSetupRequired) {
+      socket.close(4001, "Two-factor setup required");
+      return;
+    }
+    const client: HubClient = { socket, userId: user.id, username: user.username, access: user, sessionId: user.sessionId, subscriptions: new Map() };
     ctx.hub.add(client);
     ctx.hub.send(client, { type: "hello", user: { id: user.id, username: user.username, role: user.role } });
 
@@ -45,7 +49,7 @@ export async function wsRoutes(app: FastifyInstance, ctx: AppContext) {
             return;
           case "subscribe": {
             if (typeof msg.serverId !== "string" || client.subscriptions.has(msg.serverId)) return;
-            if (!can(client.role, "console.read")) return;
+            if (!canAccess(client.access, "console.read", msg.serverId)) return;
             await ctx.servers.row(msg.serverId);
             client.subscriptions.set(msg.serverId, ctx.agent.watch(msg.serverId));
             ctx.hub.send(client, { type: "console", serverId: msg.serverId, lines: ctx.agent.history(msg.serverId, 1000), replay: true });
@@ -59,7 +63,7 @@ export async function wsRoutes(app: FastifyInstance, ctx: AppContext) {
             return;
           }
           case "command": {
-            if (!can(client.role, "console.command")) return ctx.hub.send(client, { type: "error", message: "You do not have permission to run commands" });
+            if (!canAccess(client.access, "console.command", msg.serverId)) return ctx.hub.send(client, { type: "error", message: "You do not have permission to run commands" });
             const parsed = commandSchema.safeParse({ command: msg.command });
             if (!parsed.success) return ctx.hub.send(client, { type: "error", message: parsed.error.issues[0].message });
             ctx.servers.sendCommand(msg.serverId, parsed.data.command);

@@ -53,6 +53,13 @@ export class ScheduleService {
     return rows.map((r) => this.toInfo(r));
   }
 
+  /** The server a schedule acts on (null for global ones such as DDNS updates). */
+  async serverIdOf(id: string): Promise<string | null> {
+    const [row] = await this.db.select({ serverId: schedules.serverId }).from(schedules).where(eq(schedules.id, id));
+    if (!row) throw notFound("Schedule");
+    return row.serverId;
+  }
+
   async runs(scheduleId: string, limit = 50) {
     return this.db.select().from(scheduleRuns).where(eq(scheduleRuns.scheduleId, scheduleId)).orderBy(desc(scheduleRuns.startedAt)).limit(limit);
   }

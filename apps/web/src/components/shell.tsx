@@ -14,6 +14,7 @@ import { RealtimeProvider, useConnectionState } from "@/lib/realtime";
 import { useServers } from "@/lib/queries";
 import { StatusDot } from "./status";
 import { Logo } from "./logo";
+import { TwoFactorRequired } from "./auth-forms";
 import { UpdateNotice } from "./updates";
 
 const NAV = [
@@ -61,6 +62,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         <Logo className="size-8 animate-pulse text-muted-foreground" />
       </div>
     );
+  if (state.user.twoFactorSetupRequired) return <TwoFactorRequired />;
 
   return (
     <RealtimeProvider enabled>
@@ -201,7 +203,10 @@ function UserMenu() {
             <span className="flex size-7 items-center justify-center rounded-full bg-foreground text-xs font-semibold uppercase text-background">{user.username.slice(0, 1)}</span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-medium">{user.username}</span>
-              <span className="block text-[11px] text-muted-foreground">{ROLE_LABELS[user.role]}</span>
+              <span className="block text-[11px] text-muted-foreground">
+                {ROLE_LABELS[user.role]}
+                {user.serverScope === "selected" && user.role !== "owner" ? " · selected servers" : ""}
+              </span>
             </span>
             <ChevronsUpDown className="size-3.5 text-muted-foreground" />
           </button>

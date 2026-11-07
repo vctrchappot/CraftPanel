@@ -25,7 +25,7 @@ import { eq, servers as serversTable } from "@craftpanel/database";
 import { directorySize, freeDiskSpace } from "@craftpanel/server-runtime";
 import { diagnoseWan, formatAddress, lanAddresses, fetchPublicIp, isPrivateIPv4 } from "@craftpanel/network";
 import { getProvider } from "@craftpanel/minecraft-providers";
-import { actorOf, noContent, requirePermission, type AppContext } from "../context";
+import { actorOf, canSee, noContent, requirePermission, type AppContext } from "../context";
 import { parse } from "../validate";
 
 type IdParams = { Params: { id: string } };
@@ -52,8 +52,8 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
   // ---- CRUD -------------------------------------------------------------------
 
   app.get("/api/servers", async (req) => {
-    requirePermission(req, "server.view");
-    return (await servers.rows()).map((r) => servers.summary(r));
+    const me = requirePermission(req, "server.view");
+    return (await servers.rows()).filter((r) => canSee(me, r.id)).map((r) => servers.summary(r));
   });
 
   app.post("/api/servers", async (req) => {

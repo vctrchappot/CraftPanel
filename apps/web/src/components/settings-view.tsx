@@ -3,17 +3,12 @@
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Coffee, Download, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { Coffee, Download, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import {
   Badge,
   Button,
   Callout,
-  ConfirmDialog,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
   Field,
   Input,
   NativeSelect,
@@ -27,7 +22,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@craftpanel/ui";
-import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, ROLE_DESCRIPTIONS, ROLE_LABELS, ROLES, type JavaRuntimeInfo, type Role, type UserInfo } from "@craftpanel/shared";
+import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, ROLE_LABELS, type JavaRuntimeInfo } from "@craftpanel/shared";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth, useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
@@ -35,6 +30,8 @@ import { formatDateTime } from "@/lib/format";
 import { useSystem } from "./home";
 import { RemoteAccess } from "./remote-access";
 import { UpdateSection } from "./updates";
+import { SessionsSection, TwoFactorSection } from "./account-security";
+import { UsersAdmin } from "./users-admin";
 
 export function SettingsView() {
   const params = useSearchParams();
@@ -57,7 +54,7 @@ export function SettingsView() {
         <TabsContent value="account">
           <Account />
         </TabsContent>
-        <TabsContent value="users">{canOwner && <Users />}</TabsContent>
+        <TabsContent value="users">{canOwner && <UsersAdmin />}</TabsContent>
         <TabsContent value="backups">{canOwner && <BackupSettings />}</TabsContent>
         <TabsContent value="access">{canOwner && <RemoteAccess />}</TabsContent>
         <TabsContent value="network">{canOwner && <DdnsSettings />}</TabsContent>
@@ -82,7 +79,7 @@ function Account() {
     onSuccess: () => (setCur(""), setNext("")),
   });
   return (
-    <div className="max-w-md space-y-6">
+    <div className="max-w-2xl space-y-6">
       <Section title="Your account">
         <p className="text-[13px]">
           Signed in as <span className="font-medium">{state?.user?.username}</span> · {state?.user && ROLE_LABELS[state.user.role]}
@@ -99,118 +96,9 @@ function Account() {
           Change password
         </Button>
       </Section>
+      <TwoFactorSection />
+      <SessionsSection />
     </div>
-  );
-}
-
-function Users() {
-  const q = useQuery({ queryKey: ["users"], queryFn: () => api.get<UserInfo[]>("/api/users") });
-  const { state } = useAuth();
-  const [creating, setCreating] = React.useState(false);
-  const [deleting, setDeleting] = React.useState<UserInfo | null>(null);
-  const update = useAction((v: { id: string; role?: Role; disabled?: boolean }) => api.patch(`/api/users/${v.id}`, { role: v.role, disabled: v.disabled }), { success: "User updated", invalidate: [["users"]] });
-  const del = useAction((id: string) => api.del(`/api/users/${id}`), { success: "User deleted", invalidate: [["users"]] });
-  return (
-    <div className="space-y-6">
-      <Section
-        title="Dashboard users"
-        description="Roles control access to CraftPanel. They are unrelated to Minecraft operator status."
-        actions={
-          <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus /> Add user
-          </Button>
-        }
-      >
-        {q.isLoading ? (
-          <Skeleton className="h-32 rounded-xl" />
-        ) : (
-          <Panel>
-            <ul className="divide-y divide-border">
-              {q.data?.map((u) => (
-                <li key={u.id} className="flex flex-wrap items-center gap-4 px-4 py-3 text-[13px]">
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 font-medium">
-                      {u.username}
-                      {u.id === state?.user?.id && <Badge>You</Badge>}
-                      {u.disabled && <Badge variant="danger">Disabled</Badge>}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Created {formatDateTime(u.createdAt)}</p>
-                  </div>
-                  <NativeSelect value={u.role} onChange={(e) => update.mutate({ id: u.id, role: e.target.value as Role })} disabled={u.id === state?.user?.id} className="h-8 w-40 text-[13px]" aria-label={`Role of ${u.username}`}>
-                    {[...ROLES].reverse().map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABELS[r]}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                  {u.id !== state?.user?.id && (
-                    <>
-                      <Button size="xs" variant="ghost" onClick={() => update.mutate({ id: u.id, disabled: !u.disabled })}>
-                        {u.disabled ? "Enable" : "Disable"}
-                      </Button>
-                      <Button size="icon-sm" variant="destructive-ghost" onClick={() => setDeleting(u)} aria-label={`Delete ${u.username}`}>
-                        <Trash2 />
-                      </Button>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        )}
-      </Section>
-      <Section title="Roles">
-        <dl className="grid gap-3 text-[13px] sm:grid-cols-2">
-          {[...ROLES].reverse().map((r) => (
-            <div key={r} className="rounded-lg border border-border p-3">
-              <dt className="font-medium">{ROLE_LABELS[r]}</dt>
-              <dd className="text-muted-foreground">{ROLE_DESCRIPTIONS[r]}</dd>
-            </div>
-          ))}
-        </dl>
-      </Section>
-      <CreateUser open={creating} onOpenChange={setCreating} />
-      <ConfirmDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)} title={`Delete ${deleting?.username}?`} description="Their sessions end immediately." destructive confirmLabel="Delete user" onConfirm={() => del.mutateAsync(deleting!.id)} />
-    </div>
-  );
-}
-
-function CreateUser({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const [f, setF] = React.useState({ username: "", password: "", role: "viewer" as Role });
-  const create = useAction(() => api.post("/api/users", f), {
-    success: "User created",
-    invalidate: [["users"]],
-    onSuccess: () => (onOpenChange(false), setF({ username: "", password: "", role: "viewer" })),
-  });
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader title="Add user" description="Share the credentials with the person securely. They can change their password after signing in." />
-        <Field label="Username" htmlFor="nu">
-          <Input id="nu" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} autoComplete="off" />
-        </Field>
-        <Field label="Initial password" htmlFor="np" help="At least 10 characters.">
-          <Input id="np" type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} autoComplete="new-password" />
-        </Field>
-        <Field label="Role" htmlFor="nr" help={ROLE_DESCRIPTIONS[f.role]}>
-          <NativeSelect id="nr" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as Role })}>
-            {[...ROLES].reverse().map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABELS[r]}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={() => create.mutate()} loading={create.isPending} disabled={f.username.length < 3 || f.password.length < 10}>
-            Create user
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

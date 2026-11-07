@@ -10,15 +10,15 @@ import { getProvider, log4shellMitigation, PROVIDERS } from "@craftpanel/minecra
 import { SETTING_GROUPS, SETTINGS } from "@craftpanel/config";
 import { freeDiskSpace } from "@craftpanel/server-runtime";
 import { dashboardUrls, isClientAllowed, lanAddresses, parseNetwork } from "@craftpanel/network";
-import { actorOf, noContent, requirePermission, requireUser, type AppContext } from "../context";
+import { actorOf, canSee, noContent, requirePermission, requireUser, visibleServerIds, type AppContext } from "../context";
 import { parse } from "../validate";
 
 export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
   // ---- backups ------------------------------------------------------------------
 
   app.get<{ Querystring: { serverId?: string } }>("/api/backups", async (req) => {
-    requirePermission(req, "server.view");
-    return ctx.backups.list(req.query.serverId);
+    const me = requirePermission(req, "server.view", req.query.serverId || undefined);
+    return (await ctx.backups.list(req.query.serverId)).filter((b) => canSee(me, b.serverId));
   });
   app.post<{ Params: { id: string } }>("/api/servers/:id/backups", async (req, reply) => {
     requirePermission(req, "backup.create");
@@ -29,22 +29,22 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
     return reply.code(202).send({ ok: true });
   });
   app.post<{ Params: { id: string } }>("/api/backups/:id/verify", async (req) => {
-    requirePermission(req, "backup.create");
+    requirePermission(req, "backup.create", (await ctx.backups.get(req.params.id)).serverId);
     return ctx.backups.verify(req.params.id);
   });
   app.post<{ Params: { id: string } }>("/api/backups/:id/restore", async (req, reply) => {
-    requirePermission(req, "backup.restore");
+    requirePermission(req, "backup.restore", (await ctx.backups.get(req.params.id)).serverId);
     await ctx.backups.restore(req.params.id, actorOf(req));
     return noContent(reply);
   });
   app.delete<{ Params: { id: string } }>("/api/backups/:id", async (req, reply) => {
-    requirePermission(req, "backup.delete");
+    requirePermission(req, "backup.delete", (await ctx.backups.get(req.params.id)).serverId);
     await ctx.backups.remove(req.params.id, actorOf(req));
     return noContent(reply);
   });
   app.get<{ Params: { id: string } }>("/api/backups/:id/download", async (req, reply) => {
-    requirePermission(req, "backup.restore");
     const row = await ctx.backups.get(req.params.id);
+    requirePermission(req, "backup.restore", row.serverId);
     if (row.status !== "completed") throw badRequest("Backup is not complete");
     const file = await ctx.backups.filePath(row);
     const st = await fsp.stat(file);
@@ -55,29 +55,33 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
   // ---- schedules ------------------------------------------------------------------
 
   app.get<{ Querystring: { serverId?: string } }>("/api/schedules", async (req) => {
-    requirePermission(req, "server.view");
-    return ctx.schedules.list(req.query.serverId);
+    const me = requirePermission(req, "server.view", req.query.serverId || undefined);
+    return (await ctx.schedules.list(req.query.serverId)).filter((x) => canSee(me, x.serverId));
   });
   app.post("/api/schedules", async (req) => {
-    requirePermission(req, "schedule.manage");
-    return ctx.schedules.create(parse(scheduleSchema, req.body), actorOf(req));
+    const input = parse(scheduleSchema, req.body);
+    requirePermission(req, "schedule.manage", input.serverId ?? null);
+    return ctx.schedules.create(input, actorOf(req));
   });
   app.put<{ Params: { id: string } }>("/api/schedules/:id", async (req) => {
-    requirePermission(req, "schedule.manage");
-    return ctx.schedules.update(req.params.id, parse(scheduleSchema, req.body), actorOf(req));
+    const input = parse(scheduleSchema, req.body);
+    // Both the schedule's current server and the one it moves to must be manageable.
+    requirePermission(req, "schedule.manage", await ctx.schedules.serverIdOf(req.params.id));
+    requirePermission(req, "schedule.manage", input.serverId ?? null);
+    return ctx.schedules.update(req.params.id, input, actorOf(req));
   });
   app.delete<{ Params: { id: string } }>("/api/schedules/:id", async (req, reply) => {
-    requirePermission(req, "schedule.manage");
+    requirePermission(req, "schedule.manage", await ctx.schedules.serverIdOf(req.params.id));
     await ctx.schedules.remove(req.params.id, actorOf(req));
     return noContent(reply);
   });
   app.post<{ Params: { id: string } }>("/api/schedules/:id/run", async (req, reply) => {
-    requirePermission(req, "schedule.manage");
+    requirePermission(req, "schedule.manage", await ctx.schedules.serverIdOf(req.params.id));
     ctx.schedules.runNow(req.params.id, actorOf(req)).catch(() => undefined);
     return reply.code(202).send({ ok: true });
   });
   app.get<{ Params: { id: string } }>("/api/schedules/:id/runs", async (req) => {
-    requirePermission(req, "server.view");
+    requirePermission(req, "server.view", await ctx.schedules.serverIdOf(req.params.id));
     return ctx.schedules.runs(req.params.id);
   });
   app.get<{ Querystring: { cron?: string } }>("/api/schedules/preview", async (req) => {
@@ -129,9 +133,9 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
   // ---- system / host --------------------------------------------------------------
 
   app.get("/api/system", async (req) => {
-    requireUser(req);
+    const me = requireUser(req);
     const disk = await freeDiskSpace(ctx.config.layout.root);
-    const rows = await ctx.servers.rows();
+    const rows = (await ctx.servers.rows()).filter((r) => canSee(me, r.id));
     const running = rows.filter((r) => ctx.agent.isRunning(r.id));
     return {
       version: CRAFTPANEL_VERSION,
@@ -218,8 +222,13 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
   // ---- activity & audit -----------------------------------------------------------------
 
   app.get<{ Querystring: { serverId?: string; limit?: string; before?: string } }>("/api/activity", async (req) => {
-    requirePermission(req, "server.view");
-    return ctx.activity.list({ serverId: req.query.serverId, limit: Number(req.query.limit ?? 100), before: req.query.before ? Number(req.query.before) : undefined });
+    const me = requirePermission(req, "server.view", req.query.serverId || undefined);
+    return ctx.activity.list({
+      serverId: req.query.serverId,
+      onlyServers: visibleServerIds(me),
+      limit: Number(req.query.limit ?? 100),
+      before: req.query.before ? Number(req.query.before) : undefined,
+    });
   });
   app.get("/api/audit", async (req) => {
     requirePermission(req, "audit.view");
