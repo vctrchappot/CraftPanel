@@ -12,30 +12,57 @@ export const INFO_PACK_DIR = "craftpanel-info";
 export const INFO_TRIGGER = "craftpanel";
 const MARKER = ".craftpanel-managed";
 
+/** What the info card says about the server it runs on. */
+export interface InfoPackDetails {
+  software: string;
+  mcVersion: string;
+}
+
+const SOFTWARE_LABEL: Record<string, string> = { vanilla: "Vanilla", paper: "Paper" };
+
 function text(t: string, extra: Record<string, unknown> = {}) {
   return { text: t, ...extra };
 }
 
-function link(label: string, url: string) {
-  // Both spellings: `click_event`/`url` (1.21.5+) and `clickEvent`/`value` (older); each version ignores the other.
+function hover(label: string) {
+  // Both spellings: `hover_event`/`value` (1.21.5+) and `hoverEvent`/`contents` (older); each version ignores the other.
+  return { hover_event: { action: "show_text", value: label }, hoverEvent: { action: "show_text", contents: label } };
+}
+
+function link(label: string, url: string, tip: string) {
   return text(label, {
     color: "aqua",
-    underlined: true,
+    bold: true,
     click_event: { action: "open_url", url },
     clickEvent: { action: "open_url", value: url },
+    ...hover(tip),
   });
 }
 
-function infoFunction(): string {
+const rule = (width: number) => text(" ".repeat(width), { color: "dark_gray", strikethrough: true });
+const bullet = (label: string, value: unknown[]) => ["", text(" » ", { color: "gold" }), text(label, { color: "gray" }), ...value];
+
+function infoFunction(details: InfoPackDetails): string {
+  const software = `${SOFTWARE_LABEL[details.software] ?? details.software} ${details.mcVersion}`;
   const lines: unknown[] = [
-    ["", text("CraftPanel", { color: "gold", bold: true }), text(` v${CRAFTPANEL_VERSION}`, { color: "gray" })],
-    text("This server is managed with CraftPanel, a free and open-source dashboard for running Minecraft servers on your own PC, Raspberry Pi or VPS.", { color: "white" }),
-    ["", text("Get it: ", { color: "gray" }), link(CRAFTPANEL_REPO_URL.replace(/^https:\/\//, ""), CRAFTPANEL_REPO_URL)],
+    ["", rule(14), text(" ✦ ", { color: "gold" }), text("CraftPanel", { color: "gold", bold: true }), text(" ✦ ", { color: "gold" }), rule(14)],
+    ["", text("Hey ", { color: "white" }), { selector: "@s", color: "yellow" }, text("! This server is powered by ", { color: "white" }), text("CraftPanel", { color: "gold" }), text(` v${CRAFTPANEL_VERSION}`, { color: "dark_gray" })],
+    bullet("Running ", [text(software, { color: "green" })]),
+    bullet("Self-hosted on a ", [text("PC", { color: "aqua" }), text(", ", { color: "gray" }), text("Raspberry Pi", { color: "light_purple" }), text(" or ", { color: "gray" }), text("VPS", { color: "aqua" })]),
+    bullet("One-click servers, live console, backups & plugins", []),
+    bullet("Free & open source ", [text("(AGPL-3.0)", { color: "dark_gray" })]),
+    ["", text(" "), link("[ Get CraftPanel ]", CRAFTPANEL_REPO_URL, "Open the project page"), text("  Made with ", { color: "gray" }), text("❤", { color: "red" }), text(" by vctrchappot", { color: "gray" })],
+    ["", rule(42)],
   ];
-  return [...lines.map((l) => `tellraw @s ${JSON.stringify(l)}`), `scoreboard players set @s ${INFO_TRIGGER} 0`, ""].join("\n");
+  return [
+    ...lines.map((l) => `tellraw @s ${JSON.stringify(l)}`),
+    `playsound minecraft:entity.experience_orb.pickup master @s ~ ~ ~ 0.6 1.4`,
+    `scoreboard players set @s ${INFO_TRIGGER} 0`,
+    "",
+  ].join("\n");
 }
 
-function packFiles(): Record<string, string> {
+function packFiles(details: InfoPackDetails): Record<string, string> {
   const load = [`scoreboard objectives add ${INFO_TRIGGER} trigger`, `schedule function craftpanel:poll 10t replace`, ""].join("\n");
   // Re-enable the trigger for everyone (triggers lock after each use) and answer pending requests.
   const poll = [
@@ -44,7 +71,7 @@ function packFiles(): Record<string, string> {
     `schedule function craftpanel:poll 10t replace`,
     "",
   ].join("\n");
-  const functions = { "load.mcfunction": load, "poll.mcfunction": poll, "info.mcfunction": infoFunction() };
+  const functions = { "load.mcfunction": load, "poll.mcfunction": poll, "info.mcfunction": infoFunction(details) };
   const loadTag = JSON.stringify({ values: ["craftpanel:load"] });
 
   const files: Record<string, string> = {
@@ -82,7 +109,7 @@ async function levelName(serverDir: string): Promise<string> {
 }
 
 /** Install, update or remove the info datapack in the server's active world. Returns true if anything changed. */
-export async function syncInfoPack(serverDir: string, enabled: boolean): Promise<boolean> {
+export async function syncInfoPack(serverDir: string, enabled: boolean, details: InfoPackDetails): Promise<boolean> {
   const level = await levelName(serverDir);
   // level-name may point anywhere; only touch a world directory inside the server directory.
   const worldDir = path.resolve(serverDir, level);
@@ -100,7 +127,7 @@ export async function syncInfoPack(serverDir: string, enabled: boolean): Promise
   }
 
   let changed = false;
-  for (const [rel, body] of Object.entries(packFiles())) {
+  for (const [rel, body] of Object.entries(packFiles(details))) {
     const file = path.join(packDir, rel);
     const current = await fsp.readFile(file, "utf8").catch(() => null);
     if (current === body) continue;

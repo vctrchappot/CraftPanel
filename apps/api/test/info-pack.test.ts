@@ -13,12 +13,13 @@ afterEach(async () => {
 });
 
 const pack = (world = "world") => path.join(dir, world, "datapacks", INFO_PACK_DIR);
+const D = { software: "paper", mcVersion: "1.21.11" };
 const exists = (p: string) => fsp.access(p).then(() => true, () => false);
 
 describe("info datapack", () => {
   it("installs into the active world with both function folder layouts", async () => {
     await fsp.writeFile(path.join(dir, "server.properties"), "level-name=survival\n");
-    expect(await syncInfoPack(dir, true)).toBe(true);
+    expect(await syncInfoPack(dir, true, D)).toBe(true);
     const p = pack("survival");
     const mcmeta = JSON.parse(await fsp.readFile(path.join(p, "pack.mcmeta"), "utf8"));
     expect(mcmeta.pack.min_format).toBeLessThanOrEqual(mcmeta.pack.pack_format);
@@ -30,24 +31,25 @@ describe("info datapack", () => {
     // Every tellraw argument must be valid JSON on a single line.
     for (const line of info.split("\n").filter((l) => l.startsWith("tellraw @s "))) expect(() => JSON.parse(line.slice("tellraw @s ".length))).not.toThrow();
     expect(info).toContain("scoreboard players set @s craftpanel 0");
+    expect(info).toContain("Paper 1.21.11");
   });
 
   it("is idempotent and removes only its own pack when disabled", async () => {
-    await syncInfoPack(dir, true);
-    expect(await syncInfoPack(dir, true)).toBe(false);
-    expect(await syncInfoPack(dir, false)).toBe(true);
+    await syncInfoPack(dir, true, D);
+    expect(await syncInfoPack(dir, true, D)).toBe(false);
+    expect(await syncInfoPack(dir, false, D)).toBe(true);
     expect(await exists(pack())).toBe(false);
 
     // A user's folder with the same name (no marker) is left alone.
     await fsp.mkdir(pack(), { recursive: true });
     await fsp.writeFile(path.join(pack(), "pack.mcmeta"), "{}");
-    expect(await syncInfoPack(dir, false)).toBe(false);
+    expect(await syncInfoPack(dir, false, D)).toBe(false);
     expect(await exists(path.join(pack(), "pack.mcmeta"))).toBe(true);
   });
 
   it("never writes outside the server directory", async () => {
     await fsp.writeFile(path.join(dir, "server.properties"), "level-name=../escaped\n");
-    expect(await syncInfoPack(dir, true)).toBe(false);
+    expect(await syncInfoPack(dir, true, D)).toBe(false);
     expect(await exists(path.join(dir, "..", "escaped"))).toBe(false);
   });
 });

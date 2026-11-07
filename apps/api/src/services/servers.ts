@@ -312,7 +312,7 @@ export class ServerService {
       await this.syncManagedProperties(row);
       await this.writeEula(row.directory, actor).catch(() => undefined);
       const { infoCommand } = await this.settings.get();
-      await syncInfoPack(row.directory, infoCommand).catch((err) => this.activity.event(id, "server.info_pack_failed", `Could not update the CraftPanel info datapack: ${(err as Error).message}`, { level: "warn" }));
+      await syncInfoPack(row.directory, infoCommand, { software: row.software, mcVersion: row.mcVersion }).catch((err) => this.activity.event(id, "server.info_pack_failed", `Could not update the CraftPanel info datapack: ${(err as Error).message}`, { level: "warn" }));
       const javaPath = await this.ensureJava(row.javaMajor, row.javaPath);
       if (javaPath !== row.javaPath) await this.db.update(servers).set({ javaPath }).where(eq(servers.id, id));
 
