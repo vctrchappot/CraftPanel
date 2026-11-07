@@ -1,5 +1,7 @@
 # CraftPanel
 
+[![CI](https://github.com/vctrchappot/CraftPanel/actions/workflows/ci.yml/badge.svg)](https://github.com/vctrchappot/CraftPanel/actions/workflows/ci.yml)
+
 **Self-hosted Minecraft server management.** Install CraftPanel on your PC, a spare computer, a Raspberry Pi or a VPS, open the dashboard in a browser, and create, run and manage real Minecraft Java servers. No accounts, no subscriptions, no cloud.
 
 - Creates **Vanilla** and **Paper** servers for any published version, downloaded from Mojang and PaperMC and checksum-verified.

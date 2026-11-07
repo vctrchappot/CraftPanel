@@ -2,7 +2,7 @@
 
 Legend: ✅ verified against real Minecraft servers / real services · 🧪 covered by automated tests (unit/integration, fake process) · 🟡 implemented, not yet verified end-to-end · ⏳ planned.
 
-Verification environments so far: **Windows 11 x64, Node 26** and **Linux x64 (Ubuntu 24.04 under WSL 2 with systemd), Node 24**. macOS and Raspberry Pi (arm64) use the same code paths (no native add-ons) but have **not yet been run**.
+Verification environments so far: **Windows 11 x64, Node 26** and **Linux x64 (Ubuntu 24.04 under WSL 2 with systemd), Node 24**. **GitHub Actions CI** runs on every push: typecheck, unit/integration tests and a production build on Linux, Windows and macOS; the full browser flow with a real Minecraft server on Linux **x64 and ARM64** (the same architecture as a Raspberry Pi 4/5); and the Linux installer with its update path on a systemd host. A physical Raspberry Pi and a manual macOS run are still pending.
 
 Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-running the installer (graceful world save on restart), Paper 1.21.11 and Vanilla 26.3 with automatically downloaded Linux Java 21/25, a real player connection from another machine (mineflayer bot via the network), kick/ban/pardon/whitelist, the in-game info command, the remote-access policy over the network, and the dashboard in a browser (console auto-scroll, dark-mode dropdowns).
 
@@ -48,7 +48,7 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 
 **Players**: ✅ online list, whitelist (live and offline; non-whitelisted player rejected), ops, kick/ban/pardon with reasons (verified with a connected client), IP bans 🟡, session history ✅, Mojang UUID lookup ✅.
 
-**In-game info command**: ✅ `/trigger craftpanel` datapack, enabled by default and removable in Settings. Verified with a player on Paper 1.21.11 (colors, click/hover link, sound) and loaded without errors on Vanilla 26.3 (no client for 26.3 available).
+**In-game info command**: ✅ `/craftpanel` on Paper via a bundled 2 KB plugin (verified with a player; disabling it in the Plugins tab is remembered), ✅ `/trigger craftpanel` datapack, enabled by default and removable in Settings. Verified with a player on Paper 1.21.11 (colors, click/hover link, sound) and loaded without errors on Vanilla 26.3 (no client for 26.3 available).
 
 **Plugins**: ✅ Modrinth search with compatibility badges and verified install (LuckPerms loaded on Paper 1.21.11), ✅ enable/disable/remove/upload paths 🟡 in UI, 🟡 update check (Modrinth hash API), ✅ executable-code warnings.
 
@@ -64,7 +64,7 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 
 **Security**: 🧪 scrypt hashing, sessions, CSRF, Origin checks (HTTP and WS ✅), RBAC matrix for all four roles, rate limiting, setup token for network-exposed installs, audit log.
 
-**Deployment**: ✅ single-folder production bundle runs without `node_modules`, ✅ `pnpm dev`, ✅ `deploy/install-linux.sh` and the systemd unit (install and update), ✅ readable service logs, 🟡 macOS, 🟡 Raspberry Pi (arm64).
+**Deployment**: ✅ single-folder production bundle runs without `node_modules`, ✅ `pnpm dev`, ✅ `deploy/install-linux.sh` and the systemd unit (install and update), ✅ readable service logs, ✅ one-command update (`update.cmd` / `./update.sh`, tested from a diverged old copy on Windows and on a Linux service install), ✅ ARM64 and macOS in CI, 🟡 physical Raspberry Pi.
 
 ## Known limitations
 
