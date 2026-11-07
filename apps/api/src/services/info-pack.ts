@@ -1,12 +1,17 @@
+import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { readZipEntry } from "@craftpanel/backup";
 import { PropertiesDocument } from "@craftpanel/config";
 import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, CRAFTPANEL_VERSION } from "@craftpanel/shared";
 
 /**
- * A tiny datapack that adds `/trigger craftpanel` to every managed world: any player
- * (no operator rights needed) gets a short info/credits message about CraftPanel.
- * Datapacks work the same on Vanilla and Paper, so no plugin is required.
+ * In-game info card about CraftPanel, enabled by default and removable globally or per server.
+ *  - A tiny datapack adds `/trigger craftpanel` to every managed world (Vanilla and Paper,
+ *    no operator rights needed). It holds the card itself.
+ *  - On Paper, a ~2 KB plugin (plugins/craftpanel-info) adds the nicer `/craftpanel`, which
+ *    simply runs the datapack's function for the player. Datapacks can't register commands.
  */
 export const INFO_PACK_DIR = "craftpanel-info";
 export const INFO_TRIGGER = "craftpanel";
@@ -146,3 +151,47 @@ export async function syncInfoPack(serverDir: string, enabled: boolean, details:
   }
   return changed;
 }
+
+// ---- Paper plugin: /craftpanel ---------------------------------------------------
+
+export const INFO_PLUGIN_FILE = "CraftPanelInfo.jar";
+const INFO_PLUGIN_MAIN = "site.vctr.craftpanel.CraftPanelInfo";
+
+/** Bundled jar: dist/assets next to the bundle, or apps/api/assets when running from source. */
+function bundledPluginPath(): string | null {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  for (const candidate of [path.join(here, "assets", INFO_PLUGIN_FILE), path.resolve(here, "../../assets", INFO_PLUGIN_FILE)]) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/** True when a plugins/ file is CraftPanel's own info plugin (checked by its main class, not just the name). */
+export async function isInfoPlugin(file: string): Promise<boolean> {
+  const yml = await readZipEntry(file, "plugin.yml").catch(() => null);
+  return !!yml && yml.toString("utf8").includes(`main: ${INFO_PLUGIN_MAIN}`);
+}
+
+/**
+ * Install/update or remove the /craftpanel plugin in a Paper server's plugins/ folder.
+ * A copy the user disabled in the Plugins tab (.jar.disabled) is left alone.
+ */
+export async function syncInfoPlugin(serverDir: string, enabled: boolean, source = bundledPluginPath()): Promise<boolean> {
+  const pluginsDir = path.join(serverDir, "plugins");
+  const target = path.join(pluginsDir, INFO_PLUGIN_FILE);
+  if (!enabled) {
+    if (!(await exists(target)) || !(await isInfoPlugin(target))) return false;
+    await fsp.rm(target);
+    return true;
+  }
+  if (!source || (await exists(`${target}.disabled`))) return false;
+  const wanted = await fsp.readFile(source);
+  const current = await fsp.readFile(target).catch(() => null);
+  if (current && Buffer.compare(current, wanted) === 0) return false;
+  if (current && !(await isInfoPlugin(target))) return false; // someone else's jar with the same name
+  await fsp.mkdir(pluginsDir, { recursive: true });
+  await fsp.writeFile(target, wanted);
+  return true;
+}
+
+const exists = (p: string) => fsp.access(p).then(() => true, () => false);

@@ -51,6 +51,8 @@ export const servers = sqliteTable("servers", {
   eulaAccepted: integer("eula_accepted", { mode: "boolean" }).notNull().default(false),
   eulaAcceptedAt: integer("eula_accepted_at"),
   autoStart: integer("auto_start", { mode: "boolean" }).notNull().default(false),
+  /** In-game info command (/craftpanel, /trigger craftpanel): null follows the global setting. */
+  infoCommand: integer("info_command", { mode: "boolean" }),
   installState: text("install_state", { enum: ["pending", "installing", "installed", "failed"] }).notNull().default("pending"),
   installError: text("install_error"),
   /** Last observed lifecycle state, persisted for startup recovery. */

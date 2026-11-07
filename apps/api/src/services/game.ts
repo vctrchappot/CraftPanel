@@ -16,6 +16,7 @@ import {
 } from "@craftpanel/minecraft-providers";
 import type { AppConfig } from "../config";
 import type { ActivityService, Actor } from "./activity";
+import { INFO_PLUGIN_FILE, isInfoPlugin } from "./info-pack";
 import type { ServerRow, ServerService } from "./servers";
 
 /** UUID Minecraft assigns to players in offline mode (name-based v3). */
@@ -355,6 +356,8 @@ export class GameService {
     const to = path.join(dir, enabled ? base : `${base}.disabled`);
     if (from === to) return;
     await fsp.rename(from, to);
+    // Disabling/enabling CraftPanel's own info plugin is remembered, so it isn't reinstalled on the next start.
+    if (base === INFO_PLUGIN_FILE) await this.servers.update(row.id, { infoCommand: enabled }, actor);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
     await this.activity.audit(actor, enabled ? "plugin.enable" : "plugin.disable", row.id, { file: base });
   }
@@ -362,7 +365,9 @@ export class GameService {
   async removePlugin(row: ServerRow, file: string, actor: Actor) {
     this.requirePaper(row);
     this.safePluginFile(file);
+    const isOwnInfoPlugin = file.replace(/.disabled$/, "") === INFO_PLUGIN_FILE && (await isInfoPlugin(path.join(this.pluginsDir(row), file)));
     await fsp.rm(path.join(this.pluginsDir(row), file));
+    if (isOwnInfoPlugin) await this.servers.update(row.id, { infoCommand: false }, actor);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
     await this.activity.event(row.id, "plugin.removed", `Plugin ${file} removed`, { actor });
     await this.activity.audit(actor, "plugin.remove", row.id, { file });

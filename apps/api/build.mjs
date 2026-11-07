@@ -1,5 +1,5 @@
 // Bundles the API and all workspace packages into dist/index.js, and copies
-// database migrations and the exported web dashboard next to it.
+// database migrations, bundled assets (the info plugin) and the exported web dashboard next to it.
 import { build } from "esbuild";
 import fs from "node:fs";
 import path from "node:path";
@@ -23,6 +23,7 @@ await build({
 });
 
 fs.cpSync(path.resolve(here, "../../packages/database/drizzle"), path.join(dist, "drizzle"), { recursive: true });
+fs.cpSync(path.join(here, "assets"), path.join(dist, "assets"), { recursive: true });
 const web = path.resolve(here, "../web/out");
 if (fs.existsSync(path.join(web, "index.html"))) fs.cpSync(web, path.join(dist, "web"), { recursive: true });
 else console.warn("apps/web/out not found — build the web app first (pnpm build at the repo root does both).");

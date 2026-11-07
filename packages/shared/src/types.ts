@@ -44,6 +44,8 @@ export interface ServerSummary {
 
 export interface ServerDetail extends ServerSummary {
   directory: string;
+  /** In-game info command override: null follows the global setting. */
+  infoCommand: boolean | null;
   javaMajor: number;
   javaPath: string | null;
   jvmArgs: string;

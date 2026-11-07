@@ -1,0 +1,11 @@
+name: CraftPanelInfo
+version: "1.0.0"
+main: site.vctr.craftpanel.CraftPanelInfo
+api-version: "1.13"
+description: Adds /craftpanel, a short info card about CraftPanel. Installed and managed by CraftPanel.
+author: vctrchappot
+website: https://github.com/vctrchappot/CraftPanel
+commands:
+  craftpanel:
+    description: Shows information about CraftPanel, the dashboard that manages this server.
+    usage: /craftpanel

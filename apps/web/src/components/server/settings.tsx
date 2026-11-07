@@ -260,7 +260,7 @@ function GameRuleRow({ rule, disabled, onSave }: { rule: GameRuleInfo; disabled:
 function RuntimeSettings({ server: s }: { server: ServerDetail }) {
   const canEdit = useCan("server.configure");
   const java = useQuery({ queryKey: ["java"], queryFn: () => api.get<{ path: string; major: number; version: string; vendor: string | null; managed: boolean }[]>("/api/java") });
-  const [f, setF] = React.useState({ name: s.name, description: s.description, memoryMb: s.memoryMb, jvmArgs: s.jvmArgs, javaPath: s.javaPath ?? "", autoStart: s.autoStart });
+  const [f, setF] = React.useState({ name: s.name, description: s.description, memoryMb: s.memoryMb, jvmArgs: s.jvmArgs, javaPath: s.javaPath ?? "", autoStart: s.autoStart, infoCommand: s.infoCommand });
   const save = useAction(() => api.patch(`/api/servers/${s.id}`, { ...f, javaPath: f.javaPath || null }), { success: "Saved", invalidate: [["server", s.id], ["servers"]] });
   return (
     <div className="max-w-2xl space-y-6">
@@ -272,6 +272,23 @@ function RuntimeSettings({ server: s }: { server: ServerDetail }) {
           <Input id="rdesc" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} disabled={!canEdit} maxLength={280} />
         </Field>
         <ToggleRow label="Start with CraftPanel" help="Start automatically when CraftPanel starts." checked={f.autoStart} onChange={(v) => setF({ ...f, autoStart: v })} disabled={!canEdit} />
+        <Field
+          label="In-game info command"
+          htmlFor="rinfo"
+          help={`Players see a short card about CraftPanel with ${s.software === "paper" ? "/craftpanel (or /trigger craftpanel)" : "/trigger craftpanel"}. Installed or removed on the next start.`}
+        >
+          <NativeSelect
+            id="rinfo"
+            value={f.infoCommand === null ? "default" : f.infoCommand ? "on" : "off"}
+            onChange={(e) => setF({ ...f, infoCommand: e.target.value === "default" ? null : e.target.value === "on" })}
+            disabled={!canEdit}
+            className="max-w-xs"
+          >
+            <option value="default">Use the global setting</option>
+            <option value="on">On for this server</option>
+            <option value="off">Off for this server</option>
+          </NativeSelect>
+        </Field>
       </Section>
       <Section title="Java & memory" description="Changes apply on the next start.">
         <Field label="Memory" htmlFor="rmem" aside={<span className="text-[13px] font-medium tabular-nums">{(f.memoryMb / 1024).toFixed(1)} GB</span>}>

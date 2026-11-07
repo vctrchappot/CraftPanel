@@ -22,7 +22,7 @@ import type { z } from "zod";
 import type { Hub } from "../hub";
 import type { AppConfig } from "../config";
 import { SYSTEM_ACTOR, type ActivityService, type Actor } from "./activity";
-import { syncInfoPack } from "./info-pack";
+import { syncInfoPack, syncInfoPlugin } from "./info-pack";
 import type { SettingsService } from "./settings";
 
 export type ServerRow = typeof servers.$inferSelect;
@@ -115,6 +115,7 @@ export class ServerService {
     return {
       ...this.summary(row),
       directory: row.directory,
+      infoCommand: row.infoCommand,
       javaMajor: row.javaMajor,
       javaPath: row.javaPath,
       jvmArgs: row.jvmArgs,
@@ -311,8 +312,7 @@ export class ServerService {
 
       await this.syncManagedProperties(row);
       await this.writeEula(row.directory, actor).catch(() => undefined);
-      const { infoCommand } = await this.settings.get();
-      await syncInfoPack(row.directory, infoCommand, { software: row.software, mcVersion: row.mcVersion }).catch((err) => this.activity.event(id, "server.info_pack_failed", `Could not update the CraftPanel info datapack: ${(err as Error).message}`, { level: "warn" }));
+      await this.syncInfoCommand(row);
       const javaPath = await this.ensureJava(row.javaMajor, row.javaPath);
       if (javaPath !== row.javaPath) await this.db.update(servers).set({ javaPath }).where(eq(servers.id, id));
 
@@ -400,7 +400,18 @@ export class ServerService {
 
   // ---- updates & deletion -------------------------------------------------
 
-  async update(id: string, patch: Partial<Pick<ServerRow, "name" | "description" | "memoryMb" | "jvmArgs" | "javaPath" | "autoStart" | "networkMode" | "bindAddress" | "port">>, actor: Actor) {
+  /** Install or remove the in-game info command (datapack everywhere, /craftpanel plugin on Paper). */
+  async syncInfoCommand(row: ServerRow) {
+    const enabled = row.infoCommand ?? (await this.settings.get()).infoCommand;
+    try {
+      await syncInfoPack(row.directory, enabled, { software: row.software, mcVersion: row.mcVersion });
+      await syncInfoPlugin(row.directory, enabled && row.software === "paper");
+    } catch (err) {
+      await this.activity.event(row.id, "server.info_command_failed", `Could not update the CraftPanel info command: ${(err as Error).message}`, { level: "warn" });
+    }
+  }
+
+  async update(id: string, patch: Partial<Pick<ServerRow, "name" | "description" | "memoryMb" | "jvmArgs" | "javaPath" | "autoStart" | "networkMode" | "bindAddress" | "port" | "infoCommand">>, actor: Actor) {
     const row = await this.row(id);
     if (patch.port !== undefined && patch.port !== row.port) {
       const others = (await this.rows()).filter((s) => s.id !== id);

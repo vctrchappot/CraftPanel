@@ -92,6 +92,7 @@ export const updateServerSchema = z.object({
   javaPath: z.string().max(1024).nullable().optional(),
   autoStart: z.boolean().optional(),
   networkMode: z.enum(["lan", "wan"]).optional(),
+  infoCommand: z.boolean().nullable().optional(),
 });
 
 export const commandSchema = z.object({

@@ -390,8 +390,9 @@ function InfoCommandSetting() {
   return (
     <div className="flex items-start justify-between gap-6">
       <p className="text-[13px] text-muted-foreground">
-        Players can type <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">/trigger craftpanel</code> to see a short note that the server runs on CraftPanel, with a link to the
-        project. It is a small datapack (works on Vanilla and Paper, no operator rights needed) that CraftPanel adds to each server's world on start. Turn it off to remove it on the next start.
+        Players can type <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">/craftpanel</code> (Paper) or{" "}
+        <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">/trigger craftpanel</code> (Vanilla and Paper) to see a short card about CraftPanel. CraftPanel adds a small datapack and, on Paper, a 2 KB
+        plugin on each start; no operator rights needed. Turn it off here for all servers, or per server in its Settings tab. Removing or disabling the plugin in a server's Plugins tab also keeps it off.
       </p>
       <Switch checked={q.data.infoCommand} disabled={toggle.isPending} onCheckedChange={(v) => toggle.mutate(v)} aria-label="In-game info command" />
     </div>
