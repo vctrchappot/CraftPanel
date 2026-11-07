@@ -18,7 +18,7 @@
 Requirements: **Node.js 22.13 or newer** (24 LTS recommended), **pnpm** (`corepack enable`, or `npm install -g pnpm` on Node 25+ where corepack is no longer bundled), Git, and an internet connection for downloads. Java is installed automatically.
 
 ```bash
-git clone <this repository> craftpanel
+git clone https://github.com/vctrchappot/CraftPanel.git craftpanel
 cd craftpanel
 corepack enable            # Node 25+: npm install -g pnpm
 pnpm install
@@ -30,12 +30,13 @@ Open **http://127.0.0.1:8080**, create the owner account, and follow the wizard 
 
 ### Running on another machine (second PC, Raspberry Pi, VPS)
 
-By default the dashboard only listens on `127.0.0.1`. To manage CraftPanel from other devices on your network, bind it to the network:
+By default the dashboard only listens on this computer. To manage CraftPanel from other devices, start it with the `lan` profile:
 
 ```bash
-CRAFTPANEL_HOST=0.0.0.0 pnpm start          # Linux / macOS
-$env:CRAFTPANEL_HOST="0.0.0.0"; pnpm start  # Windows PowerShell
+pnpm start:lan
 ```
+
+Which networks may connect (home network, VPN such as Tailscale, specific addresses) is set in **Settings → Remote access**.
 
 When the dashboard is reachable from the network, the first account can only be created with a **one-time setup token**. It is printed in the console on startup and saved as `setup-token.txt` in the data directory. Nobody else on your network can claim the owner account first.
 
@@ -48,6 +49,31 @@ sudo ./deploy/install-linux.sh
 See [docs/deployment](docs/deployment/README.md) for Windows, macOS, Raspberry Pi, VPS and reverse-proxy/HTTPS setups.
 
 > **Do not port-forward the dashboard.** Only the Minecraft game port should be reachable from the internet. Use a VPN (WireGuard, Tailscale) or an HTTPS reverse proxy with care for remote administration.
+
+## Updating
+
+Already have CraftPanel? One command brings it to the newest version:
+
+```bash
+update.cmd        # Windows (in the CraftPanel folder)
+./update.sh       # Linux / macOS / Raspberry Pi
+```
+
+It keeps your local changes and commits, installs dependencies, rebuilds, and on a Linux service install restarts the service. Your servers, worlds, backups and settings live in the data directory and are not touched; database changes are applied automatically on the next start. Restart CraftPanel afterwards if it was running.
+
+<details>
+<summary>Copy from before 7 November 2026 (no update script yet, or <code>git pull</code> fails)</summary>
+
+The published history was reorganised once. Run this one time in the CraftPanel folder, then use the update script from then on:
+
+```bash
+git stash
+git fetch origin
+git reset --hard origin/main
+```
+
+`git stash` keeps any edits you made; nothing in your data directory is affected.
+</details>
 
 ## Configuration
 

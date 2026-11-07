@@ -29,7 +29,13 @@ const fail = (msg, hint) => {
   process.exit(1);
 };
 
-const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+const git = (...args) => {
+  try {
+    return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  } catch (err) {
+    fail(`git ${args[0]} failed: ${String(err.stderr || err.message).trim()}`, "Nothing was deleted. Fix the problem above (or ask for help in a GitHub issue) and run the update again.");
+  }
+};
 const gitOk = (...args) => spawnSync("git", args, { cwd: root, stdio: "ignore" }).status === 0;
 const version = () => {
   try {
@@ -76,6 +82,19 @@ if (dirty) {
 }
 
 // ---- move to the new version ------------------------------------------------------
+// Untracked files where the new version brings a file would block the update: drop identical
+// copies, keep differing ones as <file>.before-update.
+const incoming = new Set(git("ls-tree", "-r", "--name-only", target).split("\n"));
+for (const file of git("ls-files", "--others", "--exclude-standard").split("\n").filter((f) => f && incoming.has(f))) {
+  const abs = path.join(root, file);
+  const same = execFileSync("git", ["hash-object", abs], { cwd: root, encoding: "utf8" }).trim() === git("rev-parse", `${target}:${file}`);
+  if (same) fs.rmSync(abs);
+  else {
+    fs.renameSync(abs, `${abs}.before-update`);
+    info(yellow(`Your file ${file} was kept as ${file}.before-update (the new version brings its own).`));
+  }
+}
+
 if (gitOk("merge-base", "--is-ancestor", "HEAD", target)) {
   git("merge", "--ff-only", "--quiet", target);
 } else {
