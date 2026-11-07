@@ -18,6 +18,9 @@ let serverId: string;
 
 function config(host = "127.0.0.1"): AppConfig {
   return {
+    profile: "local",
+    serveWeb: false,
+    logFormat: "json",
     host,
     port: 0,
     layout: dataLayout(root),

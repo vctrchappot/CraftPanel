@@ -15,8 +15,9 @@ WorkingDirectory=/opt/craftpanel
 ExecStart=/usr/bin/node apps/api/dist/index.js
 Environment=NODE_ENV=production
 Environment=CRAFTPANEL_DATA_DIR=/var/lib/craftpanel
-# Reachable from the LAN; keep it off the public internet.
-Environment=CRAFTPANEL_HOST=0.0.0.0
+# Profile "lan": dashboard reachable from the local network; keep it off the public internet.
+# Use "proxy" behind an HTTPS reverse proxy on this machine, or "local" for SSH-tunnel access.
+Environment=CRAFTPANEL_PROFILE=lan
 Environment=CRAFTPANEL_PORT=8080
 # CraftPanel stops Minecraft servers gracefully on SIGTERM (up to 60 s each).
 KillSignal=SIGTERM
