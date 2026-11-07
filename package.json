@@ -4,6 +4,10 @@
   "private": true,
   "description": "Open-source, self-hosted Minecraft server manager",
   "license": "AGPL-3.0-or-later",
+  "author": "Victor (@vctrchappot) (https://www.vctr.site)",
+  "homepage": "https://github.com/vctrchappot/CraftPanel",
+  "repository": { "type": "git", "url": "https://github.com/vctrchappot/CraftPanel.git" },
+  "bugs": "https://github.com/vctrchappot/CraftPanel/issues",
   "packageManager": "pnpm@12.14.0",
   "engines": { "node": ">=22.13" },
   "scripts": {

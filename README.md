@@ -55,12 +55,17 @@ All settings are environment variables. See [`.env.example`](.env.example).
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `CRAFTPANEL_HOST` | `127.0.0.1` | Dashboard bind address |
+| `CRAFTPANEL_PROFILE` | `local` | Start profile: `local`, `lan`, `proxy` or `headless` (also `pnpm start:<profile>`) |
+| `CRAFTPANEL_HOST` | from profile | Dashboard bind address |
 | `CRAFTPANEL_PORT` | `8080` | Dashboard port |
 | `CRAFTPANEL_DATA_DIR` | platform default | Servers, backups, Java runtimes, database |
 | `CRAFTPANEL_SECURE_COOKIES` | `false` | Set `true` behind HTTPS |
 | `CRAFTPANEL_TRUST_PROXY` | `false` | Set `true` behind a reverse proxy |
+| `CRAFTPANEL_TLS_CERT` / `CRAFTPANEL_TLS_KEY` | — | Serve HTTPS directly with these PEM files |
 | `CRAFTPANEL_SESSION_TTL_HOURS` | `168` | Session lifetime |
+| `CRAFTPANEL_LOG_LEVEL` / `CRAFTPANEL_LOG_FORMAT` | `info` / `pretty` | Logging (`debug` shows every request, `json` for log collectors) |
+
+Who may open the dashboard from other devices is configured live in **Settings → Remote access** (see [docs/deployment](docs/deployment/README.md#remote-access-for-teams)).
 
 ## Development
 
@@ -83,6 +88,11 @@ See [docs/STATUS.md](docs/STATUS.md) for what is implemented, how it was verifie
 
 CraftPanel runs Minecraft servers as **native processes without container isolation**. Plugins are arbitrary code running as the CraftPanel user. Read [docs/security](docs/security/README.md) before exposing anything to a network.
 
+## Author
+
+CraftPanel was created by **Victor** ([@vctrchappot](https://github.com/vctrchappot)) · [www.vctr.site](https://www.vctr.site).
+Issues, ideas and pull requests are welcome on [GitHub](https://github.com/vctrchappot/CraftPanel).
+
 ## License
 
-[AGPL-3.0-or-later](LICENSE). See [docs/development](docs/development/README.md#license) for the reasoning and dependency license notes.
+Copyright © 2026 Victor ([@vctrchappot](https://github.com/vctrchappot)). Licensed under [AGPL-3.0-or-later](LICENSE). See [docs/development](docs/development/README.md#license) for the reasoning and dependency license notes.

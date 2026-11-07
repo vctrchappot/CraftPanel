@@ -27,7 +27,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@craftpanel/ui";
-import { ROLE_DESCRIPTIONS, ROLE_LABELS, ROLES, type JavaRuntimeInfo, type Role, type UserInfo } from "@craftpanel/shared";
+import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, ROLE_DESCRIPTIONS, ROLE_LABELS, ROLES, type JavaRuntimeInfo, type Role, type UserInfo } from "@craftpanel/shared";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth, useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
@@ -430,6 +430,24 @@ function About() {
             </dd>
             <dt className="text-muted-foreground">Data directory</dt>
             <dd className="break-all font-mono text-xs">{s.data.dataDir}</dd>
+            <dt className="text-muted-foreground">Created by</dt>
+            <dd>
+              {CRAFTPANEL_AUTHOR.name} (
+              <a href={CRAFTPANEL_AUTHOR.github} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                @{CRAFTPANEL_AUTHOR.handle}
+              </a>
+              ) ·{" "}
+              <a href={CRAFTPANEL_AUTHOR.website} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                {CRAFTPANEL_AUTHOR.website.replace(/^https:\/\//, "")}
+              </a>
+            </dd>
+            <dt className="text-muted-foreground">Project</dt>
+            <dd>
+              <a href={CRAFTPANEL_REPO_URL} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                {CRAFTPANEL_REPO_URL.replace(/^https:\/\//, "")}
+              </a>{" "}
+              · issues and ideas welcome
+            </dd>
             <dt className="text-muted-foreground">License</dt>
             <dd>AGPL-3.0-or-later. Minecraft is a trademark of Mojang AB; CraftPanel is not affiliated with Mojang or Microsoft.</dd>
           </dl>

@@ -1,7 +1,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { PropertiesDocument } from "@craftpanel/config";
-import { CRAFTPANEL_REPO_URL, CRAFTPANEL_VERSION } from "@craftpanel/shared";
+import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, CRAFTPANEL_VERSION } from "@craftpanel/shared";
 
 /**
  * A tiny datapack that adds `/trigger craftpanel` to every managed world: any player
@@ -29,10 +29,10 @@ function hover(label: string) {
   return { hover_event: { action: "show_text", value: label }, hoverEvent: { action: "show_text", contents: label } };
 }
 
-function link(label: string, url: string, tip: string) {
+function link(label: string, url: string, tip: string, bold = true) {
   return text(label, {
     color: "aqua",
-    bold: true,
+    bold,
     click_event: { action: "open_url", url },
     clickEvent: { action: "open_url", value: url },
     ...hover(tip),
@@ -51,7 +51,16 @@ function infoFunction(details: InfoPackDetails): string {
     bullet("Self-hosted on a ", [text("PC", { color: "aqua" }), text(", ", { color: "gray" }), text("Raspberry Pi", { color: "light_purple" }), text(" or ", { color: "gray" }), text("VPS", { color: "aqua" })]),
     bullet("One-click servers, live console, backups & plugins", []),
     bullet("Free & open source ", [text("(AGPL-3.0)", { color: "dark_gray" })]),
-    ["", text(" "), link("[ Get CraftPanel ]", CRAFTPANEL_REPO_URL, "Open the project page"), text("  Made with ", { color: "gray" }), text("❤", { color: "red" }), text(" by vctrchappot", { color: "gray" })],
+    ["", text(" "), link("[ Get CraftPanel ]", CRAFTPANEL_REPO_URL, "Open the project on GitHub")],
+    [
+      "",
+      text(" Made with ", { color: "gray" }),
+      text("❤", { color: "red" }),
+      text(" by ", { color: "gray" }),
+      link(`${CRAFTPANEL_AUTHOR.name} (@${CRAFTPANEL_AUTHOR.handle})`, CRAFTPANEL_AUTHOR.github, "Developer on GitHub", false),
+      text(" · ", { color: "dark_gray" }),
+      link(CRAFTPANEL_AUTHOR.website.replace(/^https:\/\//, ""), CRAFTPANEL_AUTHOR.website, "Developer's website", false),
+    ],
     ["", rule(42)],
   ];
   return [
