@@ -1,0 +1,161 @@
+"use client";
+
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, Boxes, Cpu, HardDrive, MemoryStick, Plus } from "lucide-react";
+import { Button, EmptyState, PageHeader, Panel, Progress, Section, Skeleton, Stat } from "@craftpanel/ui";
+import type { ActivityEvent } from "@craftpanel/shared";
+import { api } from "@/lib/api";
+import { useCan } from "@/lib/auth";
+import { useServers } from "@/lib/queries";
+import { formatBytes } from "@/lib/format";
+import { StatusBadge } from "./status";
+import { EventList } from "./activity";
+
+export interface SystemInfo {
+  version: string;
+  platform: string;
+  arch: string;
+  hostname: string;
+  cpus: number;
+  cpuModel: string | null;
+  loadAverage: number[] | null;
+  memory: { total: number; free: number };
+  allocatedMemoryMb: number;
+  disk: { free: number; total: number } | null;
+  dataDir: string;
+  dashboard: { host: string; port: number; loopbackOnly: boolean; secureCookies: boolean };
+  lan: string[];
+  servers: { total: number; running: number };
+}
+
+export function useSystem() {
+  return useQuery({ queryKey: ["system"], queryFn: () => api.get<SystemInfo>("/api/system"), refetchInterval: 30_000 });
+}
+
+export function HomeView() {
+  const servers = useServers();
+  const system = useSystem();
+  const activity = useQuery({ queryKey: ["activity", "home"], queryFn: () => api.get<ActivityEvent[]>("/api/activity?limit=8") });
+  const canCreate = useCan("server.create");
+  const s = system.data;
+  const memUsed = s ? s.memory.total - s.memory.free : 0;
+
+  return (
+    <div className="space-y-10">
+      <PageHeader
+        title="Overview"
+        description={s ? `${s.hostname} · ${s.platform}/${s.arch} · CraftPanel ${s.version}` : " "}
+        actions={
+          canCreate && (
+            <Button asChild>
+              <Link href="/servers/new/">
+                <Plus /> New server
+              </Link>
+            </Button>
+          )
+        }
+      />
+
+      <Panel className="grid grid-cols-2 divide-border lg:grid-cols-4 lg:divide-x">
+        <div className="p-5">
+          <Stat label="Servers" value={s ? `${s.servers.running} / ${s.servers.total}` : <Skeleton className="h-7 w-16" />} sub="running / total" />
+        </div>
+        <div className="p-5">
+          <Stat label="Host memory" value={s ? formatBytes(memUsed) : <Skeleton className="h-7 w-20" />} sub={s ? `of ${formatBytes(s.memory.total)} · ${(s.allocatedMemoryMb / 1024).toFixed(1)} GB allocated to servers` : undefined} />
+          {s && <Progress value={(memUsed / s.memory.total) * 100} className="mt-3" />}
+        </div>
+        <div className="p-5">
+          <Stat label="Disk free" value={s?.disk ? formatBytes(s.disk.free) : s ? "—" : <Skeleton className="h-7 w-20" />} sub={s?.disk ? `of ${formatBytes(s.disk.total)}` : "Unavailable on this platform"} />
+          {s?.disk && <Progress value={((s.disk.total - s.disk.free) / s.disk.total) * 100} className="mt-3" />}
+        </div>
+        <div className="p-5">
+          <Stat label="CPU" value={s ? `${s.cpus} cores` : <Skeleton className="h-7 w-16" />} sub={s?.loadAverage ? `load ${s.loadAverage.map((l) => l.toFixed(2)).join(" ")}` : (s?.cpuModel ?? undefined)} />
+        </div>
+      </Panel>
+
+      <Section title="Servers" actions={<Link href="/servers/" className="flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground">All servers <ArrowRight className="size-3.5" /></Link>}>
+        {servers.isLoading ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}</div>
+        ) : servers.data?.length ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {servers.data.map((srv) => (
+              <Link key={srv.id} href={`/server/?id=${srv.id}`} className="group rounded-xl border border-border bg-surface p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{srv.name}</p>
+                    <p className="mt-0.5 text-[13px] text-muted-foreground">
+                      {srv.software === "paper" ? "Paper" : "Vanilla"} {srv.mcVersion}
+                      {srv.build ? ` · #${srv.build}` : ""}
+                    </p>
+                  </div>
+                  <StatusBadge status={srv.status} />
+                </div>
+                <div className="mt-6 grid grid-cols-3 gap-2 text-[13px]">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Players</p>
+                    <p className="font-medium tabular-nums">{srv.status === "running" ? `${srv.playersOnline}/${srv.maxPlayers}` : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Port</p>
+                    <p className="font-medium tabular-nums">{srv.port}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Memory</p>
+                    <p className="font-medium tabular-nums">{(srv.memoryMb / 1024).toFixed(1)} GB</p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<Boxes />}
+            title="No servers yet"
+            description="Create your first Minecraft server. CraftPanel downloads the official server software and a compatible Java runtime for you."
+            action={
+              canCreate && (
+                <Button asChild>
+                  <Link href="/servers/new/">
+                    <Plus /> Create server
+                  </Link>
+                </Button>
+              )
+            }
+          />
+        )}
+      </Section>
+
+      <div className="grid gap-10 lg:grid-cols-3">
+        <Section title="Recent activity" className="lg:col-span-2" actions={<Link href="/activity/" className="flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground">View all <ArrowRight className="size-3.5" /></Link>}>
+          <Panel>{activity.data ? <EventList events={activity.data} showServer /> : <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-8" />)}</div>}</Panel>
+        </Section>
+        <Section title="This host">
+          <Panel className="divide-y divide-border text-[13px]">
+            {[
+              [<Cpu key="c" />, "Processor", s?.cpuModel ?? "—"],
+              [<MemoryStick key="m" />, "Memory", s ? formatBytes(s.memory.total) : "—"],
+              [<HardDrive key="d" />, "Data directory", s?.dataDir ?? "—"],
+            ].map(([icon, label, value]) => (
+              <div key={label as string} className="flex items-start gap-3 p-4 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground">
+                {icon}
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="break-all">{value}</p>
+                </div>
+              </div>
+            ))}
+            {s && (
+              <div className="p-4">
+                <p className="text-xs text-muted-foreground">Dashboard access</p>
+                <p>{s.dashboard.loopbackOnly ? "This computer only (127.0.0.1)" : `Network: ${s.dashboard.host}:${s.dashboard.port}`}</p>
+                {!s.dashboard.loopbackOnly && !s.dashboard.secureCookies && <p className="mt-1 text-xs text-warning">Served over plain HTTP. Use a private network or put HTTPS in front.</p>}
+              </div>
+            )}
+          </Panel>
+          {servers.data?.some((x) => x.status === "crashed") && <p className="text-xs text-destructive">One or more servers crashed. Open the server to see the reason in its console.</p>}
+        </Section>
+      </div>
+    </div>
+  );
+}

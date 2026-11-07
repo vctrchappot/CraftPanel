@@ -1,0 +1,94 @@
+import fs from "node:fs";
+import path from "node:path";
+import Fastify, { type FastifyInstance } from "fastify";
+import cookie from "@fastify/cookie";
+import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
+import multipart from "@fastify/multipart";
+import websocket from "@fastify/websocket";
+import fastifyStatic from "@fastify/static";
+import { AppError } from "@craftpanel/shared";
+import { PathError } from "@craftpanel/backup";
+import { SESSION_COOKIE, safeEqual } from "./auth/sessions";
+import type { AppContext } from "./context";
+import { authRoutes } from "./routes/auth";
+import { serverRoutes } from "./routes/servers";
+import { fileRoutes } from "./routes/files";
+import { systemRoutes } from "./routes/system";
+import { wsRoutes, isAllowedOrigin } from "./routes/ws";
+
+const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const CSRF_EXEMPT = new Set(["/api/auth/login", "/api/auth/setup"]);
+
+export async function buildApp(ctx: AppContext, opts: { logger?: boolean | object } = {}): Promise<FastifyInstance> {
+  const app = Fastify({
+    logger: opts.logger ?? { level: ctx.config.logLevel },
+    trustProxy: ctx.config.trustProxy,
+    bodyLimit: 6 * 1024 * 1024,
+  });
+
+  await app.register(cookie);
+  if (ctx.config.corsOrigins.length) await app.register(cors, { origin: ctx.config.corsOrigins, credentials: true });
+  await app.register(rateLimit, { max: 600, timeWindow: "1 minute" });
+  await app.register(multipart);
+  await app.register(websocket, { options: { maxPayload: 64 * 1024 } });
+
+  app.decorateRequest("user", null);
+
+  app.addHook("onRequest", async (req, reply) => {
+    reply.header("X-Content-Type-Options", "nosniff");
+    reply.header("X-Frame-Options", "DENY");
+    reply.header("Referrer-Policy", "same-origin");
+    if (!req.url.startsWith("/api/")) return;
+    reply.header("Cache-Control", "no-store");
+    req.user = await ctx.sessions.resolve(req.cookies[SESSION_COOKIE]);
+
+    if (UNSAFE.has(req.method)) {
+      // Defense in depth: reject cross-site requests by Origin, then require the CSRF token.
+      const origin = req.headers.origin;
+      if (origin && !isAllowedOrigin(origin, req.headers.host, ctx.config.corsOrigins)) throw new AppError(403, "bad_origin", "Cross-origin request rejected");
+      const path = req.url.split("?")[0];
+      if (!CSRF_EXEMPT.has(path) && req.user) {
+        const token = req.headers["x-csrf-token"];
+        if (typeof token !== "string" || !safeEqual(token, req.user.csrfToken)) throw new AppError(403, "csrf", "Invalid or missing CSRF token. Reload the page.");
+      }
+    }
+  });
+
+  app.setErrorHandler((err: Error, req, reply) => {
+    if (err instanceof AppError) {
+      return reply.code(err.status).send({ error: { code: err.code, message: err.message, hint: err.hint, details: (err as AppError & { details?: unknown }).details } });
+    }
+    if (err instanceof PathError) return reply.code(400).send({ error: { code: "invalid_path", message: err.message } });
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return reply.code(404).send({ error: { code: "not_found", message: "File or directory not found" } });
+    if (code === "EEXIST") return reply.code(409).send({ error: { code: "conflict", message: "Already exists" } });
+    if (code === "ENOSPC") return reply.code(507).send({ error: { code: "disk_full", message: "The disk is full", hint: "Free up space or move backups to another drive." } });
+    if (code === "EACCES" || code === "EPERM") return reply.code(500).send({ error: { code: "permission_denied", message: "CraftPanel lacks filesystem permission for this operation" } });
+    const status = (err as { statusCode?: number }).statusCode;
+    if (status && status < 500) return reply.code(status).send({ error: { code: (err as { code?: string }).code ?? "bad_request", message: err.message } });
+    req.log.error(err);
+    return reply.code(500).send({ error: { code: "internal", message: err.message || "Internal error" } });
+  });
+
+  await app.register(async (api) => {
+    await authRoutes(api, ctx);
+    await serverRoutes(api, ctx);
+    await fileRoutes(api, ctx);
+    await systemRoutes(api, ctx);
+    await wsRoutes(api, ctx);
+    api.get("/api/health", async () => ({ ok: true }));
+  });
+
+  // Serve the exported dashboard (production). In development Next.js serves it.
+  const webDir = ctx.config.webDir;
+  if (webDir && fs.existsSync(path.join(webDir, "index.html"))) {
+    await app.register(fastifyStatic, { root: webDir, prefix: "/", wildcard: true, index: ["index.html"], redirect: true });
+    app.setNotFoundHandler((req, reply) => {
+      if (req.url.startsWith("/api/")) return reply.code(404).send({ error: { code: "not_found", message: "Not found" } });
+      return reply.code(404).type("text/html").sendFile("404.html");
+    });
+  }
+
+  return app;
+}

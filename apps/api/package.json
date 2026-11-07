@@ -1,0 +1,35 @@
+{
+  "name": "@craftpanel/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "build": "node build.mjs",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@craftpanel/backup": "workspace:*",
+    "@craftpanel/config": "workspace:*",
+    "@craftpanel/database": "workspace:*",
+    "@craftpanel/minecraft-providers": "workspace:*",
+    "@craftpanel/network": "workspace:*",
+    "@craftpanel/scheduler": "workspace:*",
+    "@craftpanel/server-runtime": "workspace:*",
+    "@craftpanel/shared": "workspace:*",
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/cors": "^11.4.1",
+    "@fastify/multipart": "^10.1.8",
+    "@fastify/rate-limit": "^11.2.2",
+    "@fastify/static": "^10.1.10",
+    "@fastify/websocket": "^11.3.7",
+    "fastify": "^5.12.8",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "@types/ws": "^8.18.1"
+  }
+}

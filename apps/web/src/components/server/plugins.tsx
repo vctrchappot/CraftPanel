@@ -1,0 +1,296 @@
+"use client";
+
+import * as React from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, ArrowUpCircle, Download, Puzzle, Search, ShieldAlert, Trash2, Upload, Zap } from "lucide-react";
+import { toast } from "sonner";
+import { Badge, Button, Callout, ConfirmDialog, Dialog, DialogContent, DialogFooter, DialogHeader, EmptyState, Input, Panel, Section, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@craftpanel/ui";
+import type { PluginInfo, ServerDetail } from "@craftpanel/shared";
+import { api, errorMessage, upload } from "@/lib/api";
+import { useCan } from "@/lib/auth";
+import { useAction } from "@/lib/queries";
+import { formatBytes } from "@/lib/format";
+
+interface MarketHit {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  author: string;
+  downloads: number;
+  iconUrl: string | null;
+  compatible: boolean;
+}
+
+export function PluginsTab({ server: s }: { server: ServerDetail }) {
+  const key = ["plugins", s.id];
+  const q = useQuery({ queryKey: key, queryFn: () => api.get<{ supported: boolean; plugins: PluginInfo[]; restartRequired: boolean }>(`/api/servers/${s.id}/plugins`) });
+  const canManage = useCan("plugins.manage");
+
+  if (q.isLoading) return <Skeleton className="h-48 rounded-xl" />;
+  if (!q.data?.supported) return <VanillaMigration server={s} />;
+
+  return (
+    <div className="space-y-6">
+      <Callout variant="warning" icon={<ShieldAlert />} title="Plugins are executable code">
+        Plugins run with the same permissions as the Minecraft server on this machine. Only install plugins from authors you trust. CraftPanel verifies download checksums but cannot verify what a plugin does.
+      </Callout>
+      <Tabs defaultValue="installed" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="installed">Installed ({q.data.plugins.length})</TabsTrigger>
+          {canManage && <TabsTrigger value="browse">Browse Modrinth</TabsTrigger>}
+          {canManage && <TabsTrigger value="updates">Updates</TabsTrigger>}
+        </TabsList>
+        <TabsContent value="installed">
+          <Installed server={s} plugins={q.data.plugins} canManage={canManage} />
+        </TabsContent>
+        <TabsContent value="browse">
+          <Browse server={s} />
+        </TabsContent>
+        <TabsContent value="updates">
+          <Updates server={s} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function Installed({ server: s, plugins, canManage }: { server: ServerDetail; plugins: PluginInfo[]; canManage: boolean }) {
+  const key = [["plugins", s.id], ["server", s.id]];
+  const toggle = useAction((v: { file: string; enabled: boolean }) => api.patch(`/api/servers/${s.id}/plugins/${encodeURIComponent(v.file)}`, { enabled: v.enabled }), { invalidate: key, success: "Saved. Restart to apply." });
+  const remove = useAction((file: string) => api.del(`/api/servers/${s.id}/plugins/${encodeURIComponent(file)}`), { invalidate: key, success: "Plugin removed. Restart to apply." });
+  const [removing, setRemoving] = React.useState<string | null>(null);
+  const [pct, setPct] = React.useState<number | null>(null);
+  const qc = useQueryClient();
+  const input = React.useRef<HTMLInputElement>(null);
+
+  return (
+    <Section
+      title="Installed plugins"
+      description="Changes take effect after a restart."
+      actions={
+        canManage && (
+          <>
+            <input
+              ref={input}
+              type="file"
+              accept=".jar"
+              hidden
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                setPct(0);
+                try {
+                  await upload(`/api/servers/${s.id}/plugins/upload`, f, setPct);
+                  toast.success(`${f.name} uploaded. Restart to load it.`);
+                  void qc.invalidateQueries({ queryKey: ["plugins", s.id] });
+                  void qc.invalidateQueries({ queryKey: ["server", s.id] });
+                } catch (err) {
+                  toast.error(errorMessage(err));
+                } finally {
+                  setPct(null);
+                }
+              }}
+            />
+            <Button size="sm" variant="secondary" onClick={() => input.current?.click()} loading={pct !== null}>
+              <Upload /> {pct !== null ? `${pct}%` : "Upload .jar"}
+            </Button>
+          </>
+        )
+      }
+    >
+      {plugins.length ? (
+        <Panel>
+          <ul className="divide-y divide-border">
+            {plugins.map((p) => (
+              <li key={p.file} className="flex flex-wrap items-start gap-4 px-4 py-3.5 text-[13px]">
+                <Puzzle className="mt-0.5 size-4 text-muted-foreground" />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="flex flex-wrap items-center gap-2 font-medium">
+                    {p.name ?? p.file}
+                    {p.version && <span className="font-normal text-muted-foreground">{p.version}</span>}
+                    {!p.enabled && <Badge>Disabled</Badge>}
+                    {p.name === null && <Badge variant="danger">Invalid plugin</Badge>}
+                  </p>
+                  {p.description && <p className="text-muted-foreground">{p.description}</p>}
+                  <p className="text-xs text-muted-foreground">
+                    {p.file} · {formatBytes(p.size)}
+                    {p.authors.length ? ` · ${p.authors.join(", ")}` : ""}
+                    {p.apiVersion ? ` · API ${p.apiVersion}` : ""}
+                    {p.depend.length ? ` · requires ${p.depend.join(", ")}` : ""}
+                  </p>
+                  {p.enabled && p.missingDependencies.length > 0 && (
+                    <p className="flex items-center gap-1.5 text-xs text-destructive">
+                      <AlertTriangle className="size-3.5" /> Missing dependencies: {p.missingDependencies.join(", ")}. The plugin will fail to load.
+                    </p>
+                  )}
+                </div>
+                {canManage && (
+                  <div className="flex items-center gap-3">
+                    <Switch checked={p.enabled} onCheckedChange={(v) => toggle.mutate({ file: p.file, enabled: v })} aria-label={`Enable ${p.name ?? p.file}`} />
+                    <Button size="icon-sm" variant="destructive-ghost" onClick={() => setRemoving(p.file)} aria-label="Remove">
+                      <Trash2 />
+                    </Button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : (
+        <EmptyState icon={<Puzzle />} title="No plugins installed" description="Browse Modrinth for plugins compatible with this server, or upload a .jar." />
+      )}
+      <ConfirmDialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)} title="Remove plugin?" description={`${removing} will be deleted. Its configuration folder is kept.`} confirmLabel="Remove" destructive onConfirm={() => remove.mutateAsync(removing!)} />
+    </Section>
+  );
+}
+
+function Browse({ server: s }: { server: ServerDetail }) {
+  const [query, setQuery] = React.useState("");
+  const [debounced, setDebounced] = React.useState("");
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebounced(query), 350);
+    return () => clearTimeout(t);
+  }, [query]);
+  const q = useQuery({ queryKey: ["market", s.id, debounced], queryFn: () => api.get<{ hits: MarketHit[]; total: number }>(`/api/servers/${s.id}/plugins/search?q=${encodeURIComponent(debounced)}`) });
+  const [confirm, setConfirm] = React.useState<MarketHit | null>(null);
+  const install = useAction((projectId: string) => api.post<{ file: string; version: string; requiredDependencies: string[] }>(`/api/servers/${s.id}/plugins/install`, { projectId }), {
+    success: (r) => `Installed ${r.file}${r.requiredDependencies.length ? ` — also needs ${r.requiredDependencies.length} dependency plugin(s)` : ""}. Restart to load it.`,
+    invalidate: [["plugins", s.id], ["server", s.id]],
+  });
+
+  return (
+    <Section title="Modrinth" description={`Results are filtered to Paper/Bukkit plugins. Compatibility with Minecraft ${s.mcVersion} is checked against Modrinth's version metadata before installing.`}>
+      <div className="relative max-w-md">
+        <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search plugins…" className="pl-8" aria-label="Search plugins" />
+      </div>
+      {q.isLoading ? (
+        <Skeleton className="h-48 rounded-xl" />
+      ) : q.error ? (
+        <Callout variant="danger" icon={<AlertTriangle />}>{errorMessage(q.error)}</Callout>
+      ) : (
+        <Panel>
+          <ul className="divide-y divide-border">
+            {q.data?.hits.map((h) => (
+              <li key={h.id} className="flex items-start gap-4 px-4 py-3.5 text-[13px]">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="flex flex-wrap items-center gap-2 font-medium">
+                    <a href={`https://modrinth.com/plugin/${h.slug}`} target="_blank" rel="noreferrer" className="hover:underline">
+                      {h.title}
+                    </a>
+                    <span className="font-normal text-muted-foreground">by {h.author}</span>
+                    {h.compatible ? <Badge variant="success">Supports {s.mcVersion}</Badge> : <Badge variant="warning">Not listed for {s.mcVersion}</Badge>}
+                  </p>
+                  <p className="text-muted-foreground">{h.description}</p>
+                  <p className="text-xs text-muted-foreground">{h.downloads.toLocaleString()} downloads</p>
+                </div>
+                <Button size="sm" variant="secondary" disabled={!h.compatible} onClick={() => setConfirm(h)}>
+                  <Download /> Install
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+      <ConfirmDialog
+        open={!!confirm}
+        onOpenChange={(o) => !o && setConfirm(null)}
+        title={`Install ${confirm?.title}?`}
+        description="This downloads third-party executable code from Modrinth into the server's plugins folder. Only continue if you trust the author."
+        confirmLabel="Install plugin"
+        onConfirm={() => install.mutateAsync(confirm!.id)}
+      />
+    </Section>
+  );
+}
+
+function Updates({ server: s }: { server: ServerDetail }) {
+  const q = useQuery({
+    queryKey: ["plugin-updates", s.id],
+    queryFn: () => api.get<{ file: string; name: string | null; current: string | null; versionId: string; versionNumber: string }[]>(`/api/servers/${s.id}/plugins/updates`),
+  });
+  const update = useAction((v: { file: string; versionId: string }) => api.post(`/api/servers/${s.id}/plugins/${encodeURIComponent(v.file)}/update`, { versionId: v.versionId }), {
+    success: "Plugin updated. Restart to apply.",
+    invalidate: [["plugins", s.id], ["plugin-updates", s.id], ["server", s.id]],
+  });
+  return (
+    <Section title="Available updates" description="Checked against Modrinth by file hash. Plugins from other sources cannot be checked.">
+      {q.isLoading ? (
+        <Skeleton className="h-24 rounded-xl" />
+      ) : q.error ? (
+        <Callout variant="danger">{errorMessage(q.error)}</Callout>
+      ) : q.data?.length ? (
+        <Panel>
+          <ul className="divide-y divide-border">
+            {q.data.map((u) => (
+              <li key={u.file} className="flex items-center gap-4 px-4 py-3 text-[13px]">
+                <ArrowUpCircle className="size-4 text-accent" />
+                <div className="flex-1">
+                  <p className="font-medium">{u.name ?? u.file}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {u.current ?? "?"} → {u.versionNumber}
+                  </p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => update.mutate({ file: u.file, versionId: u.versionId })} loading={update.isPending && update.variables?.file === u.file}>
+                  Update
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : (
+        <p className="text-[13px] text-muted-foreground">All Modrinth plugins are up to date.</p>
+      )}
+    </Section>
+  );
+}
+
+function VanillaMigration({ server: s }: { server: ServerDetail }) {
+  const canConfigure = useCan("server.configure");
+  const opts = useQuery({ queryKey: ["software-options", s.id], queryFn: () => api.get<{ paperAvailable: boolean }>(`/api/servers/${s.id}/software/options`), enabled: canConfigure });
+  const [open, setOpen] = React.useState(false);
+  const migrate = useAction(() => api.post<{ backupId: string }>(`/api/servers/${s.id}/software`, { software: "paper", version: s.mcVersion }), {
+    success: "Migrated to Paper. A backup of the Vanilla server was created first.",
+    invalidate: [["server", s.id], ["plugins", s.id], ["servers"], ["backups"]],
+  });
+  const running = s.status !== "stopped" && s.status !== "crashed" && s.status !== "error";
+  return (
+    <div className="space-y-6">
+      <EmptyState
+        icon={<Puzzle />}
+        title="Vanilla servers cannot load plugins"
+        description="Plugins require Paper, a compatible server that keeps Vanilla gameplay while adding plugin support and performance improvements."
+        action={
+          canConfigure && (
+            <Button onClick={() => setOpen(true)} disabled={!opts.data?.paperAvailable}>
+              <Zap /> Switch to Paper
+            </Button>
+          )
+        }
+      />
+      {opts.data && !opts.data.paperAvailable && <p className="text-center text-xs text-muted-foreground">Paper is not available for Minecraft {s.mcVersion} yet.</p>}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader title={`Switch to Paper ${s.mcVersion}`} description="Your worlds, settings and player lists are kept." />
+          <ol className="list-decimal space-y-1.5 pl-5 text-[13px] text-muted-foreground">
+            <li>A full backup of the current server is created.</li>
+            <li>The latest stable Paper build for {s.mcVersion} is downloaded and verified.</li>
+            <li>On first start, Paper converts the world layout (Nether and End move into separate folders).</li>
+            <li>To roll back, restore the pre-migration backup and switch back to Vanilla.</li>
+          </ol>
+          {running && <Callout variant="warning" icon={<AlertTriangle />}>Stop the server first.</Callout>}
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={running} loading={migrate.isPending} onClick={() => migrate.mutate(undefined, { onSuccess: () => setOpen(false) })}>
+              Back up & switch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

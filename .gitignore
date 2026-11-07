@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.next/
+out/
+.data/
+coverage/
+test-results/
+playwright-report/
+*.log
+.env
+.env.local
+
+# local test artifacts
+.api-*.log
+.dev-test.log
+tsconfig.tsbuildinfo
