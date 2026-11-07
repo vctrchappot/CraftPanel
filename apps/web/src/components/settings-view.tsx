@@ -21,6 +21,7 @@ import {
   Panel,
   Section,
   Skeleton,
+  Switch,
   Tabs,
   TabsContent,
   TabsList,
@@ -215,6 +216,7 @@ interface AppSettingsView {
   ddnsProvider: "none" | "duckdns";
   ddnsDomain: string;
   ddnsToken: string;
+  infoCommand: boolean;
 }
 
 function useAppSettings() {
@@ -375,8 +377,27 @@ function AuditLog() {
   );
 }
 
+function InfoCommandSetting() {
+  const q = useAppSettings();
+  const toggle = useAction((enabled: boolean) => api.put("/api/settings", { infoCommand: enabled }), {
+    success: "Saved. Applies to each server on its next start.",
+    invalidate: [["app-settings"]],
+  });
+  if (!q.data) return <Skeleton className="h-16 rounded-xl" />;
+  return (
+    <div className="flex items-start justify-between gap-6">
+      <p className="text-[13px] text-muted-foreground">
+        Players can type <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground">/trigger craftpanel</code> to see a short note that the server runs on CraftPanel, with a link to the
+        project. It is a small datapack (works on Vanilla and Paper, no operator rights needed) that CraftPanel adds to each server's world on start. Turn it off to remove it on the next start.
+      </p>
+      <Switch checked={q.data.infoCommand} disabled={toggle.isPending} onCheckedChange={(v) => toggle.mutate(v)} aria-label="In-game info command" />
+    </div>
+  );
+}
+
 function About() {
   const s = useSystem();
+  const canOwner = useCan("app.configure");
   return (
     <div className="max-w-2xl space-y-6">
       <Callout variant="warning" icon={<ShieldAlert />} title="Native execution">
@@ -389,6 +410,11 @@ function About() {
             : `The dashboard listens on ${s.data?.dashboard.host}:${s.data?.dashboard.port}. Keep it on a private network or VPN, and put an HTTPS reverse proxy in front for remote access. Never port-forward it.`}
         </p>
       </Section>
+      {canOwner && (
+        <Section title="In-game info command">
+          <InfoCommandSetting />
+        </Section>
+      )}
       {s.data && (
         <Section title="About">
           <dl className="grid grid-cols-[160px_1fr] gap-y-2 text-[13px]">

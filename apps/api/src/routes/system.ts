@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { appSettingsSchema, backupCreateSchema, badRequest, scheduleSchema } from "@craftpanel/shared";
+import { appSettingsSchema, backupCreateSchema, badRequest, CRAFTPANEL_VERSION, scheduleSchema } from "@craftpanel/shared";
 import { nextRuns, validateCron } from "@craftpanel/scheduler";
 import { getProvider, PROVIDERS } from "@craftpanel/minecraft-providers";
 import { SETTING_GROUPS, SETTINGS } from "@craftpanel/config";
@@ -130,7 +130,7 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
     const rows = await ctx.servers.rows();
     const running = rows.filter((r) => ctx.agent.isRunning(r.id));
     return {
-      version: "0.1.0",
+      version: CRAFTPANEL_VERSION,
       platform: process.platform,
       arch: process.arch,
       hostname: os.hostname(),

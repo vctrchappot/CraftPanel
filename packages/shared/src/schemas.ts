@@ -151,6 +151,7 @@ export const appSettingsSchema = z.object({
   ddnsProvider: z.enum(["none", "duckdns"]).optional(),
   ddnsDomain: z.string().max(253).regex(/^[a-z0-9.-]*$/i).optional(),
   ddnsToken: z.string().max(200).optional(),
+  infoCommand: z.boolean().optional(),
 });
 
 export const fileWriteSchema = z.object({ path: z.string().max(4096), content: z.string().max(5 * 1024 * 1024) });

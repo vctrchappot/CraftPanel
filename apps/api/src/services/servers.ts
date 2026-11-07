@@ -22,6 +22,8 @@ import type { z } from "zod";
 import type { Hub } from "../hub";
 import type { AppConfig } from "../config";
 import { SYSTEM_ACTOR, type ActivityService, type Actor } from "./activity";
+import { syncInfoPack } from "./info-pack";
+import type { SettingsService } from "./settings";
 
 export type ServerRow = typeof servers.$inferSelect;
 const MARKER = ".craftpanel";
@@ -39,6 +41,7 @@ export class ServerService {
     private activity: ActivityService,
     readonly java: JavaManager,
     private config: AppConfig,
+    private settings: SettingsService,
   ) {
     this.wireAgent();
   }
@@ -308,6 +311,8 @@ export class ServerService {
 
       await this.syncManagedProperties(row);
       await this.writeEula(row.directory, actor).catch(() => undefined);
+      const { infoCommand } = await this.settings.get();
+      await syncInfoPack(row.directory, infoCommand).catch((err) => this.activity.event(id, "server.info_pack_failed", `Could not update the CraftPanel info datapack: ${(err as Error).message}`, { level: "warn" }));
       const javaPath = await this.ensureJava(row.javaMajor, row.javaPath);
       if (javaPath !== row.javaPath) await this.db.update(servers).set({ javaPath }).where(eq(servers.id, id));
 

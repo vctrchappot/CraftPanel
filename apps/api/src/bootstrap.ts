@@ -32,7 +32,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const activity = new ActivityService(db, hub);
   const settings = new SettingsService(db);
   const sessions = new SessionStore(db, config.sessionTtlMs);
-  const servers = new ServerService(db, agent, hub, activity, java, config);
+  const servers = new ServerService(db, agent, hub, activity, java, config, settings);
   const backups = new BackupService(db, servers, hub, activity, settings, config);
   const schedules = new ScheduleService(db, servers, backups, activity, settings);
   const game = new GameService(db, servers, activity, config);

@@ -7,6 +7,8 @@ export interface AppSettings {
   ddnsDomain: string;
   ddnsToken: string;
   publicIp: string | null;
+  /** Ship the `/trigger craftpanel` info datapack to managed worlds. */
+  infoCommand: boolean;
 }
 
 const DEFAULTS: AppSettings = {
@@ -16,6 +18,7 @@ const DEFAULTS: AppSettings = {
   ddnsDomain: "",
   ddnsToken: "",
   publicIp: null,
+  infoCommand: true,
 };
 
 export class SettingsService {
