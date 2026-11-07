@@ -34,6 +34,7 @@ import { useAction } from "@/lib/queries";
 import { formatDateTime } from "@/lib/format";
 import { useSystem } from "./home";
 import { RemoteAccess } from "./remote-access";
+import { UpdateSection } from "./updates";
 
 export function SettingsView() {
   const params = useSearchParams();
@@ -42,7 +43,7 @@ export function SettingsView() {
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Application-wide configuration. Per-server settings live in each server's Settings tab." />
-      <Tabs defaultValue={params.get("tab") ?? "account"} className="space-y-6">
+      <Tabs key={params.get("tab") ?? "account"} defaultValue={params.get("tab") ?? "account"} className="space-y-6">
         <TabsList className="max-w-full overflow-x-auto">
           <TabsTrigger value="account">Account</TabsTrigger>
           {canOwner && <TabsTrigger value="users">Users</TabsTrigger>}
@@ -415,6 +416,11 @@ function About() {
           Addresses and allowed networks are under Remote access.
         </p>
       </Section>
+      {canOwner && (
+        <Section title="Updates">
+          <UpdateSection />
+        </Section>
+      )}
       {canOwner && (
         <Section title="In-game info command">
           <InfoCommandSetting />

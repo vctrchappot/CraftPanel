@@ -14,9 +14,10 @@ import { BackupService } from "./services/backups";
 import { ScheduleService } from "./services/schedules";
 import { GameService } from "./services/game";
 import { SettingsService } from "./services/settings";
+import { UpdateService } from "./services/updates";
 
 /** Wire up persistence, runtime and services. Does not start listening. */
-export async function createContext(config: AppConfig, opts: { migrationsFolder?: string } = {}): Promise<AppContext> {
+export async function createContext(config: AppConfig, opts: { migrationsFolder?: string; installRoot?: string } = {}): Promise<AppContext> {
   const L = config.layout;
   for (const dir of [L.root, L.servers, L.backups, L.java, L.cache, L.logs, L.tmp]) await fsp.mkdir(dir, { recursive: true });
   // Clear leftovers from interrupted uploads/exports.
@@ -31,6 +32,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const java = new JavaManager(L.java, L.tmp);
   const activity = new ActivityService(db, hub);
   const settings = new SettingsService(db);
+  const updates = new UpdateService(settings, opts.installRoot ?? null);
   const sessions = new SessionStore(db, config.sessionTtlMs);
   const servers = new ServerService(db, agent, hub, activity, java, config, settings);
   const backups = new BackupService(db, servers, hub, activity, settings, config);
@@ -47,5 +49,5 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
     await fsp.writeFile(tokenFile, setupToken + "\n", { mode: 0o600 });
   } else await fsp.rm(tokenFile, { force: true });
 
-  return { config, database, agent, hub, sessions, activity, servers, backups, schedules, game, settings, java, setupToken };
+  return { config, database, agent, hub, sessions, activity, servers, backups, schedules, game, settings, updates, java, setupToken };
 }

@@ -237,3 +237,31 @@ describe("remote access policy", () => {
     expect(sys.dashboard).toMatchObject({ profile: "local", https: false });
   });
 });
+
+describe("updates and installer control", () => {
+  it("lets only administrators see the update status and respects the opt-out", async () => {
+    expect((await call(sessions.operator!, "GET", "/api/updates")).statusCode).toBe(403);
+    expect((await call(owner, "PUT", "/api/settings", { updateCheck: false })).statusCode).toBe(200);
+    const status = (await call(owner, "GET", "/api/updates")).json();
+    expect(status).toMatchObject({ enabled: false, available: false, install: { method: "manual" } });
+  });
+
+  it("shuts down over the local control channel only with the token", async () => {
+    let stopped = 0;
+    const controlled = await buildApp(ctx, { logger: false, control: { token: "secret-token", shutdown: () => stopped++ } });
+    try {
+      expect((await controlled.inject({ method: "POST", url: "/api/control/shutdown" })).statusCode).toBe(403);
+      expect((await controlled.inject({ method: "POST", url: "/api/control/shutdown", headers: { "x-craftpanel-control": "wrong-token!" } })).statusCode).toBe(403);
+      // A forwarded header must not make a remote request look local.
+      expect((await controlled.inject({ method: "POST", url: "/api/control/shutdown", remoteAddress: "192.168.1.20", headers: { "x-craftpanel-control": "secret-token", "x-forwarded-for": "127.0.0.1" } })).statusCode).toBe(403);
+      expect(stopped).toBe(0);
+      expect((await controlled.inject({ method: "POST", url: "/api/control/shutdown", headers: { "x-craftpanel-control": "secret-token" } })).statusCode).toBe(202);
+      await new Promise((r) => setImmediate(r));
+      expect(stopped).toBe(1);
+      // Without a control token (tests, embedding) the endpoint is closed.
+      expect((await app.inject({ method: "POST", url: "/api/control/shutdown", headers: { "x-craftpanel-control": "secret-token" } })).statusCode).toBe(403);
+    } finally {
+      await controlled.close();
+    }
+  });
+});

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,8 +43,15 @@ async function main() {
     config.webDir = candidates.find((c) => fs.existsSync(path.join(c, "index.html"))) ?? null;
   }
 
-  const ctx = await createContext(config, { migrationsFolder });
+  // Folder that holds apps/ (a git checkout or an installer's install directory).
+  const installRoot = path.resolve(here, "../../..");
+  const ctx = await createContext(config, { migrationsFolder, installRoot });
+  // Lets the installers stop CraftPanel gracefully before an update (see control.json below).
+  const controlToken = crypto.randomBytes(24).toString("hex");
+  const controlFile = path.join(config.layout.root, "control.json");
+  let requestShutdown = (_reason: string) => undefined as void;
   const app = await buildApp(ctx, {
+    control: { token: controlToken, shutdown: () => requestShutdown("Shutdown request") },
     logger: config.logFormat === "json" ? { level: config.logLevel } : { level: config.logLevel, stream: prettyLogStream({ level: config.logLevel }) },
   });
 
@@ -56,6 +64,9 @@ async function main() {
   }, 3600_000);
 
   await app.listen({ host: config.host, port: config.port });
+  const wildcard = config.host === "0.0.0.0" || config.host === "::";
+  const controlHost = wildcard ? "127.0.0.1" : config.host.includes(":") ? `[${config.host}]` : config.host;
+  fs.writeFileSync(controlFile, JSON.stringify({ pid: process.pid, version: CRAFTPANEL_VERSION, url: `${config.tls ? "https" : "http"}://${controlHost}:${config.port}`, token: controlToken }) + "\n", { mode: 0o600 });
   if (config.logFormat === "pretty") console.log(banner(config, ctx.setupToken));
   else {
     app.log.info({ profile: config.profile, host: config.host, port: config.port, dataDir: config.layout.root }, "CraftPanel started");
@@ -75,8 +86,10 @@ async function main() {
     await ctx.agent.shutdown(60_000);
     await app.close();
     ctx.database.close();
+    fs.rmSync(controlFile, { force: true });
     process.exit(0);
   };
+  requestShutdown = (reason) => void shutdown(reason);
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   if (process.platform === "win32") process.on("SIGBREAK", () => void shutdown("SIGBREAK"));

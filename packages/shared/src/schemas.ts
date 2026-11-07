@@ -155,6 +155,7 @@ export const appSettingsSchema = z.object({
   infoCommand: z.boolean().optional(),
   dashboardAccess: z.enum(["local", "private", "any"]).optional(),
   allowedNetworks: z.array(z.string().trim().min(1).max(64)).max(50).optional(),
+  updateCheck: z.boolean().optional(),
 });
 
 export const fileWriteSchema = z.object({ path: z.string().max(4096), content: z.string().max(5 * 1024 * 1024) });

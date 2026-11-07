@@ -12,6 +12,7 @@ import type { BackupService } from "./services/backups";
 import type { ScheduleService } from "./services/schedules";
 import type { GameService } from "./services/game";
 import type { SettingsService } from "./services/settings";
+import type { UpdateService } from "./services/updates";
 
 export interface AppContext {
   config: AppConfig;
@@ -25,6 +26,7 @@ export interface AppContext {
   schedules: ScheduleService;
   game: GameService;
   settings: SettingsService;
+  updates: UpdateService;
   java: JavaManager;
   /** One-time token required to create the first account on non-loopback installs. */
   setupToken: string | null;

@@ -21,7 +21,19 @@ import { wsRoutes, isAllowedOrigin } from "./routes/ws";
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const CSRF_EXEMPT = new Set(["/api/auth/login", "/api/auth/setup"]);
 
-export async function buildApp(ctx: AppContext, opts: { logger?: boolean | object } = {}): Promise<FastifyInstance> {
+export interface BuildOptions {
+  logger?: boolean | object;
+  /**
+   * Local control channel for installers: a token stored in the data directory (readable only by
+   * the account running CraftPanel) allows a graceful shutdown from this machine. Windows has no
+   * SIGTERM for other processes, so this is how an update stops CraftPanel and its servers cleanly.
+   */
+  control?: { token: string; shutdown: () => void };
+}
+
+const LOOPBACK_PEERS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+
+export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promise<FastifyInstance> {
   const tls = ctx.config.tls;
   const app = Fastify({
     logger: opts.logger ?? { level: ctx.config.logLevel },
@@ -96,6 +108,15 @@ export async function buildApp(ctx: AppContext, opts: { logger?: boolean | objec
     await systemRoutes(api, ctx);
     await wsRoutes(api, ctx);
     api.get("/api/health", async () => ({ ok: true }));
+    api.post("/api/control/shutdown", async (req, reply) => {
+      // The socket address, not req.ip: a proxy header must never make a request look local.
+      const token = req.headers["x-craftpanel-control"];
+      const local = LOOPBACK_PEERS.has(req.socket.remoteAddress ?? "");
+      if (!opts.control || !local || typeof token !== "string" || !safeEqual(token, opts.control.token)) throw new AppError(403, "forbidden", "Not allowed");
+      req.log.info("Shutdown requested by a local installer or update");
+      setImmediate(opts.control.shutdown);
+      return reply.code(202).send({ ok: true });
+    });
   });
 
   // Serve the exported dashboard (production). In development Next.js serves it.

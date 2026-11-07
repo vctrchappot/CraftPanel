@@ -159,6 +159,11 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
     };
   });
 
+  app.get<{ Querystring: { refresh?: string } }>("/api/updates", async (req) => {
+    requirePermission(req, "app.configure");
+    return ctx.updates.status(req.query.refresh === "1");
+  });
+
   // ---- application settings ----------------------------------------------------------
 
   app.get("/api/settings", async (req) => {

@@ -14,6 +14,7 @@ import { RealtimeProvider, useConnectionState } from "@/lib/realtime";
 import { useServers } from "@/lib/queries";
 import { StatusDot } from "./status";
 import { Logo } from "./logo";
+import { UpdateNotice } from "./updates";
 
 const NAV = [
   { href: "/", label: "Overview", icon: LayoutGrid },
@@ -181,6 +182,7 @@ function Sidebar({ onSearch }: { onSearch: () => void }) {
         ))}
         {servers.data?.length === 0 && <p className="px-2.5 py-1 text-xs text-muted-foreground">No servers yet</p>}
       </div>
+      <UpdateNotice />
       <UserMenu />
     </>
   );

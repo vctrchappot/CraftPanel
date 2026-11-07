@@ -14,6 +14,8 @@ export interface AppSettings {
   dashboardAccess: AccessPolicy;
   /** Extra IPs/CIDR ranges always allowed, e.g. an office's public address. */
   allowedNetworks: string[];
+  /** Look up the newest CraftPanel release on GitHub and show a notice in the dashboard. */
+  updateCheck: boolean;
 }
 
 const DEFAULTS: AppSettings = {
@@ -26,6 +28,7 @@ const DEFAULTS: AppSettings = {
   infoCommand: true,
   dashboardAccess: "private",
   allowedNetworks: [],
+  updateCheck: true,
 };
 
 export class SettingsService {
