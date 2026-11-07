@@ -110,7 +110,7 @@ Architecture, package layout and contribution notes: [docs/architecture](docs/ar
 
 ## Status
 
-See [docs/STATUS.md](docs/STATUS.md) for what is implemented, how it was verified, and known limitations.
+See [docs/STATUS.md](docs/STATUS.md) for what is implemented, how it was verified, and known limitations. What's planned next: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Security
 
