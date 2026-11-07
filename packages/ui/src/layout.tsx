@@ -7,7 +7,7 @@ export function PageHeader({ title, description, actions, className }: { title: 
     <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div className="min-w-0 space-y-1">
         <h1 className="truncate text-2xl font-semibold tracking-tight">{title}</h1>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        {description && <div className="text-sm text-muted-foreground">{description}</div>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -22,7 +22,7 @@ export function Section({ title, description, actions, children, className }: { 
         <div className="flex items-end justify-between gap-4">
           <div className="space-y-0.5">
             {title && <h2 className="text-sm font-semibold tracking-tight">{title}</h2>}
-            {description && <p className="text-[13px] text-muted-foreground">{description}</p>}
+            {description && <div className="text-[13px] text-muted-foreground">{description}</div>}
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
@@ -41,8 +41,8 @@ export function EmptyState({ icon, title, description, action, className }: { ic
     <div className={cn("flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border px-6 py-14 text-center", className)}>
       {icon && <div className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground [&_svg]:size-5">{icon}</div>}
       <div className="space-y-1">
-        <p className="text-sm font-medium">{title}</p>
-        {description && <p className="mx-auto max-w-sm text-[13px] text-muted-foreground">{description}</p>}
+        <div className="text-sm font-medium">{title}</div>
+        {description && <div className="mx-auto max-w-sm text-[13px] text-muted-foreground">{description}</div>}
       </div>
       {action}
     </div>
@@ -61,7 +61,7 @@ export function Callout({ variant = "info", title, children, icon, className }: 
     <div className={cn("flex gap-3 rounded-lg border px-4 py-3 text-[13px]", styles, className)}>
       {icon && <div className={cn("mt-0.5 shrink-0 [&_svg]:size-4", iconColor)}>{icon}</div>}
       <div className="min-w-0 space-y-1">
-        {title && <p className="font-medium text-foreground">{title}</p>}
+        {title && <div className="font-medium text-foreground">{title}</div>}
         {children && <div className="text-muted-foreground [&_a]:underline [&_a]:underline-offset-2">{children}</div>}
       </div>
     </div>
@@ -79,7 +79,7 @@ export function Field({ label, htmlFor, help, error, children, className, aside 
         {aside}
       </div>
       {children}
-      {error ? <p className="text-xs text-destructive">{error}</p> : help ? <p className="text-xs text-muted-foreground">{help}</p> : null}
+      {error ? <div className="text-xs text-destructive">{error}</div> : help ? <div className="text-xs text-muted-foreground">{help}</div> : null}
     </div>
   );
 }
@@ -87,9 +87,9 @@ export function Field({ label, htmlFor, help, error, children, className, aside 
 export function Stat({ label, value, sub, className }: { label: React.ReactNode; value: React.ReactNode; sub?: React.ReactNode; className?: string }) {
   return (
     <div className={cn("min-w-0 space-y-1", className)}>
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="truncate text-xl font-semibold tracking-tight tabular-nums">{value}</p>
-      {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="truncate text-xl font-semibold tracking-tight tabular-nums">{value}</div>
+      {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
     </div>
   );
 }

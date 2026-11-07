@@ -36,7 +36,7 @@ export function DialogHeader({ title, description }: { title: React.ReactNode; d
   return (
     <div className="space-y-1.5 pr-6">
       <DialogPrimitive.Title className="text-base font-semibold tracking-tight">{title}</DialogPrimitive.Title>
-      {description ? <DialogPrimitive.Description className="text-sm text-muted-foreground">{description}</DialogPrimitive.Description> : <DialogPrimitive.Description className="sr-only">{String(title)}</DialogPrimitive.Description>}
+      {description ? <DialogPrimitive.Description asChild><div className="text-sm text-muted-foreground">{description}</div></DialogPrimitive.Description> : <DialogPrimitive.Description className="sr-only">{String(title)}</DialogPrimitive.Description>}
     </div>
   );
 }

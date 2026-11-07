@@ -29,6 +29,8 @@ class RealtimeClient {
     const ws = new WebSocket(wsUrl());
     this.ws = ws;
     ws.onopen = () => {
+      // disconnect() was called while connecting (e.g. React StrictMode's double mount); a later connect() clears the flag again.
+      if (this.closedByUser) return ws.close();
       this.retry = 0;
       this.setState("open");
       for (const id of this.subs.keys()) this.send({ type: "subscribe", serverId: id });
@@ -54,7 +56,8 @@ class RealtimeClient {
   disconnect() {
     this.closedByUser = true;
     if (this.timer) clearTimeout(this.timer);
-    this.ws?.close();
+    // Closing a socket that is still connecting logs a browser warning; onopen closes it instead.
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.close();
   }
 
   private setState(s: ConnectionState) {
