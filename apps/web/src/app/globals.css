@@ -8,6 +8,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  /* Lets native controls (select popups, scrollbars, date pickers) follow the theme. */
+  color-scheme: light;
   --background: oklch(0.985 0 0);
   --surface: oklch(1 0 0);
   --foreground: oklch(0.18 0 0);
@@ -25,6 +27,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --surface: oklch(0.175 0 0);
   --foreground: oklch(0.96 0 0);
@@ -73,6 +76,15 @@
     background: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
+  }
+  /* Native select popups don't inherit the page colors on every platform (e.g. Chrome on Windows). */
+  select option,
+  select optgroup {
+    background-color: var(--surface);
+    color: var(--foreground);
+  }
+  select option:disabled {
+    color: var(--muted-foreground);
   }
   ::selection {
     background: color-mix(in oklch, var(--accent) 25%, transparent);

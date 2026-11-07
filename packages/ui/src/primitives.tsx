@@ -86,7 +86,7 @@ export const NativeSelect = React.forwardRef<HTMLSelectElement, React.SelectHTML
     ref={ref}
     style={{ backgroundImage: CHEVRON, ...style }}
     className={cn(
-      "h-9 w-full appearance-none rounded-md border border-border bg-surface bg-[length:16px] bg-[right_0.6rem_center] bg-no-repeat pl-3 pr-8 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/25 disabled:opacity-50",
+      "h-9 w-full appearance-none rounded-md border border-border bg-surface bg-[length:16px] bg-[right_0.6rem_center] bg-no-repeat pl-3 pr-8 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/25 disabled:opacity-50",
       className,
     )}
     {...props}
