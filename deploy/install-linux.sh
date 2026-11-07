@@ -23,8 +23,8 @@ command -v pnpm >/dev/null || corepack enable >/dev/null 2>&1 || npm install -g 
 # Build as the user who owns the checkout so node_modules/dist don't end up owned by root.
 BUILD_USER=$(stat -c %U "$REPO_DIR")
 if [[ "$BUILD_USER" != root ]]; then
-  sudo -u "$BUILD_USER" -H pnpm install --frozen-lockfile
-  sudo -u "$BUILD_USER" -H pnpm build
+  sudo -u "$BUILD_USER" -H env "PATH=$PATH" pnpm install --frozen-lockfile
+  sudo -u "$BUILD_USER" -H env "PATH=$PATH" pnpm build
 else
   pnpm install --frozen-lockfile
   pnpm build
@@ -38,7 +38,12 @@ chown -R root:root "$INSTALL_DIR"
 chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
 chmod 750 "$DATA_DIR"
 
-cp deploy/craftpanel.service /etc/systemd/system/craftpanel.service
+# Point the unit at the Node.js actually installed (NodeSource, distro package, /usr/local, …).
+NODE_BIN=$(readlink -f "$(command -v node)")
+case "$NODE_BIN" in
+  /home/*|/root/*) echo "Warning: Node.js lives in $NODE_BIN; the hardened service cannot read home directories. Install Node.js system-wide (e.g. NodeSource) for the service." >&2 ;;
+esac
+sed "s|^ExecStart=/usr/bin/node |ExecStart=$NODE_BIN |" deploy/craftpanel.service > /etc/systemd/system/craftpanel.service
 systemctl daemon-reload
 systemctl enable craftpanel
 # restart (not "enable --now") so a re-run also picks up the new build; running servers are stopped gracefully.

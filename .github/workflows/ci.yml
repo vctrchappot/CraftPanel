@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Typecheck, unit/integration tests and a production build on every OS.
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  # The committed /craftpanel plugin jar must match its source.
+  plugin:
+    name: Info plugin is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: node scripts/build-info-plugin.mjs --check
+
+  # Full browser flow with a real Minecraft server, on x64 and ARM64 (stand-in for Raspberry Pi).
+  e2e:
+    name: End-to-end (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
+      - run: pnpm test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.os }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+
+  # deploy/install-linux.sh on a real systemd host: install, health check, update path.
+  installer:
+    name: Linux installer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Install as a service
+        run: sudo env "PATH=$PATH" ./deploy/install-linux.sh
+      - name: Service answers
+        run: |
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/api/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8080/api/auth/state | grep -q '"setupTokenRequired":true'
+          systemctl is-active craftpanel
+      - name: Re-running the installer updates and restarts the service
+        run: |
+          before=$(systemctl show craftpanel -p MainPID --value)
+          sudo env "PATH=$PATH" ./deploy/install-linux.sh
+          after=$(systemctl show craftpanel -p MainPID --value)
+          test "$before" != "$after"
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/api/health && break; sleep 1; done
+      - if: failure()
+        run: sudo journalctl -u craftpanel --no-pager | tail -100
