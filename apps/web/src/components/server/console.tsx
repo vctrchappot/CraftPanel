@@ -70,10 +70,30 @@ export function ConsoleLines({
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD;
     if (atBottom !== autoScroll) onAutoScrollChange(atBottom);
   };
+  // With fast output, re-pinning to the bottom can win the race against the scroll event,
+  // so react to the user's intent to scroll up directly.
+  const pause = () => {
+    if (autoScroll && onAutoScrollChange) onAutoScrollChange(false);
+  };
+  const touchY = React.useRef<number | null>(null);
 
   return (
     <div className={cn("relative", className)}>
-      <div ref={ref} onScroll={onScroll} className="scrollbar-thin h-full overflow-y-auto px-4 py-3 font-mono text-[12px] leading-[1.6] text-console-foreground" role="log" aria-live="off">
+      <div
+        ref={ref}
+        onScroll={onScroll}
+        onWheel={(e) => e.deltaY < 0 && pause()}
+        onTouchStart={(e) => (touchY.current = e.touches[0]?.clientY ?? null)}
+        onTouchMove={(e) => {
+          const y = e.touches[0]?.clientY;
+          if (touchY.current !== null && y !== undefined && y > touchY.current + 4) pause();
+        }}
+        onKeyDown={(e) => ["ArrowUp", "PageUp", "Home"].includes(e.key) && pause()}
+        tabIndex={0}
+        className="scrollbar-thin h-full overflow-y-auto px-4 py-3 font-mono text-[12px] leading-[1.6] text-console-foreground outline-none"
+        role="log"
+        aria-live="off"
+      >
         {lines.length === 0 && <p className="text-neutral-500">No output yet.</p>}
         {lines.map((l) => (
           <div
