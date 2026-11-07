@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
-export const USER_AGENT = "CraftPanel/0.1 (+https://github.com/craftpanel/craftpanel)";
+export const USER_AGENT = "CraftPanel (+https://github.com/vctrchappot/CraftPanel)";
 
 export interface DownloadProgress {
   received: number;
@@ -15,7 +15,7 @@ export interface DownloadProgress {
 export interface DownloadOptions {
   url: string;
   destination: string;
-  checksum?: { algorithm: "sha1" | "sha256" | "sha512"; value: string };
+  checksum?: { algorithm: "md5" | "sha1" | "sha256" | "sha512"; value: string };
   onProgress?: (p: DownloadProgress) => void;
   signal?: AbortSignal;
   maxBytes?: number;
@@ -28,6 +28,8 @@ const TRUSTED_HOSTS = [
   "launcher.mojang.com",
   "fill.papermc.io",
   "fill-data.papermc.io",
+  "api.purpurmc.org",
+  "meta.fabricmc.net",
   "api.papermc.io",
   "api.adoptium.net",
   "github.com",
@@ -96,7 +98,7 @@ export async function download(opts: DownloadOptions): Promise<void> {
   }
 }
 
-export async function hashFile(file: string, algorithm: "sha1" | "sha256" | "sha512"): Promise<string> {
+export async function hashFile(file: string, algorithm: "md5" | "sha1" | "sha256" | "sha512"): Promise<string> {
   const h = crypto.createHash(algorithm);
   await pipeline(fs.createReadStream(file), h);
   return h.digest("hex");

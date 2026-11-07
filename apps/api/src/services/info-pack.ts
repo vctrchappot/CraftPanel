@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readZipEntry } from "@craftpanel/backup";
 import { PropertiesDocument } from "@craftpanel/config";
-import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, CRAFTPANEL_VERSION } from "@craftpanel/shared";
+import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, CRAFTPANEL_VERSION, softwareLabel } from "@craftpanel/shared";
 
 /**
  * In-game info card about CraftPanel, enabled by default and removable globally or per server.
@@ -22,8 +22,6 @@ export interface InfoPackDetails {
   software: string;
   mcVersion: string;
 }
-
-const SOFTWARE_LABEL: Record<string, string> = { vanilla: "Vanilla", paper: "Paper" };
 
 function text(t: string, extra: Record<string, unknown> = {}) {
   return { text: t, ...extra };
@@ -48,7 +46,7 @@ const rule = (width: number) => text(" ".repeat(width), { color: "dark_gray", st
 const bullet = (label: string, value: unknown[]) => ["", text(" » ", { color: "gold" }), text(label, { color: "gray" }), ...value];
 
 function infoFunction(details: InfoPackDetails): string {
-  const software = `${SOFTWARE_LABEL[details.software] ?? details.software} ${details.mcVersion}`;
+  const software = `${softwareLabel(details.software)} ${details.mcVersion}`;
   const lines: unknown[] = [
     ["", rule(14), text(" ✦ ", { color: "gold" }), text("CraftPanel", { color: "gold", bold: true }), text(" ✦ ", { color: "gold" }), rule(14)],
     ["", text("Hey ", { color: "white" }), { selector: "@s", color: "yellow" }, text("! This server is powered by ", { color: "white" }), text("CraftPanel", { color: "gold" }), text(` v${CRAFTPANEL_VERSION}`, { color: "dark_gray" })],

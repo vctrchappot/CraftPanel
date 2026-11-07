@@ -4,11 +4,11 @@
 
 **Self-hosted Minecraft server management.** Install CraftPanel on your PC, a spare computer, a Raspberry Pi or a VPS, open the dashboard in a browser, and create, run and manage real Minecraft Java servers. No accounts, no subscriptions, no cloud.
 
-- Creates **Vanilla** and **Paper** servers for any published version, downloaded from Mojang and PaperMC and checksum-verified.
+- Creates **Paper**, **Purpur**, **Fabric** and **Vanilla** servers for any published version, downloaded from the official sources and checksum-verified. Minecraft 1.7–1.18 is protected against Log4Shell automatically.
 - Provisions the **right Java version automatically** (Eclipse Temurin 8/17/21/25 from Adoptium) for Windows, Linux and macOS on x64 and ARM64.
 - **Live console** over WebSockets, real CPU/RAM/TPS/MSPT metrics, player tracking.
 - Validated **server.properties editor**, version-aware **game rules**, whitelist/ops/bans.
-- **Plugins** from Modrinth with compatibility checks, uploads, updates and a Vanilla→Paper migration.
+- **Plugins** (Paper, Purpur) and **Fabric mods** from Modrinth with compatibility checks, uploads, updates and a Vanilla→Paper migration.
 - **Worlds, file manager, backups** (consistent live backups, verification, restore with automatic safety backup) and **scheduled tasks**.
 - **LAN/WAN guidance** with diagnostics (CGNAT detection), optional DuckDNS.
 - **Multi-user** with Owner / Administrator / Operator / Viewer roles and an audit log.

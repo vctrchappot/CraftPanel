@@ -1,7 +1,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import { badRequest, conflict, notFound, type GameRuleInfo, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
+import { badRequest, conflict, notFound, SOFTWARE_INFO, softwareLabel, type AddonKind, type GameRuleInfo, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
 import { PropertiesDocument, SETTINGS, SETTINGS_BY_KEY, parseJsonList, validateSetting, type BanEntry, type OpEntry, type WhitelistEntry } from "@craftpanel/config";
 import { desc, eq, playerSessions, servers as serversTable, type Database } from "@craftpanel/database";
 import { createZip, extractZip, listZip, readZipEntry } from "@craftpanel/backup";
@@ -13,6 +13,7 @@ import {
   installModrinthVersion,
   listPlugins,
   lookupProfile,
+  searchModrinthPlugins,
 } from "@craftpanel/minecraft-providers";
 import type { AppConfig } from "../config";
 import type { ActivityService, Actor } from "./activity";
@@ -329,17 +330,26 @@ export class GameService {
 
   // ---- plugins --------------------------------------------------------------
 
+  // Plugins (Paper, Purpur) and Fabric mods share these routes; the server's software decides which.
+
   private pluginsDir(row: ServerRow) {
-    return path.join(row.directory, "plugins");
+    return path.join(row.directory, SOFTWARE_INFO[row.software].addons ?? "plugins");
   }
 
-  private requirePaper(row: ServerRow) {
-    if (row.software !== "paper") throw conflict("Plugins require Paper. Vanilla servers cannot load plugins.", "Use the migration assistant on the Plugins page to switch to Paper.");
+  private requireAddons(row: ServerRow): AddonKind {
+    const kind = SOFTWARE_INFO[row.software].addons;
+    if (!kind) throw conflict("Vanilla servers cannot load plugins or mods.", "Use the migration assistant on the Plugins page to switch to Paper.");
+    return kind;
+  }
+
+  private addonLabel(row: ServerRow) {
+    return SOFTWARE_INFO[row.software].addons === "mods" ? "Mod" : "Plugin";
   }
 
   async plugins(row: ServerRow): Promise<PluginInfo[]> {
-    if (row.software !== "paper") return [];
-    return listPlugins(this.pluginsDir(row));
+    const kind = SOFTWARE_INFO[row.software].addons;
+    if (!kind) return [];
+    return listPlugins(this.pluginsDir(row), kind);
   }
 
   private safePluginFile(file: string) {
@@ -348,7 +358,7 @@ export class GameService {
   }
 
   async togglePlugin(row: ServerRow, file: string, enabled: boolean, actor: Actor) {
-    this.requirePaper(row);
+    this.requireAddons(row);
     this.safePluginFile(file);
     const dir = this.pluginsDir(row);
     const base = file.replace(/\.disabled$/, "");
@@ -363,58 +373,70 @@ export class GameService {
   }
 
   async removePlugin(row: ServerRow, file: string, actor: Actor) {
-    this.requirePaper(row);
+    this.requireAddons(row);
     this.safePluginFile(file);
     const isOwnInfoPlugin = file.replace(/.disabled$/, "") === INFO_PLUGIN_FILE && (await isInfoPlugin(path.join(this.pluginsDir(row), file)));
     await fsp.rm(path.join(this.pluginsDir(row), file));
     if (isOwnInfoPlugin) await this.servers.update(row.id, { infoCommand: false }, actor);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
-    await this.activity.event(row.id, "plugin.removed", `Plugin ${file} removed`, { actor });
+    await this.activity.event(row.id, "plugin.removed", `${this.addonLabel(row)} ${file} removed`, { actor });
     await this.activity.audit(actor, "plugin.remove", row.id, { file });
   }
 
-  /** Validate and move an uploaded jar into plugins/. */
+  /** Validate and move an uploaded jar into plugins/ (or mods/). */
   async installUploadedPlugin(row: ServerRow, tmpFile: string, filename: string, actor: Actor) {
-    this.requirePaper(row);
+    const kind = this.requireAddons(row);
     const name = path.basename(filename).replace(/[^A-Za-z0-9 ._+()-]/g, "_");
-    if (!name.endsWith(".jar")) throw badRequest("Only .jar files can be installed as plugins");
-    const meta = (await readZipEntry(tmpFile, "plugin.yml").catch(() => null)) ?? (await readZipEntry(tmpFile, "paper-plugin.yml").catch(() => null));
-    if (!meta) throw badRequest("This jar is not a Bukkit/Paper plugin (no plugin.yml or paper-plugin.yml)");
+    if (!name.endsWith(".jar")) throw badRequest(`Only .jar files can be installed as ${kind}`);
+    if (kind === "mods") {
+      if (!(await readZipEntry(tmpFile, "fabric.mod.json").catch(() => null))) throw badRequest("This jar is not a Fabric mod (no fabric.mod.json)");
+    } else {
+      const meta = (await readZipEntry(tmpFile, "plugin.yml").catch(() => null)) ?? (await readZipEntry(tmpFile, "paper-plugin.yml").catch(() => null));
+      if (!meta) throw badRequest("This jar is not a Bukkit/Paper plugin (no plugin.yml or paper-plugin.yml)");
+    }
     await fsp.mkdir(this.pluginsDir(row), { recursive: true });
     const dest = path.join(this.pluginsDir(row), name);
     if (await exists(dest)) throw conflict(`${name} is already installed`);
     await fsp.copyFile(tmpFile, dest);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
-    await this.activity.event(row.id, "plugin.installed", `Plugin ${name} uploaded`, { actor, level: "warn" });
+    await this.activity.event(row.id, "plugin.installed", `${this.addonLabel(row)} ${name} uploaded`, { actor, level: "warn" });
     await this.activity.audit(actor, "plugin.upload", row.id, { file: name });
   }
 
   async installFromModrinth(row: ServerRow, projectId: string, versionId: string | undefined, actor: Actor) {
-    this.requirePaper(row);
-    const versions = await compatibleModrinthVersions(projectId, row.mcVersion);
+    const kind = this.requireAddons(row);
+    const versions = await compatibleModrinthVersions(projectId, row.mcVersion, kind);
     const chosen = versionId ? versions.find((v) => v.id === versionId) : versions.find((v) => v.version_type === "release") ?? versions[0];
-    if (!chosen) throw conflict(`This plugin has no version marked compatible with Minecraft ${row.mcVersion} on Paper`);
+    if (!chosen) throw conflict(`This ${this.addonLabel(row).toLowerCase()} has no version marked compatible with Minecraft ${row.mcVersion} on ${softwareLabel(row.software)}`);
     const res = await installModrinthVersion(chosen.id, this.pluginsDir(row));
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
-    await this.activity.event(row.id, "plugin.installed", `Plugin ${res.file} installed from Modrinth`, { actor });
+    await this.activity.event(row.id, "plugin.installed", `${this.addonLabel(row)} ${res.file} installed from Modrinth`, { actor });
     await this.activity.audit(actor, "plugin.install", row.id, { projectId, versionId: chosen.id, file: res.file });
     return { ...res, version: chosen.version_number };
   }
 
+  async searchModrinth(row: ServerRow, query: string, offset: number) {
+    return searchModrinthPlugins(query, row.mcVersion, offset, this.requireAddons(row));
+  }
+
+  async modrinthVersions(row: ServerRow, projectId: string) {
+    return compatibleModrinthVersions(projectId, row.mcVersion, this.requireAddons(row));
+  }
+
   async pluginUpdates(row: ServerRow) {
-    this.requirePaper(row);
-    const plugins = await listPlugins(this.pluginsDir(row));
-    const updates = await checkModrinthUpdates(plugins.map((p) => p.sha1), row.mcVersion);
+    const kind = this.requireAddons(row);
+    const plugins = await listPlugins(this.pluginsDir(row), kind);
+    const updates = await checkModrinthUpdates(plugins.map((p) => p.sha1), row.mcVersion, kind);
     return plugins.filter((p) => updates[p.sha1]).map((p) => ({ file: p.file, name: p.name, current: p.version, ...updates[p.sha1] }));
   }
 
   async updatePlugin(row: ServerRow, file: string, versionId: string, actor: Actor) {
-    this.requirePaper(row);
+    this.requireAddons(row);
     this.safePluginFile(file);
     const res = await installModrinthVersion(versionId, this.pluginsDir(row));
     if (res.file !== file) await fsp.rm(path.join(this.pluginsDir(row), file), { force: true });
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
-    await this.activity.event(row.id, "plugin.updated", `Plugin ${file} updated to ${res.file}`, { actor });
+    await this.activity.event(row.id, "plugin.updated", `${this.addonLabel(row)} ${file} updated to ${res.file}`, { actor });
     await this.activity.audit(actor, "plugin.update", row.id, { file, versionId });
   }
 }

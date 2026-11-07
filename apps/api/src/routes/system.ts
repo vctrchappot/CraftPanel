@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { appSettingsSchema, backupCreateSchema, badRequest, CRAFTPANEL_VERSION, scheduleSchema } from "@craftpanel/shared";
+import { appSettingsSchema, backupCreateSchema, badRequest, CRAFTPANEL_VERSION, scheduleSchema, SOFTWARE_INFO } from "@craftpanel/shared";
 import { nextRuns, validateCron } from "@craftpanel/scheduler";
-import { getProvider, PROVIDERS } from "@craftpanel/minecraft-providers";
+import { getProvider, log4shellMitigation, PROVIDERS } from "@craftpanel/minecraft-providers";
 import { SETTING_GROUPS, SETTINGS } from "@craftpanel/config";
 import { freeDiskSpace } from "@craftpanel/server-runtime";
 import { dashboardUrls, isClientAllowed, lanAddresses, parseNetwork } from "@craftpanel/network";
@@ -91,7 +91,7 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.get("/api/catalog/software", async (req) => {
     requireUser(req);
-    return Object.values(PROVIDERS).map((p) => ({ id: p.id, label: p.label, description: p.description, supportsPlugins: p.supportsPlugins }));
+    return Object.values(PROVIDERS).map((p) => ({ id: p.id, label: p.label, description: p.description, supportsPlugins: p.supportsPlugins, addons: SOFTWARE_INFO[p.id].addons }));
   });
   app.get<{ Params: { software: string } }>("/api/catalog/:software/versions", async (req) => {
     requireUser(req);
@@ -103,7 +103,11 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
     const version = parse(z.string().regex(/^[A-Za-z0-9._-]{1,64}$/), req.params.version);
     const [builds, java] = await Promise.all([p.listBuilds(version), p.javaRequirement(version)]);
     const runtime = await ctx.java.findCompatible(java.major);
-    return { builds: builds.slice(0, 30), java: { ...java, available: runtime ? { path: runtime.path, version: runtime.version, managed: runtime.managed } : null } };
+    return {
+      builds: builds.slice(0, 30),
+      java: { ...java, available: runtime ? { path: runtime.path, version: runtime.version, managed: runtime.managed } : null },
+      log4shell: log4shellMitigation(version)?.description ?? null,
+    };
   });
   app.get("/api/catalog/settings", async (req) => {
     requireUser(req);

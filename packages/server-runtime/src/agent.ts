@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import type { ConsoleLine, OnlinePlayer, ServerMetrics, ServerSoftware, ServerStatus } from "@craftpanel/shared";
+import { SOFTWARE_INFO, type ConsoleLine, type OnlinePlayer, type ServerMetrics, type ServerSoftware, type ServerStatus } from "@craftpanel/shared";
 import { ManagedServer, type LaunchSpec } from "./managed-server";
 import { createProcessProbe, isJavaProcess, isPidAlive, type ProcessProbe } from "./process-info";
 import { parseMspt, parseTps, type LogSignal } from "./log-parser";
@@ -159,7 +159,7 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
     if (this.tickSupport.get(id) === false) return;
     let tps: number | null = null;
     let mspt: number | null = null;
-    if (this.software.get(id) === "paper") {
+    if (SOFTWARE_INFO[this.software.get(id) ?? "vanilla"].paperCommands) {
       const m = await s.query("tps", /TPS from last 1m, 5m, 15m:.*/, { timeoutMs: 3000 });
       tps = m ? parseTps(m[0]) : null;
       const ms = await s.query("mspt", /^[◴\s]*([\d.]+)\/([\d.]+)\/([\d.]+)/, { timeoutMs: 3000, swallow: /Server tick times|^\s*$/ });

@@ -11,9 +11,15 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - One-line installers: `install.sh` for Linux and Raspberry Pi (systemd service, private Node.js if needed) and `install.ps1` for Windows (runs at sign-in, no admin rights needed). Re-running them updates; a failed update rolls back.
 - Update notice in the dashboard when a newer release is available, with the right update command for the install.
 - Settings in `/etc/craftpanel/craftpanel.env` (Linux service) survive updates.
+- Purpur servers (Paper fork; same plugins, TPS/MSPT and `/craftpanel` command).
+- Fabric servers with a choice of loader version; Fabric mods from Modrinth (search, install, updates, upload) with dependency checks by mod id.
+- Log4Shell protection for Minecraft 1.7–1.18: CraftPanel adds Mojang's JVM flag or patched logging config on every start and shows it in the wizard and the server's runtime settings.
 
 ### Changed
 - The version lives only in `package.json`.
+
+### Fixed
+- Invalid HTML nesting in the dashboard (a loading placeholder inside a paragraph) that caused hydration warnings, and a WebSocket warning in development.
 
 ## 0.1.0 – 2026-11-07
 

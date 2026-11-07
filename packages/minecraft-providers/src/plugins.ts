@@ -1,9 +1,9 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import type { PluginInfo } from "@craftpanel/shared";
+import type { AddonKind, PluginInfo } from "@craftpanel/shared";
 import { readZipEntry } from "@craftpanel/backup";
-import { download, fetchJson } from "./download";
+import { download, fetchJson, USER_AGENT } from "./download";
 
 const MODRINTH = "https://api.modrinth.com/v2";
 
@@ -42,7 +42,9 @@ function unquote(s: string): string {
 
 const asList = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : typeof v === "string" && v ? [v] : []);
 
-export async function inspectPluginJar(file: string): Promise<Omit<PluginInfo, "missingDependencies">> {
+type AddonMeta = Omit<PluginInfo, "missingDependencies"> & { provides: string[] };
+
+export async function inspectPluginJar(file: string): Promise<AddonMeta> {
   const st = await fsp.stat(file);
   const buf = await fsp.readFile(file);
   const sha1 = crypto.createHash("sha1").update(buf).digest("hex");
@@ -65,23 +67,74 @@ export async function inspectPluginJar(file: string): Promise<Omit<PluginInfo, "
     depend: asList(meta.depend),
     softDepend: asList(meta.softdepend),
     main: (meta.main as string) ?? null,
+    provides: asList(meta.provides),
     size: st.size,
     sha1,
   };
 }
 
-/** List plugins (enabled *.jar and disabled *.jar.disabled) and resolve dependencies. */
-export async function listPlugins(pluginsDir: string): Promise<PluginInfo[]> {
+/** Dependencies every Fabric server provides itself. */
+const FABRIC_BUILTINS = new Set(["minecraft", "java", "fabricloader", "fabric-loader"]);
+
+const authorName = (a: unknown) => (typeof a === "string" ? a : a && typeof a === "object" && "name" in a ? String(a.name) : null);
+const keysOf = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? Object.keys(v) : []);
+
+/** Read a Fabric mod's fabric.mod.json. */
+export async function inspectModJar(file: string): Promise<AddonMeta> {
+  const st = await fsp.stat(file);
+  const buf = await fsp.readFile(file);
+  const sha1 = crypto.createHash("sha1").update(buf).digest("hex");
+  let meta: Record<string, unknown> = {};
+  try {
+    const json = await readZipEntry(file, "fabric.mod.json");
+    // Some mods have raw line breaks inside strings, which JSON.parse rejects.
+    if (json) meta = JSON.parse(json.toString("utf8").replace(/[\r\n\t]+/g, " "));
+  } catch {
+    /* not a Fabric mod */
+  }
+  const id = typeof meta.id === "string" ? meta.id : null;
+  const base = path.basename(file);
+  return {
+    file: base,
+    enabled: base.endsWith(".jar"),
+    name: typeof meta.name === "string" ? meta.name : id,
+    version: meta.version != null ? String(meta.version) : null,
+    description: typeof meta.description === "string" ? meta.description : null,
+    authors: (Array.isArray(meta.authors) ? meta.authors : []).map(authorName).filter((a): a is string => !!a),
+    apiVersion: null,
+    depend: keysOf(meta.depends).filter((d) => !FABRIC_BUILTINS.has(d)),
+    softDepend: [...keysOf(meta.recommends), ...keysOf(meta.suggests)],
+    main: id,
+    provides: [...(id ? [id] : []), ...asList(meta.provides)],
+    size: st.size,
+    sha1,
+  };
+}
+
+/**
+ * List plugins or mods (enabled *.jar and disabled *.jar.disabled) and resolve
+ * dependencies. Plugins depend on plugin names, mods on mod ids.
+ */
+export async function listPlugins(dir: string, kind: AddonKind = "plugins"): Promise<PluginInfo[]> {
   let files: string[] = [];
   try {
-    files = (await fsp.readdir(pluginsDir)).filter((f) => f.endsWith(".jar") || f.endsWith(".jar.disabled"));
+    files = (await fsp.readdir(dir)).filter((f) => f.endsWith(".jar") || f.endsWith(".jar.disabled"));
   } catch {
     return [];
   }
-  const infos = await Promise.all(files.map((f) => inspectPluginJar(path.join(pluginsDir, f))));
-  const enabledNames = new Set(infos.filter((p) => p.enabled && p.name).map((p) => p.name!.toLowerCase()));
+  const inspect = kind === "mods" ? inspectModJar : inspectPluginJar;
+  const infos = await Promise.all(files.map((f) => inspect(path.join(dir, f))));
+  const available = new Set(
+    infos
+      .filter((p) => p.enabled)
+      .flatMap((p) => (kind === "mods" ? p.provides : p.name ? [p.name] : []))
+      .map((n) => n.toLowerCase()),
+  );
+  // Fabric API bundles its modules (fabric-networking-api-v1, …) as nested jars.
+  const fabricApi = kind === "mods" && available.has("fabric-api");
+  const satisfied = (d: string) => available.has(d.toLowerCase()) || (fabricApi && (d === "fabric" || d.startsWith("fabric-")));
   return infos
-    .map((p) => ({ ...p, missingDependencies: p.depend.filter((d) => !enabledNames.has(d.toLowerCase())) }))
+    .map(({ provides: _, ...p }) => ({ ...p, missingDependencies: p.depend.filter((d) => !satisfied(d)) }))
     .sort((a, b) => (a.name ?? a.file).localeCompare(b.name ?? b.file));
 }
 
@@ -101,8 +154,17 @@ export interface MarketplaceProject {
   source: "modrinth";
 }
 
-export async function searchModrinthPlugins(query: string, mcVersion: string, offset = 0): Promise<{ hits: MarketplaceProject[]; total: number }> {
-  const facets = JSON.stringify([["project_type:plugin"], ["categories:paper", "categories:bukkit", "categories:spigot"], ["server_side:required", "server_side:optional"]]);
+/** Modrinth loaders whose files a server of this kind can load. */
+const LOADERS: Record<AddonKind, string[]> = { plugins: ["paper", "spigot", "bukkit", "purpur", "folia"], mods: ["fabric"] };
+/** Loaders to ask Modrinth for. */
+const QUERY_LOADERS: Record<AddonKind, string[]> = { plugins: ["paper", "spigot", "bukkit"], mods: ["fabric"] };
+
+export async function searchModrinthPlugins(query: string, mcVersion: string, offset = 0, kind: AddonKind = "plugins"): Promise<{ hits: MarketplaceProject[]; total: number }> {
+  const facets = JSON.stringify([
+    [kind === "mods" ? "project_type:mod" : "project_type:plugin"],
+    QUERY_LOADERS[kind].map((l) => `categories:${l}`),
+    ["server_side:required", "server_side:optional"],
+  ]);
   const url = `${MODRINTH}/search?query=${encodeURIComponent(query)}&limit=20&offset=${offset}&index=${query ? "relevance" : "downloads"}&facets=${encodeURIComponent(facets)}`;
   const d = await fetchJson<{ hits: { project_id: string; slug: string; title: string; description: string; author: string; downloads: number; icon_url: string | null; categories: string[]; versions: string[] }[]; total_hits: number }>(url);
   return {
@@ -136,14 +198,12 @@ interface ModrinthVersion {
   files: { url: string; filename: string; primary: boolean; size: number; hashes: { sha1: string; sha512: string } }[];
 }
 
-const PLUGIN_LOADERS = ["paper", "spigot", "bukkit", "purpur", "folia"];
-
-/** Versions of a project verified compatible with this Minecraft version and a Paper-compatible loader. */
-export async function compatibleModrinthVersions(projectId: string, mcVersion: string): Promise<ModrinthVersion[]> {
+/** Versions of a project verified compatible with this Minecraft version and the server's loader. */
+export async function compatibleModrinthVersions(projectId: string, mcVersion: string, kind: AddonKind = "plugins"): Promise<ModrinthVersion[]> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(projectId)) throw new Error("Invalid project id");
-  const url = `${MODRINTH}/project/${projectId}/version?game_versions=${encodeURIComponent(JSON.stringify([mcVersion]))}&loaders=${encodeURIComponent(JSON.stringify(["paper", "spigot", "bukkit"]))}`;
+  const url = `${MODRINTH}/project/${projectId}/version?game_versions=${encodeURIComponent(JSON.stringify([mcVersion]))}&loaders=${encodeURIComponent(JSON.stringify(QUERY_LOADERS[kind]))}`;
   const versions = await fetchJson<ModrinthVersion[]>(url);
-  return versions.filter((v) => v.game_versions.includes(mcVersion) && v.loaders.some((l) => PLUGIN_LOADERS.includes(l)));
+  return versions.filter((v) => v.game_versions.includes(mcVersion) && v.loaders.some((l) => LOADERS[kind].includes(l)));
 }
 
 export async function installModrinthVersion(versionId: string, pluginsDir: string): Promise<{ file: string; requiredDependencies: string[] }> {
@@ -158,12 +218,12 @@ export async function installModrinthVersion(versionId: string, pluginsDir: stri
 }
 
 /** Ask Modrinth for a newer compatible version of an installed file (identified by SHA-1). */
-export async function checkModrinthUpdates(sha1s: string[], mcVersion: string): Promise<Record<string, { versionId: string; versionNumber: string; projectId: string }>> {
+export async function checkModrinthUpdates(sha1s: string[], mcVersion: string, kind: AddonKind = "plugins"): Promise<Record<string, { versionId: string; versionNumber: string; projectId: string }>> {
   if (!sha1s.length) return {};
   const res = await fetch(`${MODRINTH}/version_files/update`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "User-Agent": "CraftPanel/0.1" },
-    body: JSON.stringify({ hashes: sha1s, algorithm: "sha1", loaders: ["paper", "spigot", "bukkit"], game_versions: [mcVersion] }),
+    headers: { "Content-Type": "application/json", "User-Agent": USER_AGENT },
+    body: JSON.stringify({ hashes: sha1s, algorithm: "sha1", loaders: QUERY_LOADERS[kind], game_versions: [mcVersion] }),
     signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error(`Modrinth update check failed (HTTP ${res.status})`);

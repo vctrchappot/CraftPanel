@@ -1,6 +1,7 @@
 import type { Role } from "./roles";
+import type { ServerSoftware } from "./software";
+export type { ServerSoftware };
 
-export type ServerSoftware = "vanilla" | "paper";
 export type Edition = "java";
 export type NetworkMode = "lan" | "wan";
 
@@ -50,6 +51,8 @@ export interface ServerDetail extends ServerSummary {
   javaPath: string | null;
   jvmArgs: string;
   bindAddress: string;
+  /** Log4Shell protection CraftPanel applies on start (Minecraft 1.7–1.18), or null when none is needed. */
+  log4shell: string | null;
   pid: number | null;
   exitCode: number | null;
   lastError: string | null;

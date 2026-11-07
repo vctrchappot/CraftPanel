@@ -16,13 +16,15 @@ import {
   playerActionSchema,
   portSchema,
   propertiesUpdateSchema,
+  SERVER_SOFTWARE,
+  SOFTWARE_INFO,
   updateServerSchema,
   worldCreateSchema,
 } from "@craftpanel/shared";
 import { eq, servers as serversTable } from "@craftpanel/database";
 import { directorySize, freeDiskSpace } from "@craftpanel/server-runtime";
 import { diagnoseWan, formatAddress, lanAddresses, fetchPublicIp, isPrivateIPv4 } from "@craftpanel/network";
-import { getProvider, searchModrinthPlugins, compatibleModrinthVersions } from "@craftpanel/minecraft-providers";
+import { getProvider } from "@craftpanel/minecraft-providers";
 import { actorOf, noContent, requirePermission, type AppContext } from "../context";
 import { parse } from "../validate";
 
@@ -278,17 +280,18 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
   app.get<IdParams>("/api/servers/:id/plugins", async (req) => {
     requirePermission(req, "server.view");
     const r = await row(req.params.id);
-    return { supported: r.software === "paper", software: r.software, plugins: await game.plugins(r), restartRequired: servers.restartRequired.has(r.id) };
+    const kind = SOFTWARE_INFO[r.software].addons;
+    return { supported: kind !== null, kind, software: r.software, plugins: await game.plugins(r), restartRequired: servers.restartRequired.has(r.id) };
   });
   app.get<IdParams & { Querystring: { q?: string; offset?: string } }>("/api/servers/:id/plugins/search", async (req) => {
     requirePermission(req, "plugins.manage");
     const r = await row(req.params.id);
-    return searchModrinthPlugins(String(req.query.q ?? "").slice(0, 100), r.mcVersion, Math.max(0, Number(req.query.offset ?? 0)) || 0);
+    return game.searchModrinth(r, String(req.query.q ?? "").slice(0, 100), Math.max(0, Number(req.query.offset ?? 0)) || 0);
   });
   app.get<IdParams & { Params: { project: string } }>("/api/servers/:id/plugins/versions/:project", async (req) => {
     requirePermission(req, "plugins.manage");
     const r = await row(req.params.id);
-    const versions = await compatibleModrinthVersions(req.params.project, r.mcVersion);
+    const versions = await game.modrinthVersions(r, req.params.project);
     return versions.map((v) => ({ id: v.id, name: v.name, version: v.version_number, type: v.version_type, published: v.date_published, loaders: v.loaders, dependencies: v.dependencies }));
   });
   app.post<IdParams>("/api/servers/:id/plugins/install", async (req) => {
@@ -335,13 +338,18 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     requirePermission(req, "server.configure");
     const r = await row(req.params.id);
     const paper = await getProvider("paper").listVersions().catch(() => []);
-    return { current: { software: r.software, version: r.mcVersion, build: r.build }, paperAvailable: paper.some((v) => v.id === r.mcVersion) };
+    const purpur = await getProvider("purpur").listVersions().catch(() => []);
+    return {
+      current: { software: r.software, version: r.mcVersion, build: r.build },
+      paperAvailable: paper.some((v) => v.id === r.mcVersion),
+      purpurAvailable: purpur.some((v) => v.id === r.mcVersion),
+    };
   });
 
-  /** Vanilla → Paper migration (or version update) with automatic backup first. */
+  /** Software migration (e.g. Vanilla → Paper) or version update, with an automatic backup first. */
   app.post<IdParams>("/api/servers/:id/software", async (req) => {
     requirePermission(req, "server.configure");
-    const body = parse(z.object({ software: z.enum(["vanilla", "paper"]), version: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/), build: z.string().max(32).nullable().optional() }), req.body);
+    const body = parse(z.object({ software: z.enum(SERVER_SOFTWARE), version: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/), build: z.string().max(32).nullable().optional() }), req.body);
     const r = await row(req.params.id);
     if (servers.agent.isRunning(r.id)) throw badRequest("Stop the server first");
     const backup = await ctx.backups.create(r.id, r.software !== body.software ? "pre-migration" : "pre-update", actorOf(req), `Before switching to ${body.software} ${body.version}`);

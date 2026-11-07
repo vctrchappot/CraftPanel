@@ -3,10 +3,10 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Download, RotateCw, Save, Search, Upload } from "lucide-react";
+import { AlertTriangle, Download, RotateCw, Save, Search, ShieldCheck, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Button, Callout, ConfirmDialog, Field, Input, NativeSelect, Panel, Section, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, cn } from "@craftpanel/ui";
-import type { GameRuleInfo, ServerDetail } from "@craftpanel/shared";
+import { SOFTWARE_INFO, type GameRuleInfo, type ServerDetail } from "@craftpanel/shared";
 import { api, ApiError, downloadUrl, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
@@ -275,7 +275,7 @@ function RuntimeSettings({ server: s }: { server: ServerDetail }) {
         <Field
           label="In-game info command"
           htmlFor="rinfo"
-          help={`Players see a short card about CraftPanel with ${s.software === "paper" ? "/craftpanel (or /trigger craftpanel)" : "/trigger craftpanel"}. Installed or removed on the next start.`}
+          help={`Players see a short card about CraftPanel with ${SOFTWARE_INFO[s.software].addons === "plugins" ? "/craftpanel (or /trigger craftpanel)" : "/trigger craftpanel"}. Installed or removed on the next start.`}
         >
           <NativeSelect
             id="rinfo"
@@ -307,6 +307,11 @@ function RuntimeSettings({ server: s }: { server: ServerDetail }) {
         <Field label="JVM arguments" htmlFor="rjvm" help="Each argument must start with '-'. Memory flags are managed above.">
           <Textarea id="rjvm" rows={3} value={f.jvmArgs} onChange={(e) => setF({ ...f, jvmArgs: e.target.value })} disabled={!canEdit} className="font-mono text-xs" />
         </Field>
+        {s.log4shell && (
+          <Callout icon={<ShieldCheck />} title="Log4Shell protection active">
+            Minecraft {s.mcVersion} is affected by Log4Shell. CraftPanel adds {s.log4shell} on every start. Setting your own <code>-Dlog4j.configurationFile</code> or <code>-Dlog4j2.formatMsgNoLookups</code> argument turns this off.
+          </Callout>
+        )}
       </Section>
       {canEdit && (
         <Button onClick={() => save.mutate()} loading={save.isPending}>

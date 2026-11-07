@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Boxes, Cpu, HardDrive, MemoryStick, Plus } from "lucide-react";
 import { Button, EmptyState, PageHeader, Panel, Progress, Section, Skeleton, Stat } from "@craftpanel/ui";
-import type { ActivityEvent } from "@craftpanel/shared";
+import { softwareLabel, type ActivityEvent } from "@craftpanel/shared";
 import { api } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useServers } from "@/lib/queries";
@@ -95,7 +95,7 @@ export function HomeView() {
                   <div className="min-w-0">
                     <p className="truncate font-medium">{srv.name}</p>
                     <p className="mt-0.5 text-[13px] text-muted-foreground">
-                      {srv.software === "paper" ? "Paper" : "Vanilla"} {srv.mcVersion}
+                      {softwareLabel(srv.software)} {srv.mcVersion}
                       {srv.build ? ` · #${srv.build}` : ""}
                     </p>
                   </div>

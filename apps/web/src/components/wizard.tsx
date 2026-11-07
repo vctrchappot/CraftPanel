@@ -4,9 +4,9 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Check, ChevronLeft, ChevronRight, Coffee, Globe, Home, Info, Package, Zap } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, Coffee, Feather, Globe, Home, Info, Package, Puzzle, ShieldCheck, Zap } from "lucide-react";
 import { Badge, Button, Callout, Field, Input, NativeSelect, PageHeader, Panel, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
-import type { CreateServerInput } from "@craftpanel/shared";
+import { SOFTWARE_INFO, softwareLabel, type CreateServerInput, type ServerSoftware } from "@craftpanel/shared";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { useServers } from "@/lib/queries";
 import { formatBytes } from "@/lib/format";
@@ -20,7 +20,15 @@ interface VersionOption {
 interface VersionInfo {
   builds: { id: string; channel: string; time: string; changes: string[] }[];
   java: { major: number; recommendedFlags: string[]; available: { path: string; version: string; managed: boolean } | null };
+  log4shell: string | null;
 }
+
+const SOFTWARE_CHOICES: { id: ServerSoftware; badge?: string; description: string; icon: React.ReactNode }[] = [
+  { id: "paper", badge: "Recommended", description: "Faster than Vanilla and supports Bukkit/Paper plugins. Gameplay matches Vanilla closely.", icon: <Zap /> },
+  { id: "purpur", description: "Paper with many extra gameplay and configuration options. Runs the same plugins.", icon: <Feather /> },
+  { id: "fabric", description: "Mod loader for server-side Fabric mods (e.g. Lithium for performance). Most mods need Fabric API.", icon: <Puzzle /> },
+  { id: "vanilla", description: "The unmodified official server from Mojang. No plugins or mods.", icon: <Package /> },
+];
 
 const STEPS = ["Basics", "Software", "Version", "World", "Gameplay", "Resources", "Network", "Review"] as const;
 
@@ -68,6 +76,7 @@ export function CreateServerWizard() {
     autoStart: false,
   });
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((p) => ({ ...p, [k]: v }));
+  const buildLabel = SOFTWARE_INFO[f.software].buildLabel;
   React.useEffect(() => setF((p) => (p.port === 25565 && nextPort !== 25565 ? { ...p, port: nextPort } : p)), [nextPort]);
 
   const versions = useQuery({ queryKey: ["catalog", f.software, "versions"], queryFn: () => api.get<VersionOption[]>(`/api/catalog/${f.software}/versions`), staleTime: 600_000 });
@@ -182,8 +191,17 @@ export function CreateServerWizard() {
                 </Field>
                 <Field label="Server software">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Choice selected={f.software === "paper"} title="Paper" badge="Recommended" description="Faster than Vanilla and supports Bukkit/Paper plugins. Gameplay matches Vanilla closely." icon={<Zap />} onClick={() => set("software", "paper")} />
-                    <Choice selected={f.software === "vanilla"} title="Vanilla" description="The unmodified official server from Mojang. No plugins." icon={<Package />} onClick={() => set("software", "vanilla")} />
+                    {SOFTWARE_CHOICES.map((c) => (
+                      <Choice
+                        key={c.id}
+                        selected={f.software === c.id}
+                        title={softwareLabel(c.id)}
+                        badge={c.badge}
+                        description={c.description}
+                        icon={c.icon}
+                        onClick={() => (set("software", c.id), set("build", ""))}
+                      />
+                    ))}
                   </div>
                 </Field>
               </div>
@@ -209,13 +227,18 @@ export function CreateServerWizard() {
                     </NativeSelect>
                   )}
                 </Field>
-                {f.software === "paper" && (
-                  <Field label="Paper build" htmlFor="build" help="The newest stable build is used by default.">
+                {buildLabel && (
+                  <Field
+                    label={f.software === "fabric" ? "Fabric Loader" : `${softwareLabel(f.software)} build`}
+                    htmlFor="build"
+                    help={`The newest stable ${f.software === "fabric" ? "loader" : "build"} is used by default.`}
+                  >
                     <NativeSelect id="build" value={f.build} onChange={(e) => set("build", e.target.value)} disabled={!versionInfo.data}>
                       <option value="">Latest stable</option>
                       {versionInfo.data?.builds.map((b) => (
                         <option key={b.id} value={b.id}>
-                          #{b.id} · {b.channel.toLowerCase()} · {new Date(b.time).toLocaleDateString()}
+                          {f.software === "fabric" ? b.id : `#${b.id}`} · {b.channel.toLowerCase()}
+                          {b.time ? ` · ${new Date(b.time).toLocaleDateString()}` : ""}
                         </option>
                       ))}
                     </NativeSelect>
@@ -226,6 +249,11 @@ export function CreateServerWizard() {
                     {versionInfo.data.java.available
                       ? `Java ${versionInfo.data.java.available.version} is available${versionInfo.data.java.available.managed ? " (managed by CraftPanel)" : ""}.`
                       : `Not installed yet. CraftPanel will download Eclipse Temurin ${versionInfo.data.java.major} from Adoptium during installation.`}
+                  </Callout>
+                )}
+                {versionInfo.data?.log4shell && (
+                  <Callout icon={<ShieldCheck />} title="Log4Shell protection">
+                    Minecraft {f.mcVersion} is affected by the Log4Shell vulnerability. CraftPanel protects it automatically on every start: {versionInfo.data.log4shell}.
                   </Callout>
                 )}
               </div>
@@ -304,7 +332,7 @@ export function CreateServerWizard() {
                 <Field label="Additional JVM arguments" htmlFor="jvm" help="Optional. Each argument must start with '-'. Memory is set above." error={fieldErrors.jvmArgs}>
                   <Textarea id="jvm" rows={3} value={f.jvmArgs} onChange={(e) => set("jvmArgs", e.target.value)} className="font-mono text-xs" placeholder="-XX:+UseG1GC" />
                 </Field>
-                {f.software === "paper" && versionInfo.data?.java.recommendedFlags.length ? (
+                {versionInfo.data?.java.recommendedFlags.length ? (
                   <Button variant="secondary" size="sm" onClick={() => set("jvmArgs", versionInfo.data!.java.recommendedFlags.join(" "))}>
                     Use Paper&apos;s recommended flags
                   </Button>
@@ -352,7 +380,7 @@ export function CreateServerWizard() {
                 <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-2.5 text-[13px]">
                   {[
                     ["Name", f.name],
-                    ["Software", `${f.software === "paper" ? "Paper" : "Vanilla"} ${f.mcVersion}${f.build ? ` build ${f.build}` : ""}`],
+                    ["Software", `${softwareLabel(f.software)} ${f.mcVersion}${f.build ? ` ${f.software === "fabric" ? "loader" : "build"} ${f.build}` : ""}`],
                     ["Java", versionInfo.data ? `Java ${versionInfo.data.java.major}${versionInfo.data.java.available ? "" : " (will be downloaded)"}` : "—"],
                     ["World", `${f.levelName}${f.seed ? ` · seed ${f.seed}` : ""} · ${f.levelType.replace("minecraft:", "")}`],
                     ["Gameplay", `${f.mode} · ${f.mode === "hardcore" ? "hard" : f.difficulty} · ${f.maxPlayers} players${f.whitelist ? " · whitelist" : ""}`],

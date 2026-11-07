@@ -18,7 +18,7 @@ import {
   Skeleton,
   cn,
 } from "@craftpanel/ui";
-import type { ServerDetail } from "@craftpanel/shared";
+import { SOFTWARE_INFO, softwareLabel, type ServerDetail } from "@craftpanel/shared";
 import { api, downloadUrl } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useServerStream } from "@/lib/realtime";
@@ -80,7 +80,7 @@ export function ServerWorkspace() {
             )}
             aria-current={tab === t ? "page" : undefined}
           >
-            {label}
+            {t === "plugins" && SOFTWARE_INFO[s.software].addons === "mods" ? "Mods" : label}
             {t === "players" && s.status === "running" && <span className="ml-1.5 text-muted-foreground tabular-nums">{stream.players?.length ?? s.players.length}</span>}
           </Link>
         ))}
@@ -117,8 +117,8 @@ function Header({ server: s }: { server: ServerDetail }) {
           <StatusBadge status={s.status} />
         </div>
         <p className="text-[13px] text-muted-foreground">
-          {s.software === "paper" ? "Paper" : "Vanilla"} {s.mcVersion}
-          {s.build ? ` · build ${s.build}` : ""} · Java {s.javaMajor} · {(s.memoryMb / 1024).toFixed(1)} GB · port {s.port}
+          {softwareLabel(s.software)} {s.mcVersion}
+          {s.build ? ` · ${(SOFTWARE_INFO[s.software].buildLabel ?? "build").toLowerCase()} ${s.build}` : ""} · Java {s.javaMajor} · {(s.memoryMb / 1024).toFixed(1)} GB · port {s.port}
           {s.description ? ` · ${s.description}` : ""}
         </p>
       </div>

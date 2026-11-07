@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { Panel, Progress, Section, Skeleton, Stat } from "@craftpanel/ui";
-import type { ActivityEvent, BackupInfo, ServerDetail, ServerMetrics } from "@craftpanel/shared";
+import { SOFTWARE_INFO, softwareLabel, type ActivityEvent, type BackupInfo, type ServerDetail, type ServerMetrics } from "@craftpanel/shared";
 import { api } from "@/lib/api";
 import { formatBytes, formatDuration, timeAgo } from "@/lib/format";
 import { EventList } from "../activity";
@@ -44,7 +44,7 @@ export function OverviewTab({ server: s, stream }: { server: ServerDetail; strea
         <div className="p-5">
           <Stat
             label="TPS"
-            value={running && m?.tps != null ? m.tps.toFixed(1) : <Unavailable reason={s.software === "vanilla" ? "Vanilla reports MSPT via /tick query (1.20.3+); TPS is derived from it" : "Waiting for the next sample"} />}
+            value={running && m?.tps != null ? m.tps.toFixed(1) : <Unavailable reason={SOFTWARE_INFO[s.software].paperCommands ? "Waiting for the next sample" : `${softwareLabel(s.software)} reports MSPT via /tick query (1.20.3+); TPS is derived from it`} />}
             sub={running && m?.mspt != null ? `${m.mspt.toFixed(1)} ms/tick` : "ms/tick unavailable"}
           />
         </div>

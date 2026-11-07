@@ -35,7 +35,7 @@ export const servers = sqliteTable("servers", {
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
   edition: text("edition").notNull().default("java"),
-  software: text("software", { enum: ["vanilla", "paper"] }).notNull(),
+  software: text("software", { enum: ["vanilla", "paper", "purpur", "fabric"] }).notNull(),
   mcVersion: text("mc_version").notNull(),
   build: text("build"),
   jarFile: text("jar_file"),

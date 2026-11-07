@@ -30,9 +30,10 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 - [ ] Optional: multi-arch Docker image (amd64/arm64) with a data volume.
 
 ### 2. Quick platform wins
-- [ ] Log4Shell protection for Minecraft 1.7–1.18 (JVM flag / patched log config), verify it is applied. Security-relevant, small.
-- [ ] Fabric provider (Fabric meta API, server launcher jar; mods via the existing Modrinth integration).
-- [ ] Purpur provider (Paper fork, same plugin handling).
+- [x] Log4Shell protection for Minecraft 1.7–1.18 (JVM flag / patched log config), verified with a JNDI probe.
+- [x] Fabric provider (Fabric meta API, server launcher jar; mods via the existing Modrinth integration).
+- [x] Purpur provider (Paper fork, same plugin handling).
+- [ ] Software switch in the dashboard for every direction (today: Vanilla→Paper; the API already supports all).
 
 ### 3. Teams and security (Phase 2)
 - [ ] Two-factor sign-in (TOTP), optionally required per role.

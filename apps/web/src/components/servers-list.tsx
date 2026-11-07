@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Boxes, Plus } from "lucide-react";
 import { Button, EmptyState, PageHeader, Panel, Skeleton } from "@craftpanel/ui";
+import { softwareLabel } from "@craftpanel/shared";
 import { useCan } from "@/lib/auth";
 import { useServers } from "@/lib/queries";
 import { formatDuration } from "@/lib/format";
@@ -76,7 +77,7 @@ export function ServersView() {
                     <StatusBadge status={s.status} />
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {s.software === "paper" ? "Paper" : "Vanilla"} {s.mcVersion}
+                    {softwareLabel(s.software)} {s.mcVersion}
                   </td>
                   <td className="px-4 py-3 tabular-nums">{s.status === "running" ? `${s.playersOnline} / ${s.maxPlayers}` : "—"}</td>
                   <td className="px-4 py-3 tabular-nums">{s.port}</td>

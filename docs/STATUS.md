@@ -32,9 +32,12 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 
 **Software & Java**
 - ✅ Vanilla (Mojang manifest, SHA-1), Paper (Fill v3 API, SHA-256, build selection)
+- ✅ Purpur (Purpur API v2, MD5 from the API, SHA-256 recorded): 1.21.11 build 2568 started, `version` confirmed Purpur, LuckPerms installed from Modrinth, `/craftpanel` plugin loaded
+- ✅ Fabric (Fabric meta: game versions, loader selection, server launcher; vanilla `server.jar` pre-downloaded with SHA-1): 1.21.11 with loader 0.20.1 started; Fabric API + Lithium installed from Modrinth and loaded after a restart. 🟡 the launcher jar has no published checksum (HTTPS from meta.fabricmc.net only)
+- ✅ Log4Shell protection (Mojang guidance: flag for 1.17–1.18.0, patched config for 1.7–1.16.5, config downloaded from Mojang with SHA-1). Verified with a JNDI probe (`say ${jndi:ldap://127.0.0.1:…}` and a local listener): unprotected Vanilla 1.16.5 made 3 connections; protected Vanilla 1.16.5, 1.17.1, 1.8.9, Paper 1.16.5 and Fabric 1.17.1 made none. Own `-Dlog4j…` JVM arguments turn it off
 - ✅ Automatic Java provisioning: Java 25 for 26.x and Java 21 for 1.21.x were downloaded side by side and chosen correctly
 - 🧪 Java compatibility policy (legacy 8, 16/17, 21+)
-- ✅ Vanilla → Paper migration with pre-migration backup and old-jar cleanup. Rollback restores the DB metadata on failure; the failure path itself is 🟡
+- ✅ Vanilla → Paper migration with pre-migration backup and old-jar cleanup (✅ also Vanilla 1.17.1 → Fabric via the API; `server.jar` is kept for the launcher). Rollback restores the DB metadata on failure; the failure path itself is 🟡
 
 **Monitoring**
 - ✅ CPU and RAM per process (Windows via a persistent PowerShell probe; Linux `/proc`, macOS `ps` 🟡)
@@ -79,8 +82,9 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 - Vanilla before 1.20.3 has no TPS/MSPT; it's shown as unavailable.
 - Inbound reachability from the internet cannot be tested without a third-party service; the UI says so.
 - Modrinth is the only plugin marketplace; Hangar/Spigot are not integrated.
+- Fabric: the dashboard only offers the Vanilla→Paper migration; other switches (e.g. to Fabric or Purpur) are API-only so far. Client-only mods are not filtered beyond Modrinth's `server_side` flag.
 - UI is English-only; mobile layouts are responsive by design but were only checked at desktop width.
 
 ## Planned
 
-Two-factor sign-in and per-server permissions for teams, Fabric and NeoForge providers (mods via Modrinth), Bedrock Dedicated Server adapter, S3-compatible backup storage, tunnel provider integrations, remote runtime agents for multiple hosts, container-based isolation, Hangar integration, i18n (German first).
+Two-factor sign-in and per-server permissions for teams, NeoForge provider, Bedrock Dedicated Server adapter, S3-compatible backup storage, tunnel provider integrations, remote runtime agents for multiple hosts, container-based isolation, Hangar integration, i18n (German first).

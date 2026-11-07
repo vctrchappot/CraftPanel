@@ -8,13 +8,15 @@ import {
   conflict,
   createServerSchema,
   notFound,
+  SOFTWARE_INFO,
   type InstallProgress,
   type ServerDetail,
+  type ServerSoftware,
   type ServerStatus,
   type ServerSummary,
 } from "@craftpanel/shared";
 import { eq, playerSessions, servers, and, isNull, type Database } from "@craftpanel/database";
-import { getProvider, JavaManager, inspectJava, isJavaCompatible } from "@craftpanel/minecraft-providers";
+import { ensureLog4jConfig, getProvider, hasOwnLog4jSettings, JavaManager, inspectJava, isJavaCompatible, log4shellMitigation } from "@craftpanel/minecraft-providers";
 import { PropertiesDocument } from "@craftpanel/config";
 import { isPortAvailable } from "@craftpanel/network";
 import { freeDiskSpace, LocalAgent, ServerSandbox } from "@craftpanel/server-runtime";
@@ -120,11 +122,18 @@ export class ServerService {
       javaPath: row.javaPath,
       jvmArgs: row.jvmArgs,
       bindAddress: row.bindAddress,
+      log4shell: this.log4shell(row)?.description ?? null,
       pid: info.pid ?? (row.lastStatus === "orphaned" ? row.pid : null),
       exitCode: info.lastExitCode ?? row.lastExitCode,
       lastError: info.lastError ?? row.lastError,
       players: info.players,
     };
+  }
+
+  /** Log4Shell protection CraftPanel adds on start, unless the user set their own log4j options. */
+  private log4shell(row: Pick<ServerRow, "mcVersion" | "jvmArgs">) {
+    const m = log4shellMitigation(row.mcVersion);
+    return m && !hasOwnLog4jSettings(splitArgs(row.jvmArgs)) ? m : null;
   }
 
   sandbox(row: ServerRow) {
@@ -241,6 +250,11 @@ export class ServerService {
 
         const provider = getProvider(row.software);
         const result = await provider.install({ directory: row.directory, version: row.mcVersion, build: row.build, onProgress: report, signal: ac.signal });
+        const log4j = this.log4shell(row);
+        if (log4j?.configFile) {
+          report("Downloading Log4Shell protection", null);
+          await ensureLog4jConfig(row.directory, log4j.configFile, ac.signal);
+        }
         report("Checking Java runtime", null);
         const javaPath = await this.ensureJava(row.javaMajor, row.javaPath, report, ac.signal);
         await this.db
@@ -315,6 +329,19 @@ export class ServerService {
       await this.syncInfoCommand(row);
       const javaPath = await this.ensureJava(row.javaMajor, row.javaPath);
       if (javaPath !== row.javaPath) await this.db.update(servers).set({ javaPath }).where(eq(servers.id, id));
+      const log4j = this.log4shell(row);
+      if (log4j?.configFile) {
+        try {
+          await ensureLog4jConfig(row.directory, log4j.configFile);
+        } catch (err) {
+          throw new AppError(
+            502,
+            "log4shell_config",
+            `Could not download the Log4Shell protection for Minecraft ${row.mcVersion}: ${(err as Error).message}`,
+            "This version is vulnerable without it, so the server was not started. Check the internet connection and try again.",
+          );
+        }
+      }
 
       this.restartRequired.delete(id);
       await this.db.update(servers).set({ desiredRunning: true, lastError: null, lastStatus: "starting", updatedAt: Date.now() }).where(eq(servers.id, id));
@@ -323,7 +350,7 @@ export class ServerService {
         directory: row.directory,
         jarFile: row.jarFile ?? "server.jar",
         memoryMb: row.memoryMb,
-        jvmArgs: row.jvmArgs.trim() ? row.jvmArgs.trim().split(/\s+/) : [],
+        jvmArgs: [...(log4j?.jvmArgs ?? []), ...splitArgs(row.jvmArgs)],
         software: row.software,
       });
       await this.activity.event(id, "server.start", `Server starting`, { actor });
@@ -405,7 +432,7 @@ export class ServerService {
     const enabled = row.infoCommand ?? (await this.settings.get()).infoCommand;
     try {
       await syncInfoPack(row.directory, enabled, { software: row.software, mcVersion: row.mcVersion });
-      await syncInfoPlugin(row.directory, enabled && row.software === "paper");
+      await syncInfoPlugin(row.directory, enabled && SOFTWARE_INFO[row.software].addons === "plugins");
     } catch (err) {
       await this.activity.event(row.id, "server.info_command_failed", `Could not update the CraftPanel info command: ${(err as Error).message}`, { level: "warn" });
     }
@@ -458,7 +485,7 @@ export class ServerService {
   }
 
   /** Change server software version (e.g. Vanilla → Paper migration or update). */
-  async changeSoftware(id: string, software: "vanilla" | "paper", version: string, build: string | null, actor: Actor) {
+  async changeSoftware(id: string, software: ServerSoftware, version: string, build: string | null, actor: Actor) {
     const row = await this.row(id);
     if (this.agent.isRunning(id)) throw conflict("Stop the server first");
     const provider = getProvider(software);
@@ -472,8 +499,8 @@ export class ServerService {
     await this.install(id, actor);
     const after = await this.row(id);
     if (after.installState !== "installed") throw new AppError(500, "install_failed", after.installError ?? "Installation failed");
-    // Remove the previous jar when the filename changed.
-    if (row.jarFile && after.jarFile !== row.jarFile) await fsp.rm(path.join(row.directory, row.jarFile), { force: true });
+    // Remove the previous jar when the filename changed (Fabric's launcher starts the vanilla server.jar).
+    if (row.jarFile && after.jarFile !== row.jarFile && !(software === "fabric" && row.jarFile === "server.jar")) await fsp.rm(path.join(row.directory, row.jarFile), { force: true });
   }
 
   // ---- agent events & recovery ---------------------------------------------
@@ -544,4 +571,8 @@ export class ServerService {
       }
     }
   }
+}
+
+function splitArgs(args: string): string[] {
+  return args.trim() ? args.trim().split(/\s+/) : [];
 }

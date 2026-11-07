@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ROLES } from "./roles";
+import { SERVER_SOFTWARE } from "./software";
 
 export const usernameSchema = z
   .string()
@@ -58,7 +59,7 @@ export const createServerSchema = z.object({
   name: serverNameSchema,
   description: z.string().max(280).optional().default(""),
   edition: z.literal("java").default("java"),
-  software: z.enum(["vanilla", "paper"]),
+  software: z.enum(SERVER_SOFTWARE),
   mcVersion: mcIdentifierSchema,
   build: z.string().max(32).nullable().optional(),
   levelName: levelNameSchema.default("world"),
