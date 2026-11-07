@@ -1,6 +1,37 @@
 # Deployment
 
-CraftPanel needs **Node.js 22.13+** (24 LTS recommended) on the host. Java is downloaded automatically per Minecraft version. A production build is a single folder, `apps/api/dist`, that contains the server bundle, database migrations and the dashboard. You can build on one machine and copy that folder to another.
+CraftPanel needs **Node.js 22.13+** (24 LTS recommended) on the host. Java is downloaded automatically per Minecraft version. A production build is a single folder, `apps/api/dist`, that contains the server bundle, database migrations and the dashboard. It has no native add-ons, so one build runs on every OS and CPU.
+
+## One-line install (recommended)
+
+Every release on GitHub publishes `craftpanel-vX.Y.Z.tar.gz` (the built app plus these docs), the two installers and `SHA256SUMS`. The installers download the release, verify its checksum, and set CraftPanel up to run in the background.
+
+**Linux** (Debian, Ubuntu, Raspberry Pi OS, other systemd distributions; x64, ARM64, ARMv7):
+
+```bash
+curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash
+```
+
+- App in `/opt/craftpanel`, data in `/var/lib/craftpanel`, service `craftpanel` running as the unprivileged `craftpanel` user (hardened unit, see below).
+- Uses the system Node.js if it is 22.13 or newer and installed system-wide; otherwise downloads the current Node.js LTS from nodejs.org (checksum-verified) into `/opt/craftpanel/node`. Your system Node.js is not changed.
+- Settings: `/etc/craftpanel/craftpanel.env` (port, profile, HTTPS, …). It is created once and kept on updates; apply changes with `sudo systemctl restart craftpanel`. If you move the data directory, also add it to `ReadWritePaths` with `sudo systemctl edit craftpanel`.
+- Update: run the command again or `sudo /opt/craftpanel/update.sh`. Options: `--version 0.2.0` (a specific release, also to go back), `--archive file.tar.gz` (offline; verified if `SHA256SUMS` is next to it), `--port 8090`, `--uninstall` (keeps data and settings). Pass them as `curl … | sudo bash -s -- --port 8090`.
+
+**Windows 10/11** (x64, ARM64):
+
+```powershell
+irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex
+```
+
+- App in `%LOCALAPPDATA%\Programs\CraftPanel`, data in `%LOCALAPPDATA%\CraftPanel`, no administrator rights needed. A scheduled task named `CraftPanel` starts it hidden when you sign in; a Start-menu entry opens the dashboard. Logs: `%LOCALAPPDATA%\CraftPanel\logs\craftpanel.log`.
+- Uses an installed Node.js 22.13+ or downloads one into the install folder.
+- Settings: `config.env` in the install folder. Options are environment variables set before running the command: `$env:CRAFTPANEL_PORT = "8090"`, `CRAFTPANEL_PROFILE` (`lan` or `local`), `CRAFTPANEL_INSTALL_VERSION`, `CRAFTPANEL_ARCHIVE`, `CRAFTPANEL_UNINSTALL = "1"` (keeps data).
+- Update: run the command again, or `update.ps1` in the install folder (the dashboard shows the exact command).
+- CraftPanel runs only while you are signed in. For a dedicated machine, turn on automatic sign-in, or wrap `start.ps1` in a service manager.
+
+**Updates in both installers:** CraftPanel is stopped gracefully first (every running Minecraft server saves its world and stops; on Windows through a local control channel secured by a token in the data directory), the new version replaces the old one, and the installer waits until it answers. If it doesn't start, the previous version is put back and started again. Servers with "Start with CraftPanel" come back up automatically.
+
+## Build it yourself
 
 ```bash
 corepack enable            # Node 25+: npm install -g pnpm
@@ -41,7 +72,7 @@ Recommended setups for a team on different networks:
 
 Give every person their own account with the lowest role that fits.
 
-## Linux (Debian/Ubuntu/Raspberry Pi OS, x64 and arm64)
+## Linux from a git checkout (Debian/Ubuntu/Raspberry Pi OS, x64 and arm64)
 
 ```bash
 # Node.js 24 (NodeSource) — or use your distribution / nvm
@@ -51,13 +82,13 @@ git clone <repository> craftpanel && cd craftpanel
 sudo ./deploy/install-linux.sh
 ```
 
-The installer creates a `craftpanel` system user, installs to `/opt/craftpanel`, stores data in `/var/lib/craftpanel`, and enables `deploy/craftpanel.service` (hardened systemd unit, listening on `0.0.0.0:8080`). Logs: `journalctl -u craftpanel -f`.
+The installer builds the checkout, creates a `craftpanel` system user, installs to `/opt/craftpanel`, stores data in `/var/lib/craftpanel`, and enables `deploy/craftpanel.service` (hardened systemd unit, listening on `0.0.0.0:8080`). Logs: `journalctl -u craftpanel -f`.
 
 **Raspberry Pi notes.** Use a 64-bit OS (Temurin provides aarch64 builds). A Pi 4/5 with 4–8 GB RAM runs a small Paper server well; allocate 1.5–3 GB and keep view distance around 6–8. Prefer an SSD over an SD card for worlds and backups.
 
 **Firewall.** `sudo ufw allow 25565/tcp` for each game port. Allow `8080/tcp` only from your LAN: `sudo ufw allow from 192.168.0.0/16 to any port 8080`.
 
-## Windows
+## Windows from a git checkout
 
 1. Install Node.js 24 LTS from nodejs.org, and Git.
 2. In PowerShell: `corepack enable` (on Node 25+ use `npm install -g pnpm` instead), then `pnpm install; pnpm build`.
@@ -95,7 +126,9 @@ Then set `CRAFTPANEL_SECURE_COOKIES=true` and `CRAFTPANEL_TRUST_PROXY=true`. Web
 
 ## Updating CraftPanel
 
-From the CraftPanel folder:
+Installed with a one-line installer: run it again (see above). The dashboard shows a notice with the right command when a new release is out; it only reads the latest release from the GitHub API and can be turned off in Settings or with `CRAFTPANEL_UPDATE_CHECK=false`.
+
+Git checkout, from the CraftPanel folder:
 
 ```bash
 ./update.sh       # Linux / macOS (update.cmd on Windows)

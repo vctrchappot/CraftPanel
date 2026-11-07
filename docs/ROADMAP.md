@@ -20,11 +20,13 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 ### 1. Release packages and one-line installers (finish Phase 1)
 The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target machine (a Next.js build on a Pi 4 is slow and memory-hungry).
-- [ ] Release workflow: on a `v*` tag, build once and publish `craftpanel-vX.Y.Z.tar.gz` (the self-contained `apps/api/dist` plus `deploy/`, `README.md`, `LICENSE`) with release notes. The bundle has no native add-ons, so one archive fits every OS and CPU.
-- [ ] `deploy/install.sh` for Linux/Pi (`curl -fsSL …/install.sh | bash`): checks Node.js, downloads and verifies the release, installs to `/opt/craftpanel`, sets up the systemd service, prints the address and setup token. Re-running updates.
-- [ ] `deploy/install.ps1` for Windows (`irm …/install.ps1 | iex`): same, with a scheduled task or service wrapper.
-- [ ] Update notice in the dashboard (checks GitHub Releases; no auto-update), and let the update script use releases for non-git installs.
-- [ ] Version bump process: single source of truth for the version (`package.json` → `CRAFTPANEL_VERSION`), changelog.
+- [x] Release workflow: on a `v*` tag, build once and publish `craftpanel-vX.Y.Z.tar.gz` with release notes from `CHANGELOG.md` and `SHA256SUMS`.
+- [x] `deploy/install.sh` for Linux/Pi: verifies the release, private Node.js if needed, systemd service, settings file kept on updates, rollback if the new version doesn't start. Re-running (or `/opt/craftpanel/update.sh`) updates.
+- [x] `deploy/install.ps1` for Windows: per-user install, scheduled task at sign-in, graceful stop via a local control channel, rollback.
+- [x] Update notice in the dashboard (GitHub latest release, opt-out; shows the update command for the install method).
+- [x] Version bump process: `package.json` is the single source, `node scripts/release.mjs bump X.Y.Z` dates the changelog, commits and tags.
+- [ ] Publish the first release and run the real `curl | sudo bash` / `irm | iex` path against it (also on a physical Pi).
+- [ ] macOS: a LaunchAgent installer (today: run the release archive with Node.js by hand).
 - [ ] Optional: multi-arch Docker image (amd64/arm64) with a data volume.
 
 ### 2. Quick platform wins

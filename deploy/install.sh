@@ -155,6 +155,9 @@ main() {
       mv "$INSTALL_DIR/apps.previous" "$INSTALL_DIR/apps"
       [[ -f $INSTALL_DIR/apps.previous.release.json ]] && mv "$INSTALL_DIR/apps.previous.release.json" "$INSTALL_DIR/release.json"
       systemctl start craftpanel || true
+      if wait_healthy; then
+        die "CraftPanel v$version did not start; the previous version${previous:+ (v$previous)} is running again." "See what went wrong: sudo journalctl -u craftpanel -n 80 --no-pager"
+      fi
     fi
     die "CraftPanel did not start." "See what happened: sudo journalctl -u craftpanel -n 50 --no-pager"
   fi
@@ -267,8 +270,10 @@ wait_healthy() {
   host=$(env_value CRAFTPANEL_HOST)
   [[ -z $host || $host == 0.0.0.0 || $host == :: ]] && host=127.0.0.1
   for _ in $(seq 1 60); do
-    curl -fsSk -o /dev/null --max-time 2 "$scheme://$host:$port/api/health" && return 0
+    curl -fsk -o /dev/null --max-time 2 "$scheme://$host:$port/api/health" && return 0
+    # Crash loop: systemd keeps restarting it (Restart=on-failure), so don't wait the full minute.
     systemctl is-failed --quiet craftpanel && return 1
+    (($(systemctl show craftpanel -p NRestarts --value 2>/dev/null || echo 0) >= 2)) && return 1
     sleep 1
   done
   return 1

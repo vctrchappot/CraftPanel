@@ -64,6 +64,10 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 
 **Security**: 🧪 scrypt hashing, sessions, CSRF, Origin checks (HTTP and WS ✅), RBAC matrix for all four roles, rate limiting, setup token for network-exposed installs, audit log.
 
+**Release packages and installers**: ✅ `scripts/release.mjs pack` → one `craftpanel-vX.Y.Z.tar.gz` + `SHA256SUMS`; `release.yml` publishes it on a `v*` tag (🟡 until the first tag is pushed). ✅ `deploy/install.sh` on Linux (WSL 2 Ubuntu, systemd): migration from a `install-linux.sh` service install, private Node.js download when none is installed (v24 from nodejs.org, checksum-verified), update in place, automatic rollback of a broken release within ~12 s with the old version running again; settings in `/etc/craftpanel/craftpanel.env` survive updates. ✅ `deploy/install.ps1` on Windows 11 (no admin): scheduled task at sign-in, update while a Paper 1.21.11 server was running (world saved via the local control channel, server back up with "Start with CraftPanel"), rollback of a broken release. 🧪 both installers in CI (install, update, uninstall keeps data). 🟡 Windows ARM64, physical Raspberry Pi, ARMv7, the `curl | sudo bash` path against a published release.
+
+**Update notice**: 🧪 GitHub latest-release check (cached 6 h, errors and "no release yet" handled, opt-out by setting and `CRAFTPANEL_UPDATE_CHECK=false`), admin-only API, install-method detection for the update command; ✅ Settings → Security & about renders it in the browser. 🟡 the sidebar notice for an actual newer release.
+
 **Deployment**: ✅ single-folder production bundle runs without `node_modules`, ✅ `pnpm dev`, ✅ `deploy/install-linux.sh` and the systemd unit (install and update), ✅ readable service logs, ✅ one-command update (`update.cmd` / `./update.sh`, tested from a diverged old copy on Windows and on a Linux service install), ✅ ARM64 and macOS in CI, 🟡 physical Raspberry Pi.
 
 ## Known limitations

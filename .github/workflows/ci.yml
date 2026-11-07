@@ -103,3 +103,76 @@ jobs:
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/api/health && break; sleep 1; done
       - if: failure()
         run: sudo journalctl -u craftpanel --no-pager | tail -100
+
+  # The release package with the one-line installers: install, update in place, uninstall.
+  package-linux:
+    name: Release package (Linux installer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/release.mjs pack
+      - name: Install from the package
+        run: sudo bash release/install.sh --archive release/craftpanel-v*.tar.gz --port 8085
+      - name: Service answers
+        run: |
+          curl -fsS http://127.0.0.1:8085/api/health
+          curl -fsS http://127.0.0.1:8085/api/auth/state | grep -q '"setupTokenRequired":true'
+          grep -q '"linux-service"' /opt/craftpanel/install.json
+      - name: Updating restarts the service and keeps the settings
+        run: |
+          before=$(systemctl show craftpanel -p MainPID --value)
+          sudo /opt/craftpanel/update.sh --archive release/craftpanel-v*.tar.gz
+          after=$(systemctl show craftpanel -p MainPID --value)
+          test "$before" != "$after"
+          grep -q '^CRAFTPANEL_PORT=8085' /etc/craftpanel/craftpanel.env
+          curl -fsS http://127.0.0.1:8085/api/health
+      - name: Uninstall keeps the data
+        run: |
+          sudo /opt/craftpanel/update.sh --uninstall
+          test ! -e /opt/craftpanel
+          test -f /var/lib/craftpanel/craftpanel.db
+      - if: failure()
+        run: sudo journalctl -u craftpanel --no-pager | tail -100
+
+  package-windows:
+    name: Release package (Windows installer)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/release.mjs pack
+      - name: Install, update and uninstall
+        shell: powershell
+        run: |
+          $env:CRAFTPANEL_ARCHIVE = (Get-Item release\craftpanel-v*.tar.gz).FullName
+          $env:CRAFTPANEL_PORT = "8085"
+          powershell -NoProfile -ExecutionPolicy Bypass -File deploy\install.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8085/api/health | Out-Null
+          $data = Join-Path $env:LOCALAPPDATA "CraftPanel"
+          $before = (Get-Content "$data\control.json" -Raw | ConvertFrom-Json).pid
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Programs\CraftPanel\update.ps1"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $after = (Get-Content "$data\control.json" -Raw | ConvertFrom-Json).pid
+          if ($before -eq $after) { throw "CraftPanel was not restarted" }
+          if (Get-Process -Id $before -ErrorAction SilentlyContinue) { throw "The old CraftPanel is still running" }
+          $env:CRAFTPANEL_UNINSTALL = "1"
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Programs\CraftPanel\update.ps1"
+          if (Test-Path "$env:LOCALAPPDATA\Programs\CraftPanel") { throw "Install folder still exists" }
+          if (-not (Test-Path "$data\craftpanel.db")) { throw "Data was removed" }
+      - if: failure()
+        shell: powershell
+        run: Get-Content "$env:LOCALAPPDATA\CraftPanel\logs\*.log" -ErrorAction SilentlyContinue

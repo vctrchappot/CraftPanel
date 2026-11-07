@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Installs CraftPanel as a systemd service on Linux (x64 or arm64, e.g. Raspberry Pi 4/5).
+# Installs CraftPanel from a git checkout as a systemd service on Linux (x64 or arm64).
+# Most people want the release installer instead (no build needed): see deploy/install.sh.
 # Run from the cloned repository:  sudo ./deploy/install-linux.sh
-# Re-run it after "git pull" to update: it rebuilds, replaces /opt/craftpanel and restarts the service.
+# Re-run it after "git pull" (or use ./update.sh) to update: it rebuilds, replaces /opt/craftpanel and restarts the service.
 set -euo pipefail
 
 INSTALL_DIR=/opt/craftpanel
@@ -34,6 +35,9 @@ echo "Installing to $INSTALL_DIR…"
 rm -rf "$INSTALL_DIR/apps"
 mkdir -p "$INSTALL_DIR/apps/api"
 cp -r apps/api/dist "$INSTALL_DIR/apps/api/dist"
+# Tells the dashboard's update notice how this copy is updated.
+printf '{ "method": "linux-service", "updateCommand": "cd %s && ./update.sh" }\n' "$REPO_DIR" > "$INSTALL_DIR/install.json"
+rm -f "$INSTALL_DIR/release.json" "$INSTALL_DIR/update.sh"
 chown -R root:root "$INSTALL_DIR"
 chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
 chmod 750 "$DATA_DIR"

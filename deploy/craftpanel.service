@@ -1,7 +1,6 @@
 # systemd unit for CraftPanel on Linux (Raspberry Pi OS, Debian, Ubuntu, ...).
-# Install:  sudo cp deploy/craftpanel.service /etc/systemd/system/
-#           sudo systemctl daemon-reload && sudo systemctl enable --now craftpanel
-# Adjust User, WorkingDirectory and the environment to your setup.
+# Installed by deploy/install.sh (release) or deploy/install-linux.sh (git checkout); both replace it on update.
+# Change settings in /etc/craftpanel/craftpanel.env instead: it overrides the defaults below and is kept.
 [Unit]
 Description=CraftPanel Minecraft server manager
 After=network-online.target
@@ -19,6 +18,7 @@ Environment=CRAFTPANEL_DATA_DIR=/var/lib/craftpanel
 # Use "proxy" behind an HTTPS reverse proxy on this machine, or "local" for SSH-tunnel access.
 Environment=CRAFTPANEL_PROFILE=lan
 Environment=CRAFTPANEL_PORT=8080
+EnvironmentFile=-/etc/craftpanel/craftpanel.env
 # CraftPanel stops Minecraft servers gracefully on SIGTERM (up to 60 s each).
 KillSignal=SIGTERM
 TimeoutStopSec=120

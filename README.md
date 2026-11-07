@@ -15,7 +15,27 @@
 
 > Minecraft is a trademark of Mojang AB. CraftPanel is not affiliated with Mojang or Microsoft and never redistributes server software. It downloads it from official sources on your behalf after you accept the [Minecraft EULA](https://aka.ms/MinecraftEULA).
 
-## Quick start
+## Install
+
+One command installs the latest release and keeps CraftPanel running in the background. Nothing is built on your machine, and Node.js is set up automatically if needed. Java is installed per Minecraft version.
+
+**Linux, Raspberry Pi, VPS** (systemd; x64, ARM64, ARMv7):
+
+```bash
+curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash
+```
+
+**Windows 10/11** (PowerShell, no administrator rights needed; starts when you sign in):
+
+```powershell
+irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex
+```
+
+The installer prints the dashboard address and a one-time **setup token** for creating the owner account. Run the same command again to update; a failed update rolls back automatically. The dashboard shows a notice when a new release is out (Settings → Security & about). Options, uninstalling and what goes where: [docs/deployment](docs/deployment/README.md#one-line-install-recommended).
+
+Every release also has a plain `craftpanel-vX.Y.Z.tar.gz` that runs anywhere with Node.js 22.13+: unpack it and run `node apps/api/dist/index.js --profile lan`.
+
+## Run from source
 
 Requirements: **Node.js 22.13 or newer** (24 LTS recommended), **pnpm** (`corepack enable`, or `npm install -g pnpm` on Node 25+ where corepack is no longer bundled), Git, and an internet connection for downloads. Java is installed automatically.
 
@@ -42,11 +62,7 @@ Which networks may connect (home network, VPN such as Tailscale, specific addres
 
 When the dashboard is reachable from the network, the first account can only be created with a **one-time setup token**. It is printed in the console on startup and saved as `setup-token.txt` in the data directory. Nobody else on your network can claim the owner account first.
 
-For a permanent install on Linux (including Raspberry Pi OS 64-bit), use the systemd installer:
-
-```bash
-sudo ./deploy/install-linux.sh
-```
+For a permanent install from a git checkout on Linux, `sudo ./deploy/install-linux.sh` builds it and sets up the same systemd service as the one-line installer.
 
 See [docs/deployment](docs/deployment/README.md) for Windows, macOS, Raspberry Pi, VPS and reverse-proxy/HTTPS setups.
 
@@ -54,7 +70,9 @@ See [docs/deployment](docs/deployment/README.md) for Windows, macOS, Raspberry P
 
 ## Updating
 
-Already have CraftPanel? One command brings it to the newest version:
+Installed with the one-line installer? Run the install command again (Linux also: `sudo /opt/craftpanel/update.sh`).
+
+Running a git checkout? One command brings it to the newest version:
 
 ```bash
 update.cmd        # Windows (in the CraftPanel folder)
@@ -79,7 +97,7 @@ git reset --hard origin/main
 
 ## Configuration
 
-All settings are environment variables. See [`.env.example`](.env.example).
+All settings are environment variables. Installed with the one-line installer, they go into `/etc/craftpanel/craftpanel.env` (Linux) or `config.env` in the install folder (Windows). See [`.env.example`](.env.example).
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -92,6 +110,7 @@ All settings are environment variables. See [`.env.example`](.env.example).
 | `CRAFTPANEL_TLS_CERT` / `CRAFTPANEL_TLS_KEY` | — | Serve HTTPS directly with these PEM files |
 | `CRAFTPANEL_SESSION_TTL_HOURS` | `168` | Session lifetime |
 | `CRAFTPANEL_LOG_LEVEL` / `CRAFTPANEL_LOG_FORMAT` | `info` / `pretty` | Logging (`debug` shows every request, `json` for log collectors) |
+| `CRAFTPANEL_UPDATE_CHECK` | `true` | `false` never contacts GitHub for the update notice (also a switch in Settings) |
 
 Who may open the dashboard from other devices is configured live in **Settings → Remote access** (see [docs/deployment](docs/deployment/README.md#remote-access-for-teams)).
 
