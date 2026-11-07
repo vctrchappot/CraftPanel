@@ -1,7 +1,7 @@
 # Development
 
 ```bash
-corepack enable
+corepack enable            # Node 25+: npm install -g pnpm
 pnpm install
 pnpm dev            # API :8080 (tsx watch) + Next.js :3000; data in ./.data
 ```

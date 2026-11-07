@@ -15,12 +15,12 @@
 
 ## Quick start
 
-Requirements: **Node.js 22.13 or newer** (24 LTS recommended), **pnpm** (`corepack enable`), Git, and an internet connection for downloads. Java is installed automatically.
+Requirements: **Node.js 22.13 or newer** (24 LTS recommended), **pnpm** (`corepack enable`, or `npm install -g pnpm` on Node 25+ where corepack is no longer bundled), Git, and an internet connection for downloads. Java is installed automatically.
 
 ```bash
 git clone <this repository> craftpanel
 cd craftpanel
-corepack enable
+corepack enable            # Node 25+: npm install -g pnpm
 pnpm install
 pnpm build
 pnpm start

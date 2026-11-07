@@ -3,7 +3,7 @@
 CraftPanel needs **Node.js 22.13+** (24 LTS recommended) on the host. Java is downloaded automatically per Minecraft version. A production build is a single folder, `apps/api/dist`, that contains the server bundle, database migrations and the dashboard. You can build on one machine and copy that folder to another.
 
 ```bash
-corepack enable
+corepack enable            # Node 25+: npm install -g pnpm
 pnpm install
 pnpm build            # → apps/api/dist
 node apps/api/dist/index.js
@@ -38,7 +38,7 @@ The installer creates a `craftpanel` system user, installs to `/opt/craftpanel`,
 ## Windows
 
 1. Install Node.js 24 LTS from nodejs.org, and Git.
-2. In PowerShell: `corepack enable; pnpm install; pnpm build`.
+2. In PowerShell: `corepack enable` (on Node 25+ use `npm install -g pnpm` instead), then `pnpm install; pnpm build`.
 3. Run `node apps\api\dist\index.js`. Windows Defender Firewall asks to allow Java the first time a server starts. Allow **private networks** only.
 4. To run at logon, create a Task Scheduler task ("At log on", action `node.exe` with argument `C:\path\to\craftpanel\apps\api\dist\index.js`, "Start in" the repository folder). For a background service, wrap it with a service manager such as NSSM or WinSW. Make sure it stops with Ctrl+C/SIGINT semantics so servers shut down gracefully.
 
@@ -48,7 +48,7 @@ Data lives in `%LOCALAPPDATA%\CraftPanel` by default.
 
 ```bash
 brew install node git
-corepack enable && pnpm install && pnpm build
+npm install -g pnpm && pnpm install && pnpm build
 node apps/api/dist/index.js
 ```
 
