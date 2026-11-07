@@ -85,6 +85,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          # The installer builds as another user via sudo, so there is no store to cache here.
+          package-manager-cache: false
       - name: Install as a service
         run: sudo env "PATH=$PATH" ./deploy/install-linux.sh
       - name: Service answers
