@@ -14,3 +14,4 @@ playwright-report/
 .api-*.log
 .dev-test.log
 tsconfig.tsbuildinfo
+release/

@@ -1,0 +1,56 @@
+name: Release
+
+# Publishes a GitHub release when a version tag is pushed:
+#   node scripts/release.mjs bump 0.2.0 && git push --follow-tags
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Tag matches package.json
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: node scripts/release.mjs pack
+      - name: Smoke test the package
+        run: |
+          mkdir /tmp/smoke && tar -xzf release/craftpanel-$GITHUB_REF_NAME.tar.gz -C /tmp/smoke
+          cd /tmp/smoke/craftpanel-$GITHUB_REF_NAME
+          CRAFTPANEL_DATA_DIR=/tmp/smoke/data CRAFTPANEL_PORT=8090 node apps/api/dist/index.js &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8090/api/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8090/ | grep -q CraftPanel
+      - name: Release notes
+        run: |
+          node scripts/release.mjs notes > release/NOTES.md
+          cat >> release/NOTES.md <<NOTES
+
+          ## Install or update
+
+          **Linux / Raspberry Pi** (systemd): \`curl -fsSL https://github.com/$GITHUB_REPOSITORY/releases/latest/download/install.sh | sudo bash\`
+
+          **Windows** (PowerShell): \`irm https://github.com/$GITHUB_REPOSITORY/releases/latest/download/install.ps1 | iex\`
+
+          Already installed: run the same command again, or the update command shown in Settings → Security & about. Servers, worlds and backups are kept.
+          NOTES
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          [[ $GITHUB_REF_NAME == *-* ]] && prerelease="--prerelease"
+          gh release create "$GITHUB_REF_NAME" --title "CraftPanel $GITHUB_REF_NAME" --notes-file release/NOTES.md $prerelease \
+            release/craftpanel-$GITHUB_REF_NAME.tar.gz release/install.sh release/install.ps1 release/SHA256SUMS
