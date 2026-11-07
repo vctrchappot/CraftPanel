@@ -9,7 +9,9 @@ CraftPanel administers processes and files on the host. Whoever controls an Owne
 **Authentication & sessions**
 - Local accounts only. Passwords are hashed with scrypt (N=2¹⁵, r=8, p=1) and a per-user salt, and compared in constant time. Unknown users get a dummy hash comparison so timing doesn't reveal which accounts exist.
 - Random 256-bit session tokens in an `HttpOnly`, `SameSite=Strict` cookie (`Secure` when `CRAFTPANEL_SECURE_COOKIES=true`). Only the SHA-256 of the token is stored. Sessions slide and expire, and are revoked on logout, password change, role change or account disablement. Open WebSockets for those sessions are closed.
-- First-run setup on network-exposed installs requires a one-time token readable only on the host.
+- First-run setup on network-exposed installs requires a one-time token readable only on the host. The token file is deleted once the owner account exists.
+- Network access policy (Settings → Remote access): by default only private networks and VPNs may reach the dashboard, even when it listens on all interfaces. Checked before anything else on every request and WebSocket upgrade; the host itself is always allowed, and changes that would lock out the requester are refused.
+- Optional built-in HTTPS (`CRAFTPANEL_TLS_CERT`/`CRAFTPANEL_TLS_KEY`) turns on Secure cookies automatically.
 - Login and setup are rate-limited (10/min per IP), and the whole API is limited to 600/min.
 
 **Request integrity**

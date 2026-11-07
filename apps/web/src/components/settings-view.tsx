@@ -33,6 +33,7 @@ import { useAuth, useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
 import { formatDateTime } from "@/lib/format";
 import { useSystem } from "./home";
+import { RemoteAccess } from "./remote-access";
 
 export function SettingsView() {
   const params = useSearchParams();
@@ -46,6 +47,7 @@ export function SettingsView() {
           <TabsTrigger value="account">Account</TabsTrigger>
           {canOwner && <TabsTrigger value="users">Users</TabsTrigger>}
           {canOwner && <TabsTrigger value="backups">Backups</TabsTrigger>}
+          {canOwner && <TabsTrigger value="access">Remote access</TabsTrigger>}
           {canOwner && <TabsTrigger value="network">Dynamic DNS</TabsTrigger>}
           <TabsTrigger value="java">Java</TabsTrigger>
           {canAudit && <TabsTrigger value="audit">Audit log</TabsTrigger>}
@@ -56,6 +58,7 @@ export function SettingsView() {
         </TabsContent>
         <TabsContent value="users">{canOwner && <Users />}</TabsContent>
         <TabsContent value="backups">{canOwner && <BackupSettings />}</TabsContent>
+        <TabsContent value="access">{canOwner && <RemoteAccess />}</TabsContent>
         <TabsContent value="network">{canOwner && <DdnsSettings />}</TabsContent>
         <TabsContent value="java">
           <JavaRuntimes />
@@ -406,8 +409,9 @@ function About() {
       <Section title="Dashboard exposure">
         <p className="text-[13px] text-muted-foreground">
           {s.data?.dashboard.loopbackOnly
-            ? "The dashboard only listens on this computer (127.0.0.1). To manage it from another device, set CRAFTPANEL_HOST to a LAN address and restart."
-            : `The dashboard listens on ${s.data?.dashboard.host}:${s.data?.dashboard.port}. Keep it on a private network or VPN, and put an HTTPS reverse proxy in front for remote access. Never port-forward it.`}
+            ? "The dashboard only listens on this computer (127.0.0.1). Start CraftPanel with the lan profile to manage it from other devices."
+            : `The dashboard listens on ${s.data?.dashboard.host}:${s.data?.dashboard.port}. Keep it on a private network or VPN, and use HTTPS for access over the internet. Never port-forward it over plain HTTP.`}{" "}
+          Addresses and allowed networks are under Remote access.
         </p>
       </Section>
       {canOwner && (

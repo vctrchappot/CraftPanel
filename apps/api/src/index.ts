@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CRAFTPANEL_VERSION } from "@craftpanel/shared";
-import { lanAddresses } from "@craftpanel/network";
+import { dashboardUrls } from "@craftpanel/network";
 import { loadConfig, PROFILES, type AppConfig } from "./config";
 import { createContext } from "./bootstrap";
 import { buildApp } from "./app";
@@ -14,27 +14,19 @@ const bold = style("1");
 const dim = style("2");
 const cyan = style("36");
 
-const VIRTUAL_ADAPTER = /vEthernet|Hyper-V|VirtualBox|VMware|docker|^br-|^veth|^virbr|^vboxnet|^tailscale|^zt/i;
-
 function banner(config: AppConfig, setupToken: string | null): string {
-  const port = config.port;
-  const wildcard = config.host === "0.0.0.0" || config.host === "::";
-  const local = `http://${config.isLoopbackOnly || wildcard ? "localhost" : config.host}:${port}`;
-  // Hide virtual adapters (WSL, Hyper-V, VirtualBox, Docker) unless they are all there is.
-  const all = wildcard ? lanAddresses() : [];
-  const physical = all.filter((a) => !VIRTUAL_ADAPTER.test(a.interface));
-  const lan = (physical.length ? physical : all).map((a) => `http://${a.address}:${port}`);
+  // VM/container adapters (WSL, Hyper-V, Docker…) are rarely what you want to share; the dashboard lists them all.
+  const shown = dashboardUrls(config.host, config.port, !!config.tls).filter((u) => u.kind !== "virtual");
   const what = config.serveWeb && config.webDir ? "Dashboard" : "API";
   const rows: string[] = [
     "",
     `  ${bold("CraftPanel")} ${dim("v" + CRAFTPANEL_VERSION)}  ·  profile ${bold(config.profile)} ${dim("(" + PROFILES[config.profile].summary + ")")}`,
     "",
-    `  ${what.padEnd(10)} ${cyan(local)}`,
-    ...lan.map((u) => `  ${"".padEnd(10)} ${cyan(u)} ${dim("(network)")}`),
+    ...shown.map((u, i) => `  ${(i === 0 ? what : "").padEnd(10)} ${cyan(u.url)}${u.kind === "local" ? "" : " " + dim(u.kind === "vpn" ? "(VPN)" : "(network)")}`),
     `  ${"Data".padEnd(10)} ${config.layout.root}`,
   ];
   if (setupToken) rows.push("", `  ${bold("Setup token")} ${bold(cyan(setupToken))}  ${dim("needed once to create the owner account")}`);
-  rows.push("", dim(`  Profiles: ${Object.keys(PROFILES).join(" | ")}  →  pnpm start:<profile>  or  --profile <name>.  Stop with Ctrl+C.`), "");
+  rows.push("", dim(`  Profiles: ${Object.keys(PROFILES).join(" | ")}  →  pnpm start:<profile>  or  --profile <name>.${tty ? "  Stop with Ctrl+C." : ""}`), "");
   return rows.join("\n");
 }
 

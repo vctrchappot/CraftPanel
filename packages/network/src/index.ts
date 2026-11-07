@@ -63,6 +63,103 @@ export function listLocalAddresses(): LocalAddress[] {
   return out;
 }
 
+// ---- dashboard access control ------------------------------------------------
+
+/** Who may open the dashboard: only this machine, private networks and VPNs, or anyone. */
+export type AccessPolicy = "local" | "private" | "any";
+
+/** Strip the IPv4-mapped IPv6 prefix (::ffff:192.168.1.5) and IPv6 zone ids. */
+export function normalizeIp(ip: string): string {
+  const s = ip.trim().toLowerCase().replace(/%.*$/, "");
+  return s.startsWith("::ffff:") && s.includes(".") ? s.slice(7) : s;
+}
+
+function ipv6ToBigInt(ip: string): bigint | null {
+  if (!/^[0-9a-f:]+$/.test(ip) || !ip.includes(":")) return null;
+  const halves = ip.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":") : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const missing = 8 - head.length - tail.length;
+  if (missing < 0 || (halves.length === 1 && missing !== 0)) return null;
+  const groups = [...head, ...Array(missing).fill("0"), ...tail];
+  let n = 0n;
+  for (const g of groups) {
+    if (!/^[0-9a-f]{1,4}$/.test(g)) return null;
+    n = (n << 16n) | BigInt(parseInt(g, 16));
+  }
+  return n;
+}
+
+/** Validate an IP address or CIDR range (IPv4 or IPv6). Returns the normalized form or null. */
+export function parseNetwork(input: string): string | null {
+  const [rawIp, bitsStr, ...rest] = input.trim().split("/");
+  if (rest.length || !rawIp) return null;
+  const ip = normalizeIp(rawIp);
+  const v4 = ipv4ToInt(ip) !== null;
+  const v6 = !v4 && ipv6ToBigInt(ip) !== null;
+  if (!v4 && !v6) return null;
+  if (bitsStr === undefined) return ip;
+  if (!/^\d{1,3}$/.test(bitsStr) || Number(bitsStr) > (v4 ? 32 : 128)) return null;
+  return `${ip}/${Number(bitsStr)}`;
+}
+
+/** True when `ip` equals or lies inside `network` (IP or CIDR, IPv4 or IPv6). */
+export function ipMatches(ip: string, network: string): boolean {
+  const addr = normalizeIp(ip);
+  const [base, bitsStr] = network.split("/");
+  if (!base) return false;
+  if (ipv4ToInt(addr) !== null) return bitsStr === undefined ? addr === base : ipv4ToInt(base) !== null && inRange(addr, `${base}/${bitsStr}`);
+  const a = ipv6ToBigInt(addr);
+  const b = ipv6ToBigInt(base);
+  if (a === null || b === null) return false;
+  const bits = bitsStr === undefined ? 128 : Number(bitsStr);
+  const shift = BigInt(128 - bits);
+  return a >> shift === b >> shift;
+}
+
+/** Private address space: home/office LANs, VPN overlays such as Tailscale (100.64/10), link-local and IPv6 ULA. */
+export function isPrivateAddress(ip: string): boolean {
+  const a = normalizeIp(ip);
+  if (ipv4ToInt(a) !== null) return isLoopback(a) || isPrivateIPv4(a) || isCgnatIPv4(a) || isLinkLocal(a);
+  return a === "::1" || ipMatches(a, "fc00::/7") || ipMatches(a, "fe80::/10");
+}
+
+/** Whether a client address may use the dashboard. The host itself is always allowed, so nobody locks themselves out. */
+export function isClientAllowed(ip: string, policy: AccessPolicy, extraNetworks: string[] = []): boolean {
+  const a = normalizeIp(ip);
+  if (isLoopback(a)) return true;
+  if (extraNetworks.some((n) => ipMatches(a, n))) return true;
+  if (policy === "any") return true;
+  if (policy === "private") return isPrivateAddress(a);
+  return false;
+}
+
+export interface DashboardUrl {
+  url: string;
+  /** local = this machine, lan = home/office network, vpn = Tailscale/WireGuard/ZeroTier, virtual = VM/container adapters. */
+  kind: "local" | "lan" | "vpn" | "virtual";
+  interface?: string;
+}
+
+const VPN_ADAPTER = /tailscale|wireguard|^wg\d|^zt|zerotier|^utun/i;
+const VIRTUAL_ADAPTER = /vEthernet|Hyper-V|VirtualBox|VMware|docker|^br-|^veth|^virbr|^vboxnet|^lxc|^cni/i;
+
+/** Every address the dashboard can be opened at, given the address it listens on. */
+export function dashboardUrls(host: string, port: number, https = false): DashboardUrl[] {
+  const scheme = https ? "https" : "http";
+  const fmt = (h: string) => `${scheme}://${h.includes(":") ? `[${h}]` : h}:${port}`;
+  const wildcard = host === "0.0.0.0" || host === "::";
+  if (!wildcard) return [{ url: fmt(isLoopback(host) ? "localhost" : host), kind: isLoopback(host) ? "local" : isCgnatIPv4(host) ? "vpn" : "lan" }];
+  const out: DashboardUrl[] = [{ url: fmt("localhost"), kind: "local" }];
+  for (const a of listLocalAddresses()) {
+    if (a.internal || a.family !== "IPv4" || isLinkLocal(a.address)) continue;
+    const kind = VPN_ADAPTER.test(a.interface) || isCgnatIPv4(a.address) ? "vpn" : VIRTUAL_ADAPTER.test(a.interface) ? "virtual" : "lan";
+    out.push({ url: fmt(a.address), kind, interface: a.interface });
+  }
+  return out;
+}
+
 /** Private, non-loopback IPv4 addresses players on the LAN can use. */
 export function lanAddresses(): LocalAddress[] {
   return listLocalAddresses().filter((a) => a.family === "IPv4" && !a.internal && !isLinkLocal(a.address) && (a.private || isCgnatIPv4(a.address)));

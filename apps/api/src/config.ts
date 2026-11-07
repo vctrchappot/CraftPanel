@@ -21,6 +21,8 @@ export interface AppConfig {
   /** Serve the web dashboard (false in the headless profile). */
   serveWeb: boolean;
   logFormat: "pretty" | "json";
+  /** Serve HTTPS directly with this certificate/key (PEM file paths). */
+  tls: { certFile: string; keyFile: string } | null;
   host: string;
   port: number;
   layout: DataLayout;
@@ -54,6 +56,10 @@ export function loadConfig(env = process.env, argv: string[] = []): AppConfig {
   const profile = requested as ProfileName;
   const preset = PROFILES[profile];
   const host = env.CRAFTPANEL_HOST ?? preset.host;
+  const certFile = env.CRAFTPANEL_TLS_CERT;
+  const keyFile = env.CRAFTPANEL_TLS_KEY;
+  if (!!certFile !== !!keyFile) throw new Error("Set both CRAFTPANEL_TLS_CERT and CRAFTPANEL_TLS_KEY to enable HTTPS");
+  const tls = certFile && keyFile ? { certFile: path.resolve(certFile), keyFile: path.resolve(keyFile) } : null;
   const port = Number(env.CRAFTPANEL_PORT ?? 8080);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("CRAFTPANEL_PORT must be a valid port");
   const root = env.CRAFTPANEL_DATA_DIR ? path.resolve(env.CRAFTPANEL_DATA_DIR) : defaultDataDir();
@@ -65,7 +71,9 @@ export function loadConfig(env = process.env, argv: string[] = []): AppConfig {
     profile,
     serveWeb: preset.web,
     logFormat: env.CRAFTPANEL_LOG_FORMAT === "json" ? "json" : "pretty",
-    secureCookies: env.CRAFTPANEL_SECURE_COOKIES ? env.CRAFTPANEL_SECURE_COOKIES === "true" : preset.secureCookies,
+    tls,
+    // Cookies must be Secure whenever the browser talks HTTPS (directly or through a proxy).
+    secureCookies: env.CRAFTPANEL_SECURE_COOKIES ? env.CRAFTPANEL_SECURE_COOKIES === "true" : preset.secureCookies || !!tls,
     trustProxy: env.CRAFTPANEL_TRUST_PROXY ? env.CRAFTPANEL_TRUST_PROXY === "true" : preset.trustProxy,
     webDir: env.CRAFTPANEL_WEB_DIR ?? null,
     sessionTtlMs: Number(env.CRAFTPANEL_SESSION_TTL_HOURS ?? 24 * 7) * 3600_000,

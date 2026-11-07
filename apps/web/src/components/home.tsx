@@ -24,7 +24,17 @@ export interface SystemInfo {
   allocatedMemoryMb: number;
   disk: { free: number; total: number } | null;
   dataDir: string;
-  dashboard: { host: string; port: number; loopbackOnly: boolean; secureCookies: boolean };
+  dashboard: {
+    host: string;
+    port: number;
+    loopbackOnly: boolean;
+    secureCookies: boolean;
+    profile: "local" | "lan" | "proxy" | "headless";
+    https: boolean;
+    behindProxy: boolean;
+    urls: { url: string; kind: "local" | "lan" | "vpn" | "virtual"; interface?: string }[];
+    clientIp: string;
+  };
   lan: string[];
   servers: { total: number; running: number };
 }

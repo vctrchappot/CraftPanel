@@ -9,15 +9,37 @@ pnpm build            # → apps/api/dist
 node apps/api/dist/index.js
 ```
 
-## Choosing where the dashboard listens
+## Start profiles
 
-| Scenario | Setting |
-| --- | --- |
-| Same computer only (default) | `CRAFTPANEL_HOST=127.0.0.1` |
-| Manage from other devices at home | `CRAFTPANEL_HOST=0.0.0.0` (or the machine's LAN IP) |
-| Remote administration over the internet | Keep the dashboard private and reach it through a VPN (WireGuard/Tailscale), or put it behind an HTTPS reverse proxy with `CRAFTPANEL_SECURE_COOKIES=true` and `CRAFTPANEL_TRUST_PROXY=true` |
+Pick how CraftPanel starts with a profile: `pnpm start:<profile>`, `node apps/api/dist/index.js --profile <profile>` or `CRAFTPANEL_PROFILE=<profile>`. Individual `CRAFTPANEL_*` variables still override parts of it (see `.env.example`).
 
-When bound to anything other than loopback, first-run setup requires the token printed at startup and stored in `<data dir>/setup-token.txt`.
+| Profile | Dashboard | Use it when |
+| --- | --- | --- |
+| `local` (default) | This computer only (`127.0.0.1`) | You manage servers on the machine you're sitting at, or through an SSH tunnel |
+| `lan` | All interfaces (`0.0.0.0`) | You manage a Pi, home server or second PC from other devices at home, or over a VPN |
+| `proxy` | `127.0.0.1`, Secure cookies, trusts `X-Forwarded-For` | An HTTPS reverse proxy (Caddy, nginx, Cloudflare Tunnel) on the same machine publishes the dashboard |
+| `headless` | API and WebSocket only, no web UI | Automation and scripts; base for future remote agents |
+
+When the dashboard listens on anything other than loopback, first-run setup requires the token printed at startup (also in `<data dir>/setup-token.txt`, deleted once the owner exists).
+
+## Remote access for teams
+
+Where the dashboard *listens* is set by the profile; *who may connect* is set live in **Settings → Remote access**, without restarting (running Minecraft servers keep running):
+
+- **This computer only** — everything else gets an "access not allowed" page.
+- **Private networks and VPNs** (default) — LANs (10/8, 172.16/12, 192.168/16), Tailscale/CGNAT (100.64/10), link-local and private IPv6. Requests from public addresses are refused, so an accidental port forward doesn't expose the dashboard.
+- **Anywhere** — only together with HTTPS.
+- **Additional addresses** — IPs or CIDR ranges that are always allowed, e.g. an office's public IP.
+
+The host itself is always allowed, and CraftPanel refuses a change that would lock out the person making it. The page also lists every address the dashboard is reachable at (LAN, VPN) with copy buttons.
+
+Recommended setups for a team on different networks:
+
+1. **VPN (simplest, most secure):** install Tailscale (or WireGuard) on the host and team devices, start with the `lan` profile, keep the default rule. Nothing is exposed to the internet.
+2. **HTTPS reverse proxy:** Caddy/nginx with a real certificate in front, `proxy` profile, then allow "Anywhere" or the team's addresses. A Cloudflare Tunnel works without opening ports.
+3. **Built-in HTTPS:** set `CRAFTPANEL_TLS_CERT` and `CRAFTPANEL_TLS_KEY` to PEM files (e.g. `tailscale cert <name>` or Let's Encrypt). Secure cookies switch on automatically.
+
+Give every person their own account with the lowest role that fits.
 
 ## Linux (Debian/Ubuntu/Raspberry Pi OS, x64 and arm64)
 

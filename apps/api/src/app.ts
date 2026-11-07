@@ -9,6 +9,7 @@ import websocket from "@fastify/websocket";
 import fastifyStatic from "@fastify/static";
 import { AppError } from "@craftpanel/shared";
 import { PathError } from "@craftpanel/backup";
+import { isClientAllowed } from "@craftpanel/network";
 import { SESSION_COOKIE, safeEqual } from "./auth/sessions";
 import type { AppContext } from "./context";
 import { authRoutes } from "./routes/auth";
@@ -21,10 +22,27 @@ const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const CSRF_EXEMPT = new Set(["/api/auth/login", "/api/auth/setup"]);
 
 export async function buildApp(ctx: AppContext, opts: { logger?: boolean | object } = {}): Promise<FastifyInstance> {
+  const tls = ctx.config.tls;
   const app = Fastify({
     logger: opts.logger ?? { level: ctx.config.logLevel },
     trustProxy: ctx.config.trustProxy,
     bodyLimit: 6 * 1024 * 1024,
+    ...(tls ? { https: { cert: fs.readFileSync(tls.certFile), key: fs.readFileSync(tls.keyFile) } } : {}),
+  }) as unknown as FastifyInstance;
+
+  // Network access policy (Settings → Remote access). Runs before everything else, including
+  // the dashboard files and WebSocket upgrades. The host itself is always allowed.
+  const deniedLogged = new Map<string, number>();
+  app.addHook("onRequest", async (req, reply) => {
+    const { dashboardAccess, allowedNetworks } = await ctx.settings.get();
+    if (isClientAllowed(req.ip, dashboardAccess, allowedNetworks)) return;
+    const now = Date.now();
+    if ((deniedLogged.get(req.ip) ?? 0) < now - 600_000) {
+      deniedLogged.set(req.ip, now);
+      if (deniedLogged.size > 1000) deniedLogged.clear();
+      req.log.warn(`Blocked dashboard access from ${req.ip} (allowed: ${dashboardAccess === "local" ? "this computer only" : "private networks and VPNs"}). Change this in Settings → Remote access.`);
+    }
+    return reply.code(403).type("text/plain; charset=utf-8").send("CraftPanel: access from your network is not allowed. The owner can change this in Settings → Remote access.");
   });
 
   await app.register(cookie);

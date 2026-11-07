@@ -1,4 +1,5 @@
 import { appSettings, eq, type Database } from "@craftpanel/database";
+import type { AccessPolicy } from "@craftpanel/network";
 
 export interface AppSettings {
   backupDirectory: string | null;
@@ -9,6 +10,10 @@ export interface AppSettings {
   publicIp: string | null;
   /** Ship the `/trigger craftpanel` info datapack to managed worlds. */
   infoCommand: boolean;
+  /** Which client addresses may use the dashboard (only matters when it listens beyond loopback). */
+  dashboardAccess: AccessPolicy;
+  /** Extra IPs/CIDR ranges always allowed, e.g. an office's public address. */
+  allowedNetworks: string[];
 }
 
 const DEFAULTS: AppSettings = {
@@ -19,6 +24,8 @@ const DEFAULTS: AppSettings = {
   ddnsToken: "",
   publicIp: null,
   infoCommand: true,
+  dashboardAccess: "private",
+  allowedNetworks: [],
 };
 
 export class SettingsService {

@@ -9,7 +9,7 @@ import { nextRuns, validateCron } from "@craftpanel/scheduler";
 import { getProvider, PROVIDERS } from "@craftpanel/minecraft-providers";
 import { SETTING_GROUPS, SETTINGS } from "@craftpanel/config";
 import { freeDiskSpace } from "@craftpanel/server-runtime";
-import { lanAddresses } from "@craftpanel/network";
+import { dashboardUrls, isClientAllowed, lanAddresses, parseNetwork } from "@craftpanel/network";
 import { actorOf, noContent, requirePermission, requireUser, type AppContext } from "../context";
 import { parse } from "../validate";
 
@@ -143,7 +143,17 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
       disk,
       dataDir: ctx.config.layout.root,
       uptimeSec: Math.round(process.uptime()),
-      dashboard: { host: ctx.config.host, port: ctx.config.port, loopbackOnly: ctx.config.isLoopbackOnly, secureCookies: ctx.config.secureCookies },
+      dashboard: {
+        host: ctx.config.host,
+        port: ctx.config.port,
+        loopbackOnly: ctx.config.isLoopbackOnly,
+        secureCookies: ctx.config.secureCookies,
+        profile: ctx.config.profile,
+        https: !!ctx.config.tls,
+        behindProxy: ctx.config.trustProxy,
+        urls: dashboardUrls(ctx.config.host, ctx.config.port, !!ctx.config.tls),
+        clientIp: req.ip,
+      },
       lan: lanAddresses().map((a) => a.address),
       servers: { total: rows.length, running: running.length },
     };
@@ -165,12 +175,30 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
         throw badRequest("CraftPanel cannot write to that backup directory");
       });
     }
+    if (body.allowedNetworks) {
+      const parsed = body.allowedNetworks.map((n) => ({ n, p: parseNetwork(n) }));
+      const bad = parsed.filter((x) => !x.p).map((x) => x.n);
+      if (bad.length) throw badRequest(`Not a valid IP address or CIDR range: ${bad.join(", ")}`, "Examples: 203.0.113.7, 198.51.100.0/24, 2001:db8::/48");
+      body.allowedNetworks = [...new Set(parsed.map((x) => x.p!))];
+    }
+    if (body.dashboardAccess || body.allowedNetworks) {
+      // Refuse changes that would immediately lock out the person making them.
+      const current = await ctx.settings.get();
+      const policy = body.dashboardAccess ?? current.dashboardAccess;
+      const networks = body.allowedNetworks ?? current.allowedNetworks;
+      if (!isClientAllowed(req.ip, policy, networks))
+        throw badRequest(`This would block your own connection (${req.ip})`, "Add your address under additional networks, or make this change from the host itself.");
+    }
     const patch: Record<string, unknown> = { ...body };
     if (body.ddnsToken === "••••••••") delete patch.ddnsToken;
     if (body.backupDirectory === "") patch.backupDirectory = null;
     await ctx.settings.set(patch);
     await ctx.schedules.configureDdns();
-    await ctx.activity.audit(actorOf(req), "settings.update", null, { keys: Object.keys(patch).filter((k) => k !== "ddnsToken") });
+    await ctx.activity.audit(actorOf(req), "settings.update", null, {
+      keys: Object.keys(patch).filter((k) => k !== "ddnsToken"),
+      ...(body.dashboardAccess ? { dashboardAccess: body.dashboardAccess } : {}),
+      ...(body.allowedNetworks ? { allowedNetworks: body.allowedNetworks } : {}),
+    });
     return ctx.settings.publicView();
   });
   app.post("/api/settings/ddns/test", async (req) => {
