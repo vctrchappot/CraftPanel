@@ -18,6 +18,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Two-factor sign-in with an authenticator app (TOTP) and recovery codes; owners can require it per role and reset it for a user.
 - Signed-in devices: see and sign out your sessions; owners can sign a user out everywhere.
 - Per-server access: give users a role on single servers, or limit them to selected servers (e.g. a moderator for one server).
+- Notifications via Discord webhook and e-mail (SMTP) when a server crashes or fails to start, a backup or scheduled task fails, or a CraftPanel update is available; with a test button.
 
 ### Changed
 - The version lives only in `package.json`.

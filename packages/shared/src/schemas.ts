@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ROLES, SERVER_ROLES } from "./roles";
 import { SERVER_SOFTWARE } from "./software";
+import { NOTIFICATION_CATEGORIES } from "./types";
 
 export const usernameSchema = z
   .string()
@@ -172,6 +173,21 @@ export const appSettingsSchema = z.object({
   updateCheck: z.boolean().optional(),
   /** Roles that must sign in with a second factor. */
   twoFactorRoles: z.array(z.enum(ROLES)).max(4).optional(),
+  /** Discord webhook URL, "" to turn off; the redacted placeholder keeps the stored one. */
+  notifyDiscordWebhook: z.string().trim().max(300).optional(),
+  notifyEmail: z
+    .object({
+      enabled: z.boolean(),
+      host: z.string().trim().max(253).regex(/^[A-Za-z0-9.-]*$/, "Enter a host name"),
+      port: z.number().int().min(1).max(65535),
+      security: z.enum(["tls", "starttls", "none"]),
+      username: z.string().max(200),
+      password: z.string().max(500),
+      from: z.string().trim().max(200),
+      to: z.string().trim().max(1000),
+    })
+    .optional(),
+  notifyEvents: z.array(z.enum(NOTIFICATION_CATEGORIES)).max(10).optional(),
 });
 
 export const fileWriteSchema = z.object({ path: z.string().max(4096), content: z.string().max(5 * 1024 * 1024) });

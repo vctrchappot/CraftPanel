@@ -13,6 +13,7 @@ import type { ScheduleService } from "./services/schedules";
 import type { GameService } from "./services/game";
 import type { SettingsService } from "./services/settings";
 import type { UpdateService } from "./services/updates";
+import type { NotificationService } from "./services/notifications";
 
 export interface AppContext {
   config: AppConfig;
@@ -27,6 +28,7 @@ export interface AppContext {
   game: GameService;
   settings: SettingsService;
   updates: UpdateService;
+  notifications: NotificationService;
   java: JavaManager;
   /** One-time token required to create the first account on non-loopback installs. */
   setupToken: string | null;

@@ -39,7 +39,7 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 - [x] Two-factor sign-in (TOTP), optionally required per role.
 - [x] Per-server permissions (e.g. a moderator who only manages one server).
 - [x] Session overview: signed-in devices, sign out remotely.
-- [ ] Notifications via Discord webhook / e-mail: crash, failed backup, update available.
+- [x] Notifications via Discord webhook / e-mail: crash, failed backup, update available.
 
 ### 4. More platforms (Phase 3)
 - [ ] NeoForge (run the installer with `--installServer`, start via its argument files).

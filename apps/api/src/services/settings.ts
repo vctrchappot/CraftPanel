@@ -1,6 +1,22 @@
 import { appSettings, eq, type Database } from "@craftpanel/database";
 import type { AccessPolicy } from "@craftpanel/network";
-import type { Role } from "@craftpanel/shared";
+import { NOTIFICATION_CATEGORIES, type NotificationCategory, type Role } from "@craftpanel/shared";
+
+export interface EmailSettings {
+  enabled: boolean;
+  host: string;
+  port: number;
+  /** "tls": implicit TLS (usually 465); "starttls": upgrade required (587); "none": plain (local relays only). */
+  security: "tls" | "starttls" | "none";
+  username: string;
+  password: string;
+  from: string;
+  /** Comma-separated recipients. */
+  to: string;
+}
+
+/** Shown instead of stored secrets; sending it back keeps the stored value. */
+export const REDACTED = "••••••••";
 
 export interface AppSettings {
   backupDirectory: string | null;
@@ -19,6 +35,12 @@ export interface AppSettings {
   updateCheck: boolean;
   /** Roles that must sign in with a second factor (TOTP). */
   twoFactorRoles: Role[];
+  /** Discord webhook for notifications ("" = off). */
+  notifyDiscordWebhook: string;
+  notifyEmail: EmailSettings;
+  notifyEvents: NotificationCategory[];
+  /** Last CraftPanel version an update notification was sent for. */
+  notifyLastUpdate: string | null;
 }
 
 const DEFAULTS: AppSettings = {
@@ -33,6 +55,10 @@ const DEFAULTS: AppSettings = {
   allowedNetworks: [],
   updateCheck: true,
   twoFactorRoles: [],
+  notifyDiscordWebhook: "",
+  notifyEmail: { enabled: false, host: "", port: 587, security: "starttls", username: "", password: "", from: "", to: "" },
+  notifyEvents: [...NOTIFICATION_CATEGORIES],
+  notifyLastUpdate: null,
 };
 
 export class SettingsService {
@@ -71,6 +97,12 @@ export class SettingsService {
   /** Settings safe to send to the browser (secrets redacted). */
   async publicView() {
     const s = await this.get();
-    return { ...s, ddnsToken: s.ddnsToken ? "••••••••" : "" };
+    return {
+      ...s,
+      ddnsToken: s.ddnsToken ? REDACTED : "",
+      // The webhook URL is itself the credential.
+      notifyDiscordWebhook: s.notifyDiscordWebhook ? REDACTED : "",
+      notifyEmail: { ...s.notifyEmail, password: s.notifyEmail.password ? REDACTED : "" },
+    };
   }
 }

@@ -11,6 +11,7 @@
 - **Plugins** (Paper, Purpur) and **Fabric mods** from Modrinth with compatibility checks, uploads, updates and a Vanilla→Paper migration.
 - **Worlds, file manager, backups** (consistent live backups, verification, restore with automatic safety backup) and **scheduled tasks**.
 - **LAN/WAN guidance** with diagnostics (CGNAT detection), optional DuckDNS.
+- **Notifications** via Discord or e-mail when a server crashes, a backup fails or an update is available.
 - **Multi-user** with Owner / Administrator / Operator / Viewer roles, per-server access (e.g. a moderator for one server), two-factor sign-in, a list of signed-in devices and an audit log.
 
 > Minecraft is a trademark of Mojang AB. CraftPanel is not affiliated with Mojang or Microsoft and never redistributes server software. It downloads it from official sources on your behalf after you accept the [Minecraft EULA](https://aka.ms/MinecraftEULA).

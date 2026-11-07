@@ -58,6 +58,7 @@ async function main() {
   await ctx.backups.recover();
   await ctx.servers.recover();
   await ctx.schedules.boot();
+  ctx.notifications.start();
   const housekeeping = setInterval(() => {
     void ctx.sessions.purgeExpired();
     void ctx.activity.prune();
@@ -83,6 +84,7 @@ async function main() {
     app.log.info(`${signal} received: stopping Minecraft servers gracefully…`);
     clearInterval(housekeeping);
     ctx.schedules.stop();
+    ctx.notifications.stop();
     await ctx.agent.shutdown(60_000);
     await app.close();
     ctx.database.close();

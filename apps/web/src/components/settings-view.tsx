@@ -32,6 +32,7 @@ import { RemoteAccess } from "./remote-access";
 import { UpdateSection } from "./updates";
 import { SessionsSection, TwoFactorSection } from "./account-security";
 import { UsersAdmin } from "./users-admin";
+import { NotificationSettings } from "./notifications-settings";
 
 export function SettingsView() {
   const params = useSearchParams();
@@ -47,6 +48,7 @@ export function SettingsView() {
           {canOwner && <TabsTrigger value="backups">Backups</TabsTrigger>}
           {canOwner && <TabsTrigger value="access">Remote access</TabsTrigger>}
           {canOwner && <TabsTrigger value="network">Dynamic DNS</TabsTrigger>}
+          {canOwner && <TabsTrigger value="notifications">Notifications</TabsTrigger>}
           <TabsTrigger value="java">Java</TabsTrigger>
           {canAudit && <TabsTrigger value="audit">Audit log</TabsTrigger>}
           <TabsTrigger value="about">Security & about</TabsTrigger>
@@ -58,6 +60,7 @@ export function SettingsView() {
         <TabsContent value="backups">{canOwner && <BackupSettings />}</TabsContent>
         <TabsContent value="access">{canOwner && <RemoteAccess />}</TabsContent>
         <TabsContent value="network">{canOwner && <DdnsSettings />}</TabsContent>
+        <TabsContent value="notifications">{canOwner && <NotificationSettings />}</TabsContent>
         <TabsContent value="java">
           <JavaRuntimes />
         </TabsContent>

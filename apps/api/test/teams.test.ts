@@ -320,3 +320,24 @@ describe("real-time broadcasts", () => {
     expect(received.mod).toEqual(["a"]);
   });
 });
+
+describe("notification settings", () => {
+  it("validates, redacts and keeps secrets", async () => {
+    expect((await call(owner, "POST", "/api/settings/notifications/test")).statusCode).toBe(400);
+    const bad = await call(owner, "PUT", "/api/settings", { notifyDiscordWebhook: "https://example.com/hook" });
+    expect(bad.statusCode).toBe(400);
+    const hook = "https://discord.com/api/webhooks/1/secret-token";
+    const email = { enabled: true, host: "smtp.example.test", port: 587, security: "starttls", username: "u", password: "smtp-secret", from: "", to: "a@example.test" };
+    expect((await call(owner, "PUT", "/api/settings", { notifyDiscordWebhook: hook, notifyEmail: email })).statusCode).toBe(200);
+    const view = (await call(owner, "GET", "/api/settings")).json();
+    expect(view.notifyDiscordWebhook).toBe("••••••••");
+    expect(view.notifyEmail.password).toBe("••••••••");
+    expect(JSON.stringify(view)).not.toContain("secret");
+    // Saving the form unchanged sends the placeholders back; the stored values stay.
+    expect((await call(owner, "PUT", "/api/settings", { notifyDiscordWebhook: view.notifyDiscordWebhook, notifyEmail: { ...view.notifyEmail, port: 2525 } })).statusCode).toBe(200);
+    const stored = await ctx.settings.get();
+    expect(stored.notifyDiscordWebhook).toBe(hook);
+    expect(stored.notifyEmail).toMatchObject({ password: "smtp-secret", port: 2525 });
+    await call(owner, "PUT", "/api/settings", { notifyDiscordWebhook: "", notifyEmail: { ...email, enabled: false } });
+  });
+});

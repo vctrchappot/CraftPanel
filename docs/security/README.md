@@ -52,6 +52,7 @@ CraftPanel administers processes and files on the host. Whoever controls an Owne
 - Rate limiting is per process and in memory.
 - Secrets such as the DuckDNS token and TOTP secrets are stored in the SQLite database in plain text, protected by filesystem permissions. Anyone who can read the data directory can also generate codes.
 - Pending two-factor sign-ins live in memory; a restart in the middle of one asks for the password again.
+- Notifications: the Discord webhook URL and SMTP password are stored like other secrets and never sent back to the browser. Only `discord.com` webhook URLs are accepted, and messages can't mention @everyone or roles. Messages contain server names and log excerpts; choose recipients accordingly.
 
 ## Reporting vulnerabilities
 

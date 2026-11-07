@@ -25,11 +25,15 @@
     "@fastify/static": "^10.1.10",
     "@fastify/websocket": "^11.3.7",
     "fastify": "^5.12.8",
+    "nodemailer": "^10.3.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/nodemailer": "^8.0.2",
+    "@types/smtp-server": "^3.5.13",
+    "@types/ws": "^8.18.1",
     "esbuild": "^0.28.2",
-    "tsx": "^4.23.15",
-    "@types/ws": "^8.18.1"
+    "smtp-server": "^3.21.3",
+    "tsx": "^4.23.15"
   }
 }

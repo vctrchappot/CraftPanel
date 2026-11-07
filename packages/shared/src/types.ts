@@ -239,3 +239,7 @@ export interface ScheduleInfo {
 }
 
 export type ScheduleAction = "start" | "restart" | "stop" | "backup" | "announce" | "command" | "prune-backups" | "cleanup-logs";
+
+/** What can trigger a notification (Discord / e-mail). */
+export const NOTIFICATION_CATEGORIES = ["server", "backup", "schedule", "update"] as const;
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];

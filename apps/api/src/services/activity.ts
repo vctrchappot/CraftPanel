@@ -11,15 +11,29 @@ export interface Actor {
 export const SYSTEM_ACTOR: Actor = { id: null, username: "system" };
 
 /** Persistent activity feed (server events) and security audit log. */
+type EventListener = (event: ActivityEvent, serverName: string | null) => void | Promise<void>;
+
 export class ActivityService {
+  private listeners = new Set<EventListener>();
   constructor(private db: Database, private hub: Hub) {}
+
+  /** Get every new event (used for notifications). Listener errors are ignored. */
+  listen(l: EventListener) {
+    this.listeners.add(l);
+    return () => void this.listeners.delete(l);
+  }
 
   async event(serverId: string | null, kind: string, message: string, opts: { level?: ActivityEvent["level"]; actor?: Actor } = {}) {
     const createdAt = Date.now();
     const level = opts.level ?? "info";
     const actor = opts.actor?.username ?? null;
     const [row] = await this.db.insert(events).values({ serverId, kind, level, message, actor, createdAt }).returning({ id: events.id });
-    this.hub.broadcast({ type: "event", event: { id: row.id, serverId, kind, level, message, actor, createdAt } });
+    const event: ActivityEvent = { id: row.id, serverId, kind, level, message, actor, createdAt };
+    this.hub.broadcast({ type: "event", event });
+    if (this.listeners.size) {
+      const [server] = serverId ? await this.db.select({ name: servers.name }).from(servers).where(eq(servers.id, serverId)) : [];
+      for (const l of this.listeners) void Promise.resolve(l(event, server?.name ?? null)).catch(() => undefined);
+    }
   }
 
   async audit(actor: Actor, action: string, target: string | null, details?: Record<string, unknown>) {

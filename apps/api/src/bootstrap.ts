@@ -15,6 +15,7 @@ import { ScheduleService } from "./services/schedules";
 import { GameService } from "./services/game";
 import { SettingsService } from "./services/settings";
 import { UpdateService } from "./services/updates";
+import { NotificationService } from "./services/notifications";
 
 /** Wire up persistence, runtime and services. Does not start listening. */
 export async function createContext(config: AppConfig, opts: { migrationsFolder?: string; installRoot?: string } = {}): Promise<AppContext> {
@@ -38,6 +39,8 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const backups = new BackupService(db, servers, hub, activity, settings, config);
   const schedules = new ScheduleService(db, servers, backups, activity, settings);
   const game = new GameService(db, servers, activity, config);
+  const notifications = new NotificationService(settings, updates);
+  activity.listen((event, serverName) => notifications.onEvent(event, serverName));
 
   // First-run protection: on non-loopback binds, creating the owner needs a token
   // that only someone with access to the host (console or data dir) can read.
@@ -49,5 +52,5 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
     await fsp.writeFile(tokenFile, setupToken + "\n", { mode: 0o600 });
   } else await fsp.rm(tokenFile, { force: true });
 
-  return { config, database, agent, hub, sessions, activity, servers, backups, schedules, game, settings, updates, java, setupToken };
+  return { config, database, agent, hub, sessions, activity, servers, backups, schedules, game, settings, updates, notifications, java, setupToken };
 }

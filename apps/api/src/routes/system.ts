@@ -11,6 +11,8 @@ import { SETTING_GROUPS, SETTINGS } from "@craftpanel/config";
 import { freeDiskSpace } from "@craftpanel/server-runtime";
 import { dashboardUrls, isClientAllowed, lanAddresses, parseNetwork } from "@craftpanel/network";
 import { actorOf, canSee, noContent, requirePermission, requireUser, visibleServerIds, type AppContext } from "../context";
+import { REDACTED } from "../services/settings";
+import { isDiscordWebhook } from "../services/notifications";
 import { parse } from "../validate";
 
 export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
@@ -203,16 +205,27 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
         throw badRequest(`This would block your own connection (${req.ip})`, "Add your address under additional networks, or make this change from the host itself.");
     }
     const patch: Record<string, unknown> = { ...body };
-    if (body.ddnsToken === "••••••••") delete patch.ddnsToken;
+    if (body.ddnsToken === REDACTED) delete patch.ddnsToken;
+    if (body.notifyDiscordWebhook === REDACTED) delete patch.notifyDiscordWebhook;
+    else if (body.notifyDiscordWebhook && !isDiscordWebhook(body.notifyDiscordWebhook))
+      throw badRequest("That is not a Discord webhook URL", "In Discord: Server settings → Integrations → Webhooks → Copy Webhook URL. It starts with https://discord.com/api/webhooks/.");
+    if (body.notifyEmail?.password === REDACTED) patch.notifyEmail = { ...body.notifyEmail, password: (await ctx.settings.get()).notifyEmail.password };
     if (body.backupDirectory === "") patch.backupDirectory = null;
     await ctx.settings.set(patch);
     await ctx.schedules.configureDdns();
     await ctx.activity.audit(actorOf(req), "settings.update", null, {
-      keys: Object.keys(patch).filter((k) => k !== "ddnsToken"),
+      keys: Object.keys(patch),
       ...(body.dashboardAccess ? { dashboardAccess: body.dashboardAccess } : {}),
       ...(body.allowedNetworks ? { allowedNetworks: body.allowedNetworks } : {}),
     });
     return ctx.settings.publicView();
+  });
+  app.post("/api/settings/notifications/test", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req) => {
+    requirePermission(req, "app.configure");
+    const results = await ctx.notifications.send({ title: "Test notification", message: "CraftPanel notifications work. You will get messages like this when a server crashes, a backup fails or an update is available.", level: "info" });
+    if (!results.length) throw badRequest("No notification channel is set up", "Add a Discord webhook or turn on e-mail first, and save.");
+    await ctx.activity.audit(actorOf(req), "settings.notifications_test", null, { results });
+    return results;
   });
   app.post("/api/settings/ddns/test", async (req) => {
     requirePermission(req, "app.configure");
