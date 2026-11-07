@@ -73,9 +73,17 @@ Then set `CRAFTPANEL_SECURE_COOKIES=true` and `CRAFTPANEL_TRUST_PROXY=true`. Web
 
 ## Updating CraftPanel
 
+Installed with `deploy/install-linux.sh` (runs from `/opt/craftpanel`):
+
+```bash
+git pull && sudo ./deploy/install-linux.sh   # rebuilds, replaces /opt/craftpanel, restarts the service
+```
+
+Running from the repository (`pnpm start` or your own service):
+
 ```bash
 git pull && pnpm install && pnpm build
-sudo systemctl restart craftpanel     # or restart the process
+# then restart CraftPanel
 ```
 
 Database migrations run automatically on start. Running Minecraft servers are stopped gracefully during the restart. Enable "Start with CraftPanel" on servers that should come back automatically.

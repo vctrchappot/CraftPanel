@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Installs CraftPanel as a systemd service on Linux (x64 or arm64, e.g. Raspberry Pi 4/5).
 # Run from the cloned repository:  sudo ./deploy/install-linux.sh
+# Re-run it after "git pull" to update: it rebuilds, replaces /opt/craftpanel and restarts the service.
 set -euo pipefail
 
 INSTALL_DIR=/opt/craftpanel
@@ -18,9 +19,16 @@ mkdir -p "$INSTALL_DIR" "$DATA_DIR"
 
 echo "Building CraftPanel…"
 cd "$REPO_DIR"
-corepack enable >/dev/null 2>&1 || npm install -g pnpm
-pnpm install --frozen-lockfile
-pnpm build
+command -v pnpm >/dev/null || corepack enable >/dev/null 2>&1 || npm install -g pnpm
+# Build as the user who owns the checkout so node_modules/dist don't end up owned by root.
+BUILD_USER=$(stat -c %U "$REPO_DIR")
+if [[ "$BUILD_USER" != root ]]; then
+  sudo -u "$BUILD_USER" -H pnpm install --frozen-lockfile
+  sudo -u "$BUILD_USER" -H pnpm build
+else
+  pnpm install --frozen-lockfile
+  pnpm build
+fi
 
 echo "Installing to $INSTALL_DIR…"
 rm -rf "$INSTALL_DIR/apps"
@@ -32,11 +40,15 @@ chmod 750 "$DATA_DIR"
 
 cp deploy/craftpanel.service /etc/systemd/system/craftpanel.service
 systemctl daemon-reload
-systemctl enable --now craftpanel
+systemctl enable craftpanel
+# restart (not "enable --now") so a re-run also picks up the new build; running servers are stopped gracefully.
+systemctl restart craftpanel
 
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 echo
 echo "CraftPanel is running: http://${IP:-<this-machine>}:8080"
-echo "First-run setup token (needed to create the owner account):"
 sleep 3
-cat "$DATA_DIR/setup-token.txt" 2>/dev/null || journalctl -u craftpanel --no-pager | grep -i "setup token" | tail -1
+if [[ -f "$DATA_DIR/setup-token.txt" ]]; then
+  echo "First-run setup token (needed to create the owner account):"
+  cat "$DATA_DIR/setup-token.txt"
+fi

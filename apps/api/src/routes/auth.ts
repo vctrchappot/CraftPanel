@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import fsp from "node:fs/promises";
+import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { AppError, changePasswordSchema, createUserSchema, loginSchema, setupSchema, updateUserSchema, ROLES, type UserInfo } from "@craftpanel/shared";
 import { eq, users, sql } from "@craftpanel/database";
@@ -33,6 +35,7 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext) {
     const id = crypto.randomUUID();
     await db.insert(users).values({ id, username: body.username, passwordHash: await hashPassword(body.password), role: "owner", createdAt: Date.now() });
     ctx.setupToken = null;
+    await fsp.rm(path.join(ctx.config.layout.root, "setup-token.txt"), { force: true });
     await ctx.activity.audit({ id, username: body.username, ip: req.ip }, "auth.setup", id);
     const s = await ctx.sessions.create(id, { ip: req.ip, userAgent: req.headers["user-agent"] });
     reply.setCookie(SESSION_COOKIE, s.token, cookieOpts);
