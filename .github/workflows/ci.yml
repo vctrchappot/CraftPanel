@@ -137,7 +137,7 @@ jobs:
         run: |
           sudo /opt/craftpanel/update.sh --uninstall
           test ! -e /opt/craftpanel
-          test -f /var/lib/craftpanel/craftpanel.db
+          sudo test -f /var/lib/craftpanel/craftpanel.db
       - if: failure()
         run: sudo journalctl -u craftpanel --no-pager | tail -100
 
