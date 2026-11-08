@@ -25,6 +25,10 @@ const code = (s: string) => <code className="rounded bg-muted px-1 py-0.5 font-m
 export function RemoteAccess() {
   const settings = useQuery({ queryKey: ["app-settings"], queryFn: () => api.get<{ dashboardAccess: Policy; allowedNetworks: string[] }>("/api/settings") });
   const system = useSystem();
+  const diagnostics = useQuery({
+    queryKey: ["deployment-diagnostics"],
+    queryFn: () => api.get<{ ok: boolean; checks: { id: string; status: "ok" | "warning" | "error"; message: string; hint?: string }[] }>("/api/system/diagnostics"),
+  });
   const [form, setForm] = React.useState<{ policy: Policy; networks: string } | null>(null);
   React.useEffect(() => {
     if (settings.data && !form) setForm({ policy: settings.data.dashboardAccess, networks: settings.data.allowedNetworks.join("\n") });
@@ -45,14 +49,19 @@ export function RemoteAccess() {
   if (!form || !d) return <Skeleton className="h-64 rounded-xl" />;
   const hasLan = d.urls.some((u) => u.kind === "lan" || u.kind === "vpn");
   const urls = d.urls.filter((u) => u.kind !== "virtual" || !hasLan);
-  const encrypted = d.https || d.behindProxy;
+  const encrypted = d.transportSecure;
 
   return (
     <div className="max-w-3xl space-y-8">
       <Section
         title="Where the dashboard is reachable"
-        description={`Profile “${d.profile}” · listening on ${d.host}:${d.port} · ${d.https ? "HTTPS" : d.behindProxy ? "behind a reverse proxy" : "plain HTTP"}. Share these addresses with your team.`}
+        description={`Profile “${d.profile}” · listening on ${d.host}:${d.port} · this connection uses ${encrypted ? "HTTPS" : "plain HTTP"}.`}
       >
+        {d.publicUrl && <Panel className="mb-3 flex items-center justify-between gap-3 p-4 text-[13px]">
+          <div className="min-w-0"><p className="text-xs text-muted-foreground">Dashboard address for your team</p><p className="break-all font-mono">{d.publicUrl}</p></div>
+          <CopyButton value={d.publicUrl} />
+        </Panel>}
+        {d.behindProxy && <p className="mb-3 text-[13px] text-muted-foreground">The addresses below are internal backend addresses. Forwarding headers are accepted only from {d.trustedProxies.join(", ")}. Configure CRAFTPANEL_PUBLIC_URL with the external HTTPS address to share.</p>}
         <Panel>
           <ul className="divide-y divide-border">
             {urls.map((u) => (
@@ -70,7 +79,7 @@ export function RemoteAccess() {
         {d.loopbackOnly && (
           <Callout className="mt-3">
             The dashboard only listens on this computer. To open it from other devices, restart CraftPanel with the {code("lan")} profile ({code("pnpm start:lan")}, or {code("CRAFTPANEL_PROFILE=lan")} for the Linux service).
-            Running Minecraft servers are not affected by this setting.
+            Restarting CraftPanel currently saves and stops its Minecraft servers. Enable “Start with CraftPanel” on servers that should come back automatically.
           </Callout>
         )}
         {!d.loopbackOnly && !encrypted && (
@@ -98,10 +107,19 @@ export function RemoteAccess() {
             <Textarea id="access-networks" rows={3} value={form.networks} onChange={(e) => setForm({ ...form, networks: e.target.value })} placeholder="203.0.113.7" className="max-w-md font-mono text-xs" />
           </Field>
           {form.policy === "any" && !encrypted && <Callout variant="danger">Without HTTPS, passwords and session cookies would cross the internet unencrypted. Set up HTTPS first.</Callout>}
-          <Button onClick={() => save.mutate()} loading={save.isPending}>
+          <Button onClick={() => save.mutate()} loading={save.isPending} disabled={form.policy === "any" && (!encrypted || !d.secureCookies)}>
             Save access rules
           </Button>
         </div>
+      </Section>
+
+      <Section title="Deployment checks" description="Checks run on the host as the CraftPanel service account. They do not change settings or restart servers." actions={<Button variant="secondary" size="sm" onClick={() => void diagnostics.refetch()} loading={diagnostics.isFetching}>Check again</Button>}>
+        {diagnostics.isLoading ? <Skeleton className="h-24 rounded-xl" /> : diagnostics.error ? <Callout variant="warning">Could not load deployment checks. Try again.</Callout> : <Panel className="divide-y divide-border">
+          {diagnostics.data?.checks.map((check) => <div key={check.id} className="flex items-start gap-3 p-4 text-[13px]">
+            <Badge variant={check.status === "error" ? "danger" : check.status === "warning" ? "warning" : "success"}>{check.status}</Badge>
+            <div className="min-w-0"><p className="break-words">{check.message}</p>{check.hint && <p className="mt-1 text-xs text-muted-foreground">{check.hint}</p>}</div>
+          </div>)}
+        </Panel>}
       </Section>
 
       <Section title="Giving a team access from other networks">
@@ -115,7 +133,7 @@ export function RemoteAccess() {
           <Panel className="space-y-1.5 p-4">
             <p className="font-medium">HTTPS reverse proxy</p>
             <p className="text-muted-foreground">
-              Put Caddy or nginx with a real certificate in front and start CraftPanel with the {code("proxy")} profile, then allow “Anywhere” or your team's addresses. A Cloudflare Tunnel works the same way without opening ports.
+              Put Caddy or nginx with a real certificate in front, use the {code("proxy")} profile and set {code("CRAFTPANEL_PUBLIC_URL")}. For a proxy on another host, set {code("CRAFTPANEL_TRUSTED_PROXIES")} to its address and restrict the backend port to that host. Open the HTTPS address before allowing public access.
             </p>
           </Panel>
           <Panel className="space-y-1.5 p-4">

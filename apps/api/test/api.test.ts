@@ -28,6 +28,7 @@ function config(host = "127.0.0.1"): AppConfig {
     corsOrigins: [],
     secureCookies: false,
     trustProxy: false,
+    publicUrl: null,
     webDir: null,
     sessionTtlMs: 3600_000,
     logLevel: "silent",
@@ -210,15 +211,16 @@ describe("remote access policy", () => {
     expect((await from("100.101.1.2")).statusCode).toBe(200); // Tailscale
     const blocked = await from("203.0.113.7");
     expect(blocked.statusCode).toBe(403);
-    expect(blocked.body).toContain("Remote access");
+    expect(blocked.json().error.code).toBe("https_required");
   });
 
   it("applies policy changes immediately and always lets the host in", async () => {
     expect((await call(owner, "PUT", "/api/settings", { dashboardAccess: "local" })).statusCode).toBe(200);
     expect((await from("192.168.1.20")).statusCode).toBe(403);
     expect((await from("127.0.0.1")).statusCode).toBe(200);
-    expect((await call(owner, "PUT", "/api/settings", { dashboardAccess: "private", allowedNetworks: ["203.0.113.0/24"] })).statusCode).toBe(200);
-    expect((await from("203.0.113.7")).statusCode).toBe(200);
+    expect((await call(owner, "PUT", "/api/settings", { dashboardAccess: "private", allowedNetworks: ["192.168.1.0/24"] })).statusCode).toBe(200);
+    expect((await from("192.168.1.20")).statusCode).toBe(200);
+    expect((await from("203.0.113.7")).statusCode).toBe(403);
     expect((await from("198.51.100.1")).statusCode).toBe(403);
     expect((await call(owner, "PUT", "/api/settings", { allowedNetworks: [] })).statusCode).toBe(200);
   });
@@ -235,6 +237,13 @@ describe("remote access policy", () => {
     const sys = (await call(owner, "GET", "/api/system")).json();
     expect(sys.dashboard.urls[0]).toMatchObject({ kind: "local" });
     expect(sys.dashboard).toMatchObject({ profile: "local", https: false });
+  });
+
+  it("restricts deployment diagnostics to application administrators", async () => {
+    expect((await call(sessions.operator!, "GET", "/api/system/diagnostics")).statusCode).toBe(403);
+    const response = await call(owner, "GET", "/api/system/diagnostics");
+    expect(response.statusCode).toBe(200);
+    expect(response.json().checks).toContainEqual(expect.objectContaining({ id: "database", status: "ok" }));
   });
 });
 

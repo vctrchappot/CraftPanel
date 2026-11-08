@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { canAccess, commandSchema, type WsClientMessage } from "@craftpanel/shared";
 import type { AppContext } from "../context";
 import type { HubClient } from "../hub";
+import { isRequestOriginAllowed } from "../deployment";
 
 /**
  * Real-time channel. Authenticated by the session cookie during the upgrade;
@@ -10,12 +11,11 @@ import type { HubClient } from "../hub";
 export async function wsRoutes(app: FastifyInstance, ctx: AppContext) {
   app.get("/api/ws", { websocket: true }, (socket, req) => {
     const user = req.user;
-    const origin = req.headers.origin;
     if (!user) {
       socket.close(4001, "Unauthenticated");
       return;
     }
-    if (origin && !isAllowedOrigin(origin, req.headers.host, ctx.config.corsOrigins)) {
+    if (!isRequestOriginAllowed(req, ctx.config)) {
       socket.close(4003, "Origin not allowed");
       return;
     }
@@ -81,13 +81,4 @@ export async function wsRoutes(app: FastifyInstance, ctx: AppContext) {
       ctx.hub.remove(client);
     });
   });
-}
-
-export function isAllowedOrigin(origin: string, host: string | undefined, extra: string[]): boolean {
-  if (extra.includes(origin)) return true;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
 }

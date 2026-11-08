@@ -1,6 +1,6 @@
 import net from "node:net";
 import { describe, expect, it } from "vitest";
-import { formatAddress, isCgnatIPv4, isPortAvailable, isPrivateIPv4, probeTcp, parseNetwork, ipMatches, isPrivateAddress, isClientAllowed } from "../src";
+import { formatAddress, isCgnatIPv4, isPortAvailable, isPrivateIPv4, probeTcp, parseNetwork, ipMatches, isPrivateAddress, isPrivateNetwork, isClientAllowed } from "../src";
 
 describe("network helpers", () => {
   it("classifies addresses", () => {
@@ -29,6 +29,12 @@ describe("network helpers", () => {
 });
 
 describe("dashboard access control", () => {
+  it("classifies the entire CIDR range rather than just its first address", () => {
+    for (const range of ["192.168.1.0/24", "10.0.0.0/8", "100.64.0.0/10", "fd00::/8", "::1"])
+      expect(isPrivateNetwork(range), range).toBe(true);
+    for (const range of ["192.168.1.1/0", "10.0.0.0/7", "100.64.0.0/9", "fd00::/6", "127.0.0.1/1", "203.0.113.1", "invalid"])
+      expect(isPrivateNetwork(range), range).toBe(false);
+  });
   it("parses and normalizes IPs and CIDR ranges", () => {
     expect(parseNetwork("192.168.1.0/24")).toBe("192.168.1.0/24");
     expect(parseNetwork(" 203.0.113.7 ")).toBe("203.0.113.7");

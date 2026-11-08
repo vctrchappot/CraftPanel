@@ -99,6 +99,7 @@ beforeAll(async () => {
     corsOrigins: [],
     secureCookies: false,
     trustProxy: false,
+    publicUrl: null,
     webDir: null,
     sessionTtlMs: 3600_000,
     logLevel: "silent",

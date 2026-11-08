@@ -134,6 +134,19 @@ export function isPrivateAddress(ip: string): boolean {
   return a === "::1" || ipMatches(a, "fc00::/7") || ipMatches(a, "fe80::/10");
 }
 
+/** True only if the entire range belongs to private/VPN/loopback space. */
+export function isPrivateNetwork(network: string): boolean {
+  const parsed = parseNetwork(network);
+  if (!parsed) return false;
+  const [base, prefix] = parsed.split("/");
+  const v4 = ipv4ToInt(base) !== null;
+  const bits = prefix === undefined ? (v4 ? 32 : 128) : Number(prefix);
+  const privateRanges = v4
+    ? ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16"]
+    : ["::1/128", "fc00::/7", "fe80::/10"];
+  return privateRanges.some((range) => bits >= Number(range.split("/")[1]) && ipMatches(base, range));
+}
+
 /** Whether a client address may use the dashboard. The host itself is always allowed, so nobody locks themselves out. */
 export function isClientAllowed(ip: string, policy: AccessPolicy, extraNetworks: string[] = []): boolean {
   const a = normalizeIp(ip);

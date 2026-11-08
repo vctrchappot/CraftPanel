@@ -9,7 +9,9 @@ import { nextRuns, validateCron } from "@craftpanel/scheduler";
 import { getProvider, log4shellMitigation, PROVIDERS } from "@craftpanel/minecraft-providers";
 import { SETTING_GROUPS, SETTINGS } from "@craftpanel/config";
 import { freeDiskSpace } from "@craftpanel/server-runtime";
-import { dashboardUrls, isClientAllowed, lanAddresses, parseNetwork } from "@craftpanel/network";
+import { dashboardUrls, isClientAllowed, isPrivateNetwork, lanAddresses, parseNetwork } from "@craftpanel/network";
+import { isSecureRequest } from "../deployment";
+import { deploymentDiagnostics } from "../diagnostics";
 import { actorOf, canSee, noContent, requirePermission, requireUser, visibleServerIds, type AppContext } from "../context";
 import { REDACTED } from "../services/settings";
 import { isDiscordWebhook } from "../services/notifications";
@@ -163,13 +165,21 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
         secureCookies: ctx.config.secureCookies,
         profile: ctx.config.profile,
         https: !!ctx.config.tls,
-        behindProxy: ctx.config.trustProxy,
+        behindProxy: ctx.config.trustProxy !== false,
+        publicUrl: ctx.config.publicUrl,
+        trustedProxies: ctx.config.trustProxy || [],
+        transportSecure: isSecureRequest(req, ctx.config),
         urls: dashboardUrls(ctx.config.host, ctx.config.port, !!ctx.config.tls),
         clientIp: req.ip,
       },
       lan: lanAddresses().map((a) => a.address),
       servers: { total: rows.length, running: running.length },
     };
+  });
+
+  app.get("/api/system/diagnostics", async (req) => {
+    requirePermission(req, "app.configure");
+    return deploymentDiagnostics(ctx.config, { transportSecure: isSecureRequest(req, ctx.config) });
   });
 
   app.get<{ Querystring: { refresh?: string } }>("/api/updates", async (req) => {
@@ -220,6 +230,9 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
       const current = await ctx.settings.get();
       const policy = body.dashboardAccess ?? current.dashboardAccess;
       const networks = body.allowedNetworks ?? current.allowedNetworks;
+      if ((policy === "any" || networks.some((n) => !isPrivateNetwork(n))) &&
+          (!ctx.config.secureCookies || !isSecureRequest(req, ctx.config)))
+        throw badRequest("Public dashboard access requires HTTPS and Secure cookies", "Open the dashboard over HTTPS before allowing public addresses. Configure CRAFTPANEL_PUBLIC_URL and the trusted proxies, or built-in TLS.");
       if (!isClientAllowed(req.ip, policy, networks))
         throw badRequest(`This would block your own connection (${req.ip})`, "Add your address under additional networks, or make this change from the host itself.");
     }

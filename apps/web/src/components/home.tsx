@@ -32,6 +32,9 @@ export interface SystemInfo {
     profile: "local" | "lan" | "proxy" | "headless";
     https: boolean;
     behindProxy: boolean;
+    publicUrl: string | null;
+    trustedProxies: string[];
+    transportSecure: boolean;
     urls: { url: string; kind: "local" | "lan" | "vpn" | "virtual"; interface?: string }[];
     clientIp: string;
   };
@@ -159,7 +162,8 @@ export function HomeView() {
               <div className="p-4">
                 <p className="text-xs text-muted-foreground">Dashboard access</p>
                 <p>{s.dashboard.loopbackOnly ? "This computer only (127.0.0.1)" : `Network: ${s.dashboard.host}:${s.dashboard.port}`}</p>
-                {!s.dashboard.loopbackOnly && !s.dashboard.secureCookies && <p className="mt-1 text-xs text-warning">Served over plain HTTP. Use a private network or put HTTPS in front.</p>}
+                {s.dashboard.publicUrl && <p className="mt-1 break-all">{s.dashboard.publicUrl}</p>}
+                {!s.dashboard.loopbackOnly && !s.dashboard.transportSecure && <p className="mt-1 text-xs text-warning">This connection uses plain HTTP. Use a private VPN or HTTPS.</p>}
               </div>
             )}
           </Panel>

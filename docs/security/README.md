@@ -17,6 +17,9 @@ CraftPanel administers processes and files on the host. Whoever controls an Owne
 - Signed-in devices (Settings → Account): users see their sessions (address, browser, last activity) and can end single ones or all others; owners can see and end a user's sessions. Sessions are identified by a 16-character prefix of the token hash, never the token.
 
 **Request integrity**
+- Browser origins are compared using scheme, hostname and port. `CRAFTPANEL_PUBLIC_URL` defines the external origin even if a proxy rewrites the backend Host header.
+- Forwarding headers are accepted only from configured proxy IPs/CIDRs. The proxy profile and legacy `TRUST_PROXY=true` trust loopback peers, never every connecting device. Trusted proxies must overwrite `X-Forwarded-For` and `X-Forwarded-Proto`; a missing/invalid client address is rejected.
+- Public clients require HTTPS and Secure session cookies independently of stored network rules. Public access rules and additional public ranges cannot be enabled over HTTP. TLS between a proxy and the backend does not prove that the browser-to-proxy connection is encrypted.
 - Every state-changing request needs a per-session CSRF token header, and cross-origin requests are rejected by `Origin`. WebSocket upgrades check `Origin` as well.
 - All input is validated with Zod. Commands, properties values and ban reasons must be single lines, so newlines can't smuggle in extra console commands or properties keys.
 - Security headers: `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, and `Cache-Control: no-store` on the API.

@@ -7,6 +7,8 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 ## Unreleased
 
 ### Added
+- Browser-facing dashboard origins (`CRAFTPANEL_PUBLIC_URL`) and explicit trusted proxy peers (`CRAFTPANEL_TRUSTED_PROXIES`), including proxies on another host.
+- Deployment checks in Remote access, a read-only `doctor` command with JSON output, and `/api/ready` for startup/database readiness.
 - Release packages: every `v*` tag publishes one archive that runs on every OS and CPU (no build on the target machine), with SHA-256 checksums.
 - One-line installers: `install.sh` for Linux and Raspberry Pi (systemd service, private Node.js if needed) and `install.ps1` for Windows (runs at sign-in, no admin rights needed). Re-running them updates; a failed update rolls back.
 - Update notice in the dashboard when a newer release is available, with the right update command for the install.
@@ -37,6 +39,8 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Downloads (Minecraft, Java, mods) retry twice on temporary server errors such as an HTTP 504 from GitHub instead of failing the installation.
 
 ### Fixed
+- Reverse-proxy setup requires the host's setup token even when the backend listens on loopback. Public clients require HTTPS and Secure cookies; missing proxy client-IP headers and ambiguous transport headers are rejected.
+- HTTP and WebSocket origin checks include the scheme and support an external origin when the proxy rewrites Host. Backend TLS and Secure cookies are no longer presented as proof of browser HTTPS.
 - Two servers installing at the same time no longer break each other's Java download.
 - Switching from Paper or Purpur (Minecraft 1.21 and older) to Vanilla or Fabric no longer loses the Nether and the End: their folders are moved back into the world.
 - The Worlds tab shows the Nether and the End for Minecraft 26.x worlds.

@@ -8,6 +8,7 @@ import { loadConfig, PROFILES, type AppConfig } from "./config";
 import { createContext } from "./bootstrap";
 import { buildApp } from "./app";
 import { prettyLogStream } from "./logging";
+import { deploymentDiagnostics } from "./diagnostics";
 
 const tty = process.stdout.isTTY === true && !process.env.NO_COLOR;
 const style = (code: string) => (s: string) => (tty ? `\u001b[${code}m${s}\u001b[0m` : s);
@@ -43,6 +44,14 @@ async function main() {
     config.webDir = candidates.find((c) => fs.existsSync(path.join(c, "index.html"))) ?? null;
   }
 
+  if (process.argv[2] === "doctor" || process.argv.includes("--doctor")) {
+    const report = await deploymentDiagnostics(config);
+    if (process.argv.includes("--json")) console.log(JSON.stringify(report, null, 2));
+    else for (const check of report.checks) console.log(`${check.status.toUpperCase().padEnd(7)} ${check.message}${check.hint ? `\n        ${check.hint}` : ""}`);
+    process.exitCode = report.ok ? 0 : 1;
+    return;
+  }
+
   // Folder that holds apps/ (a git checkout or an installer's install directory).
   const installRoot = path.resolve(here, "../../..");
   const ctx = await createContext(config, { migrationsFolder, installRoot });
@@ -50,7 +59,9 @@ async function main() {
   const controlToken = crypto.randomBytes(24).toString("hex");
   const controlFile = path.join(config.layout.root, "control.json");
   let requestShutdown = (_reason: string) => undefined as void;
+  let ready = false;
   const app = await buildApp(ctx, {
+    isReady: () => ready,
     control: { token: controlToken, shutdown: () => requestShutdown("Shutdown request") },
     logger: config.logFormat === "json" ? { level: config.logLevel } : { level: config.logLevel, stream: prettyLogStream({ level: config.logLevel }) },
   });
@@ -76,12 +87,14 @@ async function main() {
     if (ctx.setupToken) app.log.info(`First-run setup token: ${ctx.setupToken} (also stored in ${path.join(config.layout.root, "setup-token.txt")})`);
   }
   if (config.serveWeb && !config.webDir) app.log.warn("Web dashboard build not found; only the API is served. Run `pnpm build` or use `pnpm dev`.");
+  if (config.publicUrl) app.log.info(`External dashboard: ${config.publicUrl}`);
   if (!config.isLoopbackOnly) app.log.warn("The dashboard is reachable from other devices. Keep it on a private network or VPN, and never port-forward it to the internet.");
 
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
+    ready = false;
     app.log.info(`${signal} received: stopping Minecraft servers gracefully…`);
     clearInterval(housekeeping);
     ctx.schedules.stop();
@@ -97,9 +110,12 @@ async function main() {
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   if (process.platform === "win32") process.on("SIGBREAK", () => void shutdown("SIGBREAK"));
+  ready = true;
 }
 
 main().catch((err) => {
-  console.error("CraftPanel failed to start:", err);
+  if ((process.argv[2] === "doctor" || process.argv.includes("--doctor")) && process.argv.includes("--json"))
+    console.log(JSON.stringify({ ok: false, checks: [{ id: "configuration", status: "error", message: err.message }] }));
+  else console.error("CraftPanel failed to start:", err);
   process.exit(1);
 });

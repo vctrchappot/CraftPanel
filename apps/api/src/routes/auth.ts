@@ -76,10 +76,14 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext) {
     const body = parse(setupSchema.extend({ setupToken: z.string().max(200).optional() }), req.body);
     if (ctx.setupToken && !safeEqual(body.setupToken ?? "", ctx.setupToken))
       throw new AppError(403, "setup_token_invalid", "Invalid setup token", "The setup token is printed in the CraftPanel server log and stored in the data directory (setup-token.txt).");
-    // Single transaction-free check is safe: SQLite serializes writes and username is unique.
     if ((await userCount()) > 0) throw new AppError(409, "already_setup", "CraftPanel is already set up");
     const id = crypto.randomUUID();
-    const [row] = await db.insert(users).values({ id, username: body.username, passwordHash: await hashPassword(body.password), role: "owner", createdAt: Date.now() }).returning();
+    const passwordHash = await hashPassword(body.password);
+    // Hashing yields to concurrent setup requests. Check emptiness and insert in one SQLite statement.
+    const inserted = ctx.database.raw.prepare("INSERT INTO users (id, username, password_hash, role, created_at) SELECT ?, ?, ?, 'owner', ? WHERE NOT EXISTS (SELECT 1 FROM users) RETURNING id")
+      .get(id, body.username, passwordHash, Date.now());
+    if (!inserted) throw new AppError(409, "already_setup", "CraftPanel is already set up");
+    const [row] = await db.select().from(users).where(eq(users.id, id));
     ctx.setupToken = null;
     await fsp.rm(path.join(ctx.config.layout.root, "setup-token.txt"), { force: true });
     await ctx.activity.audit({ id, username: body.username, ip: req.ip }, "auth.setup", id);

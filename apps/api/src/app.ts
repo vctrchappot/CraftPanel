@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { isIP } from "node:net";
 import Fastify, { type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
@@ -9,20 +10,22 @@ import websocket from "@fastify/websocket";
 import fastifyStatic from "@fastify/static";
 import { AppError } from "@craftpanel/shared";
 import { PathError } from "@craftpanel/backup";
-import { isClientAllowed } from "@craftpanel/network";
+import { isClientAllowed, isPrivateAddress, normalizeIp } from "@craftpanel/network";
 import { SESSION_COOKIE, safeEqual } from "./auth/sessions";
 import type { AppContext } from "./context";
 import { authRoutes } from "./routes/auth";
 import { serverRoutes } from "./routes/servers";
 import { fileRoutes } from "./routes/files";
 import { systemRoutes } from "./routes/system";
-import { wsRoutes, isAllowedOrigin } from "./routes/ws";
+import { wsRoutes } from "./routes/ws";
+import { isHostPeer, isRequestOriginAllowed, isSecureRequest, isTrustedProxy } from "./deployment";
 
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const CSRF_EXEMPT = new Set(["/api/auth/login", "/api/auth/setup"]);
 
 export interface BuildOptions {
   logger?: boolean | object;
+  isReady?: () => boolean;
   /**
    * Local control channel for installers: a token stored in the data directory (readable only by
    * the account running CraftPanel) allows a graceful shutdown from this machine. Windows has no
@@ -30,8 +33,6 @@ export interface BuildOptions {
    */
   control?: { token: string; shutdown: () => void };
 }
-
-const LOOPBACK_PEERS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 
 /**
  * The static export writes link-prefetch payloads as `servers/new/__next.servers/new/__PAGE__.txt`,
@@ -48,7 +49,8 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
   const app = Fastify({
     rewriteUrl: (req) => nextSegmentPath(req.url ?? "/"),
     logger: opts.logger ?? { level: ctx.config.logLevel },
-    trustProxy: ctx.config.trustProxy,
+    trustProxy: (address) => isTrustedProxy(ctx.config, address),
+    requestTimeout: 120_000,
     bodyLimit: 6 * 1024 * 1024,
     ...(tls ? { https: { cert: fs.readFileSync(tls.certFile), key: fs.readFileSync(tls.keyFile) } } : {}),
   }) as unknown as FastifyInstance;
@@ -57,6 +59,19 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
   // the dashboard files and WebSocket upgrades. The host itself is always allowed.
   const deniedLogged = new Map<string, number>();
   app.addHook("onRequest", async (req, reply) => {
+    const route = req.url.split("?")[0];
+    // Installers must be able to check/stop the internal listener, including behind HTTPS.
+    const maintenance = isHostPeer(req.socket.remoteAddress ?? "") &&
+      ["/api/health", "/api/ready", "/api/control/shutdown"].includes(route);
+    if (maintenance) return;
+    if (isTrustedProxy(ctx.config, req.socket.remoteAddress ?? "")) {
+      const forwarded = req.headers["x-forwarded-for"];
+      if (typeof forwarded !== "string" || !forwarded.split(",").every((ip) => isIP(normalizeIp(ip))))
+        throw new AppError(403, "bad_forwarding_headers", "The reverse proxy did not provide a valid client address", "Configure the proxy to overwrite X-Forwarded-For and X-Forwarded-Proto on every request.");
+    }
+    const publicClient = !isPrivateAddress(req.ip);
+    if ((!isSecureRequest(req, ctx.config) && (ctx.config.secureCookies || publicClient)) || (publicClient && !ctx.config.secureCookies))
+      throw new AppError(403, "https_required", "HTTPS and Secure cookies are required for this connection", "Use the HTTPS dashboard address, or configure a trusted HTTPS reverse proxy.");
     const { dashboardAccess, allowedNetworks } = await ctx.settings.get();
     if (isClientAllowed(req.ip, dashboardAccess, allowedNetworks)) return;
     const now = Date.now();
@@ -85,10 +100,12 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
     reply.header("Cache-Control", "no-store");
     req.user = await ctx.sessions.resolve(req.cookies[SESSION_COOKIE], { ip: req.ip });
 
+    if (req.url.split("?")[0] === "/api/ws" && !isRequestOriginAllowed(req, ctx.config))
+      throw new AppError(403, "bad_origin", "WebSocket origin rejected");
+
     if (UNSAFE.has(req.method)) {
       // Defense in depth: reject cross-site requests by Origin, then require the CSRF token.
-      const origin = req.headers.origin;
-      if (origin && !isAllowedOrigin(origin, req.headers.host, ctx.config.corsOrigins)) throw new AppError(403, "bad_origin", "Cross-origin request rejected");
+      if (!isRequestOriginAllowed(req, ctx.config)) throw new AppError(403, "bad_origin", "Cross-origin request rejected");
       const path = req.url.split("?")[0];
       if (!CSRF_EXEMPT.has(path) && req.user) {
         const token = req.headers["x-csrf-token"];
@@ -120,10 +137,16 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
     await systemRoutes(api, ctx);
     await wsRoutes(api, ctx);
     api.get("/api/health", async () => ({ ok: true }));
+    api.get("/api/ready", async (_req, reply) => {
+      let ready = opts.isReady?.() ?? true;
+      try { ctx.database.raw.prepare("SELECT 1").get(); } catch { ready = false; }
+      reply.header("Cache-Control", "no-store");
+      return reply.code(ready ? 200 : 503).send({ ok: ready });
+    });
     api.post("/api/control/shutdown", async (req, reply) => {
       // The socket address, not req.ip: a proxy header must never make a request look local.
       const token = req.headers["x-craftpanel-control"];
-      const local = LOOPBACK_PEERS.has(req.socket.remoteAddress ?? "");
+      const local = isHostPeer(req.socket.remoteAddress ?? "");
       if (!opts.control || !local || typeof token !== "string" || !safeEqual(token, opts.control.token)) throw new AppError(403, "forbidden", "Not allowed");
       req.log.info("Shutdown requested by a local installer or update");
       setImmediate(opts.control.shutdown);
