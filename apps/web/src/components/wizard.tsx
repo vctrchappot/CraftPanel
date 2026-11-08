@@ -105,7 +105,8 @@ export function CreateServerWizard() {
   const versionInfo = useQuery({
     queryKey: ["catalog", f.software, "version", f.mcVersion],
     queryFn: () => api.get<VersionInfo>(`/api/catalog/${f.software}/versions/${f.mcVersion}`),
-    enabled: !!f.mcVersion,
+    // Right after a software change the version still belongs to the previous software.
+    enabled: !!f.mcVersion && !!versions.data?.some((v) => v.id === f.mcVersion),
     staleTime: 300_000,
   });
 
