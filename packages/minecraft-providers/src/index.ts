@@ -9,3 +9,4 @@ export * from "./uuid";
 export * from "./purpur";
 export * from "./fabric";
 export * from "./log4shell";
+export * from "./modpack";

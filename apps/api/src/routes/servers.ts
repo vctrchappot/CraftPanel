@@ -31,7 +31,7 @@ import {
 import { eq, servers as serversTable } from "@craftpanel/database";
 import { directorySize, freeDiskSpace } from "@craftpanel/server-runtime";
 import { diagnoseWan, formatAddress, lanAddresses, fetchPublicIp, isPrivateIPv4 } from "@craftpanel/network";
-import { getProvider } from "@craftpanel/minecraft-providers";
+import { getProvider, listModpackVersions, searchModpacks } from "@craftpanel/minecraft-providers";
 import { actorOf, canSee, noContent, requirePermission, type AppContext } from "../context";
 import { parse } from "../validate";
 import { isDowngrade, previewSwitch } from "../services/software-switch";
@@ -69,6 +69,31 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     const input = parse(createServerSchema, req.body);
     const created = await servers.create(input, actorOf(req));
     return servers.detail(created);
+  });
+
+  // ---- modpacks (prepared before a server is created from them) -----------------------------
+
+  app.get<{ Querystring: { q?: string; offset?: string } }>("/api/modpacks/search", async (req) => {
+    requirePermission(req, "server.create");
+    return searchModpacks(String(req.query.q ?? "").slice(0, 100), Number(req.query.offset) || 0);
+  });
+  app.get<{ Params: { project: string } }>("/api/modpacks/:project/versions", async (req) => {
+    requirePermission(req, "server.create");
+    return listModpackVersions(req.params.project);
+  });
+  app.post("/api/modpacks/modrinth", async (req) => {
+    requirePermission(req, "server.create");
+    const { versionId } = parse(z.object({ versionId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/) }), req.body);
+    return servers.modpacks.fromModrinth(versionId);
+  });
+  app.post("/api/modpacks/upload", async (req) => {
+    requirePermission(req, "server.create");
+    const up = await receiveUpload(ctx, req, 1024 ** 3);
+    try {
+      return await servers.modpacks.fromUpload(up.file);
+    } finally {
+      await up.cleanup();
+    }
   });
 
   app.get<IdParams>("/api/servers/:id", async (req) => {

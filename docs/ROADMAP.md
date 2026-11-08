@@ -44,7 +44,7 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 
 ### 4. More platforms (Phase 3)
 - [ ] NeoForge (run the installer with `--installServer`, start via its argument files).
-- [ ] Modrinth modpacks (`.mrpack`) with one click.
+- [x] Modrinth modpacks (`.mrpack`) with one click: Fabric and vanilla packs from the Modrinth catalogue or an uploaded file (Forge/NeoForge/Quilt packs are refused with a clear message until those loaders exist).
 - [ ] Velocity proxy (several servers behind one address).
 - [ ] Bedrock Dedicated Server (x64 only, no ARM; the runtime already supports a custom launch command).
 - [ ] Hangar as a second plugin source.

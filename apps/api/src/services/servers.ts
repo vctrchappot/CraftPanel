@@ -18,7 +18,7 @@ import {
   type ServerSummary,
 } from "@craftpanel/shared";
 import { eq, playerSessions, servers, and, isNull, type Database } from "@craftpanel/database";
-import { ensureLog4jConfig, getProvider, hasOwnLog4jSettings, JavaManager, inspectJava, isJavaCompatible, log4shellMitigation } from "@craftpanel/minecraft-providers";
+import { ensureLog4jConfig, getProvider, hasOwnLog4jSettings, installModpack, JavaManager, inspectJava, isJavaCompatible, log4shellMitigation } from "@craftpanel/minecraft-providers";
 import { PropertiesDocument } from "@craftpanel/config";
 import { isPortAvailable } from "@craftpanel/network";
 import { freeDiskSpace, LocalAgent, ServerSandbox } from "@craftpanel/server-runtime";
@@ -28,6 +28,7 @@ import type { AppConfig } from "../config";
 import { SYSTEM_ACTOR, type ActivityService, type Actor } from "./activity";
 import { syncInfoPack, syncInfoPlugin } from "./info-pack";
 import { mergeSplitDimensions, separateDimensionLayout } from "./software-switch";
+import { MODPACK_RECORD, ModpackStaging, PENDING_MODPACK } from "./modpacks";
 import type { SettingsService } from "./settings";
 
 export type ServerRow = typeof servers.$inferSelect;
@@ -38,6 +39,7 @@ export class ServerService {
   readonly restartRequired = new Set<string>();
   private locks = new Map<string, string>();
   private installs = new Map<string, AbortController>();
+  readonly modpacks: ModpackStaging;
 
   constructor(
     private db: Database,
@@ -48,6 +50,7 @@ export class ServerService {
     private config: AppConfig,
     private settings: SettingsService,
   ) {
+    this.modpacks = new ModpackStaging(config.layout.tmp);
     this.wireAgent();
   }
 
@@ -147,6 +150,8 @@ export class ServerService {
 
   async create(input: z.output<typeof createServerSchema>, actor: Actor): Promise<ServerRow> {
     const id = crypto.randomUUID();
+    const pack = input.modpackId ? await this.modpacks.get(input.modpackId) : null;
+    if (pack) input = { ...input, software: pack.info.software, mcVersion: pack.info.mcVersion, build: pack.info.loader };
     const provider = getProvider(input.software);
     const versions = await provider.listVersions();
     if (!versions.some((v) => v.id === input.mcVersion)) throw badRequest(`${provider.label} does not offer Minecraft ${input.mcVersion}`);
@@ -178,6 +183,7 @@ export class ServerService {
 
     await fsp.mkdir(directory, { recursive: true });
     await fsp.writeFile(path.join(directory, MARKER), JSON.stringify({ id, createdAt: new Date().toISOString() }));
+    if (pack) await this.modpacks.claim(pack.id, directory);
 
     // Initial server.properties from the wizard; Minecraft fills in the rest on first start.
     const props = new PropertiesDocument();
@@ -232,8 +238,9 @@ export class ServerService {
       })
       .returning();
     if (input.acceptEula) await this.writeEula(directory, actor);
-    await this.activity.event(id, "server.created", `Server "${input.name}" created (${provider.label} ${input.mcVersion})`, { actor });
-    await this.activity.audit(actor, "server.create", id, { name: input.name, software: input.software, version: input.mcVersion });
+    const from = pack ? `, modpack ${pack.info.name} ${pack.info.version}` : "";
+    await this.activity.event(id, "server.created", `Server "${input.name}" created (${provider.label} ${input.mcVersion}${from})`, { actor });
+    await this.activity.audit(actor, "server.create", id, { name: input.name, software: input.software, version: input.mcVersion, ...(pack ? { modpack: `${pack.info.name} ${pack.info.version}` } : {}) });
     void this.install(id, actor);
     return row;
   }
@@ -262,6 +269,7 @@ export class ServerService {
           report("Downloading Log4Shell protection", null);
           await ensureLog4jConfig(row.directory, log4j.configFile, ac.signal);
         }
+        await this.installPendingModpack(row, actor, ac.signal);
         report("Checking Java runtime", null);
         const javaPath = await this.ensureJava(row.javaMajor, row.javaPath, report, ac.signal);
         await this.db
@@ -281,6 +289,44 @@ export class ServerService {
     } finally {
       this.installs.delete(id);
     }
+  }
+
+  /**
+   * Download a new server's modpack files (kept as PENDING_MODPACK until they are in place, so a
+   * retried installation picks it up again). A pack's overrides may bring their own server.properties
+   * or eula.txt; the network settings, the EULA decision and CraftPanel's marker are kept.
+   */
+  private async installPendingModpack(row: ServerRow, actor: Actor, signal: AbortSignal) {
+    const sb = this.sandbox(row);
+    if (!(await sb.exists(PENDING_MODPACK))) return;
+    const keep = async (rel: string) => [rel, await sb.readTextIfExists(rel)] as const;
+    const before = await Promise.all([keep("server.properties"), keep("eula.txt"), keep(MARKER)]);
+    const record = JSON.parse((await sb.readTextIfExists(MODPACK_RECORD)) ?? "{}") as { name?: string; version?: string };
+    const result = await installModpack(
+      await sb.resolve(PENDING_MODPACK),
+      await sb.resolve("."),
+      (rel) => sb.resolve(rel),
+      (p) => this.progress({ serverId: row.id, stage: p.stage, message: `${p.stage} (${p.done}/${p.total})`, percent: p.total ? Math.round((p.done / p.total) * 100) : null }),
+      signal,
+    );
+    for (const [rel, text] of before) {
+      const now = await sb.readTextIfExists(rel);
+      if (text === null || now === text) continue;
+      if (rel !== "server.properties" || now === null) {
+        await sb.writeText(rel, text);
+        continue;
+      }
+      const ours = PropertiesDocument.parse(text);
+      const theirs = PropertiesDocument.parse(now);
+      for (const k of ["server-port", "server-ip", "query.port", "enable-rcon", "level-name"]) {
+        const v = ours.get(k);
+        if (v !== undefined) theirs.set(k, v);
+      }
+      await sb.writeText(rel, theirs.serialize());
+    }
+    await sb.writeText(MODPACK_RECORD, JSON.stringify({ ...record, installedAt: new Date().toISOString() }, null, 2));
+    await sb.remove(PENDING_MODPACK);
+    await this.activity.event(row.id, "server.modpack_installed", `Installed modpack ${record.name ?? ""} ${record.version ?? ""}: ${result.files} files, ${result.overrides} from overrides`.replace(/\s+/g, " "), { actor });
   }
 
   /** Resolve a Java executable compatible with `major`, downloading Temurin if necessary. */

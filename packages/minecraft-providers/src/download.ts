@@ -37,6 +37,9 @@ const TRUSTED_HOSTS = [
   "release-assets.githubusercontent.com",
   "api.modrinth.com",
   "cdn.modrinth.com",
+  // Allowed by the .mrpack format for modpack files (always checked against a SHA-512).
+  "raw.githubusercontent.com",
+  "gitlab.com",
 ];
 
 /** Only official/vetted hosts are allowed as download sources. */

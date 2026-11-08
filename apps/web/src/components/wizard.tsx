@@ -4,13 +4,14 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Check, ChevronLeft, ChevronRight, Coffee, Feather, Globe, Home, Info, Package, Puzzle, ShieldCheck, Zap } from "lucide-react";
+import { AlertTriangle, Boxes, Check, ChevronLeft, ChevronRight, Coffee, Feather, Globe, Home, Info, Package, Puzzle, ShieldCheck, Zap } from "lucide-react";
 import { Badge, Button, Callout, Field, Input, NativeSelect, PageHeader, Panel, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
 import { PERFORMANCE_PRESETS, PRESET_INFO, recommendPreset, SOFTWARE_INFO, softwareLabel, type CreateServerInput, type ServerSoftware } from "@craftpanel/shared";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { useServers } from "@/lib/queries";
 import { formatBytes } from "@/lib/format";
 import { useSystem } from "./home";
+import { ModpackPicker, type PreparedModpack } from "./modpack-picker";
 
 export interface VersionOption {
   id: string;
@@ -32,7 +33,11 @@ export const SOFTWARE_CHOICES: { id: ServerSoftware; badge?: string; description
 
 const STEPS = ["Basics", "Software", "Version", "World", "Gameplay", "Resources", "Network", "Review"] as const;
 
-type Form = Required<Omit<CreateServerInput, "javaPath" | "directory" | "build" | "edition">> & { build: string; directory: string; mode: "survival" | "creative" | "adventure" | "hardcore" };
+type Form = Required<Omit<CreateServerInput, "javaPath" | "directory" | "build" | "edition" | "modpackId">> & {
+  build: string;
+  directory: string;
+  mode: "survival" | "creative" | "adventure" | "hardcore";
+};
 
 export function CreateServerWizard() {
   const router = useRouter();
@@ -77,6 +82,9 @@ export function CreateServerWizard() {
     autoStart: false,
   });
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((p) => ({ ...p, [k]: v }));
+  const [fromModpack, setFromModpack] = React.useState(false);
+  const [pack, setPack] = React.useState<PreparedModpack | null>(null);
+  const modpack = fromModpack ? pack : null;
   const buildLabel = SOFTWARE_INFO[f.software].buildLabel;
   React.useEffect(() => setF((p) => (p.port === 25565 && nextPort !== 25565 ? { ...p, port: nextPort } : p)), [nextPort]);
   const recommended = system.data ? recommendPreset({ arch: system.data.arch, cpus: system.data.cpus, memoryBytes: system.data.memory.total }) : null;
@@ -87,8 +95,8 @@ export function CreateServerWizard() {
 
   const versions = useQuery({ queryKey: ["catalog", f.software, "versions"], queryFn: () => api.get<VersionOption[]>(`/api/catalog/${f.software}/versions`), staleTime: 600_000 });
   React.useEffect(() => {
-    if (versions.data?.length && !versions.data.some((v) => v.id === f.mcVersion)) set("mcVersion", versions.data[0].id);
-  }, [versions.data, f.mcVersion]);
+    if (!modpack && versions.data?.length && !versions.data.some((v) => v.id === f.mcVersion)) set("mcVersion", versions.data[0].id);
+  }, [versions.data, f.mcVersion, modpack]);
   const versionInfo = useQuery({
     queryKey: ["catalog", f.software, "version", f.mcVersion],
     queryFn: () => api.get<VersionInfo>(`/api/catalog/${f.software}/versions/${f.mcVersion}`),
@@ -99,10 +107,26 @@ export function CreateServerWizard() {
   const totalMb = system.data ? Math.floor(system.data.memory.total / 1024 / 1024) : 8192;
   const maxMb = Math.max(1024, Math.floor((totalMb - 512) / 512) * 512);
 
+  const choosePack = (p: PreparedModpack | null) => {
+    setPack(p);
+    if (!p) return;
+    // Modpacks run many mods; 4 GB is a common minimum.
+    setF((prev) => ({
+      ...prev,
+      software: p.info.software,
+      mcVersion: p.info.mcVersion,
+      build: p.info.loader ?? "",
+      name: prev.name || p.info.name.slice(0, 48),
+      memoryMb: Math.max(prev.memoryMb, Math.min(4096, maxMb)),
+    }));
+  };
+
   const stepError = (): string | null => {
     switch (STEPS[step]) {
       case "Basics":
         return f.name.trim() ? null : "Give your server a name";
+      case "Software":
+        return fromModpack && !pack ? "Choose a modpack" : null;
       case "Version":
         return f.mcVersion ? null : "Choose a Minecraft version";
       case "World":
@@ -129,6 +153,7 @@ export function CreateServerWizard() {
         hardcore: mode === "hardcore",
         build: build || null,
         directory: directory.trim() || undefined,
+        modpackId: modpack?.id,
       };
       const created = await api.post<{ id: string }>("/api/servers", body);
       toast.success("Server created. Installing…");
@@ -160,7 +185,12 @@ export function CreateServerWizard() {
                   i === step ? "bg-muted font-medium text-foreground" : i < step ? "text-foreground hover:bg-muted/60" : "text-muted-foreground",
                 )}
               >
-                <span className={cn("flex size-5 items-center justify-center rounded-full border text-[11px] tabular-nums", i < step ? "border-foreground bg-foreground text-background" : i === step ? "border-foreground" : "border-border")}>
+                <span
+                  className={cn(
+                    "flex size-5 items-center justify-center rounded-full border text-[11px] tabular-nums",
+                    i < step ? "border-foreground bg-foreground text-background" : i === step ? "border-foreground" : "border-border",
+                  )}
+                >
                   {i < step ? <Check className="size-3" /> : i + 1}
                 </span>
                 {s}
@@ -192,7 +222,14 @@ export function CreateServerWizard() {
                 <Field label="Edition">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Choice selected title="Java Edition" description="For Minecraft on Windows, macOS and Linux." icon={<Coffee />} onClick={() => undefined} />
-                    <Choice disabled title="Bedrock Edition" description="Planned. Requires a different server binary and network setup." icon={<Package />} badge="Planned" onClick={() => undefined} />
+                    <Choice
+                      disabled
+                      title="Bedrock Edition"
+                      description="Planned. Requires a different server binary and network setup."
+                      icon={<Package />}
+                      badge="Planned"
+                      onClick={() => undefined}
+                    />
                   </div>
                 </Field>
                 <Field label="Server software">
@@ -200,55 +237,76 @@ export function CreateServerWizard() {
                     {SOFTWARE_CHOICES.map((c) => (
                       <Choice
                         key={c.id}
-                        selected={f.software === c.id}
+                        selected={!fromModpack && f.software === c.id}
                         title={softwareLabel(c.id)}
                         badge={c.badge}
                         description={c.description}
                         icon={c.icon}
-                        onClick={() => (set("software", c.id), set("build", ""))}
+                        onClick={() => (setFromModpack(false), set("software", c.id), set("build", ""))}
                       />
                     ))}
+                    <Choice
+                      selected={fromModpack}
+                      title="Modpack"
+                      description="A ready-made Fabric modpack from Modrinth or your own .mrpack file. Version and loader come from the pack."
+                      icon={<Boxes />}
+                      onClick={() => (setFromModpack(true), pack && choosePack(pack))}
+                    />
                   </div>
                 </Field>
+                {fromModpack && (
+                  <Field label="Modpack">
+                    <ModpackPicker value={pack} onChange={choosePack} />
+                  </Field>
+                )}
               </div>
             )}
 
             {STEPS[step] === "Version" && (
               <div className="max-w-lg space-y-5">
-                <Field label="Minecraft version" htmlFor="version" help="Players must use the same version to join.">
-                  {versions.isLoading ? (
-                    <Skeleton className="h-9" />
-                  ) : versions.error ? (
-                    <Callout variant="danger" icon={<AlertTriangle />} title="Could not load versions">
-                      {errorMessage(versions.error)}. Check this machine's internet connection.
-                    </Callout>
-                  ) : (
-                    <NativeSelect id="version" value={f.mcVersion} onChange={(e) => (set("mcVersion", e.target.value), set("build", ""))}>
-                      {versions.data?.map((v, i) => (
-                        <option key={v.id} value={v.id}>
-                          {v.id}
-                          {i === 0 ? " (latest)" : ""}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  )}
-                </Field>
-                {buildLabel && (
-                  <Field
-                    label={f.software === "fabric" ? "Fabric Loader" : `${softwareLabel(f.software)} build`}
-                    htmlFor="build"
-                    help={`The newest stable ${f.software === "fabric" ? "loader" : "build"} is used by default.`}
-                  >
-                    <NativeSelect id="build" value={f.build} onChange={(e) => set("build", e.target.value)} disabled={!versionInfo.data}>
-                      <option value="">Latest stable</option>
-                      {versionInfo.data?.builds.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {f.software === "fabric" ? b.id : `#${b.id}`} · {b.channel.toLowerCase()}
-                          {b.time ? ` · ${new Date(b.time).toLocaleDateString()}` : ""}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </Field>
+                {modpack ? (
+                  <Callout icon={<Boxes />} title={`${modpack.info.name} ${modpack.info.version}`}>
+                    The modpack sets Minecraft {modpack.info.mcVersion}
+                    {modpack.info.loader ? ` with Fabric Loader ${modpack.info.loader}` : ""}. Players need the same modpack version in their launcher.
+                  </Callout>
+                ) : (
+                  <>
+                    <Field label="Minecraft version" htmlFor="version" help="Players must use the same version to join.">
+                      {versions.isLoading ? (
+                        <Skeleton className="h-9" />
+                      ) : versions.error ? (
+                        <Callout variant="danger" icon={<AlertTriangle />} title="Could not load versions">
+                          {errorMessage(versions.error)}. Check this machine's internet connection.
+                        </Callout>
+                      ) : (
+                        <NativeSelect id="version" value={f.mcVersion} onChange={(e) => (set("mcVersion", e.target.value), set("build", ""))}>
+                          {versions.data?.map((v, i) => (
+                            <option key={v.id} value={v.id}>
+                              {v.id}
+                              {i === 0 ? " (latest)" : ""}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      )}
+                    </Field>
+                    {buildLabel && (
+                      <Field
+                        label={f.software === "fabric" ? "Fabric Loader" : `${softwareLabel(f.software)} build`}
+                        htmlFor="build"
+                        help={`The newest stable ${f.software === "fabric" ? "loader" : "build"} is used by default.`}
+                      >
+                        <NativeSelect id="build" value={f.build} onChange={(e) => set("build", e.target.value)} disabled={!versionInfo.data}>
+                          <option value="">Latest stable</option>
+                          {versionInfo.data?.builds.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {f.software === "fabric" ? b.id : `#${b.id}`} · {b.channel.toLowerCase()}
+                              {b.time ? ` · ${new Date(b.time).toLocaleDateString()}` : ""}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      </Field>
+                    )}
+                  </>
                 )}
                 {versionInfo.data && (
                   <Callout icon={<Coffee />} title={`Requires Java ${versionInfo.data.java.major}`}>
@@ -294,16 +352,28 @@ export function CreateServerWizard() {
                         key={m}
                         type="button"
                         onClick={() => set("mode", m)}
-                        className={cn("h-9 rounded-md border text-[13px] font-medium capitalize transition-colors", f.mode === m ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted")}
+                        className={cn(
+                          "h-9 rounded-md border text-[13px] font-medium capitalize transition-colors",
+                          f.mode === m ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted",
+                        )}
                       >
                         {m}
                       </button>
                     ))}
                   </div>
                 </Field>
-                {f.mode === "hardcore" && <Callout variant="warning" icon={<AlertTriangle />}>Hardcore locks difficulty to Hard. Players become spectators when they die.</Callout>}
+                {f.mode === "hardcore" && (
+                  <Callout variant="warning" icon={<AlertTriangle />}>
+                    Hardcore locks difficulty to Hard. Players become spectators when they die.
+                  </Callout>
+                )}
                 <Field label="Difficulty" htmlFor="diff">
-                  <NativeSelect id="diff" value={f.mode === "hardcore" ? "hard" : f.difficulty} disabled={f.mode === "hardcore"} onChange={(e) => set("difficulty", e.target.value as Form["difficulty"])}>
+                  <NativeSelect
+                    id="diff"
+                    value={f.mode === "hardcore" ? "hard" : f.difficulty}
+                    disabled={f.mode === "hardcore"}
+                    onChange={(e) => set("difficulty", e.target.value as Form["difficulty"])}
+                  >
                     <option value="peaceful">Peaceful</option>
                     <option value="easy">Easy</option>
                     <option value="normal">Normal</option>
@@ -320,7 +390,11 @@ export function CreateServerWizard() {
                   checked={f.onlineMode}
                   onChange={(v) => set("onlineMode", v)}
                 />
-                {!f.onlineMode && <Callout variant="danger" icon={<AlertTriangle />}>Offline mode lets people impersonate any player, including operators. Only use it on isolated networks.</Callout>}
+                {!f.onlineMode && (
+                  <Callout variant="danger" icon={<AlertTriangle />}>
+                    Offline mode lets people impersonate any player, including operators. Only use it on isolated networks.
+                  </Callout>
+                )}
               </div>
             )}
 
@@ -333,7 +407,16 @@ export function CreateServerWizard() {
                   help={system.data ? `This machine has ${formatBytes(system.data.memory.total)} RAM. 2–4 GB suits a few players; leave room for the operating system.` : undefined}
                   error={f.memoryMb > maxMb ? "More than this machine can provide" : null}
                 >
-                  <input id="mem" type="range" min={512} max={maxMb} step={512} value={Math.min(f.memoryMb, maxMb)} onChange={(e) => set("memoryMb", Number(e.target.value))} className="w-full accent-[var(--foreground)]" />
+                  <input
+                    id="mem"
+                    type="range"
+                    min={512}
+                    max={maxMb}
+                    step={512}
+                    value={Math.min(f.memoryMb, maxMb)}
+                    onChange={(e) => set("memoryMb", Number(e.target.value))}
+                    className="w-full accent-[var(--foreground)]"
+                  />
                 </Field>
                 <Field
                   label="Performance"
@@ -357,7 +440,12 @@ export function CreateServerWizard() {
                     <option value="">None</option>
                   </NativeSelect>
                 </Field>
-                <Field label="Additional JVM arguments" htmlFor="jvm" help="Optional. Each argument must start with '-'. Memory is set above; the performance preset adds its garbage collector flags." error={fieldErrors.jvmArgs}>
+                <Field
+                  label="Additional JVM arguments"
+                  htmlFor="jvm"
+                  help="Optional. Each argument must start with '-'. Memory is set above; the performance preset adds its garbage collector flags."
+                  error={fieldErrors.jvmArgs}
+                >
                   <Textarea id="jvm" rows={3} value={f.jvmArgs} onChange={(e) => set("jvmArgs", e.target.value)} className="font-mono text-xs" placeholder="-XX:+UseG1GC" />
                 </Field>
                 <ToggleRow label="Start with CraftPanel" help="Start this server automatically whenever CraftPanel starts." checked={f.autoStart} onChange={(v) => set("autoStart", v)} />
@@ -369,7 +457,13 @@ export function CreateServerWizard() {
                 <Field label="Who should be able to join?">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Choice selected={f.networkMode === "lan"} title="Local network" description="Players on the same Wi-Fi or LAN." icon={<Home />} onClick={() => set("networkMode", "lan")} />
-                    <Choice selected={f.networkMode === "wan"} title="Internet" description="Friends anywhere. Requires router port forwarding." icon={<Globe />} onClick={() => set("networkMode", "wan")} />
+                    <Choice
+                      selected={f.networkMode === "wan"}
+                      title="Internet"
+                      description="Friends anywhere. Requires router port forwarding."
+                      icon={<Globe />}
+                      onClick={() => set("networkMode", "wan")}
+                    />
                   </div>
                 </Field>
                 <div className="grid gap-5 sm:grid-cols-2">
@@ -403,6 +497,7 @@ export function CreateServerWizard() {
                 <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-2.5 text-[13px]">
                   {[
                     ["Name", f.name],
+                    ...(modpack ? [["Modpack", `${modpack.info.name} ${modpack.info.version} · ${modpack.info.serverFiles} files`]] : []),
                     ["Software", `${softwareLabel(f.software)} ${f.mcVersion}${f.build ? ` ${f.software === "fabric" ? "loader" : "build"} ${f.build}` : ""}`],
                     ["Java", versionInfo.data ? `Java ${versionInfo.data.java.major}${versionInfo.data.java.available ? "" : " (will be downloaded)"}` : "—"],
                     ["World", `${f.levelName}${f.seed ? ` · seed ${f.seed}` : ""} · ${f.levelType.replace("minecraft:", "")}`],
@@ -455,7 +550,23 @@ export function CreateServerWizard() {
   );
 }
 
-export function Choice({ selected, disabled, title, description, icon, badge, onClick }: { selected?: boolean; disabled?: boolean; title: string; description: string; icon: React.ReactNode; badge?: string; onClick: () => void }) {
+export function Choice({
+  selected,
+  disabled,
+  title,
+  description,
+  icon,
+  badge,
+  onClick,
+}: {
+  selected?: boolean;
+  disabled?: boolean;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  badge?: string;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"

@@ -99,6 +99,8 @@ export const createServerSchema = z.object({
   directory: z.string().max(1024).optional(),
   acceptEula: z.boolean().default(false),
   autoStart: z.boolean().default(false),
+  /** A prepared .mrpack (POST /api/modpacks/…); its Minecraft version and loader replace software, mcVersion and build. */
+  modpackId: z.string().uuid().optional(),
 });
 export type CreateServerInput = z.input<typeof createServerSchema>;
 
