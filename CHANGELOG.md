@@ -26,6 +26,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Servers from a modpack: search Fabric and NeoForge modpacks on Modrinth (or upload a `.mrpack`) in the wizard; CraftPanel picks the Minecraft and loader version from the pack, downloads its server-side files with checksum checks, applies its overrides and keeps your port and EULA settings.
 - Hangar (PaperMC's plugin repository) as a second plugin source for Paper and Purpur: switch between Modrinth and Hangar under Plugins → Browse; installs are checked against Hangar's SHA-256, and plugins installed from Hangar show up under Updates.
 - `CRAFTPANEL_RELEASE_DIR`: update from a local folder of release archives instead of GitHub.
+- Velocity proxy: several servers behind one address. Create a Velocity server in the wizard, add servers on its Proxy tab in the order players should try them (optionally with a forced host), and CraftPanel writes `velocity.toml`, sets up modern forwarding with a generated secret and configures Paper/Purpur backends (and Fabric backends via FabricProxy-Lite) on their next start. Backends can be bound to this computer so players can only join through the proxy. Velocity plugins from Modrinth.
 - Notifications via Discord webhook and e-mail (SMTP) when a server crashes or fails to start, a backup or scheduled task fails, or a CraftPanel update is available; with a test button.
 
 ### Changed
@@ -36,6 +37,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Downloads (Minecraft, Java, mods) retry twice on temporary server errors such as an HTTP 504 from GitHub instead of failing the installation.
 
 ### Fixed
+- Two servers installing at the same time no longer break each other's Java download.
 - Switching from Paper or Purpur (Minecraft 1.21 and older) to Vanilla or Fabric no longer loses the Nether and the End: their folders are moved back into the world.
 - The Worlds tab shows the Nether and the End for Minecraft 26.x worlds.
 - Dashboard links no longer request missing prefetch files (404s in the browser console); page changes are faster.

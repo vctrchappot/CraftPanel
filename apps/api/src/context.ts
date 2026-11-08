@@ -14,6 +14,7 @@ import type { GameService } from "./services/game";
 import type { SettingsService } from "./services/settings";
 import type { UpdateService } from "./services/updates";
 import type { PregenService } from "./services/pregen";
+import type { ProxyService } from "./services/proxy";
 import type { NotificationService } from "./services/notifications";
 
 export interface AppContext {
@@ -28,6 +29,7 @@ export interface AppContext {
   schedules: ScheduleService;
   game: GameService;
   pregen: PregenService;
+  proxies: ProxyService;
   settings: SettingsService;
   updates: UpdateService;
   notifications: NotificationService;

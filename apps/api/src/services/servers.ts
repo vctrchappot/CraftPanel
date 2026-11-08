@@ -40,6 +40,11 @@ export class ServerService {
   private locks = new Map<string, string>();
   private installs = new Map<string, AbortController>();
   readonly modpacks: ModpackStaging;
+  /** Extension points (the proxy service writes Velocity and backend configuration here). */
+  readonly hooks = {
+    created: [] as ((row: ServerRow, input: z.output<typeof createServerSchema>) => Promise<void>)[],
+    beforeStart: [] as ((row: ServerRow) => Promise<void>)[],
+  };
 
   constructor(
     private db: Database,
@@ -185,7 +190,8 @@ export class ServerService {
     await fsp.writeFile(path.join(directory, MARKER), JSON.stringify({ id, createdAt: new Date().toISOString() }));
     if (pack) await this.modpacks.claim(pack.id, directory);
 
-    // Initial server.properties from the wizard; Minecraft fills in the rest on first start.
+    const proxy = SOFTWARE_INFO[input.software].proxy;
+    // Initial server.properties from the wizard; Minecraft fills in the rest on first start. A proxy has none.
     const props = new PropertiesDocument();
     const set = (k: string, v: string | number | boolean) => props.set(k, String(v));
     set("motd", input.motd);
@@ -208,7 +214,7 @@ export class ServerService {
       set("view-distance", PRESET_INFO[input.performancePreset].viewDistance);
       set("simulation-distance", PRESET_INFO[input.performancePreset].simulationDistance);
     }
-    await fsp.writeFile(path.join(directory, "server.properties"), "#Created by CraftPanel\n" + props.serialize());
+    if (!proxy) await fsp.writeFile(path.join(directory, "server.properties"), "#Created by CraftPanel\n" + props.serialize());
 
     const now = Date.now();
     const [row] = await this.db
@@ -237,7 +243,8 @@ export class ServerService {
         updatedAt: now,
       })
       .returning();
-    if (input.acceptEula) await this.writeEula(directory, actor);
+    if (input.acceptEula && !proxy) await this.writeEula(directory, actor);
+    for (const hook of this.hooks.created) await hook(row, input);
     const from = pack ? `, modpack ${pack.info.name} ${pack.info.version}` : "";
     await this.activity.event(id, "server.created", `Server "${input.name}" created (${provider.label} ${input.mcVersion}${from})`, { actor });
     await this.activity.audit(actor, "server.create", id, { name: input.name, software: input.software, version: input.mcVersion, ...(pack ? { modpack: `${pack.info.name} ${pack.info.version}` } : {}) });
@@ -378,9 +385,12 @@ export class ServerService {
         throw new AppError(409, "jar_missing", "The server jar is missing", "Reinstall the server software from the server settings.");
       }
 
-      await this.syncManagedProperties(row);
-      await this.writeEula(row.directory, actor).catch(() => undefined);
-      await this.syncInfoCommand(row);
+      if (!SOFTWARE_INFO[row.software].proxy) {
+        await this.syncManagedProperties(row);
+        await this.writeEula(row.directory, actor).catch(() => undefined);
+        await this.syncInfoCommand(row);
+      }
+      for (const hook of this.hooks.beforeStart) await hook(row);
       const javaPath = await this.ensureJava(row.javaMajor, row.javaPath);
       if (javaPath !== row.javaPath) await this.db.update(servers).set({ javaPath }).where(eq(servers.id, id));
       const log4j = this.log4shell(row);
@@ -465,6 +475,8 @@ export class ServerService {
 
   /** Make server.properties match the ports/bind address CraftPanel manages. */
   async syncManagedProperties(row: ServerRow) {
+    // A proxy's port lives in velocity.toml, written before every start.
+    if (SOFTWARE_INFO[row.software].proxy) return;
     const file = path.join(row.directory, "server.properties");
     let text = "";
     try {

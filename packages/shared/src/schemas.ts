@@ -104,6 +104,26 @@ export const createServerSchema = z.object({
 });
 export type CreateServerInput = z.input<typeof createServerSchema>;
 
+/** Velocity proxy settings (see ProxyConfig). */
+export const proxyConfigSchema = z.object({
+  backends: z
+    .array(
+      z.object({
+        serverId: z.string().uuid(),
+        name: z.string().regex(/^[a-z0-9_-]{1,32}$/, "Use lowercase letters, digits, - and _ (players type it in /server)"),
+        host: z
+          .string()
+          .regex(/^[a-z0-9.-]{1,253}$/i, "Enter a host name such as survival.example.com")
+          .optional(),
+      }),
+    )
+    .max(50)
+    .refine((b) => new Set(b.map((x) => x.name)).size === b.length, "Each server needs a different name")
+    .refine((b) => new Set(b.map((x) => x.serverId)).size === b.length, "A server can only be added once"),
+  onlineMode: z.boolean(),
+  localOnly: z.boolean(),
+});
+
 export const updateServerSchema = z.object({
   name: serverNameSchema.optional(),
   description: z.string().max(280).optional(),

@@ -16,6 +16,7 @@ import { GameService } from "./services/game";
 import { SettingsService } from "./services/settings";
 import { UpdateService } from "./services/updates";
 import { PregenService } from "./services/pregen";
+import { ProxyService } from "./services/proxy";
 import { NotificationService } from "./services/notifications";
 
 /** Wire up persistence, runtime and services. Does not start listening. */
@@ -41,6 +42,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const schedules = new ScheduleService(db, servers, backups, activity, settings);
   const game = new GameService(db, servers, activity, config);
   const pregen = new PregenService(servers, game);
+  const proxies = new ProxyService(servers, game, activity);
   const notifications = new NotificationService(settings, updates);
   activity.listen((event, serverName) => notifications.onEvent(event, serverName));
 
@@ -54,5 +56,5 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
     await fsp.writeFile(tokenFile, setupToken + "\n", { mode: 0o600 });
   } else await fsp.rm(tokenFile, { force: true });
 
-  return { config, database, agent, hub, sessions, activity, servers, backups, schedules, game, pregen, settings, updates, notifications, java, setupToken };
+  return { config, database, agent, hub, sessions, activity, servers, backups, schedules, game, pregen, proxies, settings, updates, notifications, java, setupToken };
 }

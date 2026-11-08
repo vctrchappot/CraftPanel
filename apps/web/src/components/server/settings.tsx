@@ -27,15 +27,17 @@ interface SettingDef {
 }
 
 export function SettingsTab({ server: s }: { server: ServerDetail }) {
+  // A proxy is configured in velocity.toml (Files) and the Proxy tab; it has no server.properties or game rules.
+  const game = !SOFTWARE_INFO[s.software].proxy;
   return (
-    <Tabs defaultValue="properties" className="space-y-6">
+    <Tabs defaultValue={game ? "properties" : "runtime"} className="space-y-6">
       <TabsList>
-        <TabsTrigger value="properties">Server properties</TabsTrigger>
-        <TabsTrigger value="gamerules">Game rules</TabsTrigger>
+        {game && <TabsTrigger value="properties">Server properties</TabsTrigger>}
+        {game && <TabsTrigger value="gamerules">Game rules</TabsTrigger>}
         <TabsTrigger value="runtime">Runtime</TabsTrigger>
-        <TabsTrigger value="software">Software & version</TabsTrigger>
-        <TabsTrigger value="performance">Performance</TabsTrigger>
-        <TabsTrigger value="raw">Raw file</TabsTrigger>
+        <TabsTrigger value="software">{game ? "Software & version" : "Velocity version"}</TabsTrigger>
+        {game && <TabsTrigger value="performance">Performance</TabsTrigger>}
+        {game && <TabsTrigger value="raw">Raw file</TabsTrigger>}
         <TabsTrigger value="danger">Danger zone</TabsTrigger>
       </TabsList>
       <TabsContent value="properties">
@@ -282,29 +284,31 @@ function RuntimeSettings({ server: s }: { server: ServerDetail }) {
           <Input id="rdesc" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} disabled={!canEdit} maxLength={280} />
         </Field>
         <ToggleRow label="Start with CraftPanel" help="Start automatically when CraftPanel starts." checked={f.autoStart} onChange={(v) => setF({ ...f, autoStart: v })} disabled={!canEdit} />
-        <Field
-          label="In-game info command"
-          htmlFor="rinfo"
-          help={`Players see a short card about CraftPanel with ${SOFTWARE_INFO[s.software].addons === "plugins" ? "/craftpanel (or /trigger craftpanel)" : "/trigger craftpanel"}. Installed or removed on the next start.`}
-        >
-          <NativeSelect
-            id="rinfo"
-            value={f.infoCommand === null ? "default" : f.infoCommand ? "on" : "off"}
-            onChange={(e) => setF({ ...f, infoCommand: e.target.value === "default" ? null : e.target.value === "on" })}
-            disabled={!canEdit}
-            className="max-w-xs"
+        {!SOFTWARE_INFO[s.software].proxy && (
+          <Field
+            label="In-game info command"
+            htmlFor="rinfo"
+            help={`Players see a short card about CraftPanel with ${SOFTWARE_INFO[s.software].addons === "plugins" ? "/craftpanel (or /trigger craftpanel)" : "/trigger craftpanel"}. Installed or removed on the next start.`}
           >
-            <option value="default">Use the global setting</option>
-            <option value="on">On for this server</option>
-            <option value="off">Off for this server</option>
-          </NativeSelect>
-        </Field>
+            <NativeSelect
+              id="rinfo"
+              value={f.infoCommand === null ? "default" : f.infoCommand ? "on" : "off"}
+              onChange={(e) => setF({ ...f, infoCommand: e.target.value === "default" ? null : e.target.value === "on" })}
+              disabled={!canEdit}
+              className="max-w-xs"
+            >
+              <option value="default">Use the global setting</option>
+              <option value="on">On for this server</option>
+              <option value="off">Off for this server</option>
+            </NativeSelect>
+          </Field>
+        )}
       </Section>
       <Section title="Java & memory" description="Changes apply on the next start.">
         <Field label="Memory" htmlFor="rmem" aside={<span className="text-[13px] font-medium tabular-nums">{(f.memoryMb / 1024).toFixed(1)} GB</span>}>
           <input id="rmem" type="range" min={512} max={32768} step={512} value={f.memoryMb} onChange={(e) => setF({ ...f, memoryMb: Number(e.target.value) })} disabled={!canEdit} className="w-full accent-[var(--foreground)]" />
         </Field>
-        <Field label="Java runtime" htmlFor="rjava" help={`Minecraft ${s.mcVersion} requires Java ${s.javaMajor}. Automatic picks a compatible runtime and downloads one if needed.`}>
+        <Field label="Java runtime" htmlFor="rjava" help={`${SOFTWARE_INFO[s.software].proxy ? "Velocity" : "Minecraft"} ${s.mcVersion} requires Java ${s.javaMajor}. Automatic picks a compatible runtime and downloads one if needed.`}>
           <NativeSelect id="rjava" value={f.javaPath} onChange={(e) => setF({ ...f, javaPath: e.target.value })} disabled={!canEdit}>
             <option value="">Automatic</option>
             {java.data?.map((j) => (

@@ -102,6 +102,12 @@ export async function previewSwitch(sb: ServerSandbox, from: { software: ServerS
   const [downgrade, java] = await Promise.all([isDowngrade(from.version, to.version), getProvider(to.software).javaRequirement(to.version)]);
   const fromInfo = SOFTWARE_INFO[from.software];
   const toInfo = SOFTWARE_INFO[to.software];
+  if (fromInfo.proxy) {
+    // No worlds: a proxy update only swaps the jar.
+    notes.push({ level: "info", text: "A backup of the proxy's files is created first. Velocity plugins and velocity.toml are kept." });
+    if (java.major !== from.javaMajor) notes.push({ level: "info", text: `Needs Java ${java.major} instead of Java ${from.javaMajor}; CraftPanel downloads it if it isn't installed.` });
+    return { downgrade: false, javaMajor: java.major, notes };
+  }
   notes.push({ level: "info", text: "A backup of the whole server is created first. To undo the change, restore it." });
   if (downgrade) notes.push({ level: "danger", text: `Minecraft cannot load worlds saved by a newer version. Going back from ${from.version} to ${to.version} can corrupt or reset chunks; restore a backup from ${to.version} instead if you have one.` });
   else if (to.version !== from.version) notes.push({ level: "info", text: `Worlds are upgraded to ${to.version} on the first start. This can take a while and cannot be undone without the backup.` });

@@ -2,7 +2,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { backups, desc, eq, servers, type Database } from "@craftpanel/database";
-import { conflict, notFound, type BackupInfo } from "@craftpanel/shared";
+import { conflict, notFound, SOFTWARE_INFO, type BackupInfo } from "@craftpanel/shared";
 import { createZip, extractZip, LocalBackupStorage, verifyZip } from "@craftpanel/backup";
 import { freeDiskSpace } from "@craftpanel/server-runtime";
 import type { Hub } from "../hub";
@@ -91,7 +91,8 @@ export class BackupService {
     const emit = (status: string, percent?: number | null, message?: string) => this.hub.broadcast({ type: "backup", serverId, backupId: id, status, percent, message });
     emit("running", 0, "Preparing backup");
 
-    const live = this.servers.agent.isRunning(serverId) && this.servers.agent.status(serverId) === "running";
+    // A proxy has no world to flush.
+    const live = !SOFTWARE_INFO[server.software].proxy && this.servers.agent.isRunning(serverId) && this.servers.agent.status(serverId) === "running";
     try {
       const storage = await this.storage();
       const dest = storage.stagingPath(storageKey);

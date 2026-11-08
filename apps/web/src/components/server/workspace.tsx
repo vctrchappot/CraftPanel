@@ -34,6 +34,7 @@ import { ServerBackupsTab } from "./backups";
 import { AutomationTab } from "./automation";
 import { SettingsTab } from "./settings";
 import { NetworkTab } from "./network";
+import { ProxyTab } from "./proxy";
 
 const TABS = [
   ["overview", "Overview"],
@@ -46,7 +47,10 @@ const TABS = [
   ["automation", "Automation"],
   ["settings", "Settings"],
   ["network", "Network"],
+  ["proxy", "Proxy"],
 ] as const;
+/** Tabs that only make sense for one kind of server: a proxy has no players or worlds, only proxies have backends. */
+const visible = (t: string, proxy: boolean) => (proxy ? t !== "players" && t !== "worlds" : t !== "proxy");
 export type TabId = (typeof TABS)[number][0];
 
 export type Stream = ReturnType<typeof useServerStream>;
@@ -70,7 +74,7 @@ export function ServerWorkspace() {
         <Header server={s} />
         <Banners server={s} stream={stream} />
         <nav className="scrollbar-thin -mx-1 flex gap-1 overflow-x-auto border-b border-border px-1" aria-label="Server sections">
-          {TABS.map(([t, label]) => (
+          {TABS.filter(([t]) => visible(t, SOFTWARE_INFO[s.software].proxy)).map(([t, label]) => (
             <Link
               key={t}
               href={`/server/?id=${id}${t === "overview" ? "" : `&tab=${t}`}`}
@@ -97,6 +101,7 @@ export function ServerWorkspace() {
           {tab === "automation" && <AutomationTab server={s} />}
           {tab === "settings" && <SettingsTab server={s} />}
           {tab === "network" && <NetworkTab server={s} />}
+          {tab === "proxy" && <ProxyTab server={s} />}
         </div>
       </div>
     </ServerScope>
