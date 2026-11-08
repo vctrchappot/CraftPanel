@@ -4,7 +4,27 @@ import * as React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowUpCircle, Download, Puzzle, Search, ShieldAlert, Trash2, Upload, Zap } from "lucide-react";
 import { toast } from "sonner";
-import { Badge, Button, Callout, ConfirmDialog, Dialog, DialogContent, DialogFooter, DialogHeader, EmptyState, Input, Panel, Section, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@craftpanel/ui";
+import {
+  Badge,
+  Button,
+  Callout,
+  ConfirmDialog,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  EmptyState,
+  Input,
+  Panel,
+  Section,
+  Skeleton,
+  Switch,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  cn,
+} from "@craftpanel/ui";
 import { SOFTWARE_INFO, softwareLabel, type PluginInfo, type ServerDetail } from "@craftpanel/shared";
 import { api, errorMessage, upload } from "@/lib/api";
 import { useCan } from "@/lib/auth";
@@ -20,7 +40,14 @@ interface MarketHit {
   downloads: number;
   iconUrl: string | null;
   compatible: boolean;
+  source: "modrinth" | "hangar";
 }
+
+type Source = "modrinth" | "hangar";
+const SOURCES: Record<Source, { label: string; url: (h: MarketHit, page: string) => string }> = {
+  modrinth: { label: "Modrinth", url: (h, page) => `https://modrinth.com/${page}/${h.slug}` },
+  hangar: { label: "Hangar", url: (h) => `https://hangar.papermc.io/${h.author}/${h.slug}` },
+};
 
 /** Wording for plugin servers (Paper, Purpur) and mod servers (Fabric, NeoForge). */
 function addonTerms(s: ServerDetail) {
@@ -41,12 +68,13 @@ export function PluginsTab({ server: s }: { server: ServerDetail }) {
   return (
     <div className="space-y-6">
       <Callout variant="warning" icon={<ShieldAlert />} title={`${t.Many} are executable code`}>
-        {t.Many} run with the same permissions as the Minecraft server on this machine. Only install {t.many} from authors you trust. CraftPanel verifies download checksums but cannot verify what a {t.one} does.
+        {t.Many} run with the same permissions as the Minecraft server on this machine. Only install {t.many} from authors you trust. CraftPanel verifies download checksums but cannot verify what a{" "}
+        {t.one} does.
       </Callout>
       <Tabs defaultValue="installed" className="space-y-4">
         <TabsList>
           <TabsTrigger value="installed">Installed ({q.data.plugins.length})</TabsTrigger>
-          {canManage && <TabsTrigger value="browse">Browse Modrinth</TabsTrigger>}
+          {canManage && <TabsTrigger value="browse">Browse</TabsTrigger>}
           {canManage && <TabsTrigger value="updates">Updates</TabsTrigger>}
         </TabsList>
         <TabsContent value="installed">
@@ -64,9 +92,15 @@ export function PluginsTab({ server: s }: { server: ServerDetail }) {
 }
 
 function Installed({ server: s, plugins, canManage }: { server: ServerDetail; plugins: PluginInfo[]; canManage: boolean }) {
-  const key = [["plugins", s.id], ["server", s.id]];
+  const key = [
+    ["plugins", s.id],
+    ["server", s.id],
+  ];
   const t = addonTerms(s);
-  const toggle = useAction((v: { file: string; enabled: boolean }) => api.patch(`/api/servers/${s.id}/plugins/${encodeURIComponent(v.file)}`, { enabled: v.enabled }), { invalidate: key, success: "Saved. Restart to apply." });
+  const toggle = useAction((v: { file: string; enabled: boolean }) => api.patch(`/api/servers/${s.id}/plugins/${encodeURIComponent(v.file)}`, { enabled: v.enabled }), {
+    invalidate: key,
+    success: "Saved. Restart to apply.",
+  });
   const remove = useAction((file: string) => api.del(`/api/servers/${s.id}/plugins/${encodeURIComponent(file)}`), { invalidate: key, success: `${t.One} removed. Restart to apply.` });
   const [removing, setRemoving] = React.useState<string | null>(null);
   const [pct, setPct] = React.useState<number | null>(null);
@@ -150,39 +184,86 @@ function Installed({ server: s, plugins, canManage }: { server: ServerDetail; pl
       ) : (
         <EmptyState icon={<Puzzle />} title={`No ${t.many} installed`} description={`Browse Modrinth for ${t.many} compatible with this server, or upload a .jar.`} />
       )}
-      <ConfirmDialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)} title={`Remove ${t.one}?`} description={`${removing} will be deleted. Its configuration folder is kept.`} confirmLabel="Remove" destructive onConfirm={() => remove.mutateAsync(removing!)} />
+      <ConfirmDialog
+        open={!!removing}
+        onOpenChange={(o) => !o && setRemoving(null)}
+        title={`Remove ${t.one}?`}
+        description={`${removing} will be deleted. Its configuration folder is kept.`}
+        confirmLabel="Remove"
+        destructive
+        onConfirm={() => remove.mutateAsync(removing!)}
+      />
     </Section>
   );
 }
 
 function Browse({ server: s }: { server: ServerDetail }) {
   const t = addonTerms(s);
+  // Hangar is PaperMC's repository: plugins only.
+  const sources: Source[] = t.one === "plugin" ? ["modrinth", "hangar"] : ["modrinth"];
+  const [source, setSource] = React.useState<Source>("modrinth");
   const [query, setQuery] = React.useState("");
   const [debounced, setDebounced] = React.useState("");
   React.useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 350);
     return () => clearTimeout(t);
   }, [query]);
-  const q = useQuery({ queryKey: ["market", s.id, debounced], queryFn: () => api.get<{ hits: MarketHit[]; total: number }>(`/api/servers/${s.id}/plugins/search?q=${encodeURIComponent(debounced)}`) });
-  const [confirm, setConfirm] = React.useState<MarketHit | null>(null);
-  const install = useAction((projectId: string) => api.post<{ file: string; version: string; requiredDependencies: string[] }>(`/api/servers/${s.id}/plugins/install`, { projectId }), {
-    success: (r) => `Installed ${r.file}${r.requiredDependencies.length ? ` — also needs ${r.requiredDependencies.length} dependency ${t.one}(s)` : ""}. Restart to load it.`,
-    invalidate: [["plugins", s.id], ["server", s.id]],
+  const q = useQuery({
+    queryKey: ["market", s.id, source, debounced],
+    queryFn: () => api.get<{ hits: MarketHit[]; total: number }>(`/api/servers/${s.id}/plugins/${source === "hangar" ? "hangar/search" : "search"}?q=${encodeURIComponent(debounced)}`),
   });
+  const [confirm, setConfirm] = React.useState<MarketHit | null>(null);
+  const install = useAction(
+    (h: MarketHit) =>
+      api.post<{ file: string; version: string; requiredDependencies: string[] }>(
+        h.source === "hangar" ? `/api/servers/${s.id}/plugins/hangar/install` : `/api/servers/${s.id}/plugins/install`,
+        h.source === "hangar" ? { project: h.id } : { projectId: h.id },
+      ),
+    {
+      success: (r) => `Installed ${r.file}${r.requiredDependencies.length ? ` — also needs ${r.requiredDependencies.length} dependency ${t.one}(s)` : ""}. Restart to load it.`,
+      invalidate: [
+        ["plugins", s.id],
+        ["server", s.id],
+      ],
+    },
+  );
 
   return (
     <Section
-      title="Modrinth"
-      description={`Results are filtered to ${t.filter}. Compatibility with Minecraft ${s.mcVersion} is checked against Modrinth's version metadata before installing.${s.software === "fabric" ? " Most mods also need Fabric API." : ""}`}
+      title={SOURCES[source].label}
+      description={
+        source === "hangar"
+          ? `PaperMC's plugin repository. Compatibility with Minecraft ${s.mcVersion} is checked against Hangar's version metadata before installing; plugins only offered as external downloads can't be installed from here.`
+          : `Results are filtered to ${t.filter}. Compatibility with Minecraft ${s.mcVersion} is checked against Modrinth's version metadata before installing.${s.software === "fabric" ? " Most mods also need Fabric API." : ""}`
+      }
     >
-      <div className="relative max-w-md">
-        <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${t.many}…`} className="pl-8" aria-label={`Search ${t.many}`} />
+      <div className="flex flex-wrap items-center gap-3">
+        {sources.length > 1 && (
+          <div className="flex rounded-md border border-border p-0.5" role="group" aria-label="Source">
+            {sources.map((id) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={source === id}
+                onClick={() => setSource(id)}
+                className={cn("h-7 rounded px-3 text-[13px] font-medium transition-colors", source === id ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
+              >
+                {SOURCES[id].label}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="relative min-w-0 max-w-md flex-1">
+          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${t.many} on ${SOURCES[source].label}…`} className="pl-8" aria-label={`Search ${t.many}`} />
+        </div>
       </div>
       {q.isLoading ? (
         <Skeleton className="h-48 rounded-xl" />
       ) : q.error ? (
-        <Callout variant="danger" icon={<AlertTriangle />}>{errorMessage(q.error)}</Callout>
+        <Callout variant="danger" icon={<AlertTriangle />}>
+          {errorMessage(q.error)}
+        </Callout>
       ) : (
         <Panel>
           <ul className="divide-y divide-border">
@@ -190,7 +271,7 @@ function Browse({ server: s }: { server: ServerDetail }) {
               <li key={h.id} className="flex items-start gap-4 px-4 py-3.5 text-[13px]">
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="flex flex-wrap items-center gap-2 font-medium">
-                    <a href={`https://modrinth.com/${t.page}/${h.slug}`} target="_blank" rel="noreferrer" className="hover:underline">
+                    <a href={SOURCES[h.source].url(h, t.page)} target="_blank" rel="noreferrer" className="hover:underline">
                       {h.title}
                     </a>
                     <span className="font-normal text-muted-foreground">by {h.author}</span>
@@ -211,9 +292,9 @@ function Browse({ server: s }: { server: ServerDetail }) {
         open={!!confirm}
         onOpenChange={(o) => !o && setConfirm(null)}
         title={`Install ${confirm?.title}?`}
-        description={`This downloads third-party executable code from Modrinth into the server's ${t.many} folder. Only continue if you trust the author.`}
+        description={`This downloads third-party executable code from ${SOURCES[confirm?.source ?? source].label} into the server's ${t.many} folder. Only continue if you trust the author.`}
         confirmLabel={`Install ${t.one}`}
-        onConfirm={() => install.mutateAsync(confirm!.id)}
+        onConfirm={() => install.mutateAsync(confirm!)}
       />
     </Section>
   );
@@ -223,14 +304,28 @@ function Updates({ server: s }: { server: ServerDetail }) {
   const t = addonTerms(s);
   const q = useQuery({
     queryKey: ["plugin-updates", s.id],
-    queryFn: () => api.get<{ file: string; name: string | null; current: string | null; versionId: string; versionNumber: string }[]>(`/api/servers/${s.id}/plugins/updates`),
+    queryFn: () => api.get<{ file: string; name: string | null; current: string | null; versionId: string; versionNumber: string; source: Source }[]>(`/api/servers/${s.id}/plugins/updates`),
   });
-  const update = useAction((v: { file: string; versionId: string }) => api.post(`/api/servers/${s.id}/plugins/${encodeURIComponent(v.file)}/update`, { versionId: v.versionId }), {
-    success: `${t.One} updated. Restart to apply.`,
-    invalidate: [["plugins", s.id], ["plugin-updates", s.id], ["server", s.id]],
-  });
+  const update = useAction(
+    (v: { file: string; versionId: string; source: Source }) => api.post(`/api/servers/${s.id}/plugins/${encodeURIComponent(v.file)}/update`, { versionId: v.versionId, source: v.source }),
+    {
+      success: `${t.One} updated. Restart to apply.`,
+      invalidate: [
+        ["plugins", s.id],
+        ["plugin-updates", s.id],
+        ["server", s.id],
+      ],
+    },
+  );
   return (
-    <Section title="Available updates" description={`Checked against Modrinth by file hash. ${t.Many} from other sources cannot be checked.`}>
+    <Section
+      title="Available updates"
+      description={
+        t.one === "plugin"
+          ? "Checked against Modrinth by file hash and against Hangar for plugins installed from there. Plugins from other sources cannot be checked."
+          : `Checked against Modrinth by file hash. ${t.Many} from other sources cannot be checked.`
+      }
+    >
       {q.isLoading ? (
         <Skeleton className="h-24 rounded-xl" />
       ) : q.error ? (
@@ -244,10 +339,15 @@ function Updates({ server: s }: { server: ServerDetail }) {
                 <div className="flex-1">
                   <p className="font-medium">{u.name ?? u.file}</p>
                   <p className="text-xs text-muted-foreground">
-                    {u.current ?? "?"} → {u.versionNumber}
+                    {u.current ?? "?"} → {u.versionNumber} · {SOURCES[u.source].label}
                   </p>
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => update.mutate({ file: u.file, versionId: u.versionId })} loading={update.isPending && update.variables?.file === u.file}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => update.mutate({ file: u.file, versionId: u.versionId, source: u.source })}
+                  loading={update.isPending && update.variables?.file === u.file}
+                >
                   Update
                 </Button>
               </li>
@@ -294,7 +394,11 @@ function VanillaMigration({ server: s }: { server: ServerDetail }) {
             <li>Up to Minecraft 1.21, Paper moves the Nether and the End into separate folders on first start; switching back moves them home again.</li>
             <li>To roll back, restore the pre-migration backup and switch back to Vanilla.</li>
           </ol>
-          {running && <Callout variant="warning" icon={<AlertTriangle />}>Stop the server first.</Callout>}
+          {running && (
+            <Callout variant="warning" icon={<AlertTriangle />}>
+              Stop the server first.
+            </Callout>
+          )}
           <DialogFooter>
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancel

@@ -47,7 +47,7 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 - [x] Modrinth modpacks (`.mrpack`) with one click: Fabric, NeoForge and vanilla packs from the Modrinth catalogue or an uploaded file (Forge/Quilt packs are refused with a clear message).
 - [ ] Velocity proxy (several servers behind one address).
 - [ ] Bedrock Dedicated Server (x64 only, no ARM; the runtime already supports a custom launch command).
-- [ ] Hangar as a second plugin source.
+- [x] Hangar as a second plugin source: search, install (Paper jar with SHA-256) and update checks for plugins installed from Hangar.
 
 ### 5. Comfort and optimisation (Phase 4)
 - [x] Measure first: `scripts/measure.mjs` (startup, idle CPU/RAM, API latency, bundle sizes); first fixes from it: minified API bundle, precompressed dashboard with long-lived caching, cached host info in `/api/system` (numbers in STATUS.md).

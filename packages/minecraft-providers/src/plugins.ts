@@ -234,7 +234,7 @@ export interface MarketplaceProject {
   categories: string[];
   versions: string[];
   compatible: boolean;
-  source: "modrinth";
+  source: "modrinth" | "hangar";
 }
 
 /** Modrinth loaders whose files a server of this kind can load. */
