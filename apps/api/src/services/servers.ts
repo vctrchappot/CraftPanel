@@ -21,7 +21,7 @@ import { eq, playerSessions, servers, and, isNull, type Database } from "@craftp
 import { ensureLog4jConfig, getProvider, hasOwnLog4jSettings, installModpack, JavaManager, inspectJava, isJavaCompatible, log4shellMitigation } from "@craftpanel/minecraft-providers";
 import { PropertiesDocument } from "@craftpanel/config";
 import { isPortAvailable } from "@craftpanel/network";
-import { freeDiskSpace, LocalAgent, localArgsFile, ServerSandbox } from "@craftpanel/server-runtime";
+import { freeDiskSpace, type RuntimeAgent, localArgsFile, ServerSandbox } from "@craftpanel/server-runtime";
 import type { z } from "zod";
 import type { Hub } from "../hub";
 import type { AppConfig } from "../config";
@@ -48,7 +48,7 @@ export class ServerService {
 
   constructor(
     private db: Database,
-    readonly agent: LocalAgent,
+    readonly agent: RuntimeAgent,
     private hub: Hub,
     private activity: ActivityService,
     readonly java: JavaManager,
@@ -409,7 +409,7 @@ export class ServerService {
 
       this.restartRequired.delete(id);
       await this.db.update(servers).set({ desiredRunning: true, lastError: null, lastStatus: "starting", updatedAt: Date.now() }).where(eq(servers.id, id));
-      this.agent.start(id, {
+      await this.agent.start(id, {
         javaPath,
         directory: row.directory,
         jarFile: row.jarFile ?? "server.jar",
@@ -431,7 +431,7 @@ export class ServerService {
     }
     await this.activity.audit(actor, "server.stop", id);
     await this.activity.event(id, "server.stop", "Graceful stop requested", { actor });
-    void this.agent.stop(id);
+    await this.agent.stop(id);
   }
 
   async restart(id: string, actor: Actor): Promise<void> {
@@ -448,7 +448,7 @@ export class ServerService {
     await this.db.update(servers).set({ desiredRunning: false }).where(eq(servers.id, id));
     await this.activity.audit(actor, "server.kill", id);
     if (this.agent.isRunning(id)) {
-      this.agent.kill(id);
+      await this.agent.kill(id);
       await this.activity.event(id, "server.kill", "Process force-terminated", { level: "warn", actor });
       return;
     }
@@ -460,7 +460,7 @@ export class ServerService {
   private async stopOrphan(row: ServerRow, actor: Actor, force: boolean) {
     const alive = row.pid ? await this.agent.probeOrphan(row.pid) : false;
     if (alive && row.pid) {
-      this.agent.terminatePid(row.pid, force);
+      await this.agent.terminatePid(row.pid, force);
       for (let i = 0; i < 60 && (await this.agent.probeOrphan(row.pid)); i++) await new Promise((r) => setTimeout(r, 1000));
     }
     await this.db.update(servers).set({ lastStatus: "stopped", pid: null, updatedAt: Date.now() }).where(eq(servers.id, row.id));
@@ -468,9 +468,9 @@ export class ServerService {
     await this.activity.event(row.id, "server.orphan_stopped", force ? "Orphaned process killed" : "Orphaned process terminated", { actor, level: "warn" });
   }
 
-  sendCommand(id: string, command: string) {
+  async sendCommand(id: string, command: string) {
     if (!this.agent.isRunning(id)) throw conflict("The server is not running");
-    this.agent.send(id, command);
+    await this.agent.send(id, command);
   }
 
   /** Make server.properties match the ports/bind address CraftPanel manages. */
@@ -543,7 +543,7 @@ export class ServerService {
         }
       }
       await this.db.delete(servers).where(eq(servers.id, id));
-      this.agent.forget(id);
+      await this.agent.forget(id);
       this.restartRequired.delete(id);
       await this.activity.event(null, "server.deleted", `Server "${row.name}" deleted${opts.deleteFiles ? " (files removed)" : " (files kept)"}`, { actor, level: "warn" });
       await this.activity.audit(actor, "server.delete", id, { name: row.name, deleteFiles: opts.deleteFiles });

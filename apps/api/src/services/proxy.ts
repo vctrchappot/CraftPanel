@@ -174,7 +174,7 @@ export class ProxyService {
 
   /** Velocity re-reads velocity.toml (servers, try, forced hosts) with "velocity reload". */
   private async reloadProxy(row: ServerRow) {
-    if (this.servers.agent.isRunning(row.id) && this.servers.agent.status(row.id) === "running") this.servers.sendCommand(row.id, "velocity reload");
+    if (this.servers.agent.isRunning(row.id) && this.servers.agent.status(row.id) === "running") await this.servers.sendCommand(row.id, "velocity reload");
   }
 
   /** Turn on modern forwarding with this proxy's secret. `actor` null: before a start (no installs, no restart flags). */

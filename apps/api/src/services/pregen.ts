@@ -101,6 +101,6 @@ export class PregenService {
         : action === "cancel"
           ? ["chunky cancel", "chunky confirm"]
           : [`chunky ${action}`];
-    for (const c of commands) this.servers.sendCommand(row.id, c);
+    for (const c of commands) await this.servers.sendCommand(row.id, c);
   }
 }
