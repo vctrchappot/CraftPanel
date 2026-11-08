@@ -139,8 +139,8 @@ CraftPanel runs Minecraft servers as **native processes without container isolat
 ## Author
 
 CraftPanel was created by **Victor** ([@vctrchappot](https://github.com/vctrchappot)) · [www.vctr.site](https://www.vctr.site).
-Issues, ideas and pull requests are welcome on [GitHub](https://github.com/vctrchappot/CraftPanel).
+Issues and ideas are welcome on [GitHub](https://github.com/vctrchappot/CraftPanel).
 
 ## License
 
-Copyright © 2026 Victor ([@vctrchappot](https://github.com/vctrchappot)). Licensed under [AGPL-3.0-or-later](LICENSE). See [docs/development](docs/development/README.md#license) for the reasoning and dependency license notes.
+Copyright © 2026 Victor ([@vctrchappot](https://github.com/vctrchappot)). Licensed under the [PolyForm Strict License 1.0.0](LICENSE): free to use for personal and other noncommercial purposes; not to be sold, changed or redistributed. For anything else (commercial use, contributions, building on it), open an issue and ask. See [docs/development](docs/development/README.md#license) for details and dependency license notes.

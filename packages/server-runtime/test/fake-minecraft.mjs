@@ -1,5 +1,5 @@
 // Minimal stand-in for a Minecraft server process used by lifecycle tests.
-// Behaviour is selected by argv[2]: "normal" | "crash" | "hang" | "slowstart".
+// Behaviour is selected by argv[2]: "normal" | "crash" | "modfail" | "hang" | "slowstart".
 import readline from "node:readline";
 
 const mode = process.argv[2] ?? "normal";
@@ -8,6 +8,15 @@ log("INFO", "Starting minecraft server version test");
 if (mode === "crash") {
   log("ERROR", "Encountered an unexpected exception");
   process.exit(1);
+}
+if (mode === "modfail") {
+  // NeoForge's mod loading report for a client-only mod (abridged), then exit code 0 like the real thing.
+  console.log("-- Mod loading issue for: statuseffectbars --");
+  console.log("Details:");
+  console.log("\tCaused by 0: java.lang.BootstrapMethodError: java.lang.RuntimeException: Attempted to load class net/minecraft/client/gui/screens/Screen for invalid dist DEDICATED_SERVER");
+  console.log("\tMod file: /srv/mc/mods/statuseffectbars-1.21.1-NeoForge-1.0.2.jar");
+  log("ERROR", "Failed to start the minecraft server");
+  process.exit(0);
 }
 setTimeout(() => log("INFO", 'Done (0.123s)! For help, type "help"'), mode === "slowstart" ? 500 : 50);
 

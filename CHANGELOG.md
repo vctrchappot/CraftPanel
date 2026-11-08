@@ -13,6 +13,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Settings in `/etc/craftpanel/craftpanel.env` (Linux service) survive updates.
 - Purpur servers (Paper fork; same plugins, TPS/MSPT and `/craftpanel` command).
 - NeoForge servers with a choice of NeoForge version (the official installer runs during installation); NeoForge mods from Modrinth (search, install, updates, upload) with dependency checks from `neoforge.mods.toml`.
+- When NeoForge fails to load a mod, the crash reason names the jar (and says when it is a client-only mod) instead of a generic "Failed to start the minecraft server".
 - Fabric servers with a choice of loader version; Fabric mods from Modrinth (search, install, updates, upload) with dependency checks by mod id.
 - Log4Shell protection for Minecraft 1.7–1.18: CraftPanel adds Mojang's JVM flag or patched logging config on every start and shows it in the wizard and the server's runtime settings.
 - Two-factor sign-in with an authenticator app (TOTP) and recovery codes; owners can require it per role and reset it for a user.
@@ -28,6 +29,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Notifications via Discord webhook and e-mail (SMTP) when a server crashes or fails to start, a backup or scheduled task fails, or a CraftPanel update is available; with a test button.
 
 ### Changed
+- License: CraftPanel is now under the PolyForm Strict License 1.0.0 (free for personal and noncommercial use; no selling, changes or redistribution) instead of AGPL-3.0-or-later.
 - The version lives only in `package.json`.
 - Faster and smaller: the dashboard is sent brotli/gzip-compressed (about 1.2 MB of JavaScript → 0.3 MB) and cached by the browser; the panel starts about 15% faster and uses less memory; the release archive no longer ships the 8 MB source map.
 - The system view answers in about 2 ms instead of 9 ms on Windows.

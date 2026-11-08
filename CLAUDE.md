@@ -10,7 +10,7 @@ Self-hosted Minecraft (Java) server manager: Fastify API + Next.js dashboard in 
 ## Working agreements
 - The owner writes in German; answer in German. Code, comments, commits and docs are in English.
 - **Commit and push on your own whenever a stable state is reached**: typecheck clean, `pnpm test` green, and verified for real where it matters. Commit in logical chunks; don't push half-finished or failing work. Check that CI is green after pushing (`gh run list`, `gh run watch`).
-- Commit identity: `vctrchappot <victor.chappot.haas@gmail.com>`. Never commit with another (e.g. work) address. Set it per checkout with `git config user.email`.
+- Commit identity: `vctrchappot <victor.chappot.haas@gmail.com>`. Never commit with another address. Set it per checkout with `git config user.email`.
 - End commit messages with `Co-Authored-By: Claude <noreply@anthropic.com>` (or the attribution your environment specifies).
 - Keep `docs/STATUS.md` honest (✅ verified / 🧪 tested / 🟡 untested) and update `docs/ROADMAP.md` when plans change.
 
@@ -43,8 +43,16 @@ node scripts/release.mjs bump X.Y.Z && git push --follow-tags   # release: GitHu
 
 ## Testing for real
 - Prefer verifying against real Minecraft servers over mocks: create, install, start via the API or the dashboard, and read the server log.
+- `scripts/real-tests/` has the API client and scenarios used for STATUS.md's ✅ entries; `run.sh <port> <data-dir> <scenario>` runs one against a throwaway instance of the current build. Add new scenarios there.
 - Player-side checks: a headless [mineflayer](https://github.com/PrismarineJS/mineflayer) bot (offline mode) can join, chat, run commands and print received chat components. It lags the newest Minecraft versions; use a Paper version it supports.
 - Linux on Windows: a WSL 2 distro with systemd works well for installer/service tests. Keep it alive with a background `wsl -d <distro> -- sleep infinity`, otherwise WSL stops it (and the service) between commands.
 - Enter test credentials only on `localhost`; run browser tests inside the machine that hosts CraftPanel.
 - Windows: very deep paths (> 260 chars) break pnpm/Next builds; test copies belong in a short path.
 - Don't touch other CraftPanel instances or Minecraft servers already running on the machine (e.g. on ports 8080/25565); use other ports and a temporary `CRAFTPANEL_DATA_DIR`.
+- WSL kills background processes when the `wsl …` call that started them returns: start the API and run the scenario inside one call (`run.sh` does).
+
+## Working in this repo with an agent
+- Where things stand and what's next: "Current state" at the top of `docs/ROADMAP.md`. Update it before handing over.
+- Parallel work: give a subagent its own git worktree and branch, let it commit there (not push), then merge into `main` yourself and resolve conflicts (CHANGELOG, STATUS, ROADMAP usually conflict).
+- Unfinished work that must survive a device switch goes to a pushed `wip/<topic>` branch, never to `main`.
+- Edits through a shell on Windows (Git Bash, `node -e`, heredocs) can silently drop regex backslashes: use the Edit/Write tools, or write a transform script to a file first, and grep changed regexes afterwards. In such scripts use `s.replace(a, () => b)`, since `$'`, `` $` `` and `$&` in a replacement string are special.

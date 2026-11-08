@@ -60,6 +60,15 @@ describe("ManagedServer lifecycle", () => {
     expect(s.lastError).toMatch(/unexpected exception/);
   });
 
+  it("names the mod NeoForge failed to load instead of the generic error", async () => {
+    const s = make();
+    s.start(spec("modfail"));
+    await waitForStatus(s, "crashed");
+    expect(s.lastError).toBe(
+      "Mod loading failed: statuseffectbars-1.21.1-NeoForge-1.0.2.jar. It uses client-only code (a client mod that can't run on a server). Disable it on the Mods tab and start again.",
+    );
+  });
+
   it("reports an error when the executable does not exist", async () => {
     const s = make();
     s.start({ ...spec("normal"), command: { file: path.join(os.tmpdir(), "definitely-not-java-xyz"), args: [] } });

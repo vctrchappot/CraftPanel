@@ -42,7 +42,11 @@ export type LogSignal =
   | { kind: "port-in-use"; detail: string }
   | { kind: "eula" }
   | { kind: "saved" }
-  | { kind: "stopping" };
+  | { kind: "stopping" }
+  /** NeoForge's mod loading report: which mod failed, its file, and whether it touched client-only classes. */
+  | { kind: "mod-failed"; mod: string }
+  | { kind: "mod-file"; file: string }
+  | { kind: "client-only" };
 
 /** Recognize lifecycle- and player-related events in a log message. */
 export function detectSignal(message: string): LogSignal | null {
@@ -57,6 +61,9 @@ export function detectSignal(message: string): LogSignal | null {
   if (/You need to agree to the EULA/i.test(message)) return { kind: "eula" };
   if (/^Saved the game$|^Saved the world$/i.test(message) || /^ThreadedAnvilChunkStorage.*All chunks are saved/.test(message)) return { kind: "saved" };
   if (/^Stopping (the )?server$/i.test(message)) return { kind: "stopping" };
+  if ((m = /^\s*-- Mod loading issue for: ([A-Za-z0-9_.-]+) --\s*$/.exec(message))) return { kind: "mod-failed", mod: m[1] };
+  if ((m = /^\s*Mod file: .*[\\/]mods[\\/]([^\\/]+\.jar)\s*$/.exec(message))) return { kind: "mod-file", file: m[1] };
+  if (/^\s*Caused by \d+: .*(for invalid dist DEDICATED_SERVER|in environment type SERVER)/.test(message)) return { kind: "client-only" };
   return null;
 }
 

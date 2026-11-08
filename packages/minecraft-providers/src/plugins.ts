@@ -126,7 +126,8 @@ export function parseModsToml(text: string): { mods: Record<string, string>[]; d
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line || line.startsWith("#")) continue;
-    const table = /^\[\[\s*([A-Za-z0-9_."-]+)\s*\]\]$/.exec(line);
+    // Many mods keep the template's comments: "[[mods]] #mandatory".
+    const table = /^\[\[\s*([A-Za-z0-9_."-]+)\s*\]\]\s*(#.*)?$/.exec(line);
     if (table) {
       current = {};
       if (table[1] === "mods") mods.push(current);
