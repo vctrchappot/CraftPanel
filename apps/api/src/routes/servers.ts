@@ -382,6 +382,20 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     const body = parse(z.object({ projectId: z.string().max(64), versionId: z.string().max(64).optional() }), req.body);
     return game.installFromModrinth(await row(req.params.id), body.projectId, body.versionId, actorOf(req));
   });
+  app.get<IdParams & { Querystring: { q?: string; offset?: string } }>("/api/servers/:id/plugins/hangar/search", async (req) => {
+    requirePermission(req, "plugins.manage");
+    const r = await row(req.params.id);
+    return game.searchHangar(r, String(req.query.q ?? "").slice(0, 100), Math.max(0, Number(req.query.offset ?? 0)) || 0);
+  });
+  app.get<IdParams & { Params: { project: string } }>("/api/servers/:id/plugins/hangar/versions/:project", async (req) => {
+    requirePermission(req, "plugins.manage");
+    return game.hangarVersions(await row(req.params.id), req.params.project);
+  });
+  app.post<IdParams>("/api/servers/:id/plugins/hangar/install", async (req) => {
+    requirePermission(req, "plugins.manage");
+    const body = parse(z.object({ project: z.string().regex(/^[A-Za-z0-9_.-]{1,64}$/), versionId: z.string().regex(/^\d{1,12}$/).optional() }), req.body);
+    return game.installFromHangar(await row(req.params.id), body.project, body.versionId, actorOf(req));
+  });
   app.post<IdParams>("/api/servers/:id/plugins/upload", async (req, reply) => {
     requirePermission(req, "plugins.manage");
     const r = await row(req.params.id);
@@ -410,8 +424,8 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
   });
   app.post<IdParams & { Params: { file: string } }>("/api/servers/:id/plugins/:file/update", async (req, reply) => {
     requirePermission(req, "plugins.manage");
-    const body = parse(z.object({ versionId: z.string().max(64) }), req.body);
-    await game.updatePlugin(await row(req.params.id), req.params.file, body.versionId, actorOf(req));
+    const body = parse(z.object({ versionId: z.string().max(64), source: z.enum(["modrinth", "hangar"]).default("modrinth") }), req.body);
+    await game.updatePlugin(await row(req.params.id), req.params.file, body.versionId, actorOf(req), body.source);
     return noContent(reply);
   });
 

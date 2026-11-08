@@ -22,6 +22,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Performance presets (Raspberry Pi / small VPS, Balanced, Powerful machine): Aikar's garbage collector flags sized for the server's memory plus view and simulation distance. The wizard picks the one recommended for this machine; Settings → Performance switches between them and keeps your other JVM arguments.
 - World pre-generation with Chunky (Paper, Purpur, Fabric): install it with one click, choose a radius around spawn, follow the progress, pause, continue or cancel.
 - Servers from a modpack: search Fabric modpacks on Modrinth (or upload a `.mrpack`) in the wizard; CraftPanel picks the Minecraft and Fabric Loader version from the pack, downloads its server-side files with checksum checks, applies its overrides and keeps your port and EULA settings.
+- Hangar (PaperMC's plugin repository) as a second plugin source for Paper and Purpur: switch between Modrinth and Hangar under Plugins → Browse; installs are checked against Hangar's SHA-256, and plugins installed from Hangar show up under Updates.
 - `CRAFTPANEL_RELEASE_DIR`: update from a local folder of release archives instead of GitHub.
 - Notifications via Discord webhook and e-mail (SMTP) when a server crashes or fails to start, a backup or scheduled task fails, or a CraftPanel update is available; with a test button.
 

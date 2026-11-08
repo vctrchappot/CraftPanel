@@ -10,10 +10,16 @@ import {
   checkModrinthUpdates,
   compatibleModrinthVersions,
   detectGamerules,
+  HANGAR_SLUG,
+  HANGAR_VERSION_ID,
+  hangarVersions,
+  installHangarVersion,
   installModrinthVersion,
   listPlugins,
   lookupProfile,
+  searchHangarPlugins,
   searchModrinthPlugins,
+  toHangarVersion,
 } from "@craftpanel/minecraft-providers";
 import type { AppConfig } from "../config";
 import type { ActivityService, Actor } from "./activity";
@@ -28,6 +34,9 @@ export function offlineUuid(name: string): string {
   const h = hash.toString("hex");
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
+
+/** Which jars in plugins/ came from Hangar (project + version), for update checks. */
+const HANGAR_INDEX = ".craftpanel-hangar.json";
 
 const MANAGED_KEYS = new Set(SETTINGS.filter((s) => s.managed).map((s) => s.key));
 
@@ -424,16 +433,102 @@ export class GameService {
     return compatibleModrinthVersions(projectId, row.mcVersion, this.requireAddons(row));
   }
 
+  // Hangar (PaperMC's repository): plugin servers only. Hangar can't look files up by hash, so
+  // CraftPanel remembers which jars came from there in a small file next to them.
+
+  private requirePluginServer(row: ServerRow) {
+    if (this.requireAddons(row) !== "plugins") throw conflict("Hangar hosts Paper plugins; Fabric servers use mods from Modrinth.");
+  }
+
+  private hangarIndexFile(row: ServerRow) {
+    return path.join(this.pluginsDir(row), HANGAR_INDEX);
+  }
+
+  private async hangarIndex(row: ServerRow): Promise<Record<string, { project: string; versionId: string }>> {
+    try {
+      const raw = JSON.parse(await fsp.readFile(this.hangarIndexFile(row), "utf8")) as Record<string, { project?: unknown; versionId?: unknown }>;
+      const out: Record<string, { project: string; versionId: string }> = {};
+      for (const [file, e] of Object.entries(raw)) if (typeof e?.project === "string" && HANGAR_SLUG.test(e.project) && typeof e.versionId === "string" && HANGAR_VERSION_ID.test(e.versionId)) out[file] = { project: e.project, versionId: e.versionId };
+      return out;
+    } catch {
+      return {};
+    }
+  }
+
+  private async rememberHangar(row: ServerRow, file: string, project: string, versionId: string) {
+    const index = await this.hangarIndex(row);
+    index[file] = { project, versionId };
+    await fsp.writeFile(this.hangarIndexFile(row), JSON.stringify(index, null, 2));
+  }
+
+  async searchHangar(row: ServerRow, query: string, offset: number) {
+    this.requirePluginServer(row);
+    return searchHangarPlugins(query, row.mcVersion, offset);
+  }
+
+  async hangarVersions(row: ServerRow, project: string) {
+    this.requirePluginServer(row);
+    if (!HANGAR_SLUG.test(project)) throw badRequest("Invalid Hangar project");
+    return (await hangarVersions(project, row.mcVersion)).map(toHangarVersion);
+  }
+
+  async installFromHangar(row: ServerRow, project: string, versionId: string | undefined, actor: Actor) {
+    this.requirePluginServer(row);
+    if (!HANGAR_SLUG.test(project)) throw badRequest("Invalid Hangar project");
+    if (versionId && !HANGAR_VERSION_ID.test(versionId)) throw badRequest("Invalid Hangar version");
+    const chosen = versionId ?? (await hangarVersions(project, row.mcVersion))[0]?.id.toString();
+    if (!chosen) throw conflict(`This plugin has no Hangar version marked compatible with Minecraft ${row.mcVersion}`);
+    let res;
+    try {
+      res = await installHangarVersion(chosen, this.pluginsDir(row));
+    } catch (err) {
+      throw badRequest((err as Error).message);
+    }
+    await this.rememberHangar(row, res.file, project, chosen);
+    if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
+    await this.activity.event(row.id, "plugin.installed", `Plugin ${res.file} installed from Hangar`, { actor });
+    await this.activity.audit(actor, "plugin.install", row.id, { source: "hangar", project, versionId: chosen, file: res.file });
+    return res;
+  }
+
   async pluginUpdates(row: ServerRow) {
     const kind = this.requireAddons(row);
     const plugins = await listPlugins(this.pluginsDir(row), kind);
-    const updates = await checkModrinthUpdates(plugins.map((p) => p.sha1), row.mcVersion, kind);
-    return plugins.filter((p) => updates[p.sha1]).map((p) => ({ file: p.file, name: p.name, current: p.version, ...updates[p.sha1] }));
+    // Jars installed from Hangar are checked there only; the same jar is often on Modrinth too, with other channels.
+    const index = kind === "plugins" ? await this.hangarIndex(row) : {};
+    const fromHangar = (p: { file: string }) => index[p.file.replace(/\.disabled$/, "")];
+    const updates = await checkModrinthUpdates(plugins.filter((p) => !fromHangar(p)).map((p) => p.sha1), row.mcVersion, kind);
+    const out: { file: string; name: string | null; current: string | null; versionId: string; versionNumber: string; projectId: string; source: "modrinth" | "hangar" }[] = plugins
+      .filter((p) => !fromHangar(p) && updates[p.sha1])
+      .map((p) => ({ file: p.file, name: p.name, current: p.version, ...updates[p.sha1], source: "modrinth" }));
+    if (kind === "plugins") {
+      await Promise.all(
+        plugins.map(async (p) => {
+          const known = fromHangar(p);
+          if (!known) return;
+          const newest = (await hangarVersions(known.project, row.mcVersion).catch(() => []))[0];
+          if (newest && String(newest.id) !== known.versionId) out.push({ file: p.file, name: p.name, current: p.version, versionId: String(newest.id), versionNumber: newest.name, projectId: known.project, source: "hangar" });
+        }),
+      );
+    }
+    return out;
   }
 
-  async updatePlugin(row: ServerRow, file: string, versionId: string, actor: Actor) {
+  async updatePlugin(row: ServerRow, file: string, versionId: string, actor: Actor, source: "modrinth" | "hangar" = "modrinth") {
     this.requireAddons(row);
     this.safePluginFile(file);
+    if (source === "hangar") {
+      const known = (await this.hangarIndex(row))[file.replace(/\.disabled$/, "")];
+      if (!known) throw badRequest(`${file} was not installed from Hangar`);
+      const res = await this.installFromHangar(row, known.project, versionId, actor);
+      if (res.file !== file) {
+        await fsp.rm(path.join(this.pluginsDir(row), file), { force: true });
+        const index = await this.hangarIndex(row);
+        delete index[file.replace(/\.disabled$/, "")];
+        await fsp.writeFile(this.hangarIndexFile(row), JSON.stringify(index, null, 2));
+      }
+      return;
+    }
     const res = await installModrinthVersion(versionId, this.pluginsDir(row));
     if (res.file !== file) await fsp.rm(path.join(this.pluginsDir(row), file), { force: true });
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
