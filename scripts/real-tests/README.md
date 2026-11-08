@@ -19,6 +19,23 @@ scripts/real-tests/run.sh <api-port> <data-dir> <scenario.mjs> [args…]
 | `modpack-fix-crash.mjs` | – | After `modpack.mjs run` with a pack that crashes (`KEEP_DATA=1`): the crash names the mod, disabling it via the mod list lets the server start. |
 | `velocity.mjs` | `[proxyPort] [paperVersion]` | Velocity proxy with a Paper backend: wiring, forwarding ready, secret not in the console; with `mineflayer` in the working directory a bot joins through the proxy and a direct join to the backend is refused. |
 
+## Deployment package smoke test
+
+`deployment.mjs` tests the built package using real HTTP, HTTPS and WebSocket connections, without downloading or running Minecraft. It starts only temporary instances on free loopback ports and leaves existing services untouched.
+
+```bash
+pnpm build
+node scripts/real-tests/deployment.mjs
+# Optional: inspect the Remote access page in installed Playwright Chromium and save a screenshot.
+node scripts/real-tests/deployment.mjs --browser
+# A separate checkout or worktree can test another checkout's production artifact:
+node scripts/real-tests/deployment.mjs --dist /path/to/CraftPanel/apps/api/dist
+```
+
+OpenSSL must be available (`openssl` on Linux/macOS; Git for Windows' `C:/Program Files/Git/usr/bin/openssl.exe` by default on Windows). Set `OPENSSL` to override its executable. A temporary self-signed localhost certificate is generated for each run; TLS verification is disabled only inside this isolated test harness. The optional browser check requires an already-installed Playwright Chromium; it does not install or download a browser.
+
+The test checks setup-token enforcement, Secure cookies, a reverse proxy that rewrites `Host`, public-client access rules, a real authenticated WebSocket upgrade and foreign-origin rejection, built-in TLS, local readiness, `doctor --json`, and rejection of an HTTP browser connection even when the proxy uses TLS to the backend. Instances are stopped through their local control tokens and their temporary data and certificates are removed. With `--browser`, the screenshot remains at `test-results/screens/deployment-proxy.png`.
+
 ## Conventions
 
 - Ports: don't use 8080/25565 or anything a real instance on the machine uses. Pick e.g. 8130+ for the API and 25820+ for Minecraft.
