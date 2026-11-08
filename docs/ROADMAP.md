@@ -4,6 +4,19 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 **Goal:** clone or download CraftPanel, run it on a second PC, a Raspberry Pi or a VPS, and create and manage Minecraft servers across platforms and versions from a browser, without needing to know Docker, Java or networking.
 
+## Current state (handoff, 2026-11-08)
+
+Everything on `main` is pushed, CI green, `pnpm test` green; features are verified as described in STATUS.md. To continue on another device or with another model: read this section, STATUS.md and CLAUDE.md, then pick the next open item.
+
+- **In progress: Velocity proxy** on branch [`wip/velocity`](https://github.com/vctrchappot/CraftPanel/tree/wip/velocity) (typecheck and unit tests green, real verification with a proxy, two Paper backends and a mineflayer bot not done yet). That branch's ROADMAP has a "Velocity — work in progress" section with what's done, what's missing and the gotchas found. Merge `main` into it, finish the verification (`scripts/real-tests/`), then merge it into `main`.
+- **Suggested next, in order:** finish Velocity → publish the first release and run the real installer paths (step 1) → Bedrock Dedicated Server → measurements on a Pi / small VPS (step 5).
+- **Known small issues** (not yet tracked elsewhere):
+  - Modrinth update checks also offer beta/alpha versions (`checkModrinthUpdates` doesn't filter by `version_type`).
+  - Removing a plugin installed from Hangar leaves its entry in `plugins/.craftpanel-hangar.json` (harmless; only existing jars are checked).
+  - Updating NeoForge in place re-runs the installer; old library versions stay in `libraries/`.
+  - The switch preview says "They stay in the folder" also for a single mod/plugin.
+- **Real-server test scenarios** used for the ✅ entries live in `scripts/real-tests/` (see its README).
+
 ## Done
 
 **Phase 0 – Verify and harden**
@@ -45,7 +58,7 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 ### 4. More platforms (Phase 3)
 - [x] NeoForge (the installer runs with `--installServer`; servers start via its argument files), with NeoForge mods and modpacks from Modrinth.
 - [x] Modrinth modpacks (`.mrpack`) with one click: Fabric, NeoForge and vanilla packs from the Modrinth catalogue or an uploaded file (Forge/Quilt packs are refused with a clear message).
-- [ ] Velocity proxy (several servers behind one address).
+- [ ] Velocity proxy (several servers behind one address). In progress on branch `wip/velocity` (see "Current state" above).
 - [ ] Bedrock Dedicated Server (x64 only, no ARM; the runtime already supports a custom launch command).
 - [x] Hangar as a second plugin source: search, install (Paper jar with SHA-256) and update checks for plugins installed from Hangar.
 
