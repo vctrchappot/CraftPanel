@@ -3,6 +3,41 @@ import type { ServerSoftware } from "./software";
 export type { ServerSoftware };
 
 export type Edition = "java";
+
+/** A server behind a Velocity proxy. `name` is how the proxy (and `/server <name>`) calls it. */
+export interface ProxyBackend {
+  serverId: string;
+  name: string;
+  /** Optional forced host: players connecting via this address land on this server. */
+  host?: string;
+}
+
+export interface ProxyConfig {
+  /** In try order: new players join the first one that is online. */
+  backends: ProxyBackend[];
+  /** The proxy authenticates players with Mojang; backends trust its forwarded identity. */
+  onlineMode: boolean;
+  /** Bind backends to 127.0.0.1 so players can only reach them through the proxy. */
+  localOnly: boolean;
+}
+
+export interface ProxyBackendStatus extends ProxyBackend {
+  serverName: string;
+  software: ServerSoftware;
+  port: number;
+  bindAddress: string;
+  status: string;
+  /** "ready": forwarding is configured; "restart": configured, applies on the next start; "manual": needs a step CraftPanel can't do. */
+  setup: "ready" | "restart" | "manual";
+  notes: string[];
+}
+
+export interface ProxyOverview {
+  config: ProxyConfig;
+  backends: ProxyBackendStatus[];
+  /** Servers that can be added (every non-proxy server not yet in the list). */
+  candidates: { id: string; name: string; software: ServerSoftware; port: number }[];
+}
 export type NetworkMode = "lan" | "wan";
 
 /**

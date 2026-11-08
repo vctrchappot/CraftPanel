@@ -22,6 +22,7 @@ import {
   PRESET_INFO,
   presetJvmFlags,
   propertiesUpdateSchema,
+  proxyConfigSchema,
   recommendPreset,
   SERVER_SOFTWARE,
   SOFTWARE_INFO,
@@ -217,7 +218,8 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
   app.get<IdParams>("/api/servers/:id/performance", async (req) => {
     requirePermission(req, "server.view");
     const r = await row(req.params.id);
-    const values = (await game.readProperties(r)).values;
+    // A proxy has no view distance; only the garbage collector flags apply.
+    const values = SOFTWARE_INFO[r.software].proxy ? {} : (await game.readProperties(r)).values;
     const num = (k: string) => (values[k] !== undefined && values[k] !== "" ? Number(values[k]) : null);
     const viewDistance = num("view-distance");
     const simulationDistance = num("simulation-distance");
@@ -235,9 +237,33 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     const r = await row(req.params.id);
     const info = PRESET_INFO[preset];
     await servers.update(r.id, { jvmArgs: applyPresetFlags(r.jvmArgs, preset, r.memoryMb) }, actorOf(req));
-    await game.updateProperties(await row(r.id), { "view-distance": String(info.viewDistance), "simulation-distance": String(info.simulationDistance) }, actorOf(req));
+    if (!SOFTWARE_INFO[r.software].proxy)
+      await game.updateProperties(await row(r.id), { "view-distance": String(info.viewDistance), "simulation-distance": String(info.simulationDistance) }, actorOf(req));
     await ctx.activity.event(r.id, "server.performance_preset", `Applied the "${info.label}" performance preset`, { actor: actorOf(req) });
     return servers.detail(await row(r.id));
+  });
+
+  // ---- Velocity proxy ------------------------------------------------------------------------
+
+  app.get<IdParams>("/api/servers/:id/proxy", async (req) => {
+    requirePermission(req, "server.view");
+    return ctx.proxies.overview(await row(req.params.id));
+  });
+  app.put<IdParams>("/api/servers/:id/proxy", async (req) => {
+    requirePermission(req, "server.configure");
+    const body = parse(proxyConfigSchema, req.body);
+    return ctx.proxies.save(await row(req.params.id), body, actorOf(req));
+  });
+  // The forwarding secret lets anyone who can reach a backend log in as any player; configure only.
+  app.get<IdParams>("/api/servers/:id/proxy/secret", async (req, reply) => {
+    requirePermission(req, "server.configure");
+    reply.header("Cache-Control", "no-store");
+    return { secret: await ctx.proxies.revealSecret(await row(req.params.id)) };
+  });
+  app.post<IdParams>("/api/servers/:id/proxy/secret", async (req, reply) => {
+    requirePermission(req, "server.configure");
+    await ctx.proxies.regenerateSecret(await row(req.params.id), actorOf(req));
+    return noContent(reply);
   });
 
   // ---- world pre-generation (Chunky) ------------------------------------------------------
@@ -443,6 +469,10 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     };
   });
 
+  /** A proxy only updates to another Velocity version; it can't become a Minecraft server or the other way round. */
+  const requireSameKind = (from: keyof typeof SOFTWARE_INFO, to: keyof typeof SOFTWARE_INFO) => {
+    if (SOFTWARE_INFO[from].proxy !== SOFTWARE_INFO[to].proxy) throw badRequest(SOFTWARE_INFO[from].proxy ? "A proxy can only be updated to another Velocity version" : "A Minecraft server can't be turned into a proxy; create a Velocity server instead");
+  };
   const switchTarget = z.object({ software: z.enum(SERVER_SOFTWARE), version: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/) });
 
   /** What a switch would do: backup, world upgrade or downgrade, add-ons that stop loading, folders that move. */
@@ -450,6 +480,7 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     requirePermission(req, "server.configure");
     const to = parse(switchTarget, req.query);
     const r = await row(req.params.id);
+    requireSameKind(r.software, to.software);
     return previewSwitch(servers.sandbox(r), { software: r.software, version: r.mcVersion, javaMajor: r.javaMajor }, to);
   });
 
@@ -459,7 +490,8 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     const body = parse(switchTarget.extend({ build: z.string().max(32).nullable().optional(), allowDowngrade: z.boolean().optional() }), req.body);
     const r = await row(req.params.id);
     if (servers.agent.isRunning(r.id)) throw badRequest("Stop the server first");
-    if (!body.allowDowngrade && (await isDowngrade(r.mcVersion, body.version)))
+    requireSameKind(r.software, body.software);
+    if (!body.allowDowngrade && !SOFTWARE_INFO[r.software].proxy && (await isDowngrade(r.mcVersion, body.version)))
       throw new AppError(409, "downgrade", `Minecraft ${body.version} is older than ${r.mcVersion}`, "Worlds saved by a newer version can break on an older one. Confirm the downgrade to continue anyway.");
     const backup = await ctx.backups.create(r.id, r.software !== body.software ? "pre-migration" : "pre-update", actorOf(req), `Before switching to ${body.software} ${body.version}`);
     try {

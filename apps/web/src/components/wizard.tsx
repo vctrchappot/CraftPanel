@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Boxes, Check, Hammer, ChevronLeft, ChevronRight, Coffee, Feather, Globe, Home, Info, Package, Puzzle, ShieldCheck, Zap } from "lucide-react";
+import { AlertTriangle, Boxes, Check, Network, Hammer, ChevronLeft, ChevronRight, Coffee, Feather, Globe, Home, Info, Package, Puzzle, ShieldCheck, Zap } from "lucide-react";
 import { Badge, Button, Callout, Field, Input, NativeSelect, PageHeader, Panel, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
 import { buildFieldLabel, buildName, PERFORMANCE_PRESETS, PRESET_INFO, recommendPreset, SOFTWARE_INFO, softwareLabel, type CreateServerInput, type ServerSoftware } from "@craftpanel/shared";
 import { api, ApiError, errorMessage } from "@/lib/api";
@@ -33,6 +33,8 @@ export const SOFTWARE_CHOICES: { id: ServerSoftware; badge?: string; description
 ];
 
 const STEPS = ["Basics", "Software", "Version", "World", "Gameplay", "Resources", "Network", "Review"] as const;
+/** A proxy has no world or gameplay settings. */
+const PROXY_STEPS = STEPS.filter((s) => s !== "World" && s !== "Gameplay");
 
 type Form = Required<Omit<CreateServerInput, "javaPath" | "directory" | "build" | "edition" | "modpackId">> & {
   build: string;
@@ -86,6 +88,8 @@ export function CreateServerWizard() {
   const [fromModpack, setFromModpack] = React.useState(false);
   const [pack, setPack] = React.useState<PreparedModpack | null>(null);
   const modpack = fromModpack ? pack : null;
+  const proxy = !fromModpack && SOFTWARE_INFO[f.software].proxy;
+  const steps = proxy ? PROXY_STEPS : STEPS;
   const buildLabel = SOFTWARE_INFO[f.software].buildLabel;
   React.useEffect(() => setF((p) => (p.port === 25565 && nextPort !== 25565 ? { ...p, port: nextPort } : p)), [nextPort]);
   const recommended = system.data ? recommendPreset({ arch: system.data.arch, cpus: system.data.cpus, memoryBytes: system.data.memory.total }) : null;
@@ -123,7 +127,7 @@ export function CreateServerWizard() {
   };
 
   const stepError = (): string | null => {
-    switch (STEPS[step]) {
+    switch (steps[step]) {
       case "Basics":
         return f.name.trim() ? null : "Give your server a name";
       case "Software":
@@ -168,14 +172,14 @@ export function CreateServerWizard() {
   };
 
   const err = stepError();
-  const isLast = step === STEPS.length - 1;
+  const isLast = step === steps.length - 1;
 
   return (
     <div className="space-y-8">
       <PageHeader title="Create a server" description="CraftPanel downloads official server software and a compatible Java runtime. Nothing is shared with third parties." />
       <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
         <ol className="flex gap-1 overflow-x-auto lg:flex-col" aria-label="Steps">
-          {STEPS.map((s, i) => (
+          {steps.map((s, i) => (
             <li key={s}>
               <button
                 type="button"
@@ -202,9 +206,9 @@ export function CreateServerWizard() {
 
         <Panel className="flex min-h-[460px] flex-col">
           <div className="flex-1 space-y-6 p-6 sm:p-8">
-            <h2 className="text-lg font-semibold tracking-tight">{STEPS[step]}</h2>
+            <h2 className="text-lg font-semibold tracking-tight">{steps[step]}</h2>
 
-            {STEPS[step] === "Basics" && (
+            {steps[step] === "Basics" && (
               <div className="max-w-lg space-y-5">
                 <Field label="Server name" htmlFor="name" error={fieldErrors.name}>
                   <Input id="name" autoFocus value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Survival with friends" maxLength={48} />
@@ -218,7 +222,7 @@ export function CreateServerWizard() {
               </div>
             )}
 
-            {STEPS[step] === "Software" && (
+            {steps[step] === "Software" && (
               <div className="space-y-5">
                 <Field label="Edition">
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -247,6 +251,14 @@ export function CreateServerWizard() {
                       />
                     ))}
                     <Choice
+                      selected={proxy}
+                      title="Velocity proxy"
+                      badge="Network"
+                      description="Puts several of your servers behind one address; players switch with /server. Set up the servers behind it after creating it."
+                      icon={<Network />}
+                      onClick={() => (setFromModpack(false), set("software", "velocity"), set("build", ""), set("memoryMb", 1024))}
+                    />
+                    <Choice
                       selected={fromModpack}
                       title="Modpack"
                       description="A ready-made Fabric or NeoForge modpack from Modrinth or your own .mrpack file. Version and loader come from the pack."
@@ -263,7 +275,7 @@ export function CreateServerWizard() {
               </div>
             )}
 
-            {STEPS[step] === "Version" && (
+            {steps[step] === "Version" && (
               <div className="max-w-lg space-y-5">
                 {modpack ? (
                   <Callout icon={<Boxes />} title={`${modpack.info.name} ${modpack.info.version}`}>
@@ -272,7 +284,11 @@ export function CreateServerWizard() {
                   </Callout>
                 ) : (
                   <>
-                    <Field label="Minecraft version" htmlFor="version" help="Players must use the same version to join.">
+                    <Field
+                      label={proxy ? "Velocity version" : "Minecraft version"}
+                      htmlFor="version"
+                      help={proxy ? "Velocity works with every Minecraft version the servers behind it run." : "Players must use the same version to join."}
+                    >
                       {versions.isLoading ? (
                         <Skeleton className="h-9" />
                       ) : versions.error ? (
@@ -324,7 +340,7 @@ export function CreateServerWizard() {
               </div>
             )}
 
-            {STEPS[step] === "World" && (
+            {steps[step] === "World" && (
               <div className="max-w-lg space-y-5">
                 <Field label="World name" htmlFor="level" help="Folder name of the world." error={fieldErrors.levelName}>
                   <Input id="level" value={f.levelName} onChange={(e) => set("levelName", e.target.value)} maxLength={64} />
@@ -344,7 +360,7 @@ export function CreateServerWizard() {
               </div>
             )}
 
-            {STEPS[step] === "Gameplay" && (
+            {steps[step] === "Gameplay" && (
               <div className="max-w-lg space-y-5">
                 <Field label="Game mode">
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -399,7 +415,7 @@ export function CreateServerWizard() {
               </div>
             )}
 
-            {STEPS[step] === "Resources" && (
+            {steps[step] === "Resources" && (
               <div className="max-w-lg space-y-5">
                 <Field
                   label="Memory"
@@ -453,7 +469,7 @@ export function CreateServerWizard() {
               </div>
             )}
 
-            {STEPS[step] === "Network" && (
+            {steps[step] === "Network" && (
               <div className="max-w-xl space-y-5">
                 <Field label="Who should be able to join?">
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -493,7 +509,7 @@ export function CreateServerWizard() {
               </div>
             )}
 
-            {STEPS[step] === "Review" && (
+            {steps[step] === "Review" && (
               <div className="max-w-xl space-y-6">
                 <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-2.5 text-[13px]">
                   {[
@@ -501,8 +517,12 @@ export function CreateServerWizard() {
                     ...(modpack ? [["Modpack", `${modpack.info.name} ${modpack.info.version} · ${modpack.info.serverFiles} files`]] : []),
                     ["Software", `${softwareLabel(f.software)} ${f.mcVersion}${f.build ? ` · ${buildFieldLabel(f.software)} ${f.build}` : ""}`],
                     ["Java", versionInfo.data ? `Java ${versionInfo.data.java.major}${versionInfo.data.java.available ? "" : " (will be downloaded)"}` : "—"],
-                    ["World", `${f.levelName}${f.seed ? ` · seed ${f.seed}` : ""} · ${f.levelType.replace("minecraft:", "")}`],
-                    ["Gameplay", `${f.mode} · ${f.mode === "hardcore" ? "hard" : f.difficulty} · ${f.maxPlayers} players${f.whitelist ? " · whitelist" : ""}`],
+                    ...(proxy
+                      ? []
+                      : [
+                          ["World", `${f.levelName}${f.seed ? ` · seed ${f.seed}` : ""} · ${f.levelType.replace("minecraft:", "")}`],
+                          ["Gameplay", `${f.mode} · ${f.mode === "hardcore" ? "hard" : f.difficulty} · ${f.maxPlayers} players${f.whitelist ? " · whitelist" : ""}`],
+                        ]),
                     ["Memory", `${(f.memoryMb / 1024).toFixed(1)} GB`],
                     ["Performance", f.performancePreset ? PRESET_INFO[f.performancePreset].label : "Java defaults"],
                     ["Network", `${f.networkMode === "lan" ? "Local network" : "Internet"} · port ${f.port}${f.bindAddress ? ` · ${f.bindAddress}` : ""}`],

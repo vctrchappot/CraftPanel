@@ -66,7 +66,7 @@ export class PregenService {
   }
 
   async status(row: ServerRow): Promise<PregenStatus> {
-    const supported = !!SOFTWARE_INFO[row.software].addons;
+    const supported = !!SOFTWARE_INFO[row.software].addons && !SOFTWARE_INFO[row.software].proxy;
     const plugin = supported ? await this.chunky(row) : undefined;
     const running = this.servers.agent.isRunning(row.id);
     return {
@@ -79,6 +79,7 @@ export class PregenService {
   }
 
   async install(row: ServerRow, actor: Actor) {
+    if (SOFTWARE_INFO[row.software].proxy) throw conflict("A proxy has no world to pre-generate. Pre-generate on the servers behind it.");
     if (!SOFTWARE_INFO[row.software].addons) throw conflict("Vanilla servers can't load Chunky. Switch to Paper, Purpur, Fabric or NeoForge first.");
     if (await this.chunky(row)) return;
     const res = await this.game.installFromModrinth(row, CHUNKY_PROJECT, undefined, actor);

@@ -203,7 +203,47 @@ export const neoforgeProvider: ServerProvider = {
   },
 };
 
-export const PROVIDERS: Record<ServerSoftware, ServerProvider> = { paper: paperProvider, purpur: purpurProvider, fabric: fabricProvider, neoforge: neoforgeProvider, vanilla: vanillaProvider };
+/**
+ * Velocity, PaperMC's proxy. Its "version" is the Velocity release (4.3.1), not a Minecraft
+ * version: one proxy serves every client version its backends support.
+ */
+export const velocityProvider: ServerProvider = {
+  id: "velocity",
+  label: "Velocity",
+  description: "Proxy that puts several servers behind one address. Runs Velocity plugins.",
+  supportsPlugins: true,
+  async listVersions() {
+    // Releases from 3.0 on; 1.x is years old and 3.x snapshots are filtered out with the other pre-releases.
+    const versions = await listPaperVersions("velocity");
+    return versions.filter((id) => Number(id.split(".")[0]) >= 3).map((id) => ({ id, stable: true }));
+  },
+  async listBuilds(version) {
+    const builds = await listPaperBuilds(version, "velocity");
+    return builds.sort((a, b) => b.id - a.id).map((b) => ({ id: String(b.id), channel: b.channel, time: b.time, changes: b.changes }));
+  },
+  async javaRequirement(version) {
+    const req = await paperJavaRequirement(version, "velocity").catch(() => null);
+    return { major: req?.minimum ?? 21, recommendedFlags: req?.flags ?? [] };
+  },
+  async install({ directory, version, build, onProgress, signal }) {
+    const b = await resolvePaperBuild(version, build, "velocity");
+    if (!b.download) throw new Error(`Velocity build ${b.id} has no download`);
+    const jarFile = b.download.name.replace(/[^A-Za-z0-9._-]/g, "_");
+    const stage = `Downloading Velocity ${version} build ${b.id}`;
+    onProgress?.(stage, null);
+    await download({ url: b.download.url, destination: path.join(directory, jarFile), checksum: { algorithm: "sha256", value: b.download.sha256 }, onProgress: (p) => onProgress?.(stage, p), signal });
+    return { jarFile, sha: b.download.sha256, build: String(b.id) };
+  },
+};
+
+export const PROVIDERS: Record<ServerSoftware, ServerProvider> = {
+  paper: paperProvider,
+  purpur: purpurProvider,
+  fabric: fabricProvider,
+  neoforge: neoforgeProvider,
+  vanilla: vanillaProvider,
+  velocity: velocityProvider,
+};
 
 export function getProvider(id: string): ServerProvider {
   const p = PROVIDERS[id as ServerSoftware];

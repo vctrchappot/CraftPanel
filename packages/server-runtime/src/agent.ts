@@ -157,6 +157,8 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
     const s = this.servers.get(id);
     if (!s || s.status !== "running") return;
     if (this.tickSupport.get(id) === false) return;
+    // A proxy doesn't tick; asking would only print "unknown command" into its console.
+    if (SOFTWARE_INFO[this.software.get(id) ?? "vanilla"].proxy) return;
     let tps: number | null = null;
     let mspt: number | null = null;
     if (SOFTWARE_INFO[this.software.get(id) ?? "vanilla"].paperCommands) {

@@ -27,15 +27,17 @@ interface SettingDef {
 }
 
 export function SettingsTab({ server: s }: { server: ServerDetail }) {
+  // A proxy is configured in velocity.toml (Files) and the Proxy tab; it has no server.properties or game rules.
+  const game = !SOFTWARE_INFO[s.software].proxy;
   return (
-    <Tabs defaultValue="properties" className="space-y-6">
+    <Tabs defaultValue={game ? "properties" : "runtime"} className="space-y-6">
       <TabsList>
-        <TabsTrigger value="properties">Server properties</TabsTrigger>
-        <TabsTrigger value="gamerules">Game rules</TabsTrigger>
+        {game && <TabsTrigger value="properties">Server properties</TabsTrigger>}
+        {game && <TabsTrigger value="gamerules">Game rules</TabsTrigger>}
         <TabsTrigger value="runtime">Runtime</TabsTrigger>
-        <TabsTrigger value="software">Software & version</TabsTrigger>
-        <TabsTrigger value="performance">Performance</TabsTrigger>
-        <TabsTrigger value="raw">Raw file</TabsTrigger>
+        <TabsTrigger value="software">{game ? "Software & version" : "Velocity version"}</TabsTrigger>
+        {game && <TabsTrigger value="performance">Performance</TabsTrigger>}
+        {game && <TabsTrigger value="raw">Raw file</TabsTrigger>}
         <TabsTrigger value="danger">Danger zone</TabsTrigger>
       </TabsList>
       <TabsContent value="properties">

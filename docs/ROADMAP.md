@@ -45,9 +45,33 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 ### 4. More platforms (Phase 3)
 - [x] NeoForge (the installer runs with `--installServer`; servers start via its argument files), with NeoForge mods and modpacks from Modrinth.
 - [x] Modrinth modpacks (`.mrpack`) with one click: Fabric, NeoForge and vanilla packs from the Modrinth catalogue or an uploaded file (Forge/Quilt packs are refused with a clear message).
-- [ ] Velocity proxy (several servers behind one address).
+- [ ] Velocity proxy (several servers behind one address). In progress, see below.
 - [ ] Bedrock Dedicated Server (x64 only, no ARM; the runtime already supports a custom launch command).
 - [x] Hangar as a second plugin source: search, install (Paper jar with SHA-256) and update checks for plugins installed from Hangar.
+
+#### Velocity — work in progress
+- **Done (code, typecheck and unit tests green):**
+  - Software `velocity` (`SOFTWARE_INFO.proxy`), installed from PaperMC's Fill API (project `velocity`, SHA-256), with the Java minimum from Fill (4.3.1 needs Java 25).
+  - `ProxyService` (`apps/api/src/services/proxy.ts`): backends in `.craftpanel-proxy.json`, the secret in `forwarding.secret`, and `velocity.toml` rewritten before every proxy start.
+  - Backends are reconfigured before every backend start:
+    - Paper/Purpur: `online-mode=false` and `proxies.velocity.{enabled,online-mode,secret}` in `config/paper-global.yml`.
+    - Fabric: FabricProxy-Lite plus Fabric API from Modrinth, and `config/FabricProxy-Lite.toml`.
+  - Optional bind of backends to 127.0.0.1. Removing a backend reverts it.
+  - Routes `GET`/`PUT /api/servers/:id/proxy` and `GET`/`POST …/proxy/secret`.
+  - Proxies get 409 on worlds, players, game rules and server.properties, and no TPS sampling or save-all before backups.
+  - Velocity plugins come from Modrinth with loader `velocity` and are read from `velocity-plugin.json`.
+  - Dashboard: a "Velocity proxy" choice in the wizard (no World/Gameplay steps) and a Proxy tab. The Players and Worlds tabs and the properties/game rules/performance settings are hidden for proxies.
+- **Verified for real:** Velocity 4.3.1 started by hand in WSL only.
+  - The console format is Paper-like (`[19:00:54 INFO]: Done (0.69s)!`), so the existing parser recognises "running", and `stop` shuts it down.
+  - Velocity accepts a partial `velocity.toml` without `config-version`. It fills in defaults and rewrites the file in its own layout: keys reordered, tables tab-indented, and `forced-hosts = {}` as a top-level key when there are none.
+  - It warns once about a "deprecated configuration version", which is harmless.
+- **Not yet verified:** a proxy and two Paper backends via the API, joining with a mineflayer bot, `/server` switching, the backend start hook on a fresh Paper (whether a `paper-global.yml` containing only `proxies.velocity` is accepted), `velocity reload` after saving, and the UI screenshots.
+- **Missing / next:**
+  - NeoForge backends: only a note for now. Proxy Compatible Forge is on Modrinth as `vDyrHl8l`; its config isn't written.
+  - Velocity plugins from Hangar (platform `VELOCITY`).
+  - Player join/leave detection from Velocity's `[connected player] Name (/ip) has connected` lines.
+  - A backend's port change while the proxy runs needs a proxy restart.
+  - Paper older than 1.19 (`paper.yml` `settings.velocity-support`) is refused.
 
 ### 5. Comfort and optimisation (Phase 4)
 - [x] Measure first: `scripts/measure.mjs` (startup, idle CPU/RAM, API latency, bundle sizes); first fixes from it: minified API bundle, precompressed dashboard with long-lived caching, cached host info in `/api/system` (numbers in STATUS.md).

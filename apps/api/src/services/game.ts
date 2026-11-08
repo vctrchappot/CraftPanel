@@ -49,6 +49,11 @@ export class GameService {
     private config: AppConfig,
   ) {}
 
+  /** Worlds, players, game rules and server.properties belong to Minecraft servers, not to a proxy. */
+  private requireGameServer(row: ServerRow) {
+    if (SOFTWARE_INFO[row.software].proxy) throw conflict(`${softwareLabel(row.software)} is a proxy: it has no worlds, players or server.properties of its own.`, "Manage those on the servers behind the proxy.");
+  }
+
   private running(row: ServerRow) {
     return this.servers.agent.isRunning(row.id) && this.servers.agent.status(row.id) === "running";
   }
@@ -56,12 +61,14 @@ export class GameService {
   // ---- server.properties --------------------------------------------------
 
   async readProperties(row: ServerRow) {
+    this.requireGameServer(row);
     const text = (await this.servers.sandbox(row).readTextIfExists("server.properties")) ?? "";
     const doc = PropertiesDocument.parse(text);
     return { raw: text, values: doc.toObject(), catalog: SETTINGS };
   }
 
   async updateProperties(row: ServerRow, values: Record<string, string>, actor: Actor) {
+    this.requireGameServer(row);
     const errors: Record<string, string> = {};
     for (const [k, v] of Object.entries(values)) {
       if (MANAGED_KEYS.has(k)) errors[k] = "Managed by CraftPanel. Change it on the Network or Worlds page.";
@@ -84,6 +91,7 @@ export class GameService {
 
   /** Replace server.properties from raw text (raw editor / import). */
   async replaceProperties(row: ServerRow, raw: string, actor: Actor) {
+    this.requireGameServer(row);
     if (raw.length > 256 * 1024) throw badRequest("File too large");
     const doc = PropertiesDocument.parse(raw);
     const errors: string[] = [];
@@ -102,6 +110,7 @@ export class GameService {
   // ---- gamerules ------------------------------------------------------------
 
   async gamerules(row: ServerRow): Promise<{ rules: GameRuleInfo[]; live: boolean }> {
+    this.requireGameServer(row);
     if (!row.javaPath) throw conflict("Java is not configured for this server yet");
     const defs = await detectGamerules({ mcVersion: row.mcVersion, javaPath: row.javaPath, cacheDir: this.config.layout.cache });
     const live = this.running(row);
@@ -120,6 +129,7 @@ export class GameService {
   }
 
   async setGamerule(row: ServerRow, name: string, value: string, actor: Actor) {
+    this.requireGameServer(row);
     if (!this.running(row)) throw conflict("Game rules can only be changed while the server is running");
     const defs = await detectGamerules({ mcVersion: row.mcVersion, javaPath: row.javaPath!, cacheDir: this.config.layout.cache });
     const def = defs.find((d) => d.name === name);
@@ -135,6 +145,7 @@ export class GameService {
   // ---- players -------------------------------------------------------------
 
   async players(row: ServerRow) {
+    this.requireGameServer(row);
     const sb = this.servers.sandbox(row);
     const [whitelist, ops, bans, ipBans, props] = await Promise.all([
       sb.readTextIfExists("whitelist.json").then((t) => parseJsonList<WhitelistEntry>(t)),
@@ -172,6 +183,7 @@ export class GameService {
   }
 
   async playerAction(row: ServerRow, action: string, name: string, reason: string | undefined, actor: Actor) {
+    this.requireGameServer(row);
     const live = this.servers.agent.isRunning(row.id);
     const r = reason?.trim() ? ` ${reason.trim()}` : "";
     const commands: Record<string, string> = {
@@ -210,6 +222,7 @@ export class GameService {
   }
 
   async ipBan(row: ServerRow, ip: string, reason: string | undefined, remove: boolean, actor: Actor) {
+    this.requireGameServer(row);
     if (this.servers.agent.isRunning(row.id)) this.servers.sendCommand(row.id, remove ? `pardon-ip ${ip}` : `ban-ip ${ip}${reason ? ` ${reason}` : ""}`);
     else
       await this.editList<BanEntry>(row, "banned-ips.json", (l) =>
@@ -220,6 +233,7 @@ export class GameService {
   }
 
   async setWhitelistEnabled(row: ServerRow, enabled: boolean, actor: Actor) {
+    this.requireGameServer(row);
     if (this.servers.agent.isRunning(row.id)) this.servers.sendCommand(row.id, `whitelist ${enabled ? "on" : "off"}`);
     const sb = this.servers.sandbox(row);
     const doc = PropertiesDocument.parse((await sb.readTextIfExists("server.properties")) ?? "");
@@ -236,6 +250,7 @@ export class GameService {
   }
 
   async worlds(row: ServerRow): Promise<WorldInfo[]> {
+    this.requireGameServer(row);
     const active = await this.levelName(row);
     const entries = await fsp.readdir(row.directory, { withFileTypes: true });
     const candidates: { name: string; mtime: number }[] = [];
@@ -273,6 +288,7 @@ export class GameService {
   }
 
   async selectWorld(row: ServerRow, name: string, opts: { seed?: string; levelType?: string }, actor: Actor) {
+    this.requireGameServer(row);
     const sb = this.servers.sandbox(row);
     await sb.resolve(name); // validates containment
     const doc = PropertiesDocument.parse((await sb.readTextIfExists("server.properties")) ?? "");
@@ -286,6 +302,7 @@ export class GameService {
   }
 
   async createWorld(row: ServerRow, name: string, seed: string | undefined, levelType: string | undefined, activate: boolean, actor: Actor) {
+    this.requireGameServer(row);
     const sb = this.servers.sandbox(row);
     if (await sb.exists(name)) throw conflict(`A folder named "${name}" already exists`);
     if (!activate) throw badRequest("New worlds are generated by Minecraft when they become active");
@@ -298,6 +315,7 @@ export class GameService {
   }
 
   async deleteWorld(row: ServerRow, name: string, actor: Actor) {
+    this.requireGameServer(row);
     if (this.servers.agent.isRunning(row.id)) throw conflict("Stop the server before deleting a world");
     if ((await this.levelName(row)) === name) throw conflict("You cannot delete the active world. Select a different world first.");
     const sb = this.servers.sandbox(row);
@@ -309,6 +327,7 @@ export class GameService {
 
   /** Export a world (including Paper dimension folders) to a temporary zip. */
   async exportWorld(row: ServerRow, name: string): Promise<string> {
+    this.requireGameServer(row);
     const sb = this.servers.sandbox(row);
     if (!(await sb.exists(path.posix.join(name, "level.dat")))) throw notFound("World");
     if (this.running(row)) {
@@ -326,6 +345,7 @@ export class GameService {
 
   /** Import a world from an uploaded zip (level.dat at the root or inside one folder). */
   async importWorld(row: ServerRow, zipFile: string, name: string, actor: Actor) {
+    this.requireGameServer(row);
     const sb = this.servers.sandbox(row);
     if (await sb.exists(name)) throw conflict(`A folder named "${name}" already exists`);
     const entries = await listZip(zipFile);
@@ -354,7 +374,12 @@ export class GameService {
   }
 
   private loader(row: ServerRow): ModLoader {
-    return SOFTWARE_INFO[row.software].modLoader ?? "fabric";
+    return row.software === "velocity" ? "velocity" : (SOFTWARE_INFO[row.software].modLoader ?? "fabric");
+  }
+
+  /** The Minecraft version add-ons must support; a proxy's version is its own, so nothing is filtered. */
+  private gameVersion(row: ServerRow): string | null {
+    return SOFTWARE_INFO[row.software].proxy ? null : row.mcVersion;
   }
 
   private addonLabel(row: ServerRow) {
@@ -407,6 +432,8 @@ export class GameService {
       if (!(await readZipEntry(tmpFile, "META-INF/neoforge.mods.toml").catch(() => null))) throw badRequest("This jar is not a NeoForge mod (no META-INF/neoforge.mods.toml)");
     } else if (kind === "mods") {
       if (!(await readZipEntry(tmpFile, "fabric.mod.json").catch(() => null))) throw badRequest("This jar is not a Fabric mod (no fabric.mod.json)");
+    } else if (this.loader(row) === "velocity") {
+      if (!(await readZipEntry(tmpFile, "velocity-plugin.json").catch(() => null))) throw badRequest("This jar is not a Velocity plugin (no velocity-plugin.json)");
     } else {
       const meta = (await readZipEntry(tmpFile, "plugin.yml").catch(() => null)) ?? (await readZipEntry(tmpFile, "paper-plugin.yml").catch(() => null));
       if (!meta) throw badRequest("This jar is not a Bukkit/Paper plugin (no plugin.yml or paper-plugin.yml)");
@@ -422,9 +449,9 @@ export class GameService {
 
   async installFromModrinth(row: ServerRow, projectId: string, versionId: string | undefined, actor: Actor) {
     const kind = this.requireAddons(row);
-    const versions = await compatibleModrinthVersions(projectId, row.mcVersion, kind, this.loader(row));
+    const versions = await compatibleModrinthVersions(projectId, this.gameVersion(row), kind, this.loader(row));
     const chosen = versionId ? versions.find((v) => v.id === versionId) : versions.find((v) => v.version_type === "release") ?? versions[0];
-    if (!chosen) throw conflict(`This ${this.addonLabel(row).toLowerCase()} has no version marked compatible with Minecraft ${row.mcVersion} on ${softwareLabel(row.software)}`);
+    if (!chosen) throw conflict(`This ${this.addonLabel(row).toLowerCase()} has no version marked compatible with ${SOFTWARE_INFO[row.software].proxy ? "" : `Minecraft ${row.mcVersion} on `}${softwareLabel(row.software)}`);
     const res = await installModrinthVersion(chosen.id, this.pluginsDir(row));
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
     await this.activity.event(row.id, "plugin.installed", `${this.addonLabel(row)} ${res.file} installed from Modrinth`, { actor });
@@ -433,11 +460,11 @@ export class GameService {
   }
 
   async searchModrinth(row: ServerRow, query: string, offset: number) {
-    return searchModrinthPlugins(query, row.mcVersion, offset, this.requireAddons(row), this.loader(row));
+    return searchModrinthPlugins(query, this.gameVersion(row), offset, this.requireAddons(row), this.loader(row));
   }
 
   async modrinthVersions(row: ServerRow, projectId: string) {
-    return compatibleModrinthVersions(projectId, row.mcVersion, this.requireAddons(row), this.loader(row));
+    return compatibleModrinthVersions(projectId, this.gameVersion(row), this.requireAddons(row), this.loader(row));
   }
 
   // Hangar (PaperMC's repository): plugin servers only. Hangar can't look files up by hash, so
@@ -445,6 +472,7 @@ export class GameService {
 
   private requirePluginServer(row: ServerRow) {
     if (this.requireAddons(row) !== "plugins") throw conflict("Hangar hosts Paper plugins; mod servers (Fabric, NeoForge) use mods from Modrinth.");
+    if (SOFTWARE_INFO[row.software].proxy) throw conflict("CraftPanel installs Velocity plugins from Modrinth; Hangar is supported for Paper plugins only.");
   }
 
   private hangarIndexFile(row: ServerRow) {
@@ -504,7 +532,7 @@ export class GameService {
     // Jars installed from Hangar are checked there only; the same jar is often on Modrinth too, with other channels.
     const index = kind === "plugins" ? await this.hangarIndex(row) : {};
     const fromHangar = (p: { file: string }) => index[p.file.replace(/\.disabled$/, "")];
-    const updates = await checkModrinthUpdates(plugins.filter((p) => !fromHangar(p)).map((p) => p.sha1), row.mcVersion, kind, this.loader(row));
+    const updates = await checkModrinthUpdates(plugins.filter((p) => !fromHangar(p)).map((p) => p.sha1), this.gameVersion(row), kind, this.loader(row));
     const out: { file: string; name: string | null; current: string | null; versionId: string; versionNumber: string; projectId: string; source: "modrinth" | "hangar" }[] = plugins
       .filter((p) => !fromHangar(p) && updates[p.sha1])
       .map((p) => ({ file: p.file, name: p.name, current: p.version, ...updates[p.sha1], source: "modrinth" }));
