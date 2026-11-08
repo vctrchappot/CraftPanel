@@ -18,7 +18,11 @@
 
 ## Install
 
-One command installs the latest release and keeps CraftPanel running in the background. Nothing is built on your machine, and Node.js is set up automatically if needed. Java is installed per Minecraft version.
+**Ubuntu home server or second PC? Start with the [Ubuntu quickstart](docs/deployment/ubuntu.md).** It covers installation, automatic startup, opening the dashboard from another device, the setup token and firewall checks.
+
+**Release installers require a published GitHub release.** Until the first release is published, use the Ubuntu quickstart or [run from source](#run-from-source). The commands below become available after a release is published.
+
+The release installer keeps CraftPanel running in the background. Nothing is built on your machine, and Node.js is set up automatically if needed. Java is installed per Minecraft version.
 
 **Linux, Raspberry Pi, VPS** (systemd; x64, ARM64, ARMv7):
 
