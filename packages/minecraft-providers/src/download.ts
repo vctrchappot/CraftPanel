@@ -46,9 +46,48 @@ export function assertTrustedUrl(url: string): void {
   if (!TRUSTED_HOSTS.includes(u.hostname)) throw new Error(`Refusing download from untrusted host: ${u.hostname}`);
 }
 
+/** Delays before the second and third attempt; exported so tests can shorten them. */
+export const RETRY_DELAYS_MS = [1000, 4000];
+
+/**
+ * fetch with a few retries for transient failures (5xx, 429, connection errors): GitHub and
+ * the Minecraft CDNs answer 502/504 now and then, and one hiccup shouldn't fail an installation.
+ */
+export async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const last = attempt >= RETRY_DELAYS_MS.length;
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      if (last || init.signal?.aborted || (err as Error).name === "AbortError" || (err as Error).name === "TimeoutError") throw err;
+      await wait(RETRY_DELAYS_MS[attempt], init.signal);
+      continue;
+    }
+    if (last || !(res.status >= 500 || res.status === 429)) return res;
+    await res.body?.cancel().catch(() => {});
+    await wait(RETRY_DELAYS_MS[attempt], init.signal);
+  }
+}
+
+function wait(ms: number, signal?: AbortSignal | null): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(signal?.reason);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 export async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   assertTrustedUrl(url);
-  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(20000) });
+  const res = await fetchWithRetry(url, { headers: { "User-Agent": USER_AGENT, Accept: "application/json" }, signal: signal ?? AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`Request to ${new URL(url).hostname} failed: HTTP ${res.status}`);
   return (await res.json()) as T;
 }
@@ -59,7 +98,7 @@ export async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T
  */
 export async function download(opts: DownloadOptions): Promise<void> {
   assertTrustedUrl(opts.url);
-  const res = await fetch(opts.url, { headers: { "User-Agent": USER_AGENT }, signal: opts.signal, redirect: "follow" });
+  const res = await fetchWithRetry(opts.url, { headers: { "User-Agent": USER_AGENT }, signal: opts.signal, redirect: "follow" });
   if (!res.ok || !res.body) throw new Error(`Download failed: HTTP ${res.status} from ${new URL(opts.url).hostname}`);
   assertTrustedUrl(res.url || opts.url);
   const total = Number(res.headers.get("content-length")) || null;
