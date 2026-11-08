@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CRAFTPANEL_VERSION } from "@craftpanel/shared";
-import { compareVersions, detectInstall, UpdateService } from "../src/services/updates";
+import { changelogSection, compareVersions, detectInstall, installerLog, newestArchive, UpdateService } from "../src/services/updates";
 import type { SettingsService } from "../src/services/settings";
 
 const settings = (updateCheck = true) => ({ get: async () => ({ updateCheck }) }) as unknown as SettingsService;
@@ -67,5 +67,95 @@ describe("UpdateService", () => {
     };
     expect(await new UpdateService(settings(false), null, {}, never).status()).toMatchObject({ enabled: false, error: null });
     expect(await new UpdateService(settings(), null, { CRAFTPANEL_UPDATE_CHECK: "false" }, never).status()).toMatchObject({ enabled: false });
+  });
+});
+
+describe("updates from the dashboard", () => {
+  const tmp = () => fs.mkdtemp(path.join(os.tmpdir(), "cp-upd-"));
+  const store = (initial: Record<string, unknown> = {}) => {
+    let s: Record<string, unknown> = { updateCheck: true, lastRunVersion: null, lastUpdateResultAt: null, ...initial };
+    return { get: async () => s, set: async (p: Record<string, unknown>) => (s = { ...s, ...p }) } as unknown as SettingsService;
+  };
+
+  it("reads the helper from install.json, also with a byte order mark", async () => {
+    const dir = await tmp();
+    const selfUpdate = { kind: "task", task: "CraftPanel Update", log: "C:/x/update.log", result: "C:/x/update-result.json" };
+    await fs.writeFile(path.join(dir, "install.json"), "\uFEFF" + JSON.stringify({ method: "windows", updateCommand: "powershell …", selfUpdate }));
+    expect(detectInstall(dir)).toEqual({ method: "windows", updateCommand: "powershell …", selfUpdate });
+    // Anything unexpected in the helper is ignored, not run.
+    await fs.writeFile(path.join(dir, "install.json"), JSON.stringify({ method: "windows", updateCommand: "x", selfUpdate: { ...selfUpdate, task: "a & calc" } }));
+    expect(detectInstall(dir).selfUpdate).toBeUndefined();
+  });
+
+  it("finds the newest archive in a release folder and offers it", async () => {
+    const dir = await tmp();
+    for (const n of ["craftpanel-v0.9.0.tar.gz", "craftpanel-v999.1.0.tar.gz", "craftpanel-v999.0.5.tar.gz", "craftpanel-vx.tar.gz", "notes.txt"]) await fs.writeFile(path.join(dir, n), "");
+    expect(newestArchive(dir)?.version).toBe("999.1.0");
+    const svc = new UpdateService(settings(), null, { CRAFTPANEL_RELEASE_DIR: dir }, async () => {
+      throw new Error("must not ask GitHub");
+    });
+    expect(await svc.status()).toMatchObject({ source: "folder", latest: "999.1.0", available: true, canInstall: false });
+  });
+
+  it("starts the systemd helper by creating the request file, then reports the installer's result", async () => {
+    const root = await tmp();
+    const data = await tmp();
+    const helper = { kind: "systemd", request: path.join(data, "requested"), log: path.join(data, "update.log"), result: path.join(data, "update-result.json") };
+    await fs.writeFile(path.join(root, "install.json"), JSON.stringify({ method: "linux-service", updateCommand: "sudo /opt/craftpanel/update.sh", selfUpdate: helper }));
+    const svc = new UpdateService(settings(), root, {}, release("v999.0.0"));
+    expect((await svc.status()).canInstall).toBe(true);
+    const started = await svc.startInstall();
+    expect(started).toMatchObject({ running: true, target: "999.0.0" });
+    expect(JSON.parse(await fs.readFile(helper.request, "utf8"))).toMatchObject({ target: "999.0.0" });
+    await expect(svc.startInstall()).rejects.toMatchObject({ code: "update_running" });
+    await fs.writeFile(helper.log, "› Looking up the latest release…\n  Checksum verified.\n› Installing CraftPanel v999.0.0 to /opt/craftpanel…\n");
+    expect((await svc.progress()).steps).toEqual(["Looking up the latest release…", "Installing CraftPanel v999.0.0 to /opt/craftpanel…"]);
+    await fs.writeFile(helper.result, JSON.stringify({ ok: false, from: CRAFTPANEL_VERSION, to: "999.0.0", message: "did not start", rolledBack: true, finishedAt: Date.now() + 10 }));
+    expect(await svc.progress()).toMatchObject({ running: false, result: { ok: false, rolledBack: true } });
+  });
+
+  it("runs the Windows update task without a shell", async () => {
+    const root = await tmp();
+    await fs.writeFile(path.join(root, "install.json"), JSON.stringify({ method: "windows", updateCommand: "x", selfUpdate: { kind: "task", task: "CraftPanel Update", log: path.join(root, "l"), result: path.join(root, "r") } }));
+    const calls: string[][] = [];
+    const svc = new UpdateService(settings(), root, {}, release("v999.0.0"), async (file, args) => (calls.push([path.basename(file), ...args]), 0));
+    await svc.startInstall();
+    expect(calls).toEqual([["schtasks.exe", "/Run", "/TN", "CraftPanel Update"]]);
+  });
+
+  it("refuses when there is nothing newer or no helper", async () => {
+    const root = await tmp();
+    await expect(new UpdateService(settings(), root, {}, release("v999.0.0")).startInstall()).rejects.toMatchObject({ code: "update_manual" });
+    await fs.writeFile(path.join(root, "install.json"), JSON.stringify({ method: "windows", updateCommand: "x", selfUpdate: { kind: "task", task: "T", log: "l", result: "r" } }));
+    await expect(new UpdateService(settings(), root, {}, release(`v${CRAFTPANEL_VERSION}`)).startInstall()).rejects.toMatchObject({ code: "up_to_date" });
+  });
+
+  it("records version changes and failed updates once at startup", async () => {
+    const root = await tmp();
+    const result = path.join(root, "update-result.json");
+    await fs.writeFile(path.join(root, "install.json"), JSON.stringify({ method: "windows", updateCommand: "x", selfUpdate: { kind: "task", task: "T", log: "l", result } }));
+    await fs.writeFile(result, JSON.stringify({ ok: false, from: "0.0.1", to: "0.0.2", message: "Checksum mismatch.", rolledBack: false, finishedAt: 1000 }));
+    const s = store({ lastRunVersion: "0.0.1" });
+    const events: string[] = [];
+    const svc = new UpdateService(s, root, {}, release("v1.0.0"));
+    await svc.recordStartup(async (kind, message) => void events.push(`${kind}: ${message}`));
+    await svc.recordStartup(async (kind, message) => void events.push(`${kind}: ${message}`));
+    svc.stop();
+    expect(events).toEqual([`craftpanel.updated: CraftPanel updated from 0.0.1 to ${CRAFTPANEL_VERSION}`, "craftpanel.update_failed: Update to 0.0.2 failed: Checksum mismatch."]);
+  });
+
+  it("extracts one version's section from the changelog", () => {
+    const log = "# Changelog\n\n## Unreleased\n\n- next\n\n## 1.2.0 – 2026-12-01\n\n### Added\n- a\n\n## 1.1.0 – 2026-11-01\n\n- old\n";
+    expect(changelogSection(log, "1.2.0")).toBe("### Added\n- a");
+    expect(changelogSection(log, "1.1.0")).toBe("- old");
+    expect(changelogSection(log, "9.9.9")).toBeNull();
+  });
+});
+
+describe("installerLog", () => {
+  it("drops PowerShell's transcript header and footer", () => {
+    const text = "﻿**********************\r\nStart der Windows PowerShell-Aufzeichnung\r\nPSVersion: 5.1\r\n**********************\r\nUpdate requested\r\n> Installing CraftPanel v1.0.0...\r\nPS>TerminatingError(Invoke-WebRequest): \"timeout\"\r\n\r\n**********************\r\nEnde der Windows PowerShell-Aufzeichnung\r\n**********************\r\n";
+    expect(installerLog(text)).toEqual(["Update requested", "> Installing CraftPanel v1.0.0..."]);
+    expect(installerLog("› Looking up…\n  Checksum verified.\n")).toEqual(["› Looking up…", "  Checksum verified."]);
   });
 });

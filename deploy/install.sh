@@ -13,6 +13,12 @@
 #   --port N          CRAFTPANEL_PORT             dashboard port (default 8080)
 #   --uninstall                                   remove the service and app, keep all data
 #
+# Updates can also be started from the dashboard (Settings → Updates): CraftPanel then creates
+# /var/lib/craftpanel/update/requested and the root unit craftpanel-update.path runs this script
+# with --from-dashboard. That request carries no options; only the newest release is installed.
+# Without access to GitHub, put release archives and their SHA256SUMS into a folder and set
+# CRAFTPANEL_RELEASE_DIR=/that/folder in /etc/craftpanel/craftpanel.env.
+#
 # Minecraft servers, worlds, backups and settings live in /var/lib/craftpanel and are never touched.
 # Service settings (port, profile, HTTPS, ...) go into /etc/craftpanel/craftpanel.env, which is kept.
 set -euo pipefail
@@ -24,29 +30,59 @@ CONFIG_DIR=/etc/craftpanel
 ENV_FILE=$CONFIG_DIR/craftpanel.env
 UNIT_FILE=/etc/systemd/system/craftpanel.service
 SERVICE_USER=craftpanel
+UPDATE_DIR=$DATA_DIR/update
+LOG_DIR=/var/log/craftpanel
+RESULT_FILE=$LOG_DIR/update-result.json
+UPDATE_UNIT=/etc/systemd/system/craftpanel-update.service
+UPDATE_PATH_UNIT=/etc/systemd/system/craftpanel-update.path
 NODE_MIN=22.13
 NODE_MAJORS="24 22"
 
 if [[ -t 1 && -z ${NO_COLOR:-} ]]; then B=$'\e[1m' D=$'\e[2m' G=$'\e[32m' Y=$'\e[33m' R=$'\e[31m' N=$'\e[0m'; else B= D= G= Y= R= N=; fi
+# A progress bar for the download in a terminal, quiet in logs.
+if [[ -t 2 ]]; then PROGRESS=(-#); else PROGRESS=(-sS); fi
 step() { echo "${B}›${N} $*"; }
 info() { echo "  $*"; }
 warn() { echo "${Y}!${N} $*" >&2; }
+LAST_ERROR="" ROLLED_BACK=false FROM_VERSION="" TO_VERSION=""
 die() {
   echo "${R}✖${N} $1" >&2
   [[ -n ${2:-} ]] && echo "  $2" >&2
+  LAST_ERROR="$1${2:+ $2}"
   exit 1
+}
+
+json_str() {
+  local s=${1//\\/\\\\}
+  s=${s//\"/\\\"}
+  printf '"%s"' "${s//$'\n'/ }"
+}
+
+# Tells the dashboard how an update it started has ended (read by CraftPanel after its restart).
+write_result() {
+  local code=$1 ok=false msg
+  [[ $code -eq 0 ]] && ok=true
+  msg=$LAST_ERROR
+  # die inside a command substitution can't set LAST_ERROR here; use the last error line of the log.
+  [[ -z $msg && $ok == false ]] && msg=$(grep -a '✖' "$LOG_DIR/update.log" 2>/dev/null | tail -1 | sed 's/^.*✖ *//')
+  [[ $ok == true ]] && msg="Updated${FROM_VERSION:+ from $FROM_VERSION} to $TO_VERSION"
+  mkdir -p "$LOG_DIR"
+  printf '{ "ok": %s, "from": %s, "to": %s, "message": %s, "rolledBack": %s, "finishedAt": %s }\n' \
+    "$ok" "$(json_str "$FROM_VERSION")" "$(json_str "$TO_VERSION")" "$(json_str "${msg:-The update failed; see $LOG_DIR/update.log}")" "$ROLLED_BACK" "$(date +%s%3N)" >"$RESULT_FILE.tmp"
+  mv "$RESULT_FILE.tmp" "$RESULT_FILE"
 }
 
 # Everything runs inside main, so a partially downloaded script does nothing.
 main() {
-  local version=${CRAFTPANEL_INSTALL_VERSION:-} archive=${CRAFTPANEL_ARCHIVE:-} port=${CRAFTPANEL_PORT:-} uninstall=false
+  local version=${CRAFTPANEL_INSTALL_VERSION:-} archive=${CRAFTPANEL_ARCHIVE:-} port=${CRAFTPANEL_PORT:-} uninstall=false from_dashboard=false
   while (($#)); do
     case $1 in
       --version) version=${2:?--version needs a value}; shift 2 ;;
       --archive) archive=${2:?--archive needs a file}; shift 2 ;;
       --port) port=${2:?--port needs a value}; shift 2 ;;
       --uninstall) uninstall=true; shift ;;
-      -h | --help) sed -n '2,19p' "$0" 2>/dev/null || echo "See https://github.com/$REPO#install"; exit 0 ;;
+      --from-dashboard) from_dashboard=true; shift ;;
+      -h | --help) sed -n '2,23p' "$0" 2>/dev/null || echo "See https://github.com/$REPO#install"; exit 0 ;;
       *) die "Unknown option: $1" "Options: --version X.Y.Z, --archive FILE, --port N, --uninstall" ;;
     esac
   done
@@ -62,12 +98,30 @@ main() {
     return
   fi
 
+  if $from_dashboard; then
+    # The request file lives in CraftPanel's own data folder: remove it (never follow it) and ignore its content.
+    rm -rf "$UPDATE_DIR/requested"
+    trap 'write_result $?' EXIT
+    version="" archive="" port=""
+    echo "${D}Update requested from the dashboard on $(date '+%Y-%m-%d %H:%M:%S')${N}"
+  fi
+  local release_dir=${CRAFTPANEL_RELEASE_DIR:-}
+  [[ -z $release_dir && -f $ENV_FILE ]] && release_dir=$(env_value CRAFTPANEL_RELEASE_DIR)
+
   for tool in curl tar sha256sum; do
     command -v "$tool" >/dev/null || die "$tool is required." "Install it, e.g.: sudo apt install $tool"
   done
 
   TMP=$(mktemp -d)
-  trap 'rm -rf "$TMP"' EXIT
+  if $from_dashboard; then trap 'code=$?; rm -rf "$TMP"; write_result $code' EXIT; else trap 'rm -rf "$TMP"' EXIT; fi
+
+  if [[ -z $archive && -z $version && -n $release_dir ]]; then
+    step "Looking for the newest release in $release_dir…"
+    archive=$(find "$release_dir" -maxdepth 1 -name 'craftpanel-v*.tar.gz' -printf '%f\n' 2>/dev/null | sed 's/^craftpanel-v//; s/\.tar\.gz$//' | sort -V | tail -1)
+    [[ -n $archive ]] || die "No craftpanel-vX.Y.Z.tar.gz in $release_dir."
+    archive=$release_dir/craftpanel-v$archive.tar.gz
+    [[ -f $release_dir/SHA256SUMS ]] || die "$release_dir has no SHA256SUMS." "Copy the SHA256SUMS file of the release next to the archive."
+  fi
 
   # ---- get the release ----------------------------------------------------------------
   local file
@@ -93,7 +147,7 @@ main() {
     step "Downloading CraftPanel v$version…"
     local base="https://github.com/$REPO/releases/download/v$version"
     file=$TMP/craftpanel-v$version.tar.gz
-    curl -fsSL --retry 3 -o "$file" "$base/craftpanel-v$version.tar.gz" || die "Could not download CraftPanel v$version." "Check the version on https://github.com/$REPO/releases"
+    curl -fL --retry 3 "${PROGRESS[@]}" -o "$file" "$base/craftpanel-v$version.tar.gz" || die "Could not download CraftPanel v$version." "Check the version on https://github.com/$REPO/releases"
     curl -fsSL --retry 3 -o "$TMP/SHA256SUMS" "$base/SHA256SUMS" || die "Could not download the checksums for v$version."
     verify_checksum "$file" "$TMP/SHA256SUMS"
   fi
@@ -107,6 +161,10 @@ main() {
 
   local previous=""
   [[ -f $INSTALL_DIR/release.json ]] && previous=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$INSTALL_DIR/release.json")
+  FROM_VERSION=$previous TO_VERSION=$version
+  if $from_dashboard && [[ -n $previous && $(printf '%s\n%s\n' "$previous" "$version" | sort -V | tail -1) == "$previous" ]]; then
+    die "CraftPanel v$previous is already the newest version."
+  fi
 
   # ---- Node.js --------------------------------------------------------------------------
   step "Checking Node.js…"
@@ -136,7 +194,8 @@ main() {
   mv "$INSTALL_DIR/apps.new" "$INSTALL_DIR/apps"
   for f in README.md LICENSE CHANGELOG.md release.json; do cp "$src/$f" "$INSTALL_DIR/$f"; done
   install -m 755 "$src/deploy/install.sh" "$INSTALL_DIR/update.sh"
-  printf '{ "method": "linux-service", "updateCommand": "sudo %s/update.sh" }\n' "$INSTALL_DIR" >"$INSTALL_DIR/install.json"
+  printf '{ "method": "linux-service", "updateCommand": "sudo %s/update.sh",\n  "selfUpdate": { "kind": "systemd", "request": "%s/requested", "log": "%s/update.log", "result": "%s" } }\n' "$INSTALL_DIR" "$UPDATE_DIR" "$LOG_DIR" "$RESULT_FILE" >"$INSTALL_DIR/install.json"
+  install_update_units
   chown -R root:root "$INSTALL_DIR"
 
   sed "s|^ExecStart=/usr/bin/node |ExecStart=$node |" "$src/deploy/craftpanel.service" >"$UNIT_FILE"
@@ -154,8 +213,10 @@ main() {
       mv "$INSTALL_DIR/apps" "$INSTALL_DIR/apps.failed"
       mv "$INSTALL_DIR/apps.previous" "$INSTALL_DIR/apps"
       [[ -f $INSTALL_DIR/apps.previous.release.json ]] && mv "$INSTALL_DIR/apps.previous.release.json" "$INSTALL_DIR/release.json"
+      systemctl reset-failed craftpanel 2>/dev/null || true
       systemctl start craftpanel || true
       if wait_healthy; then
+        ROLLED_BACK=true
         die "CraftPanel v$version did not start; the previous version${previous:+ (v$previous)} is running again." "See what went wrong: sudo journalctl -u craftpanel -n 80 --no-pager"
       fi
     fi
@@ -164,6 +225,42 @@ main() {
   rm -f "$INSTALL_DIR/apps.previous.release.json"
 
   print_summary "$version" "$previous"
+}
+
+# Lets the dashboard start updates without giving CraftPanel any extra rights: it may only create
+# a file in its own data folder; this root unit then runs update.sh, which verifies the release.
+install_update_units() {
+  install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 750 "$UPDATE_DIR"
+  install -d -o root -g "$SERVICE_USER" -m 750 "$LOG_DIR"
+  cat >"$UPDATE_UNIT" <<EOF
+# Installed by the CraftPanel installer. Runs an update that was requested from the dashboard.
+[Unit]
+Description=CraftPanel update (requested from the dashboard)
+
+[Service]
+Type=oneshot
+ExecStart=$INSTALL_DIR/update.sh --from-dashboard
+Environment=NO_COLOR=1
+EnvironmentFile=-$ENV_FILE
+StandardOutput=truncate:$LOG_DIR/update.log
+StandardError=inherit
+TimeoutStartSec=30min
+EOF
+  cat >"$UPDATE_PATH_UNIT" <<EOF
+# Installed by the CraftPanel installer. Starts craftpanel-update.service when the dashboard asks for an update.
+[Unit]
+Description=Watch for CraftPanel update requests
+
+[Path]
+PathExists=$UPDATE_DIR/requested
+Unit=craftpanel-update.service
+
+[Install]
+WantedBy=paths.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --quiet craftpanel-update.path
+  systemctl start craftpanel-update.path
 }
 
 verify_checksum() {
@@ -269,14 +366,27 @@ wait_healthy() {
   [[ -n $(env_value CRAFTPANEL_TLS_CERT) ]] && scheme=https
   host=$(env_value CRAFTPANEL_HOST)
   [[ -z $host || $host == 0.0.0.0 || $host == :: ]] && host=127.0.0.1
+  # systemd keeps counting restarts across starts; only restarts during this wait count.
+  local restarts
+  restarts=$(systemctl show craftpanel -p NRestarts --value 2>/dev/null || echo 0)
   for _ in $(seq 1 60); do
     curl -fsk -o /dev/null --max-time 2 "$scheme://$host:$port/api/health" && return 0
     # Crash loop: systemd keeps restarting it (Restart=on-failure), so don't wait the full minute.
     systemctl is-failed --quiet craftpanel && return 1
-    (($(systemctl show craftpanel -p NRestarts --value 2>/dev/null || echo 0) >= 2)) && return 1
+    (($(systemctl show craftpanel -p NRestarts --value 2>/dev/null || echo 0) - ${restarts:-0} >= 2)) && return 1
     sleep 1
   done
   return 1
+}
+
+# The release notes of the installed version, from its CHANGELOG.md.
+print_whats_new() {
+  local notes
+  notes=$(awk -v v="$1" '/^## / { if (found) exit; split(substr($0, 4), w, " "); if (w[1] == v) { found = 1; next } } found' "$INSTALL_DIR/CHANGELOG.md" 2>/dev/null | sed '/^[[:space:]]*$/d' | head -20)
+  [[ -n $notes ]] || return 0
+  echo
+  echo "  ${B}What's new${N}"
+  sed 's/^### \(.*\)/  \1/; s/^- /    • /' <<<"$notes"
 }
 
 print_summary() {
@@ -287,6 +397,7 @@ print_summary() {
   if [[ -n $previous && $previous != "$version" ]]; then
     echo "${G}✔${N} ${B}CraftPanel updated: v$previous → v$version${N}"
     info "Running Minecraft servers were stopped gracefully; servers with \"Start with CraftPanel\" are back up."
+    print_whats_new "$version"
   elif [[ -n $previous ]]; then
     echo "${G}✔${N} ${B}CraftPanel v$version reinstalled${N}"
   else
@@ -321,7 +432,8 @@ do_uninstall() {
   if systemctl list-unit-files craftpanel.service >/dev/null 2>&1; then
     systemctl disable --now craftpanel 2>/dev/null || true
   fi
-  rm -f "$UNIT_FILE"
+  systemctl disable --now craftpanel-update.path 2>/dev/null || true
+  rm -f "$UNIT_FILE" "$UPDATE_UNIT" "$UPDATE_PATH_UNIT"
   systemctl daemon-reload
   rm -rf "$INSTALL_DIR"
   echo "${G}✔${N} CraftPanel was removed. Your data was kept:"

@@ -176,6 +176,22 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
     requirePermission(req, "app.configure");
     return ctx.updates.status(req.query.refresh === "1");
   });
+  /** One-click update: the installer's helper stops CraftPanel (servers save and stop), installs and starts the new version. */
+  app.post("/api/updates/install", async (req, reply) => {
+    requirePermission(req, "app.configure");
+    const progress = await ctx.updates.startInstall();
+    await ctx.activity.event(null, "craftpanel.update_started", `Updating CraftPanel from ${CRAFTPANEL_VERSION} to ${progress.target}`, { actor: actorOf(req) });
+    await ctx.activity.audit(actorOf(req), "craftpanel.update", null, { from: CRAFTPANEL_VERSION, to: progress.target });
+    return reply.code(202).send(progress);
+  });
+  app.get("/api/updates/progress", async (req) => {
+    requirePermission(req, "app.configure");
+    return ctx.updates.progress();
+  });
+  app.get("/api/updates/whats-new", async (req) => {
+    requireUser(req);
+    return ctx.updates.whatsNew();
+  });
 
   // ---- application settings ----------------------------------------------------------
 

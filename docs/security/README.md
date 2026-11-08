@@ -39,6 +39,7 @@ CraftPanel administers processes and files on the host. Whoever controls an Owne
 **Supply chain**
 - Server software, Java and plugins are downloaded only over HTTPS from an allowlist of official hosts (Mojang, PaperMC, Adoptium/GitHub releases, Modrinth) and verified against published SHA-1/SHA-256/SHA-512 checksums.
 - No plugin or installer script is ever executed by CraftPanel. Plugins only run inside the Minecraft server, and the UI warns that they are executable code.
+- Updates from the dashboard don't give CraftPanel more rights. On Linux the unprivileged service can only create a request file in its own data folder; a root systemd path unit then runs the installed `update.sh`, which removes the file without following it, ignores its content, installs only a release newer than the installed one and verifies its SHA-256 checksum. The installer's log and result live in a root-owned folder that the service can read but not write. On Windows the dashboard can only start the "CraftPanel Update" scheduled task, which runs as the same user. Only Administrators and Owners can start an update; it is recorded in the audit log.
 
 **Privacy**
 - No telemetry and no third-party requests from the dashboard. Fonts are self-hosted and player avatars aren't fetched. External calls happen only for downloads, Modrinth searches, Mojang UUID lookups and, when you click it, the public-IP check.

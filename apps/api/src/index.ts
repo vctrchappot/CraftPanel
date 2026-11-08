@@ -58,6 +58,7 @@ async function main() {
   await ctx.backups.recover();
   await ctx.servers.recover();
   await ctx.schedules.boot();
+  await ctx.updates.recordStartup(async (kind, message, level) => void (await ctx.activity.event(null, kind, message, { level }))).catch(() => undefined);
   ctx.notifications.start();
   const housekeeping = setInterval(() => {
     void ctx.sessions.purgeExpired();
@@ -85,6 +86,7 @@ async function main() {
     clearInterval(housekeeping);
     ctx.schedules.stop();
     ctx.notifications.stop();
+    ctx.updates.stop();
     await ctx.agent.shutdown(60_000);
     await app.close();
     ctx.database.close();

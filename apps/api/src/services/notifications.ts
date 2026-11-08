@@ -14,6 +14,8 @@ const EVENT_CATEGORY: Record<string, NotificationCategory> = {
   "backup.failed": "backup",
   "schedule.error": "schedule",
   "ddns.failed": "schedule",
+  "craftpanel.updated": "update",
+  "craftpanel.update_failed": "update",
 };
 
 const TITLES: Record<string, string> = {
@@ -26,6 +28,8 @@ const TITLES: Record<string, string> = {
   "backup.failed": "Backup failed",
   "schedule.error": "Scheduled task failed",
   "ddns.failed": "Dynamic DNS update failed",
+  "craftpanel.updated": "CraftPanel updated",
+  "craftpanel.update_failed": "CraftPanel update failed",
 };
 
 export interface Notification {
@@ -84,7 +88,7 @@ export class NotificationService {
     const now = Date.now();
     if (now - (this.recent.get(key) ?? 0) < REPEAT_WINDOW_MS) return;
     this.recent.set(key, now);
-    await this.send({ title: TITLES[event.kind] ?? event.kind, message: event.message, level: event.level === "info" ? "warn" : event.level, server: serverName });
+    await this.send({ title: TITLES[event.kind] ?? event.kind, message: event.message, level: event.level === "info" && event.kind !== "craftpanel.updated" ? "warn" : event.level, server: serverName });
   }
 
   /** Periodically look for a new CraftPanel release and notify once per version. */

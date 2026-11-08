@@ -18,6 +18,8 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Signed-in devices: see and sign out your sessions; owners can sign a user out everywhere.
 - Per-server access: give users a role on single servers, or limit them to selected servers (e.g. a moderator for one server).
 - Settings → Software & version: switch between Paper, Purpur, Fabric and Vanilla in any direction, change the Minecraft version or build, with a preview of what will happen (backup, world upgrade, add-ons that stop loading). Downgrades need an explicit confirmation.
+- Update CraftPanel from the dashboard: "Update now" shows the release notes and which servers restart, follows the update through the restart and reloads into the new version, with "What's new" afterwards. Failed updates are rolled back and reported in the dashboard, the activity log and notifications. Works for installs made with `install.sh` (systemd) and `install.ps1`; run the installer once more to enable it.
+- `CRAFTPANEL_RELEASE_DIR`: update from a local folder of release archives instead of GitHub.
 - Notifications via Discord webhook and e-mail (SMTP) when a server crashes or fails to start, a backup or scheduled task fails, or a CraftPanel update is available; with a test button.
 
 ### Changed
@@ -30,6 +32,8 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Switching from Paper or Purpur (Minecraft 1.21 and older) to Vanilla or Fabric no longer loses the Nether and the End: their folders are moved back into the world.
 - The Worlds tab shows the Nether and the End for Minecraft 26.x worlds.
 - Dashboard links no longer request missing prefetch files (404s in the browser console); page changes are faster.
+- The Linux installer could report a failed update although the rollback had worked (systemd's restart counter from the broken version was counted again).
+- On Windows the dashboard could miss how CraftPanel was installed (`install.json` with a byte order mark), so it showed no update command.
 - Development mode (dashboard on its own port) rejected PUT/PATCH/DELETE requests because of the CORS defaults.
 - Invalid HTML nesting in the dashboard (a loading placeholder inside a paragraph) that caused hydration warnings, and a WebSocket warning in development.
 

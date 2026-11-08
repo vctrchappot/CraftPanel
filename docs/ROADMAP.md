@@ -24,6 +24,7 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 - [x] `deploy/install.sh` for Linux/Pi: verifies the release, private Node.js if needed, systemd service, settings file kept on updates, rollback if the new version doesn't start. Re-running (or `/opt/craftpanel/update.sh`) updates.
 - [x] `deploy/install.ps1` for Windows: per-user install, scheduled task at sign-in, graceful stop via a local control channel, rollback.
 - [x] Update notice in the dashboard (GitHub latest release, opt-out; shows the update command for the install method).
+- [x] One-click update from the dashboard (systemd path unit / scheduled task run the installer; progress, reload, "What's new", rollback reported), local release folder for offline installs.
 - [x] Version bump process: `package.json` is the single source, `node scripts/release.mjs bump X.Y.Z` dates the changelog, commits and tags.
 - [ ] Publish the first release and run the real `curl | sudo bash` / `irm | iex` path against it (also on a physical Pi).
 - [ ] macOS: a LaunchAgent installer (today: run the release archive with Node.js by hand).

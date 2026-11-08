@@ -126,7 +126,16 @@ Then set `CRAFTPANEL_SECURE_COOKIES=true` and `CRAFTPANEL_TRUST_PROXY=true`. Web
 
 ## Updating CraftPanel
 
-Installed with a one-line installer: run it again (see above). The dashboard shows a notice with the right command when a new release is out; it only reads the latest release from the GitHub API and can be turned off in Settings or with `CRAFTPANEL_UPDATE_CHECK=false`.
+Installed with a one-line installer: click **Update now** in the dashboard (sidebar notice or Settings → Security & about), or run the installer again (see above). The dashboard shows the release notes and which running servers will restart, follows the installer through the restart and reloads into the new version; a failed update is rolled back and reported in the dashboard, the activity log and notifications.
+
+How the button works without giving CraftPanel more rights:
+
+- **Linux:** CraftPanel can only create `/var/lib/craftpanel/update/requested`. The root unit `craftpanel-update.path` sees it and starts `craftpanel-update.service`, which runs `/opt/craftpanel/update.sh --from-dashboard`. That mode ignores the file's content, installs only a release newer than the installed one, verifies its checksum as usual and writes its output to `/var/log/craftpanel/update.log` and the outcome to `update-result.json` next to it.
+- **Windows:** the installer registers a second scheduled task, "CraftPanel Update", without a trigger. The dashboard starts it; it runs `update.ps1 --from-dashboard` outside CraftPanel's own task and logs to `logs\update.log` in the data folder.
+
+The update check only reads the latest release from the GitHub API and can be turned off in Settings or with `CRAFTPANEL_UPDATE_CHECK=false`.
+
+**Without access to GitHub** (offline networks, your own mirror): put `craftpanel-vX.Y.Z.tar.gz` and its `SHA256SUMS` into a folder and set `CRAFTPANEL_RELEASE_DIR=/that/folder` in `/etc/craftpanel/craftpanel.env` (Windows: `config.env` in the install folder). The dashboard then offers the newest archive in that folder, with its own changelog as release notes, and both installers install from it.
 
 Git checkout, from the CraftPanel folder:
 

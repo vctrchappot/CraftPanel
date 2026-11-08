@@ -41,6 +41,10 @@ export interface AppSettings {
   notifyEvents: NotificationCategory[];
   /** Last CraftPanel version an update notification was sent for. */
   notifyLastUpdate: string | null;
+  /** Version that ran last time, to notice updates done by any method. */
+  lastRunVersion: string | null;
+  /** finishedAt of the last installer result already reported. */
+  lastUpdateResultAt: number | null;
 }
 
 const DEFAULTS: AppSettings = {
@@ -59,6 +63,8 @@ const DEFAULTS: AppSettings = {
   notifyEmail: { enabled: false, host: "", port: 587, security: "starttls", username: "", password: "", from: "", to: "" },
   notifyEvents: [...NOTIFICATION_CATEGORIES],
   notifyLastUpdate: null,
+  lastRunVersion: null,
+  lastUpdateResultAt: null,
 };
 
 export class SettingsService {

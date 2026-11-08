@@ -13,8 +13,16 @@
 #   CRAFTPANEL_PORT             dashboard port (default 8080)
 #   CRAFTPANEL_PROFILE          lan (default: reachable from your network) or local (this computer only)
 #   CRAFTPANEL_UNINSTALL=1      remove CraftPanel, keep all data
+#   CRAFTPANEL_RELEASE_DIR      install the newest craftpanel-vX.Y.Z.tar.gz from this folder (with its SHA256SUMS);
+#                               can also be set in config.env for computers without access to GitHub
+#
+# Updates can also be started from the dashboard (Settings > Updates): CraftPanel runs the scheduled
+# task "CraftPanel Update", which runs update.ps1 --from-dashboard and installs the newest release.
 #
 # Minecraft servers, worlds, backups and accounts live in %LOCALAPPDATA%\CraftPanel and are never touched.
+
+$FromDashboard = $args -contains "--from-dashboard"
+$Result = @{ from = $null; to = $null; rolledBack = $false }
 
 function Install-CraftPanel {
   $ErrorActionPreference = "Stop"
@@ -27,7 +35,17 @@ function Install-CraftPanel {
   $Root = if ($env:CRAFTPANEL_INSTALL_DIR) { $env:CRAFTPANEL_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "Programs\CraftPanel" }
   $DataDir = if ($env:CRAFTPANEL_DATA_DIR) { $env:CRAFTPANEL_DATA_DIR } else { Join-Path $env:LOCALAPPDATA "CraftPanel" }
   $TaskName = if ($env:CRAFTPANEL_TASK_NAME) { $env:CRAFTPANEL_TASK_NAME } else { "CraftPanel" }
+  if ($FromDashboard) {
+    # Started by the update task: this script is update.ps1 in the install folder; everything else comes from there.
+    $Root = $PSScriptRoot
+    $installed = Get-Content (Join-Path $Root "install.json") -Raw | ConvertFrom-Json
+    if ($installed.taskName) { $TaskName = $installed.taskName }
+    if ($installed.dataDir) { $DataDir = $installed.dataDir }
+    foreach ($name in "CRAFTPANEL_INSTALL_VERSION", "CRAFTPANEL_ARCHIVE", "CRAFTPANEL_PORT", "CRAFTPANEL_PROFILE", "CRAFTPANEL_UNINSTALL") { Remove-Item "env:$name" -ErrorAction SilentlyContinue }
+  }
   $ConfigFile = Join-Path $Root "config.env"
+  $UpdateTask = "$TaskName Update"
+  $LogDir = Join-Path $DataDir "logs"
   $Shortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "$TaskName.url"
   $Tar = Join-Path $env:SystemRoot "System32\tar.exe"
 
@@ -141,6 +159,40 @@ exit `$p.ExitCode
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description "CraftPanel Minecraft server manager (starts when you sign in)" -Force | Out-Null
   }
 
+  # No trigger: CraftPanel starts it when you click "Update now" in the dashboard. It runs outside
+  # CraftPanel's own task, so it keeps going while CraftPanel stops and restarts.
+  function Register-UpdateTask {
+    $script = Join-Path $Root "update.ps1"
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`" --from-dashboard" -WorkingDirectory $Root
+    $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
+    $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
+    Register-ScheduledTask -TaskName $UpdateTask -Action $action -Settings $settings -Principal $principal -Description "Installs a CraftPanel update requested from the dashboard" -Force | Out-Null
+  }
+
+  # The release notes of the installed version, from its CHANGELOG.md.
+  function Show-WhatsNew($version) {
+    $changelog = Join-Path $Root "CHANGELOG.md"
+    if (-not (Test-Path $changelog)) { return }
+    $lines = @(); $found = $false
+    foreach ($line in Get-Content -Encoding UTF8 $changelog) {
+      if ($line -match '^## (\S+)') { if ($found) { break }; $found = $Matches[1] -eq $version; continue }
+      if ($found -and $line.Trim()) { $lines += $line }
+    }
+    if (-not $lines) { return }
+    Write-Host ""
+    Write-Host "  What's new" -ForegroundColor White
+    foreach ($line in $lines | Select-Object -First 20) { Write-Host ("  " + ($line -replace '^### ', '' -replace '^- ', '  * ')) }
+  }
+
+  # The newest release archive in a folder (CRAFTPANEL_RELEASE_DIR).
+  function Get-NewestArchive($dir) {
+    Get-ChildItem -Path $dir -Filter "craftpanel-v*.tar.gz" -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -match '^craftpanel-v(\d+\.\d+\.\d+)\.tar\.gz$' } |
+      Sort-Object { [version]($_.Name -replace '^craftpanel-v(\d+\.\d+\.\d+)\.tar\.gz$', '$1') } -Descending |
+      Select-Object -First 1
+  }
+
   function Wait-Healthy($port) {
     for ($i = 0; $i -lt 60; $i++) {
       if (Test-Healthy $port) { return $true }
@@ -156,6 +208,7 @@ exit `$p.ExitCode
     Step "Removing CraftPanel..."
     Stop-CraftPanel
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $UpdateTask -Confirm:$false -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force $Root -ErrorAction SilentlyContinue
     Remove-Item -Force $Shortcut -ErrorAction SilentlyContinue
     Write-Host "CraftPanel was removed. Your servers, worlds, backups and accounts were kept in $DataDir." -ForegroundColor Green
@@ -166,7 +219,16 @@ exit `$p.ExitCode
   $Tmp = Join-Path ([IO.Path]::GetTempPath()) ("craftpanel-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
   New-Item -ItemType Directory $Tmp | Out-Null
   try {
+    if ($FromDashboard) { Write-Host "Update requested from the dashboard on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" }
     # ---- get the release -------------------------------------------------------------------
+    $releaseDir = if ($env:CRAFTPANEL_RELEASE_DIR) { $env:CRAFTPANEL_RELEASE_DIR } else { (Read-Config)["CRAFTPANEL_RELEASE_DIR"] }
+    if (-not $env:CRAFTPANEL_ARCHIVE -and -not $env:CRAFTPANEL_INSTALL_VERSION -and $releaseDir) {
+      Step "Looking for the newest release in $releaseDir..."
+      $newest = Get-NewestArchive $releaseDir
+      if (-not $newest) { Fail "No craftpanel-vX.Y.Z.tar.gz in $releaseDir." }
+      if (-not (Test-Path (Join-Path $releaseDir "SHA256SUMS"))) { Fail "$releaseDir has no SHA256SUMS." "Copy the SHA256SUMS file of the release next to the archive." }
+      $env:CRAFTPANEL_ARCHIVE = $newest.FullName
+    }
     if ($env:CRAFTPANEL_ARCHIVE) {
       if (-not (Test-Path $env:CRAFTPANEL_ARCHIVE)) { Fail "Archive not found: $env:CRAFTPANEL_ARCHIVE" }
       $archive = Join-Path $Tmp (Split-Path $env:CRAFTPANEL_ARCHIVE -Leaf)
@@ -213,6 +275,8 @@ exit `$p.ExitCode
     $previous = $null
     $releaseFile = Join-Path $Root "release.json"
     if (Test-Path $releaseFile) { $previous = (Get-Content $releaseFile -Raw | ConvertFrom-Json).version }
+    $Result.from = $previous; $Result.to = $version
+    if ($FromDashboard -and $previous -and [version]($version -replace '-.*$', '') -le [version]($previous -replace '-.*$', '')) { Fail "CraftPanel v$previous is already the newest version." }
 
     # ---- Node.js -------------------------------------------------------------------------------
     Step "Checking Node.js..."
@@ -253,9 +317,14 @@ exit `$p.ExitCode
     foreach ($f in "README.md", "LICENSE", "CHANGELOG.md", "release.json") { Copy-Item -Force (Join-Path $src $f) (Join-Path $Root $f) }
     Copy-Item -Force (Join-Path $src "deploy\install.ps1") (Join-Path $Root "update.ps1")
     $update = "powershell -ExecutionPolicy Bypass -File `"$(Join-Path $Root 'update.ps1')`""
-    @{ method = "windows"; updateCommand = $update } | ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $Root "install.json")
+    @{
+      method = "windows"; updateCommand = $update; taskName = $TaskName; dataDir = $DataDir
+      selfUpdate = @{ kind = "task"; task = $UpdateTask; log = (Join-Path $LogDir "update.log"); result = (Join-Path $LogDir "update-result.json") }
+    } | ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $Root "install.json")
     Write-StartScript $node
     Register-Task
+    # Re-registering the task that runs this very script could stop it; it already exists then.
+    if (-not $FromDashboard) { Register-UpdateTask }
     $port = Get-Port
     "[InternetShortcut]`r`nURL=http://localhost:$port/`r`n" | Set-Content -Encoding ASCII $Shortcut
 
@@ -273,7 +342,7 @@ exit `$p.ExitCode
         $prevRelease = Join-Path $Root "apps.previous.release.json"
         if (Test-Path $prevRelease) { Move-Item -Force $prevRelease $releaseFile }
         Start-ScheduledTask -TaskName $TaskName
-        if (Wait-Healthy $port) { Fail "CraftPanel v$version did not start; the previous version$(if ($previous) { " (v$previous)" }) is running again." "See what went wrong in $log" }
+        if (Wait-Healthy $port) { $Result.rolledBack = $true; Fail "CraftPanel v$version did not start; the previous version$(if ($previous) { " (v$previous)" }) is running again." "See what went wrong in $log" }
       }
       Fail "CraftPanel did not start." "See what happened in $log"
     }
@@ -281,7 +350,7 @@ exit `$p.ExitCode
 
     # ---- summary -----------------------------------------------------------------------------
     Write-Host ""
-    if ($previous -and $previous -ne $version) { Write-Host "CraftPanel updated: v$previous -> v$version" -ForegroundColor Green }
+    if ($previous -and $previous -ne $version) { Write-Host "CraftPanel updated: v$previous -> v$version" -ForegroundColor Green; Show-WhatsNew $version }
     elseif ($previous) { Write-Host "CraftPanel v$version reinstalled" -ForegroundColor Green }
     else { Write-Host "CraftPanel v$version is installed and running" -ForegroundColor Green }
     Write-Host ""
@@ -303,11 +372,30 @@ exit `$p.ExitCode
   }
 }
 
+# An update started from the dashboard logs to a file the dashboard reads and leaves a result it shows after the restart.
+$dashboard = $null
+if ($FromDashboard) {
+  $dashboard = (Get-Content (Join-Path $PSScriptRoot "install.json") -Raw | ConvertFrom-Json).selfUpdate
+  New-Item -ItemType Directory -Force (Split-Path $dashboard.log) | Out-Null
+  Start-Transcript -Path $dashboard.log -Force | Out-Null
+}
+$ok = $false
+$message = ""
 try {
   Install-CraftPanel
+  $ok = $true
 } catch {
+  $message = $_.Exception.Message
   Write-Host ""
-  Write-Host "X $($_.Exception.Message)" -ForegroundColor Red
-  # Piped into iex there is no script file: don't close the user's PowerShell window.
-  if ($PSCommandPath) { exit 1 }
+  Write-Host "X $message" -ForegroundColor Red
+} finally {
+  if ($dashboard) {
+    Stop-Transcript | Out-Null
+    $summary = if ($ok) { "Updated$(if ($Result.from) { " from $($Result.from)" }) to $($Result.to)" } else { $message -replace "\s*`n\s*", " " }
+    $json = @{ ok = $ok; from = $Result.from; to = $Result.to; message = $summary; rolledBack = $Result.rolledBack; finishedAt = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() } | ConvertTo-Json -Compress
+    [IO.File]::WriteAllText("$($dashboard.result).tmp", $json)
+    Move-Item -Force "$($dashboard.result).tmp" $dashboard.result
+  }
 }
+# Piped into iex there is no script file: don't close the user's PowerShell window.
+if (-not $ok -and $PSCommandPath) { exit 1 }
