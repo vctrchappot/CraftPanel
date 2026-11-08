@@ -14,15 +14,15 @@ export interface AgentEvents {
 }
 
 /**
- * Contract between the Control API and a runtime agent. Today the only
- * implementation is in-process (`LocalAgent`); a remote agent would expose
- * the same operations over an authenticated RPC channel.
+ * Contract between orchestration and process ownership. Mutations acknowledge
+ * acceptance asynchronously; reads describe the most recent runtime snapshot.
+ * A disconnected implementation must reject mutations and unsafe liveness checks.
  */
 export interface RuntimeAgent extends EventEmitter<AgentEvents> {
-  start(serverId: string, spec: LaunchSpec & { software: ServerSoftware }): void;
+  start(serverId: string, spec: LaunchSpec & { software: ServerSoftware }): Promise<void>;
   stop(serverId: string, timeoutMs?: number): Promise<boolean>;
-  kill(serverId: string): void;
-  send(serverId: string, command: string): void;
+  kill(serverId: string): Promise<void>;
+  send(serverId: string, command: string): Promise<void>;
   query(serverId: string, command: string, pattern: RegExp, opts?: { timeoutMs?: number; swallow?: RegExp }): Promise<RegExpExecArray | null>;
   status(serverId: string): ServerStatus;
   info(serverId: string): { pid: number | null; startedAt: number | null; readyAt: number | null; players: OnlinePlayer[]; lastError: string | null; lastExitCode: number | null; maxPlayers: number | null };
@@ -32,8 +32,8 @@ export interface RuntimeAgent extends EventEmitter<AgentEvents> {
   isRunning(serverId: string): boolean;
   /** Check whether a PID recorded by a previous run is still a live Java process. */
   probeOrphan(pid: number): Promise<boolean>;
-  terminatePid(pid: number, force: boolean): boolean;
-  forget(serverId: string): void;
+  terminatePid(pid: number, force: boolean): Promise<boolean>;
+  forget(serverId: string): Promise<void>;
   shutdown(timeoutMs?: number): Promise<void>;
 }
 
@@ -66,7 +66,7 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
     return s;
   }
 
-  start(id: string, spec: LaunchSpec & { software: ServerSoftware }) {
+  async start(id: string, spec: LaunchSpec & { software: ServerSoftware }) {
     this.software.set(id, spec.software);
     this.tickSupport.delete(id);
     this.get(id).start(spec);
@@ -74,10 +74,10 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
   stop(id: string, timeoutMs?: number) {
     return this.get(id).stop(timeoutMs);
   }
-  kill(id: string) {
+  async kill(id: string) {
     this.get(id).kill();
   }
-  send(id: string, command: string) {
+  async send(id: string, command: string) {
     this.get(id).send(command);
   }
   query(id: string, command: string, pattern: RegExp, opts?: { timeoutMs?: number; swallow?: RegExp }) {
@@ -197,7 +197,7 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
     return isJavaProcess(pid);
   }
 
-  terminatePid(pid: number, force: boolean): boolean {
+  async terminatePid(pid: number, force: boolean): Promise<boolean> {
     if (!isPidAlive(pid)) return false;
     try {
       // SIGTERM triggers Minecraft's shutdown hook (world save) on Unix.
@@ -209,7 +209,7 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
     }
   }
 
-  forget(id: string) {
+  async forget(id: string) {
     const s = this.servers.get(id);
     if (s?.isAlive) throw new Error("Cannot forget a running server");
     s?.removeAllListeners();

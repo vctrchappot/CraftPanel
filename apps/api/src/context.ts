@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { DatabaseHandle } from "@craftpanel/database";
-import type { LocalAgent } from "@craftpanel/server-runtime";
+import type { RuntimeAgent } from "@craftpanel/server-runtime";
 import type { JavaManager } from "@craftpanel/minecraft-providers";
 import { AppError, canAccess, canSeeServer, forbidden, isServerPermission, notFound, type Permission } from "@craftpanel/shared";
 import type { AppConfig } from "./config";
@@ -20,7 +20,7 @@ import type { NotificationService } from "./services/notifications";
 export interface AppContext {
   config: AppConfig;
   database: DatabaseHandle;
-  agent: LocalAgent;
+  agent: RuntimeAgent;
   hub: Hub;
   sessions: SessionStore;
   activity: ActivityService;

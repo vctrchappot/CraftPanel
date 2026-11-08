@@ -198,7 +198,7 @@ export class GameService {
     const cmd = commands[action];
     if (!cmd) throw badRequest("Unknown player action");
     if (live) {
-      this.servers.sendCommand(row.id, cmd);
+      await this.servers.sendCommand(row.id, cmd);
     } else {
       if (action === "kick") throw conflict("Players can only be kicked while the server is running");
       const lower = name.toLowerCase();
@@ -223,7 +223,7 @@ export class GameService {
 
   async ipBan(row: ServerRow, ip: string, reason: string | undefined, remove: boolean, actor: Actor) {
     this.requireGameServer(row);
-    if (this.servers.agent.isRunning(row.id)) this.servers.sendCommand(row.id, remove ? `pardon-ip ${ip}` : `ban-ip ${ip}${reason ? ` ${reason}` : ""}`);
+    if (this.servers.agent.isRunning(row.id)) await this.servers.sendCommand(row.id, remove ? `pardon-ip ${ip}` : `ban-ip ${ip}${reason ? ` ${reason}` : ""}`);
     else
       await this.editList<BanEntry>(row, "banned-ips.json", (l) =>
         remove ? l.filter((e) => e.ip !== ip) : l.some((e) => e.ip === ip) ? l : [...l, { ip, created: mcDate(), source: `CraftPanel (${actor.username})`, expires: "forever", reason: reason || "Banned by an operator." }],
@@ -234,7 +234,7 @@ export class GameService {
 
   async setWhitelistEnabled(row: ServerRow, enabled: boolean, actor: Actor) {
     this.requireGameServer(row);
-    if (this.servers.agent.isRunning(row.id)) this.servers.sendCommand(row.id, `whitelist ${enabled ? "on" : "off"}`);
+    if (this.servers.agent.isRunning(row.id)) await this.servers.sendCommand(row.id, `whitelist ${enabled ? "on" : "off"}`);
     const sb = this.servers.sandbox(row);
     const doc = PropertiesDocument.parse((await sb.readTextIfExists("server.properties")) ?? "");
     doc.set("white-list", String(enabled));

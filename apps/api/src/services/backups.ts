@@ -125,7 +125,7 @@ export class BackupService {
     } finally {
       if (live && this.servers.agent.isRunning(serverId)) {
         try {
-          this.servers.agent.send(serverId, "save-on");
+          await this.servers.agent.send(serverId, "save-on");
         } catch {
           /* stopped meanwhile */
         }

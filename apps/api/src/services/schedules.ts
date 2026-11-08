@@ -188,7 +188,7 @@ export class ScheduleService {
         if (!running()) return "SKIP:not running";
         const warn = payload.warnSeconds ?? 60;
         if (warn > 0) {
-          this.servers.sendCommand(sid, `say Server restarting in ${warn} seconds`);
+          await this.servers.sendCommand(sid, `say Server restarting in ${warn} seconds`);
           await new Promise((r) => setTimeout(r, warn * 1000));
         }
         await this.servers.restart(sid, SCHEDULER_ACTOR);
@@ -199,11 +199,11 @@ export class ScheduleService {
         return;
       case "announce":
         if (!running()) return "SKIP:not running";
-        this.servers.sendCommand(sid, `say ${payload.message}`);
+        await this.servers.sendCommand(sid, `say ${payload.message}`);
         return;
       case "command":
         if (!running()) return "SKIP:not running";
-        this.servers.sendCommand(sid, payload.command!);
+        await this.servers.sendCommand(sid, payload.command!);
         return;
       case "prune-backups": {
         const n = await this.backups.applyRetention(sid, payload.keep);

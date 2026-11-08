@@ -159,7 +159,7 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     requirePermission(req, "console.command");
     const { command } = parse(commandSchema, req.body);
     await row(req.params.id);
-    servers.sendCommand(req.params.id, command);
+    await servers.sendCommand(req.params.id, command);
     await ctx.activity.audit(actorOf(req), "console.command", req.params.id, { command });
     return noContent(reply);
   });

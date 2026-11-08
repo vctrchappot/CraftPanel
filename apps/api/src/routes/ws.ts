@@ -66,7 +66,7 @@ export async function wsRoutes(app: FastifyInstance, ctx: AppContext) {
             if (!canAccess(client.access, "console.command", msg.serverId)) return ctx.hub.send(client, { type: "error", message: "You do not have permission to run commands" });
             const parsed = commandSchema.safeParse({ command: msg.command });
             if (!parsed.success) return ctx.hub.send(client, { type: "error", message: parsed.error.issues[0].message });
-            ctx.servers.sendCommand(msg.serverId, parsed.data.command);
+            await ctx.servers.sendCommand(msg.serverId, parsed.data.command);
             await ctx.activity.audit({ id: client.userId, username: client.username, ip: req.ip }, "console.command", msg.serverId, { command: parsed.data.command });
             return;
           }
