@@ -7,6 +7,7 @@ import { detectSignal, parseLine, parseListCount, type LogSignal } from "./log-p
 export interface LaunchSpec {
   javaPath: string;
   directory: string;
+  /** A jar, or a Java argument file ("…_args.txt", NeoForge) that names the main class and classpath. */
   jarFile: string;
   memoryMb: number;
   jvmArgs: string[];
@@ -107,8 +108,7 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
       "-Dterminal.jline=false",
       "-Dterminal.ansi=false",
       ...spec.jvmArgs,
-      "-jar",
-      spec.jarFile,
+      ...launchTarget(spec.jarFile),
       ...(spec.programArgs ?? ["nogui"]),
     ];
 
@@ -364,4 +364,14 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
 
 function stripTrailing(s: string): string {
   return s.replace(/\s+$/, "");
+}
+
+/** `-jar file`, or `@file` for an argument file (NeoForge writes unix_args.txt and win_args.txt; pick this OS's). */
+export function launchTarget(jarFile: string, platform: NodeJS.Platform = process.platform): string[] {
+  if (!jarFile.endsWith("_args.txt")) return ["-jar", jarFile];
+  return ["@" + localArgsFile(jarFile, platform)];
+}
+
+export function localArgsFile(file: string, platform: NodeJS.Platform = process.platform): string {
+  return file.replace(/(unix|win)_args[.]txt$/, platform === "win32" ? "win_args.txt" : "unix_args.txt");
 }

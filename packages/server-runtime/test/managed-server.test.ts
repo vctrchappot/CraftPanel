@@ -3,7 +3,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ServerStatus } from "@craftpanel/shared";
-import { ManagedServer, type LaunchSpec } from "../src/managed-server";
+import { launchTarget, ManagedServer, type LaunchSpec } from "../src/managed-server";
 
 const fake = path.join(path.dirname(fileURLToPath(import.meta.url)), "fake-minecraft.mjs");
 const spec = (mode: string): LaunchSpec => ({
@@ -107,5 +107,13 @@ describe("ManagedServer lifecycle", () => {
     s.start(spec("normal"));
     await waitForStatus(s, "running");
     expect(() => s.send("say hi\nstop")).toThrow(/single line/);
+  });
+});
+
+describe("launchTarget", () => {
+  it("starts jars with -jar and NeoForge's argument file with @, per OS", () => {
+    expect(launchTarget("server.jar")).toEqual(["-jar", "server.jar"]);
+    expect(launchTarget("libraries/net/neoforged/neoforge/21.1.172/unix_args.txt", "linux")).toEqual(["@libraries/net/neoforged/neoforge/21.1.172/unix_args.txt"]);
+    expect(launchTarget("libraries/net/neoforged/neoforge/21.1.172/unix_args.txt", "win32")).toEqual(["@libraries/net/neoforged/neoforge/21.1.172/win_args.txt"]);
   });
 });

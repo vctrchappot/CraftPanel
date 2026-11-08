@@ -6,6 +6,7 @@ import { getVersionDetail, listVanillaVersions } from "./mojang";
 import { listPaperBuilds, listPaperVersions, paperJavaRequirement, resolvePaperBuild } from "./paper";
 import { getPurpurBuild, listPurpurBuildIds, listPurpurVersions, purpurDownloadUrl, resolvePurpurBuild } from "./purpur";
 import { fabricLauncherUrl, listFabricGameVersions, listFabricLoaders, resolveFabricLaunch } from "./fabric";
+import { argsFileForPlatform, installNeoForge, neoForgeBuilds, neoForgeGameVersions, resolveNeoForge } from "./neoforge";
 
 export interface ProviderVersion {
   id: string;
@@ -26,9 +27,9 @@ export interface InstallResult {
 export type ProgressFn = (stage: string, p: DownloadProgress | null) => void;
 
 /**
- * Adapter for one kind of server software. NeoForge and Bedrock Dedicated
- * Server would add implementations here; Bedrock additionally needs a
- * different runtime (native binary, UDP 19132, no Java).
+ * Adapter for one kind of server software. Bedrock Dedicated Server would add
+ * an implementation here; it additionally needs a different runtime (native
+ * binary, UDP 19132, no Java).
  */
 export interface ServerProvider {
   id: ServerSoftware;
@@ -38,7 +39,8 @@ export interface ServerProvider {
   listVersions(): Promise<ProviderVersion[]>;
   listBuilds(version: string): Promise<ProviderBuild[]>;
   javaRequirement(version: string): Promise<{ major: number; recommendedFlags: string[] }>;
-  install(opts: { directory: string; version: string; build?: string | null; onProgress?: ProgressFn; signal?: AbortSignal }): Promise<InstallResult>;
+  /** `javaPath` is a runtime that suits the version; installers that run Java (NeoForge) need it. */
+  install(opts: { directory: string; version: string; build?: string | null; javaPath?: string; onProgress?: ProgressFn; signal?: AbortSignal }): Promise<InstallResult>;
 }
 
 export const vanillaProvider: ServerProvider = {
@@ -177,7 +179,31 @@ export const fabricProvider: ServerProvider = {
   },
 };
 
-export const PROVIDERS: Record<ServerSoftware, ServerProvider> = { paper: paperProvider, purpur: purpurProvider, fabric: fabricProvider, vanilla: vanillaProvider };
+export const neoforgeProvider: ServerProvider = {
+  id: "neoforge",
+  label: "NeoForge",
+  description: "Mod loader for NeoForge mods and most large modpacks.",
+  supportsPlugins: false,
+  async listVersions() {
+    return (await neoForgeGameVersions()).map((id) => ({ id, stable: true }));
+  },
+  async listBuilds(version) {
+    return (await neoForgeBuilds(version)).slice(0, 30).map((b) => ({ id: b.version, channel: b.stable ? "STABLE" : "BETA", time: "", changes: [] }));
+  },
+  async javaRequirement(version) {
+    const d = await getVersionDetail(version);
+    return { major: d.javaMajor, recommendedFlags: [] };
+  },
+  async install({ directory, version, build, javaPath, onProgress, signal }) {
+    if (!javaPath) throw new Error("NeoForge needs Java to run its installer");
+    const neoforge = await resolveNeoForge(version, build);
+    const argsFile = await installNeoForge({ directory, version: neoforge, javaPath, onProgress, signal });
+    // The launch "jar" is the installer's argument file; its hash marks the installed version.
+    return { jarFile: argsFile, sha: await hashFile(path.join(directory, argsFileForPlatform(argsFile)), "sha256"), build: neoforge };
+  },
+};
+
+export const PROVIDERS: Record<ServerSoftware, ServerProvider> = { paper: paperProvider, purpur: purpurProvider, fabric: fabricProvider, neoforge: neoforgeProvider, vanilla: vanillaProvider };
 
 export function getProvider(id: string): ServerProvider {
   const p = PROVIDERS[id as ServerSoftware];

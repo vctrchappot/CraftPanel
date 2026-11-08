@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowUpCircle, Download, Puzzle, Search, ShieldAlert, Trash2, Upload, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Button, Callout, ConfirmDialog, Dialog, DialogContent, DialogFooter, DialogHeader, EmptyState, Input, Panel, Section, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@craftpanel/ui";
-import { SOFTWARE_INFO, type PluginInfo, type ServerDetail } from "@craftpanel/shared";
+import { SOFTWARE_INFO, softwareLabel, type PluginInfo, type ServerDetail } from "@craftpanel/shared";
 import { api, errorMessage, upload } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
@@ -22,10 +22,10 @@ interface MarketHit {
   compatible: boolean;
 }
 
-/** Wording for plugin servers (Paper, Purpur) and mod servers (Fabric). */
+/** Wording for plugin servers (Paper, Purpur) and mod servers (Fabric, NeoForge). */
 function addonTerms(s: ServerDetail) {
   return SOFTWARE_INFO[s.software].addons === "mods"
-    ? { one: "mod", many: "mods", One: "Mod", Many: "Mods", page: "mod", filter: "Fabric mods that run on a server" }
+    ? { one: "mod", many: "mods", One: "Mod", Many: "Mods", page: "mod", filter: `${softwareLabel(s.software)} mods that run on a server` }
     : { one: "plugin", many: "plugins", One: "Plugin", Many: "Plugins", page: "plugin", filter: `Paper/Bukkit plugins` };
 }
 
@@ -173,7 +173,7 @@ function Browse({ server: s }: { server: ServerDetail }) {
   return (
     <Section
       title="Modrinth"
-      description={`Results are filtered to ${t.filter}. Compatibility with Minecraft ${s.mcVersion} is checked against Modrinth's version metadata before installing.${t.one === "mod" ? " Most mods also need Fabric API." : ""}`}
+      description={`Results are filtered to ${t.filter}. Compatibility with Minecraft ${s.mcVersion} is checked against Modrinth's version metadata before installing.${s.software === "fabric" ? " Most mods also need Fabric API." : ""}`}
     >
       <div className="relative max-w-md">
         <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -275,7 +275,7 @@ function VanillaMigration({ server: s }: { server: ServerDetail }) {
       <EmptyState
         icon={<Puzzle />}
         title="Vanilla servers cannot load plugins or mods"
-        description="Plugins require Paper, a compatible server that keeps Vanilla gameplay while adding plugin support and performance improvements. For Fabric mods, create a Fabric server."
+        description="Plugins require Paper, a compatible server that keeps Vanilla gameplay while adding plugin support and performance improvements. For mods, create a Fabric or NeoForge server."
         action={
           canConfigure && (
             <Button onClick={() => setOpen(true)} disabled={!opts.data?.paperAvailable}>

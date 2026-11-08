@@ -8,8 +8,11 @@ export function stripAnsi(s: string): string {
   return s.replace(ANSI, "").replace(SECTION, "");
 }
 
-/** Strip the timestamp/thread prefix produced by vanilla and Paper loggers. */
-const PREFIX = /^\[(\d{2}:\d{2}:\d{2})(?:\s+(INFO|WARN|ERROR|DEBUG|FATAL|TRACE))?\]\s*(?:\[([^\]]*)\/(INFO|WARN|ERROR|DEBUG|FATAL|TRACE)\]\s*)?:\s?(.*)$/;
+/**
+ * Strip the timestamp/thread prefix produced by vanilla and Paper loggers. NeoForge adds a logger
+ * group ("[18:40:20] [Server thread/INFO] [minecraft/DedicatedServer]: …") and, in latest.log, a date.
+ */
+const PREFIX = /^\[(?:\d{2}\S{3,6}\d{4} )?(\d{2}:\d{2}:\d{2})(?:\.\d{3})?(?:\s+(INFO|WARN|ERROR|DEBUG|FATAL|TRACE))?\]\s*(?:\[([^\]]*)\/(INFO|WARN|ERROR|DEBUG|FATAL|TRACE)\]\s*)?(?:\[[^\]]*\]\s*)?:\s?(.*)$/;
 
 export interface ParsedLine {
   level: LogLevel;

@@ -79,7 +79,7 @@ export class PregenService {
   }
 
   async install(row: ServerRow, actor: Actor) {
-    if (!SOFTWARE_INFO[row.software].addons) throw conflict("Vanilla servers can't load Chunky. Switch to Paper, Purpur or Fabric first.");
+    if (!SOFTWARE_INFO[row.software].addons) throw conflict("Vanilla servers can't load Chunky. Switch to Paper, Purpur, Fabric or NeoForge first.");
     if (await this.chunky(row)) return;
     const res = await this.game.installFromModrinth(row, CHUNKY_PROJECT, undefined, actor);
     if (row.software === "fabric" && res.requiredDependencies.includes(FABRIC_API_PROJECT) && !(await this.game.plugins(row)).some((p) => /fabric api/i.test(p.name ?? ""))) {

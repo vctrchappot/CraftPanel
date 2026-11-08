@@ -30,6 +30,7 @@ const TRUSTED_HOSTS = [
   "fill-data.papermc.io",
   "api.purpurmc.org",
   "meta.fabricmc.net",
+  "maven.neoforged.net",
   "api.papermc.io",
   "api.adoptium.net",
   "github.com",

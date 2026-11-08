@@ -125,7 +125,7 @@ function Pregeneration({ server: s }: { server: ServerDetail }) {
         <Skeleton className="h-28 rounded-xl" />
       ) : !d.supported ? (
         <Callout icon={<Info />} title={`${SOFTWARE_INFO[s.software].label} can't pre-generate`}>
-          Pre-generation uses the Chunky plugin, which needs Paper, Purpur or Fabric. You can switch in Settings → Software &amp; version; your world is kept.
+          Pre-generation uses Chunky, which needs Paper, Purpur, Fabric or NeoForge. You can switch in Settings → Software &amp; version; your world is kept.
         </Callout>
       ) : !d.installed ? (
         <Panel className="flex flex-wrap items-center justify-between gap-4 p-5">

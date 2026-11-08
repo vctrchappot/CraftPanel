@@ -111,18 +111,101 @@ export async function inspectModJar(file: string): Promise<AddonMeta> {
   };
 }
 
+/** Dependencies every NeoForge server provides itself. */
+const NEOFORGE_BUILTINS = new Set(["minecraft", "neoforge", "forge", "java"]);
+
+/**
+ * Minimal reader for META-INF/neoforge.mods.toml: the [[mods]] entries (modId, displayName,
+ * version, authors, description) and [[dependencies.<id>]] entries (modId, type).
+ */
+export function parseModsToml(text: string): { mods: Record<string, string>[]; dependencies: Record<string, string>[] } {
+  const mods: Record<string, string>[] = [];
+  const dependencies: Record<string, string>[] = [];
+  let current: Record<string, string> | null = null;
+  const lines = text.replace(/\r/g, "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || line.startsWith("#")) continue;
+    const table = /^\[\[\s*([A-Za-z0-9_."-]+)\s*\]\]$/.exec(line);
+    if (table) {
+      current = {};
+      if (table[1] === "mods") mods.push(current);
+      else if (table[1].startsWith("dependencies")) dependencies.push(current);
+      else current = null;
+      continue;
+    }
+    if (line.startsWith("[")) {
+      current = null;
+      continue;
+    }
+    const kv = /^([A-Za-z0-9_-]+)\s*=\s*(.*)$/.exec(line);
+    if (!kv || !current) continue;
+    let value = kv[2];
+    if (value.startsWith("'''") || value.startsWith('"""')) {
+      // Multi-line string: collect until the closing quotes.
+      const q = value.slice(0, 3);
+      let body = value.slice(3);
+      while (!body.includes(q) && i + 1 < lines.length) body += " " + lines[++i].trim();
+      value = body.slice(0, body.indexOf(q));
+    } else {
+      const quoted = /^"((?:[^"\\]|\\.)*)"|^'([^']*)'/.exec(value);
+      value = quoted ? (quoted[1] ?? quoted[2] ?? "") : value.replace(/\s+#.*$/, "").trim();
+    }
+    current[kv[1]] = value.trim();
+  }
+  return { mods, dependencies };
+}
+
+/** Read a NeoForge mod's META-INF/neoforge.mods.toml. */
+export async function inspectNeoForgeModJar(file: string): Promise<AddonMeta> {
+  const st = await fsp.stat(file);
+  const buf = await fsp.readFile(file);
+  const sha1 = crypto.createHash("sha1").update(buf).digest("hex");
+  let toml: ReturnType<typeof parseModsToml> = { mods: [], dependencies: [] };
+  try {
+    const text = await readZipEntry(file, "META-INF/neoforge.mods.toml");
+    if (text) toml = parseModsToml(text.toString("utf8"));
+  } catch {
+    /* not a NeoForge mod */
+  }
+  const main = toml.mods[0] ?? {};
+  const ids = toml.mods.map((m) => m.modId).filter(Boolean);
+  const base = path.basename(file);
+  const deps = toml.dependencies.filter((d) => d.modId && !NEOFORGE_BUILTINS.has(d.modId) && !ids.includes(d.modId));
+  const required = (d: Record<string, string>) => (d.type ? d.type.toLowerCase() === "required" : d.mandatory === "true");
+  return {
+    file: base,
+    enabled: base.endsWith(".jar"),
+    name: main.displayName ?? main.modId ?? null,
+    // "${file.jarVersion}" is filled in from the manifest at runtime; it means nothing here.
+    version: main.version && !main.version.includes("${") ? main.version : null,
+    description: main.description ?? null,
+    authors: main.authors ? main.authors.split(/,\s*/).filter(Boolean) : [],
+    apiVersion: null,
+    depend: [...new Set(deps.filter(required).map((d) => d.modId))],
+    softDepend: [...new Set(deps.filter((d) => !required(d)).map((d) => d.modId))],
+    main: main.modId ?? null,
+    provides: ids,
+    size: st.size,
+    sha1,
+  };
+}
+
+/** Modrinth loader of a server's mods. */
+export type ModLoader = "fabric" | "neoforge";
+
 /**
  * List plugins or mods (enabled *.jar and disabled *.jar.disabled) and resolve
  * dependencies. Plugins depend on plugin names, mods on mod ids.
  */
-export async function listPlugins(dir: string, kind: AddonKind = "plugins"): Promise<PluginInfo[]> {
+export async function listPlugins(dir: string, kind: AddonKind = "plugins", loader: ModLoader = "fabric"): Promise<PluginInfo[]> {
   let files: string[] = [];
   try {
     files = (await fsp.readdir(dir)).filter((f) => f.endsWith(".jar") || f.endsWith(".jar.disabled"));
   } catch {
     return [];
   }
-  const inspect = kind === "mods" ? inspectModJar : inspectPluginJar;
+  const inspect = kind === "plugins" ? inspectPluginJar : loader === "neoforge" ? inspectNeoForgeModJar : inspectModJar;
   const infos = await Promise.all(files.map((f) => inspect(path.join(dir, f))));
   const available = new Set(
     infos
@@ -131,7 +214,7 @@ export async function listPlugins(dir: string, kind: AddonKind = "plugins"): Pro
       .map((n) => n.toLowerCase()),
   );
   // Fabric API bundles its modules (fabric-networking-api-v1, …) as nested jars.
-  const fabricApi = kind === "mods" && available.has("fabric-api");
+  const fabricApi = kind === "mods" && loader === "fabric" && available.has("fabric-api");
   const satisfied = (d: string) => available.has(d.toLowerCase()) || (fabricApi && (d === "fabric" || d.startsWith("fabric-")));
   return infos
     .map(({ provides: _, ...p }) => ({ ...p, missingDependencies: p.depend.filter((d) => !satisfied(d)) }))
@@ -155,14 +238,14 @@ export interface MarketplaceProject {
 }
 
 /** Modrinth loaders whose files a server of this kind can load. */
-const LOADERS: Record<AddonKind, string[]> = { plugins: ["paper", "spigot", "bukkit", "purpur", "folia"], mods: ["fabric"] };
+const LOADERS = (kind: AddonKind, loader: ModLoader) => (kind === "plugins" ? ["paper", "spigot", "bukkit", "purpur", "folia"] : [loader]);
 /** Loaders to ask Modrinth for. */
-const QUERY_LOADERS: Record<AddonKind, string[]> = { plugins: ["paper", "spigot", "bukkit"], mods: ["fabric"] };
+const QUERY_LOADERS = (kind: AddonKind, loader: ModLoader) => (kind === "plugins" ? ["paper", "spigot", "bukkit"] : [loader]);
 
-export async function searchModrinthPlugins(query: string, mcVersion: string, offset = 0, kind: AddonKind = "plugins"): Promise<{ hits: MarketplaceProject[]; total: number }> {
+export async function searchModrinthPlugins(query: string, mcVersion: string, offset = 0, kind: AddonKind = "plugins", loader: ModLoader = "fabric"): Promise<{ hits: MarketplaceProject[]; total: number }> {
   const facets = JSON.stringify([
     [kind === "mods" ? "project_type:mod" : "project_type:plugin"],
-    QUERY_LOADERS[kind].map((l) => `categories:${l}`),
+    QUERY_LOADERS(kind, loader).map((l) => `categories:${l}`),
     ["server_side:required", "server_side:optional"],
   ]);
   const url = `${MODRINTH}/search?query=${encodeURIComponent(query)}&limit=20&offset=${offset}&index=${query ? "relevance" : "downloads"}&facets=${encodeURIComponent(facets)}`;
@@ -199,11 +282,11 @@ interface ModrinthVersion {
 }
 
 /** Versions of a project verified compatible with this Minecraft version and the server's loader. */
-export async function compatibleModrinthVersions(projectId: string, mcVersion: string, kind: AddonKind = "plugins"): Promise<ModrinthVersion[]> {
+export async function compatibleModrinthVersions(projectId: string, mcVersion: string, kind: AddonKind = "plugins", loader: ModLoader = "fabric"): Promise<ModrinthVersion[]> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(projectId)) throw new Error("Invalid project id");
-  const url = `${MODRINTH}/project/${projectId}/version?game_versions=${encodeURIComponent(JSON.stringify([mcVersion]))}&loaders=${encodeURIComponent(JSON.stringify(QUERY_LOADERS[kind]))}`;
+  const url = `${MODRINTH}/project/${projectId}/version?game_versions=${encodeURIComponent(JSON.stringify([mcVersion]))}&loaders=${encodeURIComponent(JSON.stringify(QUERY_LOADERS(kind, loader)))}`;
   const versions = await fetchJson<ModrinthVersion[]>(url);
-  return versions.filter((v) => v.game_versions.includes(mcVersion) && v.loaders.some((l) => LOADERS[kind].includes(l)));
+  return versions.filter((v) => v.game_versions.includes(mcVersion) && v.loaders.some((l) => LOADERS(kind, loader).includes(l)));
 }
 
 export async function installModrinthVersion(versionId: string, pluginsDir: string): Promise<{ file: string; requiredDependencies: string[] }> {
@@ -218,12 +301,12 @@ export async function installModrinthVersion(versionId: string, pluginsDir: stri
 }
 
 /** Ask Modrinth for a newer compatible version of an installed file (identified by SHA-1). */
-export async function checkModrinthUpdates(sha1s: string[], mcVersion: string, kind: AddonKind = "plugins"): Promise<Record<string, { versionId: string; versionNumber: string; projectId: string }>> {
+export async function checkModrinthUpdates(sha1s: string[], mcVersion: string, kind: AddonKind = "plugins", loader: ModLoader = "fabric"): Promise<Record<string, { versionId: string; versionNumber: string; projectId: string }>> {
   if (!sha1s.length) return {};
   const res = await fetch(`${MODRINTH}/version_files/update`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "User-Agent": USER_AGENT },
-    body: JSON.stringify({ hashes: sha1s, algorithm: "sha1", loaders: QUERY_LOADERS[kind], game_versions: [mcVersion] }),
+    body: JSON.stringify({ hashes: sha1s, algorithm: "sha1", loaders: QUERY_LOADERS(kind, loader), game_versions: [mcVersion] }),
     signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error(`Modrinth update check failed (HTTP ${res.status})`);

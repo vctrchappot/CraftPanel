@@ -8,5 +8,6 @@ export * from "./gamerules";
 export * from "./uuid";
 export * from "./purpur";
 export * from "./fabric";
+export * from "./neoforge";
 export * from "./log4shell";
 export * from "./modpack";

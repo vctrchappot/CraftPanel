@@ -37,7 +37,7 @@ export interface ModpackInfo {
   summary: string;
   mcVersion: string;
   software: ServerSoftware;
-  /** Fabric Loader version, null for vanilla packs. */
+  /** Fabric Loader or NeoForge version, null for vanilla packs. */
   loader: string | null;
   /** Files the server downloads (client-only ones are skipped). */
   serverFiles: number;
@@ -53,13 +53,14 @@ export function describeModpack(raw: unknown): { index: MrpackIndex; info: Modpa
   const deps = index.dependencies;
   const mcVersion = deps.minecraft;
   if (!mcVersion || !/^[A-Za-z0-9._+-]{1,64}$/.test(mcVersion)) throw new Error("The modpack does not name a Minecraft version");
-  const other = Object.keys(deps).filter((d) => d !== "minecraft" && d !== "fabric-loader");
+  const other = Object.keys(deps).filter((d) => d !== "minecraft" && d !== "fabric-loader" && d !== "neoforge");
   if (other.length) {
-    const names: Record<string, string> = { forge: "Forge", neoforge: "NeoForge", "quilt-loader": "Quilt" };
-    throw new Error(`This modpack needs ${other.map((d) => names[d] ?? d).join(", ")}, which CraftPanel does not support yet. Fabric and vanilla packs work.`);
+    const names: Record<string, string> = { forge: "Forge", "quilt-loader": "Quilt" };
+    throw new Error(`This modpack needs ${other.map((d) => names[d] ?? d).join(", ")}, which CraftPanel does not support yet. Fabric, NeoForge and vanilla packs work.`);
   }
-  const loader = deps["fabric-loader"] ?? null;
-  if (loader && !/^[A-Za-z0-9._+-]{1,64}$/.test(loader)) throw new Error("Invalid Fabric Loader version in the modpack");
+  if (deps["fabric-loader"] && deps.neoforge) throw new Error("The modpack asks for both Fabric and NeoForge");
+  const loader = deps["fabric-loader"] ?? deps.neoforge ?? null;
+  if (loader && !/^[A-Za-z0-9._+-]{1,64}$/.test(loader)) throw new Error("Invalid loader version in the modpack");
   if (index.files.length > MAX_PACK_FILES) throw new Error(`The modpack lists too many files (${index.files.length})`);
   const server = index.files.filter((f) => f.env?.server !== "unsupported");
   for (const f of server) checkPackFile(f);
@@ -72,7 +73,7 @@ export function describeModpack(raw: unknown): { index: MrpackIndex; info: Modpa
       version: String(index.versionId ?? "").slice(0, 64),
       summary: String(index.summary ?? "").slice(0, 500),
       mcVersion,
-      software: loader ? "fabric" : "vanilla",
+      software: deps.neoforge ? "neoforge" : loader ? "fabric" : "vanilla",
       loader,
       serverFiles: server.length,
       clientOnlyFiles: index.files.length - server.length,
@@ -197,9 +198,9 @@ export interface ModpackVersion {
   sha512: string;
 }
 
-/** Fabric (and vanilla) modpacks on Modrinth that can run on a server. */
+/** Fabric and NeoForge modpacks on Modrinth that can run on a server. */
 export async function searchModpacks(query: string, offset = 0): Promise<{ hits: ModpackProject[]; total: number }> {
-  const facets = JSON.stringify([["project_type:modpack"], ["categories:fabric"], ["server_side:required", "server_side:optional"]]);
+  const facets = JSON.stringify([["project_type:modpack"], ["categories:fabric", "categories:neoforge"], ["server_side:required", "server_side:optional"]]);
   const url = `${MODRINTH}/search?query=${encodeURIComponent(query)}&limit=20&offset=${Math.max(0, Math.floor(offset))}&index=${query ? "relevance" : "downloads"}&facets=${encodeURIComponent(facets)}`;
   const d = await fetchJson<{ hits: { project_id: string; slug: string; title: string; description: string; author: string; downloads: number; icon_url: string | null; versions: string[] }[]; total_hits: number }>(url);
   return {
@@ -225,10 +226,10 @@ function toModpackVersion(v: RawVersion): ModpackVersion | null {
   return { projectId: v.project_id, id: v.id, name: v.name, versionNumber: v.version_number, mcVersions: v.game_versions, loaders: v.loaders, published: v.date_published, fileUrl: file.url, fileSize: file.size, sha512: file.hashes.sha512 };
 }
 
-/** Fabric versions of a modpack, newest first. */
+/** Fabric and NeoForge versions of a modpack, newest first. */
 export async function listModpackVersions(projectId: string): Promise<ModpackVersion[]> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(projectId)) throw new Error("Invalid project id");
-  const versions = await fetchJson<RawVersion[]>(`${MODRINTH}/project/${projectId}/version?loaders=${encodeURIComponent(JSON.stringify(["fabric"]))}`);
+  const versions = await fetchJson<RawVersion[]>(`${MODRINTH}/project/${projectId}/version?loaders=${encodeURIComponent(JSON.stringify(["fabric", "neoforge"]))}`);
   return versions.map(toModpackVersion).filter((v): v is ModpackVersion => !!v);
 }
 

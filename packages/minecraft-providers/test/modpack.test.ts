@@ -26,9 +26,12 @@ describe("describeModpack", () => {
   it("treats a pack without a loader as vanilla", () => {
     expect(describeModpack(pack({ files: [], dependencies: { minecraft: "1.21.11" } })).info).toMatchObject({ software: "vanilla", loader: null });
   });
+  it("runs NeoForge packs on NeoForge", () => {
+    expect(describeModpack(pack({ dependencies: { minecraft: "1.21.1", neoforge: "21.1.172" } })).info).toMatchObject({ software: "neoforge", loader: "21.1.172", mcVersion: "1.21.1" });
+    expect(() => describeModpack(pack({ dependencies: { minecraft: "1.21.1", neoforge: "21.1.172", "fabric-loader": "0.16.0" } }))).toThrow(/both/);
+  });
   it("names loaders CraftPanel can't run", () => {
-    expect(() => describeModpack(pack({ dependencies: { minecraft: "1.20.1", forge: "47.2.0" } }))).toThrow(/Forge/);
-    expect(() => describeModpack(pack({ dependencies: { minecraft: "1.21.1", neoforge: "21.1.1" } }))).toThrow(/NeoForge/);
+    expect(() => describeModpack(pack({ dependencies: { minecraft: "1.20.1", forge: "47.2.0" } }))).toThrow(/needs Forge/);
     expect(() => describeModpack(pack({ dependencies: { minecraft: "1.21.1", "quilt-loader": "0.26" } }))).toThrow(/Quilt/);
   });
   it("rejects files outside the usual folders or with traversal", () => {

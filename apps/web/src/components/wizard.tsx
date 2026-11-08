@@ -4,9 +4,9 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Boxes, Check, ChevronLeft, ChevronRight, Coffee, Feather, Globe, Home, Info, Package, Puzzle, ShieldCheck, Zap } from "lucide-react";
+import { AlertTriangle, Boxes, Check, Hammer, ChevronLeft, ChevronRight, Coffee, Feather, Globe, Home, Info, Package, Puzzle, ShieldCheck, Zap } from "lucide-react";
 import { Badge, Button, Callout, Field, Input, NativeSelect, PageHeader, Panel, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
-import { PERFORMANCE_PRESETS, PRESET_INFO, recommendPreset, SOFTWARE_INFO, softwareLabel, type CreateServerInput, type ServerSoftware } from "@craftpanel/shared";
+import { buildFieldLabel, buildName, PERFORMANCE_PRESETS, PRESET_INFO, recommendPreset, SOFTWARE_INFO, softwareLabel, type CreateServerInput, type ServerSoftware } from "@craftpanel/shared";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { useServers } from "@/lib/queries";
 import { formatBytes } from "@/lib/format";
@@ -28,6 +28,7 @@ export const SOFTWARE_CHOICES: { id: ServerSoftware; badge?: string; description
   { id: "paper", badge: "Recommended", description: "Faster than Vanilla and supports Bukkit/Paper plugins. Gameplay matches Vanilla closely.", icon: <Zap /> },
   { id: "purpur", description: "Paper with many extra gameplay and configuration options. Runs the same plugins.", icon: <Feather /> },
   { id: "fabric", description: "Mod loader for server-side Fabric mods (e.g. Lithium for performance). Most mods need Fabric API.", icon: <Puzzle /> },
+  { id: "neoforge", description: "Mod loader for NeoForge mods and large modpacks. Uses more memory; plan for 4 GB or more.", icon: <Hammer /> },
   { id: "vanilla", description: "The unmodified official server from Mojang. No plugins or mods.", icon: <Package /> },
 ];
 
@@ -248,7 +249,7 @@ export function CreateServerWizard() {
                     <Choice
                       selected={fromModpack}
                       title="Modpack"
-                      description="A ready-made Fabric modpack from Modrinth or your own .mrpack file. Version and loader come from the pack."
+                      description="A ready-made Fabric or NeoForge modpack from Modrinth or your own .mrpack file. Version and loader come from the pack."
                       icon={<Boxes />}
                       onClick={() => (setFromModpack(true), pack && choosePack(pack))}
                     />
@@ -267,7 +268,7 @@ export function CreateServerWizard() {
                 {modpack ? (
                   <Callout icon={<Boxes />} title={`${modpack.info.name} ${modpack.info.version}`}>
                     The modpack sets Minecraft {modpack.info.mcVersion}
-                    {modpack.info.loader ? ` with Fabric Loader ${modpack.info.loader}` : ""}. Players need the same modpack version in their launcher.
+                    {modpack.info.loader ? ` with ${buildFieldLabel(modpack.info.software)} ${modpack.info.loader}` : ""}. Players need the same modpack version in their launcher.
                   </Callout>
                 ) : (
                   <>
@@ -291,15 +292,15 @@ export function CreateServerWizard() {
                     </Field>
                     {buildLabel && (
                       <Field
-                        label={f.software === "fabric" ? "Fabric Loader" : `${softwareLabel(f.software)} build`}
+                        label={buildFieldLabel(f.software)}
                         htmlFor="build"
-                        help={`The newest stable ${f.software === "fabric" ? "loader" : "build"} is used by default.`}
+                        help={`The newest stable ${SOFTWARE_INFO[f.software].modLoader ? "version" : "build"} is used by default.`}
                       >
                         <NativeSelect id="build" value={f.build} onChange={(e) => set("build", e.target.value)} disabled={!versionInfo.data}>
                           <option value="">Latest stable</option>
                           {versionInfo.data?.builds.map((b) => (
                             <option key={b.id} value={b.id}>
-                              {f.software === "fabric" ? b.id : `#${b.id}`} · {b.channel.toLowerCase()}
+                              {buildName(f.software, b.id)} · {b.channel.toLowerCase()}
                               {b.time ? ` · ${new Date(b.time).toLocaleDateString()}` : ""}
                             </option>
                           ))}
@@ -498,7 +499,7 @@ export function CreateServerWizard() {
                   {[
                     ["Name", f.name],
                     ...(modpack ? [["Modpack", `${modpack.info.name} ${modpack.info.version} · ${modpack.info.serverFiles} files`]] : []),
-                    ["Software", `${softwareLabel(f.software)} ${f.mcVersion}${f.build ? ` ${f.software === "fabric" ? "loader" : "build"} ${f.build}` : ""}`],
+                    ["Software", `${softwareLabel(f.software)} ${f.mcVersion}${f.build ? ` · ${buildFieldLabel(f.software)} ${f.build}` : ""}`],
                     ["Java", versionInfo.data ? `Java ${versionInfo.data.java.major}${versionInfo.data.java.available ? "" : " (will be downloaded)"}` : "—"],
                     ["World", `${f.levelName}${f.seed ? ` · seed ${f.seed}` : ""} · ${f.levelType.replace("minecraft:", "")}`],
                     ["Gameplay", `${f.mode} · ${f.mode === "hardcore" ? "hard" : f.difficulty} · ${f.maxPlayers} players${f.whitelist ? " · whitelist" : ""}`],

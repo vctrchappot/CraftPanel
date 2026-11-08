@@ -12,16 +12,17 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Update notice in the dashboard when a newer release is available, with the right update command for the install.
 - Settings in `/etc/craftpanel/craftpanel.env` (Linux service) survive updates.
 - Purpur servers (Paper fork; same plugins, TPS/MSPT and `/craftpanel` command).
+- NeoForge servers with a choice of NeoForge version (the official installer runs during installation); NeoForge mods from Modrinth (search, install, updates, upload) with dependency checks from `neoforge.mods.toml`.
 - Fabric servers with a choice of loader version; Fabric mods from Modrinth (search, install, updates, upload) with dependency checks by mod id.
 - Log4Shell protection for Minecraft 1.7–1.18: CraftPanel adds Mojang's JVM flag or patched logging config on every start and shows it in the wizard and the server's runtime settings.
 - Two-factor sign-in with an authenticator app (TOTP) and recovery codes; owners can require it per role and reset it for a user.
 - Signed-in devices: see and sign out your sessions; owners can sign a user out everywhere.
 - Per-server access: give users a role on single servers, or limit them to selected servers (e.g. a moderator for one server).
-- Settings → Software & version: switch between Paper, Purpur, Fabric and Vanilla in any direction, change the Minecraft version or build, with a preview of what will happen (backup, world upgrade, add-ons that stop loading). Downgrades need an explicit confirmation.
+- Settings → Software & version: switch between Paper, Purpur, Fabric, NeoForge and Vanilla in any direction, change the Minecraft version or build, with a preview of what will happen (backup, world upgrade, add-ons that stop loading). Downgrades need an explicit confirmation.
 - Update CraftPanel from the dashboard: "Update now" shows the release notes and which servers restart, follows the update through the restart and reloads into the new version, with "What's new" afterwards. Failed updates are rolled back and reported in the dashboard, the activity log and notifications. Works for installs made with `install.sh` (systemd) and `install.ps1`; run the installer once more to enable it.
 - Performance presets (Raspberry Pi / small VPS, Balanced, Powerful machine): Aikar's garbage collector flags sized for the server's memory plus view and simulation distance. The wizard picks the one recommended for this machine; Settings → Performance switches between them and keeps your other JVM arguments.
-- World pre-generation with Chunky (Paper, Purpur, Fabric): install it with one click, choose a radius around spawn, follow the progress, pause, continue or cancel.
-- Servers from a modpack: search Fabric modpacks on Modrinth (or upload a `.mrpack`) in the wizard; CraftPanel picks the Minecraft and Fabric Loader version from the pack, downloads its server-side files with checksum checks, applies its overrides and keeps your port and EULA settings.
+- World pre-generation with Chunky (Paper, Purpur, Fabric, NeoForge): install it with one click, choose a radius around spawn, follow the progress, pause, continue or cancel.
+- Servers from a modpack: search Fabric and NeoForge modpacks on Modrinth (or upload a `.mrpack`) in the wizard; CraftPanel picks the Minecraft and loader version from the pack, downloads its server-side files with checksum checks, applies its overrides and keeps your port and EULA settings.
 - `CRAFTPANEL_RELEASE_DIR`: update from a local folder of release archives instead of GitHub.
 - Notifications via Discord webhook and e-mail (SMTP) when a server crashes or fails to start, a backup or scheduled task fails, or a CraftPanel update is available; with a test button.
 

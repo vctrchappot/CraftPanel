@@ -4,7 +4,7 @@ import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowRight, Info, RefreshCw } from "lucide-react";
 import { Badge, Button, Callout, Dialog, DialogContent, DialogFooter, DialogHeader, Field, NativeSelect, Panel, Section, Skeleton, Switch } from "@craftpanel/ui";
-import { SOFTWARE_INFO, softwareLabel, type ServerDetail, type ServerSoftware } from "@craftpanel/shared";
+import { buildFieldLabel, buildName, SOFTWARE_INFO, softwareLabel, type ServerDetail, type ServerSoftware } from "@craftpanel/shared";
 import { api, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
@@ -60,12 +60,12 @@ export function SoftwareSettings({ server: s }: { server: ServerDetail }) {
           <p className="text-[13px] text-muted-foreground">Currently running</p>
           <p className="text-sm font-medium">
             {softwareLabel(s.software)} {s.mcVersion}
-            {s.build && <span className="text-muted-foreground"> · {SOFTWARE_INFO[s.software].buildLabel} {s.software === "fabric" ? s.build : `#${s.build}`}</span>}
+            {s.build && <span className="text-muted-foreground"> · {SOFTWARE_INFO[s.software].buildLabel} {buildName(s.software, s.build)}</span>}
           </p>
         </div>
         {newerBuild && (
           <Badge variant="warning">
-            {SOFTWARE_INFO[s.software].buildLabel} {s.software === "fabric" ? latestBuild : `#${latestBuild}`} available
+            {SOFTWARE_INFO[s.software].buildLabel} {buildName(s.software, latestBuild)} available
           </Badge>
         )}
       </Panel>
@@ -100,12 +100,12 @@ export function SoftwareSettings({ server: s }: { server: ServerDetail }) {
           )}
         </Field>
         {buildLabel && available && (
-          <Field label={software === "fabric" ? "Fabric Loader" : `${softwareLabel(software)} build`} htmlFor="swbuild">
+          <Field label={buildFieldLabel(software)} htmlFor="swbuild">
             <NativeSelect id="swbuild" value={build} onChange={(e) => setBuild(e.target.value)} disabled={!canEdit || !info.data}>
-              <option value="">Latest stable{latestBuild ? ` (${software === "fabric" ? latestBuild : `#${latestBuild}`})` : ""}</option>
+              <option value="">Latest stable{latestBuild ? ` (${buildName(software, latestBuild)})` : ""}</option>
               {info.data?.builds.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {software === "fabric" ? b.id : `#${b.id}`} · {b.channel.toLowerCase()}
+                  {buildName(software, b.id)} · {b.channel.toLowerCase()}
                   {b.time ? ` · ${new Date(b.time).toLocaleDateString()}` : ""}
                   {b.id === s.build && s.software === software && s.mcVersion === version ? " (current)" : ""}
                 </option>
@@ -118,7 +118,7 @@ export function SoftwareSettings({ server: s }: { server: ServerDetail }) {
       {canEdit && (
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => (setConfirmDowngrade(false), setOpen(true))} disabled={!available || unchanged}>
-            {sameTarget ? <RefreshCw /> : <ArrowRight />} {sameTarget ? `Update to ${buildLabel?.toLowerCase()} ${software === "fabric" ? chosenBuild : `#${chosenBuild}`}` : `Switch to ${softwareLabel(software)} ${version}`}
+            {sameTarget ? <RefreshCw /> : <ArrowRight />} {sameTarget ? `Update to ${buildLabel?.toLowerCase()} ${buildName(software, chosenBuild ?? "")}` : `Switch to ${softwareLabel(software)} ${version}`}
           </Button>
           {unchanged && <span className="text-[13px] text-muted-foreground">This is what the server runs now.</span>}
         </div>

@@ -14,6 +14,7 @@ import {
   listPlugins,
   lookupProfile,
   searchModrinthPlugins,
+  type ModLoader,
 } from "@craftpanel/minecraft-providers";
 import type { AppConfig } from "../config";
 import type { ActivityService, Actor } from "./activity";
@@ -331,7 +332,7 @@ export class GameService {
 
   // ---- plugins --------------------------------------------------------------
 
-  // Plugins (Paper, Purpur) and Fabric mods share these routes; the server's software decides which.
+  // Plugins (Paper, Purpur) and mods (Fabric, NeoForge) share these routes; the server's software decides which.
 
   private pluginsDir(row: ServerRow) {
     return path.join(row.directory, SOFTWARE_INFO[row.software].addons ?? "plugins");
@@ -343,6 +344,10 @@ export class GameService {
     return kind;
   }
 
+  private loader(row: ServerRow): ModLoader {
+    return SOFTWARE_INFO[row.software].modLoader ?? "fabric";
+  }
+
   private addonLabel(row: ServerRow) {
     return SOFTWARE_INFO[row.software].addons === "mods" ? "Mod" : "Plugin";
   }
@@ -350,7 +355,7 @@ export class GameService {
   async plugins(row: ServerRow): Promise<PluginInfo[]> {
     const kind = SOFTWARE_INFO[row.software].addons;
     if (!kind) return [];
-    return listPlugins(this.pluginsDir(row), kind);
+    return listPlugins(this.pluginsDir(row), kind, this.loader(row));
   }
 
   private safePluginFile(file: string) {
@@ -389,7 +394,9 @@ export class GameService {
     const kind = this.requireAddons(row);
     const name = path.basename(filename).replace(/[^A-Za-z0-9 ._+()-]/g, "_");
     if (!name.endsWith(".jar")) throw badRequest(`Only .jar files can be installed as ${kind}`);
-    if (kind === "mods") {
+    if (kind === "mods" && this.loader(row) === "neoforge") {
+      if (!(await readZipEntry(tmpFile, "META-INF/neoforge.mods.toml").catch(() => null))) throw badRequest("This jar is not a NeoForge mod (no META-INF/neoforge.mods.toml)");
+    } else if (kind === "mods") {
       if (!(await readZipEntry(tmpFile, "fabric.mod.json").catch(() => null))) throw badRequest("This jar is not a Fabric mod (no fabric.mod.json)");
     } else {
       const meta = (await readZipEntry(tmpFile, "plugin.yml").catch(() => null)) ?? (await readZipEntry(tmpFile, "paper-plugin.yml").catch(() => null));
@@ -406,7 +413,7 @@ export class GameService {
 
   async installFromModrinth(row: ServerRow, projectId: string, versionId: string | undefined, actor: Actor) {
     const kind = this.requireAddons(row);
-    const versions = await compatibleModrinthVersions(projectId, row.mcVersion, kind);
+    const versions = await compatibleModrinthVersions(projectId, row.mcVersion, kind, this.loader(row));
     const chosen = versionId ? versions.find((v) => v.id === versionId) : versions.find((v) => v.version_type === "release") ?? versions[0];
     if (!chosen) throw conflict(`This ${this.addonLabel(row).toLowerCase()} has no version marked compatible with Minecraft ${row.mcVersion} on ${softwareLabel(row.software)}`);
     const res = await installModrinthVersion(chosen.id, this.pluginsDir(row));
@@ -417,17 +424,17 @@ export class GameService {
   }
 
   async searchModrinth(row: ServerRow, query: string, offset: number) {
-    return searchModrinthPlugins(query, row.mcVersion, offset, this.requireAddons(row));
+    return searchModrinthPlugins(query, row.mcVersion, offset, this.requireAddons(row), this.loader(row));
   }
 
   async modrinthVersions(row: ServerRow, projectId: string) {
-    return compatibleModrinthVersions(projectId, row.mcVersion, this.requireAddons(row));
+    return compatibleModrinthVersions(projectId, row.mcVersion, this.requireAddons(row), this.loader(row));
   }
 
   async pluginUpdates(row: ServerRow) {
     const kind = this.requireAddons(row);
-    const plugins = await listPlugins(this.pluginsDir(row), kind);
-    const updates = await checkModrinthUpdates(plugins.map((p) => p.sha1), row.mcVersion, kind);
+    const plugins = await listPlugins(this.pluginsDir(row), kind, this.loader(row));
+    const updates = await checkModrinthUpdates(plugins.map((p) => p.sha1), row.mcVersion, kind, this.loader(row));
     return plugins.filter((p) => updates[p.sha1]).map((p) => ({ file: p.file, name: p.name, current: p.version, ...updates[p.sha1] }));
   }
 

@@ -105,11 +105,12 @@ export async function previewSwitch(sb: ServerSandbox, from: { software: ServerS
   notes.push({ level: "info", text: "A backup of the whole server is created first. To undo the change, restore it." });
   if (downgrade) notes.push({ level: "danger", text: `Minecraft cannot load worlds saved by a newer version. Going back from ${from.version} to ${to.version} can corrupt or reset chunks; restore a backup from ${to.version} instead if you have one.` });
   else if (to.version !== from.version) notes.push({ level: "info", text: `Worlds are upgraded to ${to.version} on the first start. This can take a while and cannot be undone without the backup.` });
-  if (fromInfo.addons && fromInfo.addons !== toInfo.addons) {
+  const sameAddons = fromInfo.addons === toInfo.addons && fromInfo.modLoader === toInfo.modLoader;
+  if (fromInfo.addons && !sameAddons) {
     const count = await countJars(sb, fromInfo.addons);
     if (count) notes.push({ level: "warn", text: `${count} ${fromInfo.addons === "mods" ? "mod" : "plugin"}${count === 1 ? "" : "s"} in ${fromInfo.addons}/ won't load on ${toInfo.label}. They stay in the folder.` });
   }
-  if (fromInfo.addons && fromInfo.addons === toInfo.addons && to.version !== from.version) {
+  if (fromInfo.addons && sameAddons && to.version !== from.version) {
     const count = await countJars(sb, fromInfo.addons);
     if (count) notes.push({ level: "warn", text: `Check that your ${count} ${fromInfo.addons === "mods" ? "mod" : "plugin"}${count === 1 ? "" : "s"} support Minecraft ${to.version}; the ${fromInfo.addons === "mods" ? "Mods" : "Plugins"} tab shows available updates.` });
   }

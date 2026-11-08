@@ -21,7 +21,7 @@ import { eq, playerSessions, servers, and, isNull, type Database } from "@craftp
 import { ensureLog4jConfig, getProvider, hasOwnLog4jSettings, installModpack, JavaManager, inspectJava, isJavaCompatible, log4shellMitigation } from "@craftpanel/minecraft-providers";
 import { PropertiesDocument } from "@craftpanel/config";
 import { isPortAvailable } from "@craftpanel/network";
-import { freeDiskSpace, LocalAgent, ServerSandbox } from "@craftpanel/server-runtime";
+import { freeDiskSpace, LocalAgent, localArgsFile, ServerSandbox } from "@craftpanel/server-runtime";
 import type { z } from "zod";
 import type { Hub } from "../hub";
 import type { AppConfig } from "../config";
@@ -263,15 +263,16 @@ export class ServerService {
           this.progress({ serverId: id, stage, message: stage, percent: p && p.total ? Math.round((p.received / p.total) * 100) : null });
 
         const provider = getProvider(row.software);
-        const result = await provider.install({ directory: row.directory, version: row.mcVersion, build: row.build, onProgress: report, signal: ac.signal });
+        // Java first: installers such as NeoForge's run on it.
+        report("Checking Java runtime", null);
+        const javaPath = await this.ensureJava(row.javaMajor, row.javaPath, report, ac.signal);
+        const result = await provider.install({ directory: row.directory, version: row.mcVersion, build: row.build, javaPath, onProgress: report, signal: ac.signal });
         const log4j = this.log4shell(row);
         if (log4j?.configFile) {
           report("Downloading Log4Shell protection", null);
           await ensureLog4jConfig(row.directory, log4j.configFile, ac.signal);
         }
         await this.installPendingModpack(row, actor, ac.signal);
-        report("Checking Java runtime", null);
-        const javaPath = await this.ensureJava(row.javaMajor, row.javaPath, report, ac.signal);
         await this.db
           .update(servers)
           .set({ installState: "installed", jarFile: result.jarFile, jarSha: result.sha, build: result.build, javaPath, installError: null, lastStatus: "stopped", updatedAt: Date.now() })
@@ -372,7 +373,7 @@ export class ServerService {
       const disk = await freeDiskSpace(row.directory);
       if (disk && disk.free < 256 * 1024 ** 2) throw badRequest("Less than 256 MB of disk space is free. Free up space before starting the server.");
       try {
-        await fsp.access(path.join(row.directory, row.jarFile ?? "server.jar"));
+        await fsp.access(path.join(row.directory, localArgsFile(row.jarFile ?? "server.jar")));
       } catch {
         throw new AppError(409, "jar_missing", "The server jar is missing", "Reinstall the server software from the server settings.");
       }
@@ -557,8 +558,9 @@ export class ServerService {
         await this.activity.event(id, "world.dimension_moved", m.conflict ? `${m.label} of "${m.world}" left in ${m.from}: ${m.to} already has data` : `Moved the ${m.label} of "${m.world}" from ${m.from} to ${m.to}`, { actor, level: m.conflict ? "warn" : "info" });
       }
     }
-    // Remove the previous jar when the filename changed (Fabric's launcher starts the vanilla server.jar).
-    if (row.jarFile && after.jarFile !== row.jarFile && !(software === "fabric" && row.jarFile === "server.jar")) await fsp.rm(path.join(row.directory, row.jarFile), { force: true });
+    // Remove the previous jar when the filename changed (Fabric's launcher starts the vanilla server.jar;
+    // NeoForge's argument files live in libraries/, which the installer manages).
+    if (row.jarFile && after.jarFile !== row.jarFile && !(software === "fabric" && row.jarFile === "server.jar") && !row.jarFile.endsWith("_args.txt")) await fsp.rm(path.join(row.directory, row.jarFile), { force: true });
   }
 
   // ---- agent events & recovery ---------------------------------------------

@@ -30,7 +30,7 @@ interface ModpackVersion {
   fileSize: number;
 }
 
-/** Pick a Fabric modpack from Modrinth or upload a .mrpack; the API downloads and checks it before the server is created. */
+/** Pick a Fabric or NeoForge modpack from Modrinth or upload a .mrpack; the API downloads and checks it before the server is created. */
 export function ModpackPicker({ value, onChange }: { value: PreparedModpack | null; onChange: (p: PreparedModpack | null) => void }) {
   const [project, setProject] = React.useState<ModpackHit | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -103,7 +103,7 @@ function Catalogue({ onPick }: { onPick: (p: ModpackHit) => void }) {
     <div className="space-y-3">
       <div className="relative max-w-md">
         <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search Fabric modpacks on Modrinth…" className="pl-8" aria-label="Search modpacks" />
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search Fabric and NeoForge modpacks on Modrinth…" className="pl-8" aria-label="Search modpacks" />
       </div>
       {q.isLoading ? (
         <Skeleton className="h-64 rounded-xl" />
@@ -135,7 +135,7 @@ function Catalogue({ onPick }: { onPick: (p: ModpackHit) => void }) {
           </ul>
         </Panel>
       ) : (
-        <p className="text-[13px] text-muted-foreground">No server-compatible Fabric modpacks found.</p>
+        <p className="text-[13px] text-muted-foreground">No server-compatible modpacks found.</p>
       )}
     </div>
   );
@@ -184,7 +184,7 @@ function Versions({ project, busy, onBack, onPick }: { project: ModpackHit; busy
           </Button>
         </div>
       ) : (
-        <p className="text-[13px] text-muted-foreground">This modpack has no Fabric versions.</p>
+        <p className="text-[13px] text-muted-foreground">This modpack has no Fabric or NeoForge versions.</p>
       )}
       {busy && <p className="text-xs text-muted-foreground">Downloading the modpack and checking its file list…</p>}
     </Panel>
@@ -211,7 +211,7 @@ function PreparedSummary({ pack, onChange }: { pack: PreparedModpack; onChange: 
       <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-1.5">
         <dt className="text-muted-foreground">Runs on</dt>
         <dd>
-          {i.loader ? `Fabric Loader ${i.loader}` : "Vanilla"} · Minecraft {i.mcVersion}
+          {i.loader ? `${i.software === "neoforge" ? "NeoForge" : "Fabric Loader"} ${i.loader}` : "Vanilla"} · Minecraft {i.mcVersion}
         </dd>
         <dt className="text-muted-foreground">Server files</dt>
         <dd>

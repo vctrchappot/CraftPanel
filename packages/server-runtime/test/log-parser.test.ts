@@ -10,6 +10,13 @@ describe("parseLine", () => {
     expect(parseLine("[16:11:42 INFO]: [LuckPerms] Enabling LuckPerms v5.5.71")).toMatchObject({ level: "INFO", message: "[LuckPerms] Enabling LuckPerms v5.5.71" });
     expect(parseLine("[16:11:42 ERROR]: Could not load plugin").level).toBe("ERROR");
   });
+  it("parses NeoForge console and latest.log lines", () => {
+    expect(parseLine('[18:40:20] [Server thread/INFO] [minecraft/DedicatedServer]: Done (7.461s)! For help, type "help"')).toEqual({ level: "INFO", thread: "Server thread", message: 'Done (7.461s)! For help, type "help"' });
+    expect(parseLine("[08Nov2026 18:40:15.433] [Server thread/WARN] [net.minecraft.server.dedicated.DedicatedServer/]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!")).toMatchObject({ level: "WARN", message: "**** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!" });
+    expect(parseLine("[18:41:02] [Server thread/INFO] [minecraft/MinecraftServer]: Steve joined the game").message).toBe("Steve joined the game");
+    // The date follows the JVM's locale.
+    expect(parseLine("[08Nov.2026 18:41:44.828] [Server thread/INFO] [net.minecraft.server.dedicated.DedicatedServer/]: Done (7.740s)!").message).toBe("Done (7.740s)!");
+  });
   it("normalises the 26.x 'System chat:' prefix for matching", () => {
     expect(parseLine("[12:14:28] [Server thread/INFO]: System chat: Saved the game").message).toBe("Saved the game");
   });
