@@ -36,6 +36,26 @@ OpenSSL must be available (`openssl` on Linux/macOS; Git for Windows' `C:/Progra
 
 The test checks setup-token enforcement, Secure cookies, a reverse proxy that rewrites `Host`, public-client access rules, a real authenticated WebSocket upgrade and foreign-origin rejection, built-in TLS, local readiness, `doctor --json`, and rejection of an HTTP browser connection even when the proxy uses TLS to the backend. Instances are stopped through their local control tokens and their temporary data and certificates are removed. With `--browser`, the screenshot remains at `test-results/screens/deployment-proxy.png`.
 
+## Installer recovery tests
+
+After `pnpm build`, generate controlled release archives. The fixtures deliberately change the SQLite schema and then crash or hang; another has an invalid systemd unit/Windows launcher and one lacks the recovery protocol.
+
+Linux (root, systemd; a separately named temporary service, user and data directory):
+
+```bash
+node scripts/real-tests/installer-fixtures.mjs test-results/installer-recovery craftpanel-ops-test
+sudo bash scripts/real-tests/installer-linux.sh test-results/installer-recovery craftpanel-ops-test 19685
+```
+
+Windows (temporary per-user tasks, separate app/data directories and a free port):
+
+```powershell
+node scripts/real-tests/installer-fixtures.mjs test-results/installer-recovery
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/real-tests/installer-windows.ps1 -Fixtures test-results/installer-recovery
+```
+
+Use a new fixture directory per run. Existing normal CraftPanel instances are not changed. Tests cover unsupported archives, failed migrations, hanging startup and descendants, subsequent updates and snapshot retention. Linux also checks a specific-interface proxy listener and an invalid unit; Windows checks an invalid launcher. Failed Windows test artifacts are retained for diagnosis.
+
 ## Conventions
 
 - Ports: don't use 8080/25565 or anything a real instance on the machine uses. Pick e.g. 8130+ for the API and 25820+ for Minecraft.
