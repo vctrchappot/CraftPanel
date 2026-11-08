@@ -140,6 +140,14 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
 
   // ---- system / host --------------------------------------------------------------
 
+  app.post("/api/system/stop-all", async (req) => {
+    requirePermission(req, "app.configure");
+    const results = await ctx.agent.stopAll();
+    await ctx.activity.audit(actorOf(req), "runtime.stop_all", null, { results });
+    await ctx.activity.event(null, "runtime.stop_all", "Maintenance: graceful stop requested for all servers", { actor: actorOf(req) });
+    return { results };
+  });
+
   app.get("/api/system", async (req) => {
     const me = requireUser(req);
     const disk = await freeDiskSpace(ctx.config.layout.root);

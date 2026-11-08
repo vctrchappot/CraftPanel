@@ -12,6 +12,7 @@ export const COMMAND_TTL_MS = 5000;
 export type RuntimeInfo = ReturnType<RuntimeAgent["info"]>;
 export interface RuntimeSnapshot {
   id: string;
+  registered: boolean;
   status: ServerStatus;
   info: RuntimeInfo;
   alive: boolean;

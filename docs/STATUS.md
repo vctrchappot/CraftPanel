@@ -113,3 +113,9 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 ## Planned
 
 Performance presets for Pi and small VPS, NeoForge provider, Bedrock Dedicated Server adapter, S3-compatible backup storage, tunnel provider integrations, remote runtime agents for multiple hosts, container-based isolation, Hangar integration, i18n (German first).
+# Runtime separation phase (2026-11-08)
+
+- 🧪 Asynchronous runtime contract and authenticated Unix socket / Windows named-pipe service; actual child-process tests cover dashboard disconnection, PID/control/history recovery, duplicate start rejection, expired calls, authentication/protocol mismatch and graceful runtime stop/autostart.
+- 🧪 A replacement API context reconciles the live process and database without orphaning or restarting it. Disconnected control fails closed; the dashboard shows unknown state. Runtime restores autosave if a dashboard connection disappears during a live backup.
+- 🟡 Ubuntu/systemd and Windows installer/update integration, real Minecraft player continuity, installed host reboot and failed-update acceptance remain required. The phase is not complete.
+

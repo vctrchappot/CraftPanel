@@ -1,7 +1,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { openDatabase, runMigrations, sql, users } from "@craftpanel/database";
-import { LocalAgent } from "@craftpanel/server-runtime";
+import { LocalAgent, type RuntimeAgent } from "@craftpanel/server-runtime";
 import { JavaManager } from "@craftpanel/minecraft-providers";
 import type { AppConfig } from "./config";
 import type { AppContext } from "./context";
@@ -20,7 +20,7 @@ import { ProxyService } from "./services/proxy";
 import { NotificationService } from "./services/notifications";
 
 /** Wire up persistence, runtime and services. Does not start listening. */
-export async function createContext(config: AppConfig, opts: { migrationsFolder?: string; installRoot?: string } = {}): Promise<AppContext> {
+export async function createContext(config: AppConfig, opts: { migrationsFolder?: string; installRoot?: string; agent?: RuntimeAgent } = {}): Promise<AppContext> {
   const L = config.layout;
   for (const dir of [L.root, L.servers, L.backups, L.java, L.cache, L.logs, L.tmp]) await fsp.mkdir(dir, { recursive: true });
   // Clear leftovers from interrupted uploads/exports.
@@ -31,7 +31,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const { db } = database;
 
   const hub = new Hub();
-  const agent = new LocalAgent();
+  const agent = opts.agent ?? new LocalAgent();
   const java = new JavaManager(L.java, L.tmp);
   const activity = new ActivityService(db, hub);
   const settings = new SettingsService(db);

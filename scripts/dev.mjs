@@ -11,6 +11,12 @@ const webPort = process.env.WEB_PORT ?? "3000";
 const shell = process.platform === "win32";
 
 const procs = [
+  spawn("pnpm", ["--filter", "@craftpanel/api", "exec", "tsx", "src/runtime.ts"], {
+    cwd: root,
+    stdio: "inherit",
+    shell,
+    env: { ...process.env, CRAFTPANEL_DATA_DIR: process.env.CRAFTPANEL_DATA_DIR ?? path.join(root, ".data") },
+  }),
   spawn("pnpm", ["--filter", "@craftpanel/api", "dev"], {
     cwd: root,
     stdio: "inherit",

@@ -36,7 +36,7 @@ export class RuntimeService {
   snapshot(id: string, history = false): RuntimeSnapshot {
     const info = this.agent.info(id);
     if (this.agent.status(id) === "orphaned") info.pid = this.records[id]?.pid ?? null;
-    return { id, status: this.agent.status(id), info, alive: this.agent.isRunning(id), ...(history ? { lines: this.agent.history(id) } : {}), metrics: this.agent.latestMetrics(id) };
+    return { id, registered: Object.hasOwn(this.records, id), status: this.agent.status(id), info, alive: this.agent.isRunning(id), ...(history ? { lines: this.agent.history(id) } : {}), metrics: this.agent.latestMetrics(id) };
   }
 
   private persist() {
@@ -101,6 +101,7 @@ export class RuntimeService {
     let session = "";
     let sequence = 0;
     const watches = new Map<string, () => void>();
+    const pausedSaves = new Set<string>();
     const deadline = setTimeout(() => socket.destroy(), 3000);
     const broadcast = (event: keyof AgentEvents, args: unknown[]) => {
       send({ type: "event", event, args, snapshot: this.snapshot(String(args[0])) });
@@ -145,9 +146,15 @@ export class RuntimeService {
             }
             case "stop": result = await this.agent.stop(id, timeout(m.timeoutMs)); break;
             case "kill": await this.agent.kill(id); break;
-            case "send": await this.agent.send(id, command(m.command)); break;
+            case "send":
+              await this.agent.send(id, command(m.command));
+              if (m.command === "save-off") pausedSaves.add(id);
+              if (m.command === "save-on") pausedSaves.delete(id);
+              break;
             case "query": {
               const pattern = regex(m.pattern);
+              if (m.command === "save-off") pausedSaves.add(id);
+              if (m.command === "save-on") pausedSaves.delete(id);
               const match = await this.agent.query(id, command(m.command), pattern, { timeoutMs: timeout(m.timeoutMs, 3000), swallow: m.swallow ? regex(m.swallow) : undefined });
               result = match ? { values: [...match], index: match.index, input: match.input, groups: match.groups } : null;
               break;
@@ -175,6 +182,8 @@ export class RuntimeService {
       clearTimeout(deadline);
       this.broadcasts.delete(broadcast);
       for (const release of watches.values()) release();
+      // A dashboard crash during a live backup must not leave Minecraft autosave disabled.
+      for (const id of pausedSaves) if (this.agent.isRunning(id)) void this.agent.send(id, "save-on").catch(() => undefined);
       this.peers.delete(socket);
     });
   }

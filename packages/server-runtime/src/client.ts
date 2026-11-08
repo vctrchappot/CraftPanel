@@ -136,7 +136,7 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
     return result ? Object.assign(result.values, { index: result.index, input: result.input, groups: result.groups }) as RegExpExecArray : null;
   }
   status(id: string): ServerStatus { return this.connected ? this.snapshots.get(id)?.status ?? "stopped" : "unknown"; }
-  owns(id: string) { this.assertConnected(); return this.snapshots.has(id); }
+  owns(id: string) { this.assertConnected(); return this.snapshots.get(id)?.registered ?? false; }
   info(id: string) { return this.connected ? this.snapshots.get(id)?.info ?? emptyRuntimeInfo() : emptyRuntimeInfo(); }
   history(id: string, limit = 2000) { return (this.snapshots.get(id)?.lines ?? []).slice(-limit); }
   latestMetrics(id: string) { return this.connected ? this.snapshots.get(id)?.metrics ?? null : null; }
