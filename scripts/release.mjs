@@ -84,7 +84,8 @@ function pack() {
   const stage = path.join(out, name);
   fs.rmSync(out, { recursive: true, force: true });
   fs.mkdirSync(path.join(stage, "apps/api"), { recursive: true });
-  fs.cpSync(dist, path.join(stage, "apps/api/dist"), { recursive: true });
+  // The source map (~8 MB) only helps when debugging a local build; names in stack traces survive minification.
+  fs.cpSync(dist, path.join(stage, "apps/api/dist"), { recursive: true, filter: (src) => !src.endsWith(".js.map") });
   fs.mkdirSync(path.join(stage, "deploy"));
   for (const file of ["craftpanel.service", "install.sh", "install.ps1"]) fs.copyFileSync(path.join(root, "deploy", file), path.join(stage, "deploy", file));
   fs.chmodSync(path.join(stage, "deploy/install.sh"), 0o755);

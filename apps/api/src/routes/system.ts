@@ -15,6 +15,10 @@ import { REDACTED } from "../services/settings";
 import { isDiscordWebhook } from "../services/notifications";
 import { parse } from "../validate";
 
+// os.cpus() queries every core on each call (about 1 ms on Windows); the hardware doesn't change while we run.
+let cpuCache: { cpus: number; cpuModel: string | null } | null = null;
+const cpuInfo = () => (cpuCache ??= { cpus: os.cpus().length, cpuModel: os.cpus()[0]?.model ?? null });
+
 export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
   // ---- backups ------------------------------------------------------------------
 
@@ -145,8 +149,7 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
       arch: process.arch,
       hostname: os.hostname(),
       node: process.version,
-      cpus: os.cpus().length,
-      cpuModel: os.cpus()[0]?.model ?? null,
+      ...cpuInfo(),
       loadAverage: process.platform === "win32" ? null : os.loadavg(),
       memory: { total: os.totalmem(), free: os.freemem() },
       allocatedMemoryMb: running.reduce((n, r) => n + r.memoryMb, 0),

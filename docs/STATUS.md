@@ -77,10 +77,12 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 
 **Deployment**: ✅ single-folder production bundle runs without `node_modules`, ✅ `pnpm dev`, ✅ `deploy/install-linux.sh` and the systemd unit (install and update), ✅ readable service logs, ✅ one-command update (`update.cmd` / `./update.sh`, tested from a diverged old copy on Windows and on a Linux service install), ✅ ARM64 and macOS in CI, 🟡 physical Raspberry Pi.
 
+**Performance** (`node scripts/measure.mjs`, Windows 11, Ryzen AI Max+ 395, Node 26, fresh data directory, no Minecraft server running): startup 331 ms until `/api/health` answers, idle 0.3–0.5% of one core, 92 MB resident, database 205 KB after setup; API latency p50 1–2 ms for every endpoint (`/api/system` was 8.6 ms: `os.networkInterfaces()` takes ~7 ms on Windows and is now cached for 5 s). ✅ Minified API bundle: 4.2 MB → 2.2 MB; A/B over 5 starts each, median startup 444 → 381 ms and 104 → 99 MB resident. ✅ Dashboard served precompressed (brotli/gzip chosen by `Accept-Encoding`, checked with curl): 1175 KB JS → 308 KB transferred; hashed `_next/static` files are `immutable`, HTML is `no-cache`. ✅ Release archive without the source map: 2.2 MB. 🟡 Numbers on a Raspberry Pi and a small VPS.
+
 ## Known limitations
 
 - No container or user isolation per server (see [security](security/README.md)).
-- Dashboard over plain HTTP unless you add a reverse proxy; no 2FA.
+- Dashboard over plain HTTP unless you add a reverse proxy or set `CRAFTPANEL_TLS_*`.
 - Orphaned servers (CraftPanel killed hard) can be stopped but not commanded; on Windows that stop is a hard terminate.
 - Game rule detection needs Minecraft 1.13+ and takes up to a minute per version on first use (cached).
 - Vanilla before 1.20.3 has no TPS/MSPT; it's shown as unavailable.
@@ -91,4 +93,4 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 
 ## Planned
 
-Two-factor sign-in and per-server permissions for teams, NeoForge provider, Bedrock Dedicated Server adapter, S3-compatible backup storage, tunnel provider integrations, remote runtime agents for multiple hosts, container-based isolation, Hangar integration, i18n (German first).
+Performance presets for Pi and small VPS, NeoForge provider, Bedrock Dedicated Server adapter, S3-compatible backup storage, tunnel provider integrations, remote runtime agents for multiple hosts, container-based isolation, Hangar integration, i18n (German first).

@@ -46,9 +46,18 @@ export function isLinkLocal(ip: string): boolean {
   return inRange(ip, "169.254.0.0/16") || ip.toLowerCase().startsWith("fe80:");
 }
 
+// os.networkInterfaces() takes several milliseconds on Windows and the dashboard polls the system view,
+// so the list is reused briefly; a new Wi-Fi or VPN address still shows up within seconds.
+let interfacesCache: { at: number; value: ReturnType<typeof os.networkInterfaces> } | null = null;
+function networkInterfaces() {
+  const now = Date.now();
+  if (!interfacesCache || now - interfacesCache.at > 5000) interfacesCache = { at: now, value: os.networkInterfaces() };
+  return interfacesCache.value;
+}
+
 export function listLocalAddresses(): LocalAddress[] {
   const out: LocalAddress[] = [];
-  for (const [name, addrs] of Object.entries(os.networkInterfaces())) {
+  for (const [name, addrs] of Object.entries(networkInterfaces())) {
     for (const a of addrs ?? []) {
       if (a.family !== "IPv4" && a.family !== "IPv6") continue;
       out.push({

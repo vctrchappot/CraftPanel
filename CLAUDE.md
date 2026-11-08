@@ -26,6 +26,7 @@ pnpm test:e2e         # Playwright, real Minecraft download + run (npx playwrigh
 pnpm db:generate      # after changing packages/database/src/schema.ts; commit the generated migration
 node scripts/build-info-plugin.mjs [--check]   # rebuild the /craftpanel plugin jar (needs JDK 17+, JAVA_HOME)
 node scripts/release.mjs pack                   # release/ archive + installers + SHA256SUMS (after pnpm build)
+node scripts/measure.mjs [--idle 60] [--json]   # startup, idle CPU/RAM, API latency, bundle sizes of the build (own port, temp data)
 node scripts/release.mjs bump X.Y.Z && git push --follow-tags   # release: GitHub Actions publishes it
 ```
 

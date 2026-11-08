@@ -123,7 +123,20 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
   // Serve the exported dashboard (production). In development Next.js serves it.
   const webDir = ctx.config.webDir;
   if (webDir && fs.existsSync(path.join(webDir, "index.html"))) {
-    await app.register(fastifyStatic, { root: webDir, prefix: "/", wildcard: true, index: ["index.html"], redirect: true });
+    await app.register(fastifyStatic, {
+      root: webDir,
+      prefix: "/",
+      wildcard: true,
+      index: ["index.html"],
+      redirect: true,
+      // The build writes .br/.gz copies next to each file; served when the browser accepts them.
+      preCompressed: true,
+      cacheControl: false,
+      setHeaders(reply, file) {
+        // Next.js puts content hashes in these file names, so they never change.
+        reply.header("Cache-Control", /[\\/]_next[\\/]static[\\/]/.test(file) ? "public, max-age=31536000, immutable" : "no-cache");
+      },
+    });
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith("/api/")) return reply.code(404).send({ error: { code: "not_found", message: "Not found" } });
       return reply.code(404).type("text/html").sendFile("404.html");
