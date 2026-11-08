@@ -252,7 +252,12 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
   app.put<IdParams>("/api/servers/:id/proxy", async (req) => {
     requirePermission(req, "server.configure");
     const body = parse(proxyConfigSchema, req.body);
-    return ctx.proxies.save(await row(req.params.id), body, actorOf(req));
+    const r = await row(req.params.id);
+    // Saving reconfigures every backend (forwarding, online-mode, bind address), including the ones being removed,
+    // so the user needs the same right on each of them, not only on the proxy.
+    const current = (await ctx.proxies.config(r)).backends.map((b) => b.serverId);
+    for (const id of new Set([...current, ...body.backends.map((b) => b.serverId)])) requirePermission(req, "server.configure", id);
+    return ctx.proxies.save(r, body, actorOf(req));
   });
   // The forwarding secret lets anyone who can reach a backend log in as any player; configure only.
   app.get<IdParams>("/api/servers/:id/proxy/secret", async (req, reply) => {

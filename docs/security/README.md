@@ -46,6 +46,7 @@ CraftPanel administers processes and files on the host. Whoever controls an Owne
 **Velocity proxy**
 - Modern forwarding with a random 192-bit secret per proxy, stored in the proxy's `forwarding.secret` and copied into each backend's config on start. It is never written to the activity log or console; the dashboard shows or regenerates it only for users with `server.configure` (served with `no-store`).
 - Backends behind a proxy run with `online-mode=false` and rely on the forwarding secret, so they should not be reachable directly: the Proxy tab can bind them to 127.0.0.1 (on by default), and Paper refuses players who don't come through Velocity. Removing a backend from the proxy turns forwarding off, restores `online-mode=true` and resets the bind.
+- Changing a proxy's server list rewires every backend involved (forwarding, `online-mode`, bind address), so it needs `server.configure` on the proxy and on each backend being added or removed; a moderator of the proxy alone can't take over other servers.
 
 **Privacy**
 - No telemetry and no third-party requests from the dashboard. Fonts are self-hosted and player avatars aren't fetched. External calls happen only for downloads, Modrinth searches, Mojang UUID lookups and, when you click it, the public-IP check.

@@ -182,6 +182,22 @@ describe("per-server permissions", () => {
     expect((await call(mod, "GET", `/api/servers/${ids.alpha}`)).statusCode).toBe(404);
   });
 
+  it("needs configure rights on every backend to change a proxy, not only on the proxy", async () => {
+    const id = crypto.randomUUID();
+    const dir = path.join(root, "servers", "proxy");
+    await fs.mkdir(dir, { recursive: true });
+    const now = Date.now();
+    await ctx.database.db.insert(servers).values({ id, name: "proxy", software: "velocity", mcVersion: "3.4.0", javaMajor: 21, memoryMb: 512, directory: dir, port: 25593, installState: "installed", jarFile: "velocity.jar", createdAt: now, updatedAt: now });
+    await call(owner, "POST", "/api/users", { username: "proxyadmin", password: "proxyadmin-password-1", role: "viewer", serverScope: "selected", serverRoles: { [id]: "admin", [ids.alpha]: "operator" } });
+    const pa = await login("proxyadmin", "proxyadmin-password-1");
+    const body = (serverId: string) => ({ backends: [{ serverId, name: "survival" }], onlineMode: true, localOnly: true });
+    // beta is invisible to this user, alpha visible but without configure rights: neither may be rewired through the proxy.
+    expect((await call(pa, "PUT", `/api/servers/${id}/proxy`, body(ids.beta))).statusCode).toBe(404);
+    expect((await call(pa, "PUT", `/api/servers/${id}/proxy`, body(ids.alpha))).statusCode).toBe(403);
+    // The owner passes the permission check and reaches validation (alpha runs Vanilla, which can't be a backend).
+    expect((await call(owner, "PUT", `/api/servers/${id}/proxy`, body(ids.alpha))).statusCode).toBe(400);
+  });
+
   it("removes grants when a server is deleted", async () => {
     const r = await call(owner, "DELETE", `/api/servers/${ids.beta}?deleteFiles=false&backup=false`);
     expect(r.statusCode).toBe(204);
