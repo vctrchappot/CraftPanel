@@ -7,6 +7,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 ## Unreleased
 
 ### Added
+- Windows process supervisor with suspended startup and a kill-on-close Job Object so scheduled-task shutdown also owns Node and its descendants.
 - Browser-facing dashboard origins (`CRAFTPANEL_PUBLIC_URL`) and explicit trusted proxy peers (`CRAFTPANEL_TRUSTED_PROXIES`), including proxies on another host.
 - Deployment checks in Remote access, a read-only `doctor` command with JSON output, and `/api/ready` for startup/database readiness.
 - Release packages: every `v*` tag publishes one archive that runs on every OS and CPU (no build on the target machine), with SHA-256 checksums.

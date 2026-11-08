@@ -41,6 +41,7 @@ await build({
 
 fs.cpSync(path.resolve(here, "../../packages/database/drizzle"), path.join(dist, "drizzle"), { recursive: true });
 fs.cpSync(path.join(here, "assets"), path.join(dist, "assets"), { recursive: true });
+fs.copyFileSync(path.resolve(here, "../../deploy/windows-job.ps1"), path.join(dist, "windows-job.ps1"));
 const web = path.resolve(here, "../web/out");
 if (fs.existsSync(path.join(web, "index.html"))) {
   fs.cpSync(web, path.join(dist, "web"), { recursive: true });
