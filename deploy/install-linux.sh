@@ -1,63 +1,28 @@
 #!/usr/bin/env bash
-# Installs CraftPanel from a git checkout as a systemd service on Linux (x64 or arm64).
-# Most people want the release installer instead (no build needed): see deploy/install.sh.
-# Run from the cloned repository:  sudo ./deploy/install-linux.sh
-# Re-run it after "git pull" (or use ./update.sh) to update: it rebuilds, replaces /opt/craftpanel and restarts the service.
+# Build a git checkout as its owner, then use the same transactional installer as release packages.
+# Run from the cloned repository: sudo ./deploy/install-linux.sh
 set -euo pipefail
 
-INSTALL_DIR=/opt/craftpanel
-DATA_DIR=/var/lib/craftpanel
-SERVICE_USER=craftpanel
-
 if [[ $EUID -ne 0 ]]; then echo "Run with sudo." >&2; exit 1; fi
-command -v node >/dev/null || { echo "Node.js 22.13+ is required (https://nodejs.org or your package manager)." >&2; exit 1; }
-NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
-if (( NODE_MAJOR < 22 )); then echo "Node.js 22.13+ is required, found $(node -v)." >&2; exit 1; fi
-
+command -v node >/dev/null || { echo "Node.js 22.13+ is required." >&2; exit 1; }
+node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22 || (a===22 && b>=13) ? 0 : 1)' || { echo "Node.js 22.13+ is required." >&2; exit 1; }
 REPO_DIR=$(cd "$(dirname "$0")/.." && pwd)
-id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --home "$DATA_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
-mkdir -p "$INSTALL_DIR" "$DATA_DIR"
-
-echo "Building CraftPanel…"
-cd "$REPO_DIR"
-command -v pnpm >/dev/null || corepack enable >/dev/null 2>&1 || npm install -g pnpm
-# Build as the user who owns the checkout so node_modules/dist don't end up owned by root.
-BUILD_USER=$(stat -c %U "$REPO_DIR")
-if [[ "$BUILD_USER" != root ]]; then
-  sudo -u "$BUILD_USER" -H env "PATH=$PATH" pnpm install --frozen-lockfile
-  sudo -u "$BUILD_USER" -H env "PATH=$PATH" pnpm build
-else
-  pnpm install --frozen-lockfile
-  pnpm build
-fi
-
-echo "Installing to $INSTALL_DIR…"
-rm -rf "$INSTALL_DIR/apps"
-mkdir -p "$INSTALL_DIR/apps/api"
-cp -r apps/api/dist "$INSTALL_DIR/apps/api/dist"
-# Tells the dashboard's update notice how this copy is updated.
-printf '{ "method": "linux-service", "updateCommand": "cd %s && ./update.sh" }\n' "$REPO_DIR" > "$INSTALL_DIR/install.json"
-rm -f "$INSTALL_DIR/release.json" "$INSTALL_DIR/update.sh"
-chown -R root:root "$INSTALL_DIR"
-chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
-chmod 750 "$DATA_DIR"
-
-# Point the unit at the Node.js actually installed (NodeSource, distro package, /usr/local, …).
 NODE_BIN=$(readlink -f "$(command -v node)")
 case "$NODE_BIN" in
-  /home/*|/root/*) echo "Warning: Node.js lives in $NODE_BIN; the hardened service cannot read home directories. Install Node.js system-wide (e.g. NodeSource) for the service." >&2 ;;
+  /home/*|/root/*) echo "Install Node.js system-wide; the hardened service cannot read home directories." >&2; exit 1 ;;
 esac
-sed "s|^ExecStart=/usr/bin/node |ExecStart=$NODE_BIN |" deploy/craftpanel.service > /etc/systemd/system/craftpanel.service
-systemctl daemon-reload
-systemctl enable craftpanel
-# restart (not "enable --now") so a re-run also picks up the new build; running servers are stopped gracefully.
-systemctl restart craftpanel
-
-IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-echo
-echo "CraftPanel is running: http://${IP:-<this-machine>}:8080"
-sleep 3
-if [[ -f "$DATA_DIR/setup-token.txt" ]]; then
-  echo "First-run setup token (needed to create the owner account):"
-  cat "$DATA_DIR/setup-token.txt"
+cd "$REPO_DIR"
+command -v pnpm >/dev/null || corepack enable >/dev/null 2>&1 || npm install -g pnpm
+BUILD_USER=$(stat -c %U "$REPO_DIR")
+if [[ $BUILD_USER == root ]]; then
+  pnpm install --frozen-lockfile
+  pnpm build
+  node scripts/release.mjs pack
+else
+  # Keep dependencies and build artifacts owned by the checkout's owner, not root.
+  sudo -u "$BUILD_USER" -H env "PATH=$PATH" pnpm install --frozen-lockfile
+  sudo -u "$BUILD_USER" -H env "PATH=$PATH" pnpm build
+  sudo -u "$BUILD_USER" -H env "PATH=$PATH" node scripts/release.mjs pack
 fi
+VERSION=$(node -p 'require("./package.json").version')
+exec bash "$REPO_DIR/deploy/install.sh" --archive "$REPO_DIR/release/craftpanel-v$VERSION.tar.gz" --checkout "$REPO_DIR"

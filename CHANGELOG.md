@@ -7,6 +7,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 ## Unreleased
 
 ### Added
+- Transactional Linux and Windows updates: verify recovery support before stopping, snapshot the database and startup artifacts, restore on installation failures, reject concurrent installers and retain two successful recovery points. Source-based Linux installs use the same installer path.
 - Windows process supervisor with suspended startup and a kill-on-close Job Object so scheduled-task shutdown also owns Node and its descendants.
 - Browser-facing dashboard origins (`CRAFTPANEL_PUBLIC_URL`) and explicit trusted proxy peers (`CRAFTPANEL_TRUSTED_PROXIES`), including proxies on another host.
 - Deployment checks in Remote access, a read-only `doctor` command with JSON output, and `/api/ready` for startup/database readiness.
@@ -40,6 +41,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Downloads (Minecraft, Java, mods) retry twice on temporary server errors such as an HTTP 504 from GitHub instead of failing the installation.
 
 ### Fixed
+- Concurrent first-run requests can create only one owner account. Windows task shutdown now owns the entire managed process tree, including failed startup before a control token exists.
 - Reverse-proxy setup requires the host's setup token even when the backend listens on loopback. Public clients require HTTPS and Secure cookies; missing proxy client-IP headers and ambiguous transport headers are rejected.
 - HTTP and WebSocket origin checks include the scheme and support an external origin when the proxy rewrites Host. Backend TLS and Secure cookies are no longer presented as proof of browser HTTPS.
 - Two servers installing at the same time no longer break each other's Java download.

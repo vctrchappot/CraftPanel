@@ -21,7 +21,7 @@
 #
 # Minecraft servers, worlds, backups and settings live in /var/lib/craftpanel and are never touched.
 # Service settings (port, profile, HTTPS, ...) go into /etc/craftpanel/craftpanel.env, which is kept.
-set -euo pipefail
+set -Eeuo pipefail
 
 REPO=vctrchappot/CraftPanel
 INSTALL_DIR=/opt/craftpanel
@@ -74,7 +74,7 @@ write_result() {
 
 # Everything runs inside main, so a partially downloaded script does nothing.
 main() {
-  local version=${CRAFTPANEL_INSTALL_VERSION:-} archive=${CRAFTPANEL_ARCHIVE:-} port=${CRAFTPANEL_PORT:-} uninstall=false from_dashboard=false
+  local version=${CRAFTPANEL_INSTALL_VERSION:-} archive=${CRAFTPANEL_ARCHIVE:-} port=${CRAFTPANEL_PORT:-} uninstall=false from_dashboard=false checkout=""
   while (($#)); do
     case $1 in
       --version) version=${2:?--version needs a value}; shift 2 ;;
@@ -82,6 +82,7 @@ main() {
       --port) port=${2:?--port needs a value}; shift 2 ;;
       --uninstall) uninstall=true; shift ;;
       --from-dashboard) from_dashboard=true; shift ;;
+      --checkout) checkout=${2:?--checkout needs the source directory}; shift 2 ;;
       -h | --help) sed -n '2,23p' "$0" 2>/dev/null || echo "See https://github.com/$REPO#install"; exit 0 ;;
       *) die "Unknown option: $1" "Options: --version X.Y.Z, --archive FILE, --port N, --uninstall" ;;
     esac
@@ -91,6 +92,9 @@ main() {
   [[ $(uname -s) == Linux ]] || die "This installer is for Linux." "On Windows use install.ps1; on macOS see the README."
   [[ $EUID -eq 0 ]] || die "Please run it with sudo." "curl -fsSL https://github.com/$REPO/releases/latest/download/install.sh | sudo bash"
   [[ -d /run/systemd/system ]] || die "systemd is not running on this machine." "CraftPanel installs as a systemd service. Without systemd, download the release and start it with: node apps/api/dist/index.js --profile lan"
+  command -v flock >/dev/null || die "flock is required (install util-linux)."
+  exec 9>/run/lock/craftpanel-install.lock
+  flock -n 9 || die "Another CraftPanel install or update is already running."
   if [[ -n $port ]] && { [[ ! $port =~ ^[0-9]+$ ]] || ((port < 1 || port > 65535)); }; then die "Invalid port: $port"; fi
 
   if $uninstall; then
@@ -102,7 +106,7 @@ main() {
     # The request file lives in CraftPanel's own data folder: remove it (never follow it) and ignore its content.
     rm -rf "$UPDATE_DIR/requested"
     trap 'write_result $?' EXIT
-    version="" archive="" port=""
+    version="" archive="" port="" checkout=""
     echo "${D}Update requested from the dashboard on $(date '+%Y-%m-%d %H:%M:%S')${N}"
   fi
   local release_dir=${CRAFTPANEL_RELEASE_DIR:-}
@@ -171,31 +175,111 @@ main() {
   local node
   node=$(ensure_node)
   info "Using $("$node" -v) at $node"
+  local snapshot_cli="$src/apps/api/dist/recovery.js"
+  [[ -f $snapshot_cli ]] && [[ $("$node" "$snapshot_cli" --protocol) == craftpanel-recovery-v1 ]] ||
+    die "This release does not support the required database recovery protocol." "Use a compatible release. The running service has not been stopped."
+  for f in README.md LICENSE CHANGELOG.md release.json deploy/install.sh deploy/craftpanel.service; do
+    [[ -f $src/$f && ! -L $src/$f ]] || die "The release is missing a regular file: $f"
+  done
 
   # ---- install ----------------------------------------------------------------------------
   step "Installing CraftPanel v$version to $INSTALL_DIR…"
+  validate_data_location
   id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --home "$DATA_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
   mkdir -p "$INSTALL_DIR" "$DATA_DIR" "$CONFIG_DIR"
   chown "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
   chmod 750 "$DATA_DIR"
-  write_env_file "$port"
 
   rm -rf "$INSTALL_DIR/apps.new"
   cp -r "$src/apps" "$INSTALL_DIR/apps.new"
-  local was_active=false
+  local was_active=false main_enabled=false service_state
   systemctl is-active --quiet craftpanel 2>/dev/null && was_active=true
-  if $was_active; then
-    info "Stopping CraftPanel (running Minecraft servers are saved and stopped)…"
-    systemctl stop craftpanel
+  service_state=$(systemctl show craftpanel -p ActiveState --value 2>/dev/null || true)
+  [[ $service_state == activating || $service_state == reloading ]] && was_active=true
+  systemctl is-enabled --quiet craftpanel 2>/dev/null && main_enabled=true
+  $was_active && info "Stopping CraftPanel (running Minecraft servers are saved and stopped)…"
+  stop_confirmed || die "Could not confirm that CraftPanel stopped; no snapshot or replacement was attempted."
+  # Snapshot before the new process can run migrations. Keep this outside the service's writable paths.
+  local state_dir effective_data
+  effective_data=$(env_value CRAFTPANEL_DATA_DIR)
+  effective_data=${effective_data:-$DATA_DIR}
+  state_dir="$INSTALL_DIR/state-$(date +%s)-$$"
+  if ! "$node" "$snapshot_cli" snapshot "$effective_data" "$state_dir"; then
+    $was_active && systemctl start craftpanel
+    die "Could not create the pre-update database snapshot; nothing was replaced."
   fi
+  info "Database recovery point: $state_dir"
+  local apps_moved=false new_activated=false
+  local update_path_enabled=false update_path_active=false
+  systemctl is-enabled --quiet craftpanel-update.path 2>/dev/null && update_path_enabled=true
+  systemctl is-active --quiet craftpanel-update.path 2>/dev/null && update_path_active=true
+  local -a artifact_paths=("$INSTALL_DIR/README.md" "$INSTALL_DIR/LICENSE" "$INSTALL_DIR/CHANGELOG.md" "$INSTALL_DIR/release.json" "$INSTALL_DIR/install.json" "$INSTALL_DIR/update.sh" "$ENV_FILE" "$UNIT_FILE" "$UPDATE_UNIT" "$UPDATE_PATH_UNIT")
+  mkdir "$state_dir/startup" || { $was_active && systemctl start craftpanel; die "Could not save startup configuration."; }
+  local i
+  for i in "${!artifact_paths[@]}"; do
+    if [[ -f ${artifact_paths[$i]} && ! -L ${artifact_paths[$i]} ]]; then
+      cp -p "${artifact_paths[$i]}" "$state_dir/startup/$i" || { $was_active && systemctl start craftpanel; die "Could not save startup configuration."; }
+    elif [[ -e ${artifact_paths[$i]} || -L ${artifact_paths[$i]} ]]; then
+      $was_active && systemctl start craftpanel
+      die "Startup artifact is not a regular file: ${artifact_paths[$i]}"
+    fi
+  done
+  rollback_transaction() {
+    trap - ERR
+    set +e
+    warn "Installation failed. Restoring the previous database and startup configuration."
+    # Restore a possibly invalid unit before asking systemd to stop its cgroup. Never start it yet.
+    for i in "${!artifact_paths[@]}"; do
+      if [[ -f $state_dir/startup/$i ]]; then cp -p "$state_dir/startup/$i" "${artifact_paths[$i]}" || die "Could not restore ${artifact_paths[$i]}";
+      else rm -f "${artifact_paths[$i]}" || die "Could not remove ${artifact_paths[$i]}"; fi
+    done
+    systemctl daemon-reload || die "Could not reload the restored service configuration."
+    if [[ -f $UNIT_FILE ]]; then
+      if $main_enabled; then systemctl enable --quiet craftpanel; else systemctl disable craftpanel 2>/dev/null; fi
+    fi
+    if $update_path_enabled; then systemctl enable --quiet craftpanel-update.path; else systemctl disable --now craftpanel-update.path 2>/dev/null; fi
+    $update_path_active && systemctl start craftpanel-update.path
+    if ! stop_confirmed; then
+      die "Could not confirm that CraftPanel stopped; database recovery was refused." "Recovery point: $state_dir. Resolve the service stop failure before restoring."
+    fi
+    "$node" "$snapshot_cli" restore "$effective_data" "$state_dir" ||
+      die "Database recovery failed; CraftPanel remains stopped." "Recovery point: $state_dir. Do not restart against an incompatible database."
+    if $new_activated && [[ -d $INSTALL_DIR/apps ]]; then mv "$INSTALL_DIR/apps" "$INSTALL_DIR/apps.failed-$(date +%s)-$$" || die "Could not move the failed application aside."; fi
+    if $apps_moved; then mv "$INSTALL_DIR/apps.previous" "$INSTALL_DIR/apps" || die "Could not restore the previous application."; fi
+    if [[ -d $INSTALL_DIR/apps && -f $UNIT_FILE ]]; then
+      systemctl reset-failed craftpanel 2>/dev/null || true
+      if ! $was_active; then
+        ROLLED_BACK=true
+        die "The update failed; the previous application, database and startup configuration were restored and remain stopped." "Recovery point: $state_dir."
+      fi
+      systemctl start craftpanel && wait_healthy true || die "The previous version could not restart." "Recovery point: $state_dir; see journalctl -u craftpanel."
+      ROLLED_BACK=true
+      die "The update failed; the previous application, database and startup configuration are running again." "Recovery point: $state_dir; see journalctl -u craftpanel."
+    fi
+    die "The installation failed; no previous application was available. The original database was restored." "Recovery point: $state_dir."
+  }
+  # ERR is inherited by called functions. Rollback covers copy, unit registration, start and readiness failures.
+  trap rollback_transaction ERR
+  write_env_file "$port"
   rm -rf "$INSTALL_DIR/apps.previous"
-  [[ -d $INSTALL_DIR/apps ]] && mv "$INSTALL_DIR/apps" "$INSTALL_DIR/apps.previous"
-  [[ -f $INSTALL_DIR/release.json ]] && cp "$INSTALL_DIR/release.json" "$INSTALL_DIR/apps.previous.release.json"
+  if [[ -d $INSTALL_DIR/apps ]]; then mv "$INSTALL_DIR/apps" "$INSTALL_DIR/apps.previous"; apps_moved=true; fi
   mv "$INSTALL_DIR/apps.new" "$INSTALL_DIR/apps"
+  new_activated=true
   for f in README.md LICENSE CHANGELOG.md release.json; do cp "$src/$f" "$INSTALL_DIR/$f"; done
   install -m 755 "$src/deploy/install.sh" "$INSTALL_DIR/update.sh"
-  printf '{ "method": "linux-service", "updateCommand": "sudo %s/update.sh",\n  "selfUpdate": { "kind": "systemd", "request": "%s/requested", "log": "%s/update.log", "result": "%s" } }\n' "$INSTALL_DIR" "$UPDATE_DIR" "$LOG_DIR" "$RESULT_FILE" >"$INSTALL_DIR/install.json"
-  install_update_units
+  if [[ -n $checkout ]]; then
+    "$node" --input-type=module - "$checkout" "$INSTALL_DIR/install.json" <<'NODE'
+import fs from 'node:fs';
+const [checkout, file] = process.argv.slice(2);
+const quoted = "'" + checkout.replaceAll("'", "'\\''") + "'";
+fs.writeFileSync(file, JSON.stringify({ method: 'linux-service', sourceCheckout: checkout, updateCommand: `cd ${quoted} && ./update.sh` }) + '\n');
+NODE
+    systemctl disable --now craftpanel-update.path 2>/dev/null || true
+    rm -f "$UPDATE_UNIT" "$UPDATE_PATH_UNIT"
+  else
+    printf '{ "method": "linux-service", "updateCommand": "sudo %s/update.sh",\n  "selfUpdate": { "kind": "systemd", "request": "%s/requested", "log": "%s/update.log", "result": "%s" } }\n' "$INSTALL_DIR" "$UPDATE_DIR" "$LOG_DIR" "$RESULT_FILE" >"$INSTALL_DIR/install.json"
+    install_update_units
+  fi
   chown -R root:root "$INSTALL_DIR"
 
   sed "s|^ExecStart=/usr/bin/node |ExecStart=$node |" "$src/deploy/craftpanel.service" >"$UNIT_FILE"
@@ -205,26 +289,37 @@ main() {
 
   # ---- check that it came up, roll back otherwise -----------------------------------
   step "Starting…"
-  if ! wait_healthy; then
-    if [[ -d $INSTALL_DIR/apps.previous ]]; then
-      warn "CraftPanel v$version did not start. Going back to the previous version${previous:+ (v$previous)}."
-      systemctl stop craftpanel || true
-      rm -rf "$INSTALL_DIR/apps.failed"
-      mv "$INSTALL_DIR/apps" "$INSTALL_DIR/apps.failed"
-      mv "$INSTALL_DIR/apps.previous" "$INSTALL_DIR/apps"
-      [[ -f $INSTALL_DIR/apps.previous.release.json ]] && mv "$INSTALL_DIR/apps.previous.release.json" "$INSTALL_DIR/release.json"
-      systemctl reset-failed craftpanel 2>/dev/null || true
-      systemctl start craftpanel || true
-      if wait_healthy; then
-        ROLLED_BACK=true
-        die "CraftPanel v$version did not start; the previous version${previous:+ (v$previous)} is running again." "See what went wrong: sudo journalctl -u craftpanel -n 80 --no-pager"
-      fi
-    fi
-    die "CraftPanel did not start." "See what happened: sudo journalctl -u craftpanel -n 50 --no-pager"
-  fi
-  rm -f "$INSTALL_DIR/apps.previous.release.json"
+  wait_healthy
+  trap - ERR
+  touch "$state_dir/committed"
+  prune_recovery_points
 
   print_summary "$version" "$previous"
+}
+
+stop_confirmed() {
+  # systemd owns the entire service cgroup, including startup before control.json exists.
+  [[ $(systemctl show craftpanel -p LoadState --value 2>/dev/null) == not-found ]] && return 0
+  systemctl stop craftpanel || return 1
+  local service_state pid group
+  service_state=$(systemctl show craftpanel -p ActiveState --value) || return 1
+  pid=$(systemctl show craftpanel -p MainPID --value) || return 1
+  [[ $pid == 0 && ( $service_state == inactive || $service_state == failed ) ]] || return 1
+  group=$(systemctl show craftpanel -p ControlGroup --value) || return 1
+  if [[ -n $group && $group == /* && $group != *..* && -d /sys/fs/cgroup$group ]]; then
+    if find "/sys/fs/cgroup$group" -name cgroup.procs -exec cat {} + | grep -q '[0-9]'; then return 1; fi
+  fi
+  return 0
+}
+
+prune_recovery_points() {
+  local kept=0 name
+  while IFS= read -r name; do
+    [[ -f $INSTALL_DIR/$name/committed && ! -L $INSTALL_DIR/$name ]] || continue
+    kept=$((kept + 1))
+    # Names come only from this root-owned installation directory; failed recovery points are retained.
+    if ((kept > 2)) && [[ $name =~ ^state-[0-9]+-[0-9]+$ ]]; then rm -rf -- "$INSTALL_DIR/$name"; fi
+  done < <(find "$INSTALL_DIR" -maxdepth 1 -mindepth 1 -type d -name 'state-*' -printf '%f\n' | sort -r)
 }
 
 # Lets the dashboard start updates without giving CraftPanel any extra rights: it may only create
@@ -351,7 +446,18 @@ EOF
 
 # Reads a value from the env file (without executing it).
 env_value() {
+  [[ -f $ENV_FILE ]] || return 0
   sed -n "s/^$1=//p" "$ENV_FILE" | tail -1 | tr -d '"'"'"
+}
+
+validate_data_location() {
+  local effective resolved_install
+  effective=$(env_value CRAFTPANEL_DATA_DIR)
+  effective=$(realpath -m "${effective:-$DATA_DIR}")
+  resolved_install=$(realpath -m "$INSTALL_DIR")
+  if [[ $effective == "$resolved_install" || $effective == "$resolved_install/"* || $resolved_install == "$effective/"* ]]; then
+    die "Install and data directories must be separate, non-overlapping directories." "Move server data out of the installation directory before updating or uninstalling."
+  fi
 }
 
 dashboard_port() {
@@ -361,16 +467,23 @@ dashboard_port() {
 }
 
 wait_healthy() {
-  local port scheme=http host
+  local port scheme=http host legacy=${1:-false} status deadline=$((SECONDS + 60))
   port=$(dashboard_port)
   [[ -n $(env_value CRAFTPANEL_TLS_CERT) ]] && scheme=https
   host=$(env_value CRAFTPANEL_HOST)
   [[ -z $host || $host == 0.0.0.0 || $host == :: ]] && host=127.0.0.1
+  [[ $host == *:* && $host != \[*\] ]] && host="[$host]"
   # systemd keeps counting restarts across starts; only restarts during this wait count.
   local restarts
   restarts=$(systemctl show craftpanel -p NRestarts --value 2>/dev/null || echo 0)
   for _ in $(seq 1 60); do
-    curl -fsk -o /dev/null --max-time 2 "$scheme://$host:$port/api/health" && return 0
+    status=$(curl -sk --noproxy '*' -o /dev/null -w '%{http_code}' --max-time 2 "$scheme://$host:$port/api/ready") || status=000
+    [[ $status == 200 ]] && return 0
+    # Only the previous version may predate readiness checks. Never mask a new version's 503.
+    if [[ $legacy == true && $status == 404 ]]; then
+      curl -fsk --noproxy '*' -o /dev/null --max-time 2 "$scheme://$host:$port/api/health" && return 0
+    fi
+    ((SECONDS >= deadline)) && return 1
     # Crash loop: systemd keeps restarting it (Restart=on-failure), so don't wait the full minute.
     systemctl is-failed --quiet craftpanel && return 1
     (($(systemctl show craftpanel -p NRestarts --value 2>/dev/null || echo 0) - ${restarts:-0} >= 2)) && return 1
@@ -429,8 +542,10 @@ print_summary() {
 
 do_uninstall() {
   step "Removing CraftPanel…"
+  validate_data_location
   if systemctl list-unit-files craftpanel.service >/dev/null 2>&1; then
-    systemctl disable --now craftpanel 2>/dev/null || true
+    stop_confirmed || die "CraftPanel is still running; uninstall was refused."
+    systemctl disable craftpanel 2>/dev/null || true
   fi
   systemctl disable --now craftpanel-update.path 2>/dev/null || true
   rm -f "$UNIT_FILE" "$UPDATE_UNIT" "$UPDATE_PATH_UNIT"
