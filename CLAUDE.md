@@ -10,7 +10,7 @@ Self-hosted Minecraft (Java) server manager: Fastify API + Next.js dashboard in 
 ## Working agreements
 - The owner writes in German; answer in German. Code, comments, commits and docs are in English.
 - **Commit and push on your own whenever a stable state is reached**: typecheck clean, `pnpm test` green, and verified for real where it matters. Commit in logical chunks; don't push half-finished or failing work. Check that CI is green after pushing (`gh run list`, `gh run watch`).
-- Commit identity: `vctrchappot <victor.chappot.haas@gmail.com>`. Never commit with another address. Set it per checkout with `git config user.email`.
+- Commit identity: `vctrchappot <315308326+vctrchappot@users.noreply.github.com>` (GitHub noreply; always attributed to the vctrchappot account). Never commit with another address. Set it per checkout with `git config user.name vctrchappot` and `git config user.email`.
 - End commit messages with `Co-Authored-By: Claude <noreply@anthropic.com>` (or the attribution your environment specifies).
 - Keep `docs/STATUS.md` honest (✅ verified / 🧪 tested / 🟡 untested) and update `docs/ROADMAP.md` when plans change.
 
