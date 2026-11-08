@@ -4,3 +4,6 @@ export * from "./log-parser";
 export * from "./process-info";
 export * from "./sandbox";
 export * from "./paths";
+export * from "./protocol";
+export * from "./client";
+export * from "./service";

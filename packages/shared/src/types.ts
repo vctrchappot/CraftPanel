@@ -45,6 +45,7 @@ export type NetworkMode = "lan" | "wan";
  * previous CraftPanel run is still alive but we no longer own its stdin.
  */
 export type ServerStatus =
+  | "unknown"
   | "installing"
   | "stopped"
   | "starting"

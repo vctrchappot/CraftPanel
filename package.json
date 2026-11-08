@@ -16,6 +16,7 @@
     "dev:web": "pnpm --filter @craftpanel/web dev",
     "build": "pnpm --filter @craftpanel/web build && pnpm --filter @craftpanel/api build",
     "start": "node apps/api/dist/index.js",
+    "start:runtime": "node apps/api/dist/runtime.js",
     "start:local": "node apps/api/dist/index.js --profile local",
     "start:lan": "node apps/api/dist/index.js --profile lan",
     "start:proxy": "node apps/api/dist/index.js --profile proxy",

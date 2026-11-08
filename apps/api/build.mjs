@@ -28,6 +28,18 @@ await build({
 
 // A standalone installer helper: probing recovery support can never start the API or run migrations.
 await build({
+  entryPoints: [path.join(here, "src/runtime.ts")],
+  outfile: path.join(dist, "runtime.js"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node22",
+  minify: true,
+  keepNames: true,
+  logLevel: "info",
+});
+
+await build({
   entryPoints: [path.join(here, "src/recovery-cli.ts")],
   outfile: path.join(dist, "recovery.js"),
   bundle: true,
