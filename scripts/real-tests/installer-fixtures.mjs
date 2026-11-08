@@ -8,6 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const [outputArg, instance = "craftpanel"] = process.argv.slice(2);
 if (!outputArg || !/^(craftpanel|craftpanel-ops-[a-z0-9-]+)$/.test(instance)) throw new Error("Usage: installer-fixtures.mjs OUTPUT [craftpanel-ops-NAME]");
 const output = path.resolve(outputArg);
+await fs.mkdir(path.dirname(output), { recursive: true });
 await fs.mkdir(output); // Refuse to overwrite an existing fixture set.
 const rewrite = (text) => instance === "craftpanel" ? text : text.replace(/\bcraftpanel\b/g, () => instance).replaceAll(`${instance}-recovery-v1`, "craftpanel-recovery-v1");
 await fs.writeFile(path.join(output, "install.sh"), rewrite(await fs.readFile(path.join(root, "deploy/install.sh"), "utf8")));
