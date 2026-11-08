@@ -6,6 +6,8 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 
 ## Unreleased
 
+- Add an independent Minecraft runtime transport with authenticated local IPC, bounded console replay, explicit command acknowledgements and generation-bound commands without automatic retries. Installer and dashboard integration are being completed on the runtime phase branch.
+
 ### Added
 - Transactional Linux and Windows updates: verify recovery support before stopping, snapshot the database and startup artifacts, restore on installation failures, reject concurrent installers and retain two successful recovery points. Source-based Linux installs use the same installer path.
 - Windows process supervisor with suspended startup and a kill-on-close Job Object so scheduled-task shutdown also owns Node and its descendants.

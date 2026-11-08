@@ -5,6 +5,7 @@ import { createProcessProbe, isJavaProcess, isPidAlive, type ProcessProbe } from
 import { parseMspt, parseTps, type LogSignal } from "./log-parser";
 
 export interface AgentEvents {
+  connection: [connected: boolean];
   status: [serverId: string, status: ServerStatus, detail?: string];
   lines: [serverId: string, lines: ConsoleLine[]];
   players: [serverId: string, players: OnlinePlayer[]];
@@ -19,7 +20,9 @@ export interface AgentEvents {
  * A disconnected implementation must reject mutations and unsafe liveness checks.
  */
 export interface RuntimeAgent extends EventEmitter<AgentEvents> {
-  start(serverId: string, spec: LaunchSpec & { software: ServerSoftware }): Promise<void>;
+  readonly connected: boolean;
+  owns(serverId: string): boolean;
+  start(serverId: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }): Promise<void>;
   stop(serverId: string, timeoutMs?: number): Promise<boolean>;
   kill(serverId: string): Promise<void>;
   send(serverId: string, command: string): Promise<void>;
@@ -35,12 +38,17 @@ export interface RuntimeAgent extends EventEmitter<AgentEvents> {
   terminatePid(pid: number, force: boolean): Promise<boolean>;
   forget(serverId: string): Promise<void>;
   shutdown(timeoutMs?: number): Promise<void>;
+  stopAll(timeoutMs?: number): Promise<{ id: string; stopped: boolean }[]>;
+  configureAutoStart(serverId: string, enabled: boolean): Promise<void>;
+  /** Release this dashboard's connection. Does not stop an external runtime. */
+  disconnect(): Promise<void>;
 }
 
 const RESOURCE_INTERVAL_MS = 5000;
 const TICK_INTERVAL_MS = 15000;
 
 export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgent {
+  readonly connected = true;
   private servers = new Map<string, ManagedServer>();
   private software = new Map<string, ServerSoftware>();
   private watchers = new Map<string, number>();
@@ -65,6 +73,8 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
     }
     return s;
   }
+
+  owns(id: string) { return this.servers.has(id); }
 
   async start(id: string, spec: LaunchSpec & { software: ServerSoftware }) {
     this.software.set(id, spec.software);
@@ -216,6 +226,14 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
     this.servers.delete(id);
     this.metrics.delete(id);
   }
+
+  async configureAutoStart(_id: string, _enabled: boolean) {}
+
+  async stopAll(timeoutMs = 90_000) {
+    return Promise.all([...this.servers].map(async ([id, server]) => ({ id, stopped: await server.stop(timeoutMs) })));
+  }
+
+  async disconnect() { await this.shutdown(); }
 
   /** Gracefully stop every running server (used on CraftPanel shutdown). */
   async shutdown(timeoutMs = 60_000) {

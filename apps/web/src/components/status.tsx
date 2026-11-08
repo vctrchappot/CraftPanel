@@ -2,6 +2,7 @@ import { Badge, cn } from "@craftpanel/ui";
 import type { ServerStatus } from "@craftpanel/shared";
 
 const META: Record<ServerStatus, { label: string; dot: string; variant: "success" | "warning" | "danger" | "default" | "info" }> = {
+  unknown: { label: "Connection lost", dot: "bg-muted-foreground/50", variant: "warning" },
   running: { label: "Running", dot: "bg-success", variant: "success" },
   starting: { label: "Starting", dot: "bg-warning animate-pulse", variant: "warning" },
   stopping: { label: "Stopping", dot: "bg-warning animate-pulse", variant: "warning" },

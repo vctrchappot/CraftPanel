@@ -50,6 +50,7 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
   private _status: ServerStatus = "stopped";
   private seq = 0;
   private ring: ConsoleLine[] = [];
+  private ringBytes = 0;
   private pendingLines: ConsoleLine[] = [];
   private flushTimer: NodeJS.Timeout | null = null;
   private stopRequested = false;
@@ -284,10 +285,14 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
   }
 
   private push(line: Omit<ConsoleLine, "seq" | "ts">) {
+    line = { ...line, text: line.text.slice(0, 16_384) };
     const full: ConsoleLine = { ...line, seq: ++this.seq, ts: Date.now() };
     this.ring.push(full);
-    if (this.ring.length > RING_SIZE) this.ring.splice(0, this.ring.length - RING_SIZE);
+    this.ringBytes += Buffer.byteLength(JSON.stringify(full));
+    while (this.ring.length > RING_SIZE || this.ringBytes > 512 * 1024) this.ringBytes -= Buffer.byteLength(JSON.stringify(this.ring.shift()!));
     this.pendingLines.push(full);
+    // Flush before a burst can exceed the transport frame budget.
+    if (this.pendingLines.length >= 32) this.flush();
     // Batch lines to avoid flooding WebSocket clients during startup.
     if (!this.flushTimer) this.flushTimer = setTimeout(() => this.flush(), 50);
   }
@@ -384,6 +389,7 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
 
   clearRing() {
     this.ring = [];
+    this.ringBytes = 0;
   }
 }
 
