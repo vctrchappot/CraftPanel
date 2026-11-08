@@ -96,7 +96,7 @@ function pack() {
   } catch {
     /* not a git checkout */
   }
-  fs.writeFileSync(path.join(stage, "release.json"), JSON.stringify({ version, commit, builtAt: new Date().toISOString() }, null, 2) + "\n");
+  fs.writeFileSync(path.join(stage, "release.json"), JSON.stringify({ version, commit, recoveryProtocol: 1, builtAt: new Date().toISOString() }, null, 2) + "\n");
 
   // Relative paths only: GNU tar on Windows would read "C:\…" as a remote host.
   const archive = `${name}.tar.gz`;

@@ -26,6 +26,19 @@ await build({
   logLevel: "info",
 });
 
+// A standalone installer helper: probing recovery support can never start the API or run migrations.
+await build({
+  entryPoints: [path.join(here, "src/recovery-cli.ts")],
+  outfile: path.join(dist, "recovery.js"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node22",
+  minify: true,
+  keepNames: true,
+  logLevel: "info",
+});
+
 fs.cpSync(path.resolve(here, "../../packages/database/drizzle"), path.join(dist, "drizzle"), { recursive: true });
 fs.cpSync(path.join(here, "assets"), path.join(dist, "assets"), { recursive: true });
 const web = path.resolve(here, "../web/out");
