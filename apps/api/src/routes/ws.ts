@@ -52,6 +52,8 @@ export async function wsRoutes(app: FastifyInstance, ctx: AppContext) {
             if (!canAccess(client.access, "console.read", msg.serverId)) return;
             await ctx.servers.row(msg.serverId);
             client.subscriptions.set(msg.serverId, ctx.agent.watch(msg.serverId));
+            ctx.hub.send(client, { type: "status", serverId: msg.serverId, status: ctx.agent.status(msg.serverId) });
+            ctx.hub.send(client, { type: "players", serverId: msg.serverId, players: ctx.agent.info(msg.serverId).players });
             ctx.hub.send(client, { type: "console", serverId: msg.serverId, lines: ctx.agent.history(msg.serverId, 1000), replay: true });
             const metrics = ctx.agent.latestMetrics(msg.serverId);
             if (metrics) ctx.hub.send(client, { type: "metrics", serverId: msg.serverId, metrics });

@@ -6,7 +6,7 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 ## Current state (handoff, 2026-11-08)
 
-The professional-deployment foundation is being implemented in small logical commits. The network and diagnostic changes are covered by automated tests; the new installer recovery transaction still needs package/service verification before it is marked verified. Read this section, STATUS.md and CLAUDE.md before continuing; check current git and CI state rather than assuming a previous green run covers new work.
+The active phase is **Minecraft-Laufzeit vom Dashboard trennen** on `feat/runtime-separation`. The asynchronous runtime contract, authenticated local process service and dashboard reconnection are implemented and covered by automated child-process and database integration tests. Installer integration and real failure/player acceptance checks remain open. Read STATUS.md and CLAUDE.md and check current Git/CI state before continuing.
 
 - **Velocity proxy** is done and verified (STATUS.md); remaining points are listed under step 4.
 - **Suggested next, in order:** finish the professional-deployment verification below, publish the first release and run the real installer paths (step 1), then separate runtime ownership from the dashboard before adding remote hosts. Bedrock and Pi/VPS measurements remain planned.
@@ -30,6 +30,24 @@ The professional-deployment foundation is being implemented in small logical com
 - In-game info command: `/craftpanel` (Paper plugin) and `/trigger craftpanel` (datapack), on by default, removable globally, per server or from the Plugins tab.
 
 ## Next
+
+### Minecraft-Laufzeit vom Dashboard trennen
+
+User outcome: the dashboard can close, restart or update while Minecraft continues;
+afterwards its actual state, console and controls are available again.
+
+- [x] Asynchronous runtime interface; orchestration depends on the contract.
+- [x] Separate process owner, authenticated Unix socket / Windows named pipe, bounded history and protocol handshake (automated child-process tests).
+- [x] Dashboard reconnect reconciles actual runtime snapshots, rejects controls while disconnected, and never retries expired or uncertain commands (automated integration tests).
+- [ ] Ubuntu/systemd installer migration and independent dashboard/runtime update transactions.
+- [ ] Windows installer parity, including graceful host shutdown.
+- [ ] Explicit maintenance action and runtime-update interruption preview in the dashboard.
+- [ ] Prove a real player remains connected during dashboard restart/update and abrupt crash.
+- [ ] Prove disconnect/replay handling, graceful host reboot/autostart, preserved worlds/configuration and recoverable update failure on installed services.
+
+Commit order: interface → service → reconnect → installers → failure/acceptance tests.
+Do not mark this phase complete from mocked or child-process-only evidence.
+Following phases: per-server isolation/resources → complete backups and host moves → multiple hosts.
 
 ### Professional deployments
 

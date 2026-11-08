@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ConsoleLine, InstallProgress, OnlinePlayer, ServerMetrics, ServerSummary, WsClientMessage, WsServerMessage } from "@craftpanel/shared";
+import type { ConsoleLine, InstallProgress, OnlinePlayer, ServerDetail, ServerMetrics, ServerSummary, WsClientMessage, WsServerMessage } from "@craftpanel/shared";
 import { wsUrl } from "./api";
 
 type Listener = (msg: WsServerMessage) => void;
@@ -127,9 +127,19 @@ export function RealtimeProvider({ children, enabled }: { children: React.ReactN
     const offClose = client.onClose((code) => {
       if (code === 4001 || code === 4002) void qc.invalidateQueries();
     });
+    const offState = client.onState((state) => {
+      if (state === "open") {
+        void qc.invalidateQueries({ queryKey: ["servers"] });
+        void qc.invalidateQueries({ queryKey: ["server"] });
+      } else {
+        qc.setQueryData<ServerSummary[]>(["servers"], (rows) => rows?.map((s) => ({ ...s, status: "unknown" })));
+        qc.setQueriesData<ServerDetail>({ queryKey: ["server"] }, (s) => s ? { ...s, status: "unknown", players: [], playersOnline: 0, pid: null } : s);
+      }
+    });
     return () => {
       off();
       offClose();
+      offState();
       client.disconnect();
     };
   }, [client, enabled, qc]);
@@ -186,9 +196,11 @@ export function useServerStream(serverId: string | null) {
       else if (msg.type === "status" && msg.serverId === serverId && msg.status !== "running") setMetrics(null);
     });
     const unsub = c.subscribe(serverId);
+    const offState = c.onState((state) => { if (state !== "open") { setMetrics(null); setPlayers(null); } });
     return () => {
       off();
       unsub();
+      offState();
     };
   }, [c, serverId]);
 

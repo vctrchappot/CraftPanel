@@ -80,6 +80,8 @@ export class BackupService {
    */
   async create(serverId: string, kind: BackupInfo["kind"], actor: Actor, note?: string): Promise<BackupInfo> {
     const server = await this.servers.row(serverId);
+    // Refuse an unknown runtime before allocating a running backup record or touching files.
+    const live = !SOFTWARE_INFO[server.software].proxy && this.servers.agent.isRunning(serverId) && this.servers.agent.status(serverId) === "running";
     if (this.running.has(serverId)) throw conflict("A backup of this server is already running");
     const id = crypto.randomUUID();
     const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -92,7 +94,6 @@ export class BackupService {
     emit("running", 0, "Preparing backup");
 
     // A proxy has no world to flush.
-    const live = !SOFTWARE_INFO[server.software].proxy && this.servers.agent.isRunning(serverId) && this.servers.agent.status(serverId) === "running";
     try {
       const storage = await this.storage();
       const dest = storage.stagingPath(storageKey);
@@ -112,6 +113,7 @@ export class BackupService {
         exclude: (rel) => isExcluded(rel),
         onProgress: (p) => emit("running", p.totalBytes ? Math.round((p.bytesProcessed / p.totalBytes) * 100) : null, p.currentFile ? `Archiving ${p.currentFile}` : "Archiving"),
       });
+      if (!this.servers.agent.connected) throw new Error("Runtime connection lost during backup; world consistency cannot be confirmed");
       await storage.commit(storageKey);
       await this.db.update(backups).set({ status: "completed", size: result.size, sha256: result.sha256, completedAt: Date.now() }).where(eq(backups.id, id));
       emit("completed", 100, "Backup complete");
@@ -123,9 +125,9 @@ export class BackupService {
       await this.activity.event(serverId, "backup.failed", `Backup failed: ${message}`, { level: "error", actor });
       throw err;
     } finally {
-      if (live && this.servers.agent.isRunning(serverId)) {
+      if (live) {
         try {
-          await this.servers.agent.send(serverId, "save-on");
+          if (this.servers.agent.isRunning(serverId)) await this.servers.agent.send(serverId, "save-on");
         } catch {
           /* stopped meanwhile */
         }

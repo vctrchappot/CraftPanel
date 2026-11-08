@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CRAFTPANEL_VERSION } from "@craftpanel/shared";
+import { RuntimeClient } from "@craftpanel/server-runtime";
 import { dashboardUrls } from "@craftpanel/network";
 import { loadConfig, PROFILES, type AppConfig } from "./config";
 import { createContext } from "./bootstrap";
@@ -54,14 +55,16 @@ async function main() {
 
   // Folder that holds apps/ (a git checkout or an installer's install directory).
   const installRoot = path.resolve(here, "../../..");
-  const ctx = await createContext(config, { migrationsFolder, installRoot });
+  const agent = new RuntimeClient(config.layout.root);
+  await agent.connect().catch(() => console.warn("Minecraft runtime unavailable; server state remains unknown until it reconnects. Start the runtime service with the same data directory."));
+  const ctx = await createContext(config, { migrationsFolder, installRoot, agent });
   // Lets the installers stop CraftPanel gracefully before an update (see control.json below).
   const controlToken = crypto.randomBytes(24).toString("hex");
   const controlFile = path.join(config.layout.root, "control.json");
   let requestShutdown = (_reason: string) => undefined as void;
   let ready = false;
   const app = await buildApp(ctx, {
-    isReady: () => ready,
+    isReady: () => ready && ctx.agent.connected,
     control: { token: controlToken, shutdown: () => requestShutdown("Shutdown request") },
     logger: config.logFormat === "json" ? { level: config.logLevel } : { level: config.logLevel, stream: prettyLogStream({ level: config.logLevel }) },
   });
@@ -95,12 +98,12 @@ async function main() {
     if (shuttingDown) return;
     shuttingDown = true;
     ready = false;
-    app.log.info(`${signal} received: stopping Minecraft servers gracefully…`);
+    app.log.info(`${signal} received: closing the dashboard; Minecraft servers remain in the runtime…`);
     clearInterval(housekeeping);
     ctx.schedules.stop();
     ctx.notifications.stop();
     ctx.updates.stop();
-    await ctx.agent.shutdown(60_000);
+    await ctx.agent.disconnect();
     await app.close();
     ctx.database.close();
     fs.rmSync(controlFile, { force: true });

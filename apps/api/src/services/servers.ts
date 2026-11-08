@@ -89,6 +89,7 @@ export class ServerService {
   }
 
   status(row: ServerRow): ServerStatus {
+    if (!this.agent.connected) return "unknown";
     if (row.installState === "installing" || row.installState === "pending") return "installing";
     if (row.installState === "failed") return "error";
     const live = this.agent.status(row.id);
@@ -416,6 +417,7 @@ export class ServerService {
         memoryMb: row.memoryMb,
         jvmArgs: [...(log4j?.jvmArgs ?? []), ...splitArgs(row.jvmArgs)],
         software: row.software,
+        autoStart: row.autoStart,
       });
       await this.activity.event(id, "server.start", `Server starting`, { actor });
       await this.activity.audit(actor, "server.start", id);
@@ -506,6 +508,7 @@ export class ServerService {
 
   async update(id: string, patch: Partial<Pick<ServerRow, "name" | "description" | "memoryMb" | "jvmArgs" | "javaPath" | "autoStart" | "networkMode" | "bindAddress" | "port" | "infoCommand">>, actor: Actor) {
     const row = await this.row(id);
+    if (patch.autoStart !== undefined) await this.agent.configureAutoStart(id, patch.autoStart);
     if (patch.port !== undefined && patch.port !== row.port) {
       const others = (await this.rows()).filter((s) => s.id !== id);
       if (others.some((s) => s.port === patch.port)) throw conflict(`Port ${patch.port} is used by another CraftPanel server`);
@@ -578,6 +581,21 @@ export class ServerService {
   // ---- agent events & recovery ---------------------------------------------
 
   private wireAgent() {
+    this.agent.on("connection", (connected) => {
+      void (async () => {
+        if (connected) await this.recover();
+        for (const row of await this.rows()) {
+          if (this.agent.connected !== connected) return;
+          this.hub.broadcast({ type: "status", serverId: row.id, status: this.status(row), detail: connected ? undefined : "Runtime connection lost; state is unknown" });
+          this.hub.broadcast({ type: "players", serverId: row.id, players: this.agent.info(row.id).players });
+          if (connected) {
+            this.hub.toSubscribers(row.id, { type: "console", serverId: row.id, lines: this.agent.history(row.id, 1000), replay: true });
+            const metrics = this.agent.latestMetrics(row.id);
+            if (metrics) this.hub.toSubscribers(row.id, { type: "metrics", serverId: row.id, metrics });
+          }
+        }
+      })().catch(() => undefined);
+    });
     this.agent.on("status", async (id, status, detail) => {
       const info = this.agent.info(id);
       this.hub.broadcast({ type: "status", serverId: id, status, detail });
@@ -620,9 +638,19 @@ export class ServerService {
    * record saying "running" proves nothing; we check the PID.
    */
   async recover(): Promise<void> {
+    if (!this.agent.connected) return;
     for (const row of await this.rows()) {
       if (row.installState === "installing" || row.installState === "pending") {
         await this.db.update(servers).set({ installState: "failed", installError: "Installation was interrupted. Retry the installation." }).where(eq(servers.id, row.id));
+        continue;
+      }
+      if (this.agent.owns(row.id)) {
+        const info = this.agent.info(row.id);
+        await this.db.update(servers).set({ lastStatus: this.agent.status(row.id), pid: info.pid, startedAt: info.startedAt, lastError: info.lastError, lastExitCode: info.lastExitCode }).where(eq(servers.id, row.id));
+        const online = new Set(info.players.map((p) => p.name));
+        const open = await this.db.select().from(playerSessions).where(and(eq(playerSessions.serverId, row.id), isNull(playerSessions.leftAt)));
+        for (const session of open) if (!online.has(session.name)) await this.db.update(playerSessions).set({ leftAt: Date.now() }).where(eq(playerSessions.id, session.id));
+        for (const player of info.players) if (!open.some((s) => s.name === player.name)) await this.db.insert(playerSessions).values({ serverId: row.id, name: player.name, uuid: player.uuid, joinedAt: player.joinedAt });
         continue;
       }
       const wasActive = ["starting", "running", "stopping", "orphaned"].includes(row.lastStatus);
@@ -638,7 +666,7 @@ export class ServerService {
       await this.db.update(playerSessions).set({ leftAt: Date.now() }).where(and(eq(playerSessions.serverId, row.id), isNull(playerSessions.leftAt)));
     }
     for (const row of await this.rows()) {
-      if (row.autoStart && row.installState === "installed" && row.eulaAccepted && !this.agent.isRunning(row.id) && row.lastStatus !== "orphaned") {
+      if (row.autoStart && row.installState === "installed" && row.eulaAccepted && !this.agent.owns(row.id) && !this.agent.isRunning(row.id) && row.lastStatus !== "orphaned") {
         this.start(row.id, SYSTEM_ACTOR).catch((err) => this.activity.event(row.id, "server.autostart_failed", `Automatic start failed: ${(err as Error).message}`, { level: "error" }));
       }
     }
