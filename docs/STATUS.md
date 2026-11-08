@@ -6,6 +6,16 @@ Verification environments so far: **Windows 11 x64, Node 26** and **Linux x64 (U
 
 Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-running the installer (graceful world save on restart), Paper 1.21.11 and Vanilla 26.3 with automatically downloaded Linux Java 21/25, a real player connection from another machine (mineflayer bot via the network), kick/ban/pardon/whitelist, the in-game info command, the remote-access policy over the network, and the dashboard in a browser (console auto-scroll, dark-mode dropdowns).
 
+## Professional deployment foundation (2026-11-08)
+
+- 🧪 Canonical public origins, explicit trusted proxy IP/CIDR peers, server-side HTTPS requirements for public access, and setup-token protection for loopback backends exposed through a proxy. Tests cover spoofed and missing forwarding metadata, browser-facing versus backend TLS, public CIDR ranges and HTTP/WebSocket origins.
+- 🧪 Deployment diagnostics in Remote access and the read-only `doctor --json` command; missing data directories are not initialized. Readiness is distinct from liveness and includes startup/shutdown state and database availability.
+- ✅ Standalone recovery helper: all eleven recovery tests passed on Ubuntu/WSL2, including WAL preservation, schema restore, validation, live-process refusal and symlink replacement. Windows passes the nine applicable tests; two Unix-specific tests are skipped.
+- ✅ Real isolated Linux systemd package tests: unsupported archive leaves the original process running; failed migration, invalid unit and hanging startup restore the database and startup configuration; subsequent valid updates and two-successful-snapshot retention work. A proxy listener bound to a specific LAN interface remains reachable to local maintenance probes. The existing normal CraftPanel service was unchanged.
+- ✅ Real isolated Windows scheduled-task package tests: unsupported archive, failed migration and hanging startup, restoration of schema/task configuration, subsequent valid updates and snapshot retention. Testing found that Task Scheduler alone left Node children alive; the new suspended-start/kill-on-close Job Object launcher fixed the failure. The updated descendant and bad-launcher fixtures are also registered in CI; dashboard-triggered rollback and concurrent installers still need explicit end-to-end scenarios.
+- ✅ `scripts/real-tests/deployment.mjs`: production package tested on Windows 11 (Node 26) and Ubuntu 24.04/WSL2 (Node 24) with a real HTTPS proxy, rewritten Host, setup token, Secure cookies, authenticated WebSocket upgrade and direct TLS. An HTTP browser edge is rejected even when the proxy-to-backend hop uses TLS. The Remote access UI and deployment checks were verified in Chromium on Windows. A physical separate-host proxy is not yet tested.
+- ⏳ Runtime separation, per-server process isolation, full application backups, host migration, persistent monitoring/jobs and remote agents. Current update recovery does not restore worlds or server files.
+
 ## Core flow (primary success criterion)
 
 | Step | Status | Evidence |

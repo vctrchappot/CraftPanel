@@ -6,10 +6,10 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 ## Current state (handoff, 2026-11-08)
 
-Everything on `main` is pushed, CI green, `pnpm test` green; features are verified as described in STATUS.md. To continue on another device or with another model: read this section, STATUS.md and CLAUDE.md, then pick the next open item.
+The professional-deployment foundation is being implemented in small logical commits. The network and diagnostic changes are covered by automated tests; the new installer recovery transaction still needs package/service verification before it is marked verified. Read this section, STATUS.md and CLAUDE.md before continuing; check current git and CI state rather than assuming a previous green run covers new work.
 
 - **Velocity proxy** is done and verified (STATUS.md); remaining points are listed under step 4.
-- **Suggested next, in order:** publish the first release and run the real installer paths (step 1) → Bedrock Dedicated Server → measurements on a Pi / small VPS (step 5).
+- **Suggested next, in order:** finish the professional-deployment verification below, publish the first release and run the real installer paths (step 1), then separate runtime ownership from the dashboard before adding remote hosts. Bedrock and Pi/VPS measurements remain planned.
 - **Known small issues** (not yet tracked elsewhere):
   - Modrinth update checks also offer beta/alpha versions (`checkModrinthUpdates` doesn't filter by `version_type`).
   - Removing a plugin installed from Hangar leaves its entry in `plugins/.craftpanel-hangar.json` (harmless; only existing jars are checked).
@@ -30,6 +30,20 @@ Everything on `main` is pushed, CI green, `pnpm test` green; features are verifi
 - In-game info command: `/craftpanel` (Paper plugin) and `/trigger craftpanel` (datapack), on by default, removable globally, per server or from the Plugins tab.
 
 ## Next
+
+### Professional deployments
+
+- [x] Canonical browser-facing origin (`CRAFTPANEL_PUBLIC_URL`), explicit trusted proxy peers, HTTPS checks for public clients and public access-rule changes, and setup-token protection behind reverse proxies.
+- [x] Deployment diagnostics in Remote access and the read-only `doctor --json` command; separate liveness and readiness endpoints.
+- [x] Standalone recovery protocol, consistent database snapshots and startup-artifact rollback verified through isolated Linux/Windows package installs, including failed migrations, unsupported targets and hanging startup. Linux also covers an invalid systemd unit. Source installs share the release installer transaction.
+- [x] Real HTTPS reverse-proxy, built-in TLS and WebSocket package tests on Windows and Ubuntu/WSL2, plus the Remote access UI in Chromium.
+- [ ] Extend verification to dashboard-triggered rollback, concurrent installers and a physical separate-host HTTPS proxy; keep STATUS.md evidence specific to each environment.
+- [ ] Separate the runtime service from the API so panel updates do not stop game servers and reconnect restores control.
+- [ ] Add per-server OS isolation and resource limits.
+- [ ] Add complete application backup/restore and host migration, including configuration and secrets outside the panel database.
+- [ ] Add persistent monitoring and recoverable background jobs, then authenticated remote agents and multiple hosts.
+
+Database recovery is a foundation for failed-update handling, not full world rollback or a general downgrade mechanism. Existing TOTP, per-server roles and session controls remain in place; SSO and scoped automation credentials can follow the runtime and recovery work.
 
 ### 1. Release packages and one-line installers (finish Phase 1)
 The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target machine (a Next.js build on a Pi 4 is slow and memory-hungry).

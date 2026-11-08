@@ -9,7 +9,7 @@ CraftPanel administers processes and files on the host. Whoever controls an Owne
 **Authentication & sessions**
 - Local accounts only. Passwords are hashed with scrypt (N=2¹⁵, r=8, p=1) and a per-user salt, and compared in constant time. Unknown users get a dummy hash comparison so timing doesn't reveal which accounts exist.
 - Random 256-bit session tokens in an `HttpOnly`, `SameSite=Strict` cookie (`Secure` when `CRAFTPANEL_SECURE_COOKIES=true`). Only the SHA-256 of the token is stored. Sessions slide and expire, and are revoked on logout, password change, role change or account disablement. Open WebSockets for those sessions are closed.
-- First-run setup on network-exposed installs requires a one-time token readable only on the host. The token file is deleted once the owner account exists.
+- First-run setup on network-exposed installs requires a one-time token readable only on the host, including a loopback backend behind a trusted proxy or a configured public URL. The token file is deleted once the owner account exists.
 - Network access policy (Settings → Remote access): by default only private networks and VPNs may reach the dashboard, even when it listens on all interfaces. Checked before anything else on every request and WebSocket upgrade; the host itself is always allowed, and changes that would lock out the requester are refused.
 - Optional built-in HTTPS (`CRAFTPANEL_TLS_CERT`/`CRAFTPANEL_TLS_KEY`) turns on Secure cookies automatically.
 - Login and setup are rate-limited (10/min per IP), and the whole API is limited to 600/min.
@@ -64,6 +64,8 @@ CraftPanel administers processes and files on the host. Whoever controls an Owne
 - Secrets such as the DuckDNS token and TOTP secrets are stored in the SQLite database in plain text, protected by filesystem permissions. Anyone who can read the data directory can also generate codes.
 - Pending two-factor sign-ins live in memory; a restart in the middle of one asks for the password again.
 - Notifications: the Discord webhook URL and SMTP password are stored like other secrets and never sent back to the browser. Only `discord.com` webhook URLs are accepted, and messages can't mention @everyone or roles. Messages contain server names and log excerpts; choose recipients accordingly.
+- Update recovery restores the panel database and saved startup artifacts after a failed installation. It does not restore Minecraft worlds or server files and is not a full backup or a host-migration mechanism. Recovery snapshots contain credentials and other secrets and need the same protection as the data directory.
+- The API still owns the Minecraft processes. A normal CraftPanel restart stops them gracefully; runtime separation and per-server process isolation are planned.
 
 ## Reporting vulnerabilities
 

@@ -106,14 +106,18 @@ All settings are environment variables. Installed with the one-line installer, t
 | `CRAFTPANEL_HOST` | from profile | Dashboard bind address |
 | `CRAFTPANEL_PORT` | `8080` | Dashboard port |
 | `CRAFTPANEL_DATA_DIR` | platform default | Servers, backups, Java runtimes, database |
-| `CRAFTPANEL_SECURE_COOKIES` | `false` | Set `true` behind HTTPS |
-| `CRAFTPANEL_TRUST_PROXY` | `false` | Set `true` behind a reverse proxy |
+| `CRAFTPANEL_PUBLIC_URL` | — | Browser-facing HTTP(S) origin; use the external HTTPS address behind a proxy |
+| `CRAFTPANEL_TRUSTED_PROXIES` | loopback in proxy mode | Comma-separated trusted proxy IPs/CIDRs |
+| `CRAFTPANEL_SECURE_COOKIES` | from profile/TLS/public URL | Enabled automatically for HTTPS; cannot be disabled when HTTPS is configured |
+| `CRAFTPANEL_TRUST_PROXY` | from profile | Legacy switch: `true` trusts loopback proxy peers only; prefer explicit trusted proxies |
 | `CRAFTPANEL_TLS_CERT` / `CRAFTPANEL_TLS_KEY` | — | Serve HTTPS directly with these PEM files |
 | `CRAFTPANEL_SESSION_TTL_HOURS` | `168` | Session lifetime |
 | `CRAFTPANEL_LOG_LEVEL` / `CRAFTPANEL_LOG_FORMAT` | `info` / `pretty` | Logging (`debug` shows every request, `json` for log collectors) |
 | `CRAFTPANEL_UPDATE_CHECK` | `true` | `false` never contacts GitHub for the update notice (also a switch in Settings) |
 
 Who may open the dashboard from other devices is configured live in **Settings → Remote access** (see [docs/deployment](docs/deployment/README.md#remote-access-for-teams)).
+
+For a checkout, load a configuration file explicitly: `node --env-file=.env apps/api/dist/index.js`. Copying `.env.example` to `.env` alone does not load it. Deployment diagnostics are available in Remote access and with `node --env-file=.env apps/api/dist/index.js doctor --json`; see [deployment diagnostics](docs/deployment/README.md#deployment-diagnostics).
 
 ## Development
 
