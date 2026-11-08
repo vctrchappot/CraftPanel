@@ -30,6 +30,7 @@ jobs:
         run: |
           mkdir /tmp/smoke && tar -xzf release/craftpanel-$GITHUB_REF_NAME.tar.gz -C /tmp/smoke
           cd /tmp/smoke/craftpanel-$GITHUB_REF_NAME
+          CRAFTPANEL_DATA_DIR=/tmp/smoke/data node apps/api/dist/runtime.js &
           CRAFTPANEL_DATA_DIR=/tmp/smoke/data CRAFTPANEL_PORT=8090 node apps/api/dist/index.js &
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8090/api/health && break; sleep 1; done
           curl -fsS http://127.0.0.1:8090/ | grep -q CraftPanel
@@ -53,4 +54,4 @@ jobs:
           prerelease=""
           [[ $GITHUB_REF_NAME == *-* ]] && prerelease="--prerelease"
           gh release create "$GITHUB_REF_NAME" --title "CraftPanel $GITHUB_REF_NAME" --notes-file release/NOTES.md $prerelease \
-            release/craftpanel-$GITHUB_REF_NAME.tar.gz release/install.sh release/install.ps1 release/SHA256SUMS
+            release/craftpanel-$GITHUB_REF_NAME.tar.gz release/install.sh release/install.ps1 release/release.json release/SHA256SUMS

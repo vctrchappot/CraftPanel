@@ -1,5 +1,16 @@
 # Implementation status
 
+## Runtime separation WIP (2026-11-08)
+
+Resume on `wip/runtime-separation`; read [RUNTIME-HANDOFF.md](RUNTIME-HANDOFF.md) before changing or deploying it. **Phase incomplete.**
+
+- 🧪 Runtime contract, authenticated IPC, child-process continuity/reconnection, exact-runtime update approval and stored boot policy are implemented and tested.
+- ✅ Isolated Ubuntu/WSL systemd installer regression passed: initial install, unsupported archive, migration/unit/hanging-start rollback, subsequent updates and recovery retention. This used an earlier build and no Minecraft player.
+- 🧪 Production HTTP/TLS/WebSocket deployment smoke passed with a separate runtime. Windows SCM host compiled, but service installation is untested.
+- 🟡 Final typecheck passed. Full suite previously passed 253 tests (2 skipped); the last suite run alongside typecheck had one intermittent runtime disconnect, then all 7 isolated runtime tests passed. Investigate before merge. Final source needs a fresh build.
+- 🟡 Real-player continuity, final-build installer tests, Windows service/reboot parity, legacy world migration and changed-runtime rollback remain open.
+
+
 Legend: ✅ verified against real Minecraft servers / real services · 🧪 covered by automated tests (unit/integration, fake process) · 🟡 implemented, not yet verified end-to-end · ⏳ planned.
 
 Verification environments so far: **Windows 11 x64, Node 26** and **Linux x64 (Ubuntu 24.04 under WSL 2 with systemd), Node 24**. **GitHub Actions CI** runs on every push: typecheck, unit/integration tests and a production build on Linux, Windows and macOS; the full browser flow with a real Minecraft server on Linux **x64 and ARM64** (the same architecture as a Raspberry Pi 4/5); and the Linux installer with its update path on a systemd host. A physical Raspberry Pi and a manual macOS run are still pending.
@@ -113,9 +124,3 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 ## Planned
 
 Performance presets for Pi and small VPS, NeoForge provider, Bedrock Dedicated Server adapter, S3-compatible backup storage, tunnel provider integrations, remote runtime agents for multiple hosts, container-based isolation, Hangar integration, i18n (German first).
-# Runtime separation phase (2026-11-08)
-
-- 🧪 Asynchronous runtime contract and authenticated Unix socket / Windows named-pipe service; actual child-process tests cover dashboard disconnection, PID/control/history recovery, duplicate start rejection, expired calls, authentication/protocol mismatch and graceful runtime stop/autostart.
-- 🧪 A replacement API context reconciles the live process and database without orphaning or restarting it. Disconnected control fails closed; the dashboard shows unknown state. Runtime restores autosave if a dashboard connection disappears during a live backup.
-- 🟡 Ubuntu/systemd and Windows installer/update integration, real Minecraft player continuity, installed host reboot and failed-update acceptance remain required. The phase is not complete.
-

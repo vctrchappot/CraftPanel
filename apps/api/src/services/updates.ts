@@ -44,6 +44,7 @@ export interface UpdateProgress {
 }
 
 export interface UpdateStatus {
+  runtime?: { protocol: number; sha256: string } | null;
   enabled: boolean;
   current: string;
   latest: string | null;
@@ -139,7 +140,7 @@ function readJson<T>(file: string): T | null {
 
 /** Looks up the newest GitHub release (or the newest archive in a local folder) and can hand an update to the installer. */
 export class UpdateService {
-  private cached: { status: Pick<UpdateStatus, "current" | "latest" | "available" | "releaseUrl" | "publishedAt" | "notes" | "checkedAt" | "error">; expires: number } | null = null;
+  private cached: { status: Pick<UpdateStatus, "current" | "latest" | "available" | "releaseUrl" | "publishedAt" | "notes" | "checkedAt" | "error" | "runtime">; expires: number } | null = null;
   private inflight: Promise<void> | null = null;
   private pending: { target: string | null; startedAt: number } | null = null;
   readonly install: InstallInfo;
@@ -150,6 +151,7 @@ export class UpdateService {
     private env: NodeJS.ProcessEnv = process.env,
     private fetchImpl: typeof fetch = fetch,
     private run: (file: string, args: string[]) => Promise<number> = runQuiet,
+    private runtime?: { build: () => string | null; approvalFile: string },
   ) {
     this.install = detectInstall(installRoot);
   }
@@ -174,20 +176,21 @@ export class UpdateService {
       await this.inflight;
     }
     const s = this.cached!.status;
-    return { ...base, ...s, canInstall: !!selfUpdate && s.available };
+    return { ...base, ...s, canInstall: !!selfUpdate && s.available && (!this.runtime || !!s.runtime) };
   }
 
   private async check() {
     const now = Date.now();
-    const empty = { current: CRAFTPANEL_VERSION, latest: null, available: false, releaseUrl: RELEASES_URL, publishedAt: null, notes: null, checkedAt: now, error: null };
+    const empty = { current: CRAFTPANEL_VERSION, latest: null, available: false, releaseUrl: RELEASES_URL, publishedAt: null, notes: null, checkedAt: now, error: null, runtime: null as UpdateStatus["runtime"] };
     if (this.releaseDir) {
       const newest = newestArchive(this.releaseDir);
       const available = !!newest && compareVersions(newest.version, CRAFTPANEL_VERSION) > 0;
       // The release notes are the archive's own CHANGELOG.md.
       const changelog = available ? await readFromArchive(newest.file, `craftpanel-v${newest.version}/CHANGELOG.md`) : null;
+      const manifest = available ? await readFromArchive(newest.file, `craftpanel-v${newest.version}/release.json`) : null;
       this.cached = {
         status: newest
-          ? { ...empty, latest: newest.version, available, releaseUrl: null, notes: changelog ? changelogSection(changelog, newest.version) : null }
+          ? { ...empty, latest: newest.version, available, releaseUrl: null, notes: changelog ? changelogSection(changelog, newest.version) : null, runtime: parseRuntimeManifest(manifest) }
           : { ...empty, releaseUrl: null, error: `No craftpanel-vX.Y.Z.tar.gz in ${this.releaseDir}` },
         expires: now + 60_000,
       };
@@ -204,9 +207,15 @@ export class UpdateService {
         return;
       }
       if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
-      const body = (await res.json()) as { tag_name?: string; html_url?: string; published_at?: string; body?: string };
+      const body = (await res.json()) as { tag_name?: string; html_url?: string; published_at?: string; body?: string; assets?: { name: string; browser_download_url: string }[] };
       const latest = String(body.tag_name ?? "").replace(/^v/, "");
       if (!/^\d+\.\d+\.\d+/.test(latest)) throw new Error("Unexpected release format");
+      let runtime: UpdateStatus["runtime"] = null;
+      const asset = body.assets?.find((a) => a.name === "release.json");
+      if (asset?.browser_download_url.startsWith(`https://github.com/${CRAFTPANEL_REPO}/releases/download/`)) {
+        const manifest = await this.fetchImpl(asset.browser_download_url, { signal: AbortSignal.timeout(10_000) });
+        if (manifest.ok) runtime = parseRuntimeManifest(await manifest.text());
+      }
       this.cached = {
         status: {
           ...empty,
@@ -215,6 +224,7 @@ export class UpdateService {
           releaseUrl: body.html_url ?? RELEASES_URL,
           publishedAt: body.published_at ?? null,
           notes: typeof body.body === "string" ? body.body.slice(0, 20_000) : null,
+          runtime,
         },
         expires: now + SUCCESS_TTL_MS,
       };
@@ -225,12 +235,22 @@ export class UpdateService {
   }
 
   /** Ask the installer's helper to install the newest release. CraftPanel stops and restarts during it. */
-  async startInstall(): Promise<UpdateProgress> {
+  async startInstall(approvedRuntime?: string): Promise<UpdateProgress> {
     const helper = this.install.selfUpdate;
     if (!helper) throw new AppError(400, "update_manual", "This installation can't update itself from the dashboard", this.install.updateCommand ? `Run: ${this.install.updateCommand}` : "Reinstall with the one-line installer from the README.");
     const status = await this.status(true);
     if (!status.available) throw new AppError(409, "up_to_date", status.error ?? `CraftPanel ${CRAFTPANEL_VERSION} is the newest version`);
     if ((await this.progress()).running) throw new AppError(409, "update_running", "An update is already running");
+    if (this.runtime) {
+      if (!status.runtime || status.runtime.protocol !== 1) throw new AppError(409, "runtime_update_unknown", "This release has no compatible runtime manifest", "Use the manual installer after reviewing its maintenance requirements.");
+      const current = this.runtime.build();
+      if (!current) throw new AppError(503, "runtime_disconnected", "Reconnect the runtime before updating");
+      if (current !== status.runtime.sha256) {
+        if (approvedRuntime !== status.runtime.sha256) throw new AppError(409, "runtime_update_confirmation", "This update changes the Minecraft runtime and stops its game servers", "Review the affected servers and confirm this exact runtime update.");
+        fs.mkdirSync(path.dirname(this.runtime.approvalFile), { recursive: true, mode: 0o700 });
+        fs.writeFileSync(this.runtime.approvalFile, JSON.stringify({ sha256: status.runtime.sha256, expiresAt: Date.now() + 10 * 60_000 }) + "\n", { mode: 0o600 });
+      }
+    }
     this.pending = { target: status.latest, startedAt: Date.now() };
     try {
       if (helper.kind === "systemd") {
@@ -241,6 +261,7 @@ export class UpdateService {
       }
     } catch (err) {
       this.pending = null;
+      if (this.runtime) fs.rmSync(this.runtime.approvalFile, { force: true });
       throw new AppError(500, "update_start_failed", `Could not start the update: ${(err as Error).message}`, this.install.updateCommand ? `Run it yourself: ${this.install.updateCommand}` : undefined);
     }
     return this.progress();
@@ -316,6 +337,13 @@ export class UpdateService {
     await this.settings.set({ lastUpdateResultAt: result.finishedAt });
     if (!result.ok) await record("craftpanel.update_failed", `Update${result.to ? ` to ${result.to}` : ""} failed: ${result.message}`, "error");
   }
+}
+
+function parseRuntimeManifest(text: string | null): UpdateStatus["runtime"] {
+  try {
+    const r = JSON.parse(text ?? "null")?.runtime;
+    return r?.protocol === 1 && typeof r.sha256 === "string" && /^[a-f0-9]{64}$/.test(r.sha256) ? { protocol: r.protocol, sha256: r.sha256 } : null;
+  } catch { return null; }
 }
 
 type Recorder = (kind: string, message: string, level: "info" | "error") => Promise<void>;

@@ -29,6 +29,7 @@ DATA_DIR=/var/lib/craftpanel
 CONFIG_DIR=/etc/craftpanel
 ENV_FILE=$CONFIG_DIR/craftpanel.env
 UNIT_FILE=/etc/systemd/system/craftpanel.service
+RUNTIME_UNIT=/etc/systemd/system/craftpanel-runtime.service
 SERVICE_USER=craftpanel
 UPDATE_DIR=$DATA_DIR/update
 LOG_DIR=/var/log/craftpanel
@@ -74,7 +75,7 @@ write_result() {
 
 # Everything runs inside main, so a partially downloaded script does nothing.
 main() {
-  local version=${CRAFTPANEL_INSTALL_VERSION:-} archive=${CRAFTPANEL_ARCHIVE:-} port=${CRAFTPANEL_PORT:-} uninstall=false from_dashboard=false checkout=""
+  local version=${CRAFTPANEL_INSTALL_VERSION:-} archive=${CRAFTPANEL_ARCHIVE:-} port=${CRAFTPANEL_PORT:-} uninstall=false from_dashboard=false checkout="" allow_runtime_restart=false
   while (($#)); do
     case $1 in
       --version) version=${2:?--version needs a value}; shift 2 ;;
@@ -83,6 +84,7 @@ main() {
       --uninstall) uninstall=true; shift ;;
       --from-dashboard) from_dashboard=true; shift ;;
       --checkout) checkout=${2:?--checkout needs the source directory}; shift 2 ;;
+      --allow-runtime-restart) allow_runtime_restart=true; shift ;;
       -h | --help) sed -n '2,23p' "$0" 2>/dev/null || echo "See https://github.com/$REPO#install"; exit 0 ;;
       *) die "Unknown option: $1" "Options: --version X.Y.Z, --archive FILE, --port N, --uninstall" ;;
     esac
@@ -178,9 +180,40 @@ main() {
   local snapshot_cli="$src/apps/api/dist/recovery.js"
   [[ -f $snapshot_cli ]] && [[ $("$node" "$snapshot_cli" --protocol) == craftpanel-recovery-v1 ]] ||
     die "This release does not support the required database recovery protocol." "Use a compatible release. The running service has not been stopped."
-  for f in README.md LICENSE CHANGELOG.md release.json deploy/install.sh deploy/craftpanel.service; do
+  for f in README.md LICENSE CHANGELOG.md release.json deploy/install.sh deploy/craftpanel.service deploy/craftpanel-runtime.service apps/api/dist/runtime.js; do
     [[ -f $src/$f && ! -L $src/$f ]] || die "The release is missing a regular file: $f"
   done
+  [[ $("$node" "$src/apps/api/dist/runtime.js" --protocol) == craftpanel-runtime-v1 ]] || die "Unsupported runtime protocol; nothing was stopped."
+  local runtime_hash declared_hash bundle_hash effective_data runtime_changed=true runtime_was_active=false runtime_enabled=false
+  bundle_hash=$(sha256sum "$src/apps/api/dist/runtime.js" | awk '{print $1}')
+  runtime_hash=$("$node" -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).sha256' "$src/apps/api/dist/runtime-manifest.json")
+  declared_hash=$("$node" -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).runtime?.sha256 || ""' "$src/release.json")
+  [[ $runtime_hash == "$declared_hash" ]] || die "Runtime bundle does not match release.json; nothing was stopped."
+  [[ $bundle_hash == $("$node" -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).bundleSha256' "$src/apps/api/dist/runtime-manifest.json") ]] || die "Runtime bundle checksum mismatch; nothing was stopped."
+  effective_data=$(env_value CRAFTPANEL_DATA_DIR)
+  effective_data=${effective_data:-$DATA_DIR}
+  systemctl is-active --quiet craftpanel-runtime 2>/dev/null && runtime_was_active=true
+  systemctl is-enabled --quiet craftpanel-runtime 2>/dev/null && runtime_enabled=true
+  if $runtime_was_active; then
+    local identity running_hash
+    identity=$(CRAFTPANEL_DATA_DIR="$effective_data" "$node" "$INSTALL_DIR/apps/api/dist/runtime.js" --status) || die "Cannot verify the running runtime; nothing was stopped."
+    running_hash=$("$node" -p 'JSON.parse(process.argv[1]).build' "$identity")
+    [[ $runtime_hash == "$running_hash" ]] && runtime_changed=false
+  elif [[ -f $INSTALL_DIR/apps/api/dist/runtime-manifest.json ]] && [[ $("$node" -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).sha256' "$INSTALL_DIR/apps/api/dist/runtime-manifest.json") == "$runtime_hash" ]]; then
+    runtime_changed=false
+  fi
+  if $runtime_changed && [[ -n $previous ]]; then
+    # Approval is bound to this exact bundle and expires. Never execute request-file content.
+    if $from_dashboard; then
+      if "$node" --input-type=module - "$effective_data/runtime/update-approval.json" "$runtime_hash" <<'NODE'
+import fs from 'node:fs';
+try { const a = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')); process.exit(a.sha256 === process.argv[3] && a.expiresAt > Date.now() && a.expiresAt <= Date.now() + 600000 ? 0 : 1); } catch { process.exit(1); }
+NODE
+      then allow_runtime_restart=true; fi
+    fi
+    $allow_runtime_restart || die "This release changes the Minecraft runtime (or migrates a legacy installation). Running game servers must save and stop." "Review the affected servers in the dashboard, or rerun with --allow-runtime-restart during maintenance. Nothing was stopped."
+  fi
+  rm -f "$effective_data/runtime/update-approval.json"
 
   # ---- install ----------------------------------------------------------------------------
   step "Installing CraftPanel v$version to $INSTALL_DIR…"
@@ -197,12 +230,10 @@ main() {
   service_state=$(systemctl show craftpanel -p ActiveState --value 2>/dev/null || true)
   [[ $service_state == activating || $service_state == reloading ]] && was_active=true
   systemctl is-enabled --quiet craftpanel 2>/dev/null && main_enabled=true
-  $was_active && info "Stopping CraftPanel (running Minecraft servers are saved and stopped)…"
+  $was_active && info "Stopping the dashboard; an unchanged runtime and its game servers keep running…"
   stop_confirmed || die "Could not confirm that CraftPanel stopped; no snapshot or replacement was attempted."
   # Snapshot before the new process can run migrations. Keep this outside the service's writable paths.
-  local state_dir effective_data
-  effective_data=$(env_value CRAFTPANEL_DATA_DIR)
-  effective_data=${effective_data:-$DATA_DIR}
+  local state_dir
   state_dir="$INSTALL_DIR/state-$(date +%s)-$$"
   if ! "$node" "$snapshot_cli" snapshot "$effective_data" "$state_dir"; then
     $was_active && systemctl start craftpanel
@@ -213,7 +244,7 @@ main() {
   local update_path_enabled=false update_path_active=false
   systemctl is-enabled --quiet craftpanel-update.path 2>/dev/null && update_path_enabled=true
   systemctl is-active --quiet craftpanel-update.path 2>/dev/null && update_path_active=true
-  local -a artifact_paths=("$INSTALL_DIR/README.md" "$INSTALL_DIR/LICENSE" "$INSTALL_DIR/CHANGELOG.md" "$INSTALL_DIR/release.json" "$INSTALL_DIR/install.json" "$INSTALL_DIR/update.sh" "$ENV_FILE" "$UNIT_FILE" "$UPDATE_UNIT" "$UPDATE_PATH_UNIT")
+  local -a artifact_paths=("$INSTALL_DIR/README.md" "$INSTALL_DIR/LICENSE" "$INSTALL_DIR/CHANGELOG.md" "$INSTALL_DIR/release.json" "$INSTALL_DIR/install.json" "$INSTALL_DIR/update.sh" "$ENV_FILE" "$UNIT_FILE" "$UPDATE_UNIT" "$UPDATE_PATH_UNIT" "$RUNTIME_UNIT")
   mkdir "$state_dir/startup" || { $was_active && systemctl start craftpanel; die "Could not save startup configuration."; }
   local i
   for i in "${!artifact_paths[@]}"; do
@@ -228,12 +259,20 @@ main() {
     trap - ERR
     set +e
     warn "Installation failed. Restoring the previous database and startup configuration."
+    # Restore only the dashboard unit first, so an invalid new ExecStart cannot prevent its stop.
+    [[ -f $state_dir/startup/7 ]] && cp -p "$state_dir/startup/7" "$UNIT_FILE"
+    systemctl daemon-reload || die "Could not reload service configuration for recovery."
+    stop_confirmed || die "Could not confirm that the dashboard stopped; recovery was refused."
+    if $runtime_changed && [[ -f $RUNTIME_UNIT ]]; then stop_confirmed craftpanel-runtime || die "Could not stop the failed runtime; recovery was refused."; fi
     # Restore a possibly invalid unit before asking systemd to stop its cgroup. Never start it yet.
     for i in "${!artifact_paths[@]}"; do
       if [[ -f $state_dir/startup/$i ]]; then cp -p "$state_dir/startup/$i" "${artifact_paths[$i]}" || die "Could not restore ${artifact_paths[$i]}";
       else rm -f "${artifact_paths[$i]}" || die "Could not remove ${artifact_paths[$i]}"; fi
     done
     systemctl daemon-reload || die "Could not reload the restored service configuration."
+    if [[ -f $RUNTIME_UNIT ]]; then
+      if $runtime_enabled; then systemctl enable --quiet craftpanel-runtime; else systemctl disable craftpanel-runtime 2>/dev/null; fi
+    fi
     if [[ -f $UNIT_FILE ]]; then
       if $main_enabled; then systemctl enable --quiet craftpanel; else systemctl disable craftpanel 2>/dev/null; fi
     fi
@@ -246,6 +285,11 @@ main() {
       die "Database recovery failed; CraftPanel remains stopped." "Recovery point: $state_dir. Do not restart against an incompatible database."
     if $new_activated && [[ -d $INSTALL_DIR/apps ]]; then mv "$INSTALL_DIR/apps" "$INSTALL_DIR/apps.failed-$(date +%s)-$$" || die "Could not move the failed application aside."; fi
     if $apps_moved; then mv "$INSTALL_DIR/apps.previous" "$INSTALL_DIR/apps" || die "Could not restore the previous application."; fi
+    if $runtime_changed; then
+      if [[ -f $state_dir/runtime-servers.json ]]; then cp -p "$state_dir/runtime-servers.json" "$effective_data/runtime/servers.json" || die "Could not restore runtime configuration.";
+      else rm -f "$effective_data/runtime/servers.json"; fi
+      $runtime_was_active && systemctl start craftpanel-runtime
+    fi
     if [[ -d $INSTALL_DIR/apps && -f $UNIT_FILE ]]; then
       systemctl reset-failed craftpanel 2>/dev/null || true
       if ! $was_active; then
@@ -260,6 +304,13 @@ main() {
   }
   # ERR is inherited by called functions. Rollback covers copy, unit registration, start and readiness failures.
   trap rollback_transaction ERR
+  if $runtime_changed; then
+    [[ ! -f $effective_data/runtime/servers.json ]] || cp -p "$effective_data/runtime/servers.json" "$state_dir/runtime-servers.json"
+    if [[ -f $RUNTIME_UNIT ]]; then
+      info "Runtime update: saving and stopping game servers…"
+      stop_confirmed craftpanel-runtime
+    fi
+  fi
   write_env_file "$port"
   rm -rf "$INSTALL_DIR/apps.previous"
   if [[ -d $INSTALL_DIR/apps ]]; then mv "$INSTALL_DIR/apps" "$INSTALL_DIR/apps.previous"; apps_moved=true; fi
@@ -283,7 +334,10 @@ NODE
   chown -R root:root "$INSTALL_DIR"
 
   sed "s|^ExecStart=/usr/bin/node |ExecStart=$node |" "$src/deploy/craftpanel.service" >"$UNIT_FILE"
+  sed "s|^ExecStart=/usr/bin/node |ExecStart=$node |" "$src/deploy/craftpanel-runtime.service" >"$RUNTIME_UNIT"
   systemctl daemon-reload
+  systemctl enable --quiet craftpanel-runtime
+  if $runtime_changed || ! $runtime_was_active; then systemctl start craftpanel-runtime; fi
   systemctl enable --quiet craftpanel
   systemctl restart craftpanel
 
@@ -298,14 +352,15 @@ NODE
 }
 
 stop_confirmed() {
+  local service=${1:-craftpanel}
   # systemd owns the entire service cgroup, including startup before control.json exists.
-  [[ $(systemctl show craftpanel -p LoadState --value 2>/dev/null) == not-found ]] && return 0
-  systemctl stop craftpanel || return 1
+  [[ $(systemctl show "$service" -p LoadState --value 2>/dev/null) == not-found ]] && return 0
+  systemctl stop "$service" || return 1
   local service_state pid group
-  service_state=$(systemctl show craftpanel -p ActiveState --value) || return 1
-  pid=$(systemctl show craftpanel -p MainPID --value) || return 1
+  service_state=$(systemctl show "$service" -p ActiveState --value) || return 1
+  pid=$(systemctl show "$service" -p MainPID --value) || return 1
   [[ $pid == 0 && ( $service_state == inactive || $service_state == failed ) ]] || return 1
-  group=$(systemctl show craftpanel -p ControlGroup --value) || return 1
+  group=$(systemctl show "$service" -p ControlGroup --value) || return 1
   if [[ -n $group && $group == /* && $group != *..* && -d /sys/fs/cgroup$group ]]; then
     if find "/sys/fs/cgroup$group" -name cgroup.procs -exec cat {} + | grep -q '[0-9]'; then return 1; fi
   fi
@@ -509,7 +564,7 @@ print_summary() {
   echo
   if [[ -n $previous && $previous != "$version" ]]; then
     echo "${G}✔${N} ${B}CraftPanel updated: v$previous → v$version${N}"
-    info "Running Minecraft servers were stopped gracefully; servers with \"Start with CraftPanel\" are back up."
+    info "Dashboard-only updates keep Minecraft running. Runtime changes require explicit maintenance approval."
     print_whats_new "$version"
   elif [[ -n $previous ]]; then
     echo "${G}✔${N} ${B}CraftPanel v$version reinstalled${N}"
@@ -548,7 +603,11 @@ do_uninstall() {
     systemctl disable craftpanel 2>/dev/null || true
   fi
   systemctl disable --now craftpanel-update.path 2>/dev/null || true
-  rm -f "$UNIT_FILE" "$UPDATE_UNIT" "$UPDATE_PATH_UNIT"
+  if [[ -f $RUNTIME_UNIT ]]; then
+    stop_confirmed craftpanel-runtime || die "The runtime is still running; uninstall was refused."
+    systemctl disable craftpanel-runtime 2>/dev/null || true
+  fi
+  rm -f "$UNIT_FILE" "$UPDATE_UNIT" "$UPDATE_PATH_UNIT" "$RUNTIME_UNIT"
   systemctl daemon-reload
   rm -rf "$INSTALL_DIR"
   echo "${G}✔${N} CraftPanel was removed. Your data was kept:"

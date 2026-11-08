@@ -21,8 +21,10 @@ export interface AgentEvents {
  */
 export interface RuntimeAgent extends EventEmitter<AgentEvents> {
   readonly connected: boolean;
+  readonly identity: { protocol: number; build: string } | null;
   owns(serverId: string): boolean;
   start(serverId: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }): Promise<void>;
+  configure(serverId: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }): Promise<void>;
   stop(serverId: string, timeoutMs?: number): Promise<boolean>;
   kill(serverId: string): Promise<void>;
   send(serverId: string, command: string): Promise<void>;
@@ -49,6 +51,7 @@ const TICK_INTERVAL_MS = 15000;
 
 export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgent {
   readonly connected = true;
+  readonly identity = null;
   private servers = new Map<string, ManagedServer>();
   private software = new Map<string, ServerSoftware>();
   private watchers = new Map<string, number>();
@@ -228,6 +231,7 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
   }
 
   async configureAutoStart(_id: string, _enabled: boolean) {}
+  async configure(_id: string, _spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }) {}
 
   async stopAll(timeoutMs = 90_000) {
     return Promise.all([...this.servers].map(async ([id, server]) => ({ id, stopped: await server.stop(timeoutMs) })));

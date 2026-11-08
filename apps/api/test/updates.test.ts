@@ -77,6 +77,39 @@ describe("updates from the dashboard", () => {
     return { get: async () => s, set: async (p: Record<string, unknown>) => (s = { ...s, ...p }) } as unknown as SettingsService;
   };
 
+  it("requires approval for the exact changed runtime and never approves a different release", async () => {
+    const root = await tmp();
+    const helper = { kind: "systemd", request: path.join(root, "requested"), log: path.join(root, "log"), result: path.join(root, "result") };
+    await fs.writeFile(path.join(root, "install.json"), JSON.stringify({ method: "linux-service", updateCommand: "update", selfUpdate: helper }));
+    const hash = "a".repeat(64);
+    const fetchRelease: typeof fetch = async (url) => new Response(JSON.stringify(String(url).endsWith("release.json")
+      ? { runtime: { protocol: 1, sha256: hash } }
+      : { tag_name: "v999.0.0", assets: [{ name: "release.json", browser_download_url: "https://github.com/vctrchappot/CraftPanel/releases/download/v999.0.0/release.json" }] }));
+    const approvalFile = path.join(root, "runtime", "update-approval.json");
+    const service = new UpdateService(settings(), root, {}, fetchRelease, undefined, { build: () => "b".repeat(64), approvalFile });
+    await expect(service.startInstall()).rejects.toMatchObject({ code: "runtime_update_confirmation" });
+    await expect(service.startInstall("c".repeat(64))).rejects.toMatchObject({ code: "runtime_update_confirmation" });
+    await expect(fs.access(helper.request)).rejects.toThrow();
+    await service.startInstall(hash);
+    expect(JSON.parse(await fs.readFile(approvalFile, "utf8"))).toMatchObject({ sha256: hash });
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
+  it("starts a dashboard-only update without runtime approval", async () => {
+    const root = await tmp();
+    const helper = { kind: "systemd", request: path.join(root, "requested"), log: path.join(root, "log"), result: path.join(root, "result") };
+    await fs.writeFile(path.join(root, "install.json"), JSON.stringify({ method: "linux-service", updateCommand: "update", selfUpdate: helper }));
+    const hash = "a".repeat(64);
+    const fetchRelease: typeof fetch = async (url) => new Response(JSON.stringify(String(url).endsWith("release.json")
+      ? { runtime: { protocol: 1, sha256: hash } }
+      : { tag_name: "v999.0.0", assets: [{ name: "release.json", browser_download_url: "https://github.com/vctrchappot/CraftPanel/releases/download/v999.0.0/release.json" }] }));
+    const approvalFile = path.join(root, "approval.json");
+    await new UpdateService(settings(), root, {}, fetchRelease, undefined, { build: () => hash, approvalFile }).startInstall();
+    await expect(fs.access(helper.request)).resolves.toBeUndefined();
+    await expect(fs.access(approvalFile)).rejects.toThrow();
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
   it("reads the helper from install.json, also with a byte order mark", async () => {
     const dir = await tmp();
     const selfUpdate = { kind: "task", task: "CraftPanel Update", log: "C:/x/update.log", result: "C:/x/update-result.json" };

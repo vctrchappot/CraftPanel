@@ -10,7 +10,7 @@ if (!outputArg || !/^(craftpanel|craftpanel-ops-[a-z0-9-]+)$/.test(instance)) th
 const output = path.resolve(outputArg);
 await fs.mkdir(path.dirname(output), { recursive: true });
 await fs.mkdir(output); // Refuse to overwrite an existing fixture set.
-const rewrite = (text) => instance === "craftpanel" ? text : text.replace(/\bcraftpanel\b/g, () => instance).replaceAll(`${instance}-recovery-v1`, "craftpanel-recovery-v1");
+const rewrite = (text) => instance === "craftpanel" ? text : text.replace(/\bcraftpanel\b/g, () => instance).replaceAll(`${instance}-recovery-v1`, "craftpanel-recovery-v1").replaceAll(`${instance}-runtime-v1`, "craftpanel-runtime-v1");
 await fs.writeFile(path.join(output, "install.sh"), rewrite(await fs.readFile(path.join(root, "deploy/install.sh"), "utf8")));
 await fs.copyFile(path.join(root, "deploy/install.ps1"), path.join(output, "install.ps1"));
 const archives = {};
@@ -22,10 +22,11 @@ for (const [kind, version] of [["good", "99.0.0"], ["unsupported", "98.0.0"], ["
   await fs.cp(path.join(root, "apps/api/dist"), dist, { recursive: true, filter: (p) => !p.endsWith(".js.map") });
   await fs.mkdir(path.join(stage, "deploy"));
   for (const file of ["README.md", "LICENSE", "CHANGELOG.md"]) await fs.copyFile(path.join(root, file), path.join(stage, file));
-  for (const file of ["install.sh", "craftpanel.service"])
+  for (const file of ["install.sh", "craftpanel.service", "craftpanel-runtime.service"])
     await fs.writeFile(path.join(stage, "deploy", rewrite(file)), rewrite(await fs.readFile(path.join(root, "deploy", file), "utf8")));
   await fs.copyFile(path.join(root, "deploy/install.ps1"), path.join(stage, "deploy/install.ps1"));
-  await fs.writeFile(path.join(stage, "release.json"), JSON.stringify({ version, fixture: kind, recoveryProtocol: 1 }));
+  const runtime = JSON.parse(await fs.readFile(path.join(dist, "runtime-manifest.json"), "utf8"));
+  await fs.writeFile(path.join(stage, "release.json"), JSON.stringify({ version, fixture: kind, recoveryProtocol: 1, runtime }));
   if (kind === "unsupported") await fs.rm(path.join(dist, "recovery.js"));
   if (kind === "unit") {
     const file = path.join(stage, "deploy", rewrite("craftpanel.service"));

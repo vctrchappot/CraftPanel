@@ -75,6 +75,11 @@ async function start(name, env) {
     CRAFTPANEL_DATA_DIR: data, CRAFTPANEL_UPDATE_CHECK: "false", CRAFTPANEL_LOG_LEVEL: "warn",
     CRAFTPANEL_LOG_FORMAT: "json", ...env,
   };
+  const runtime = spawn(process.execPath, [path.join(dist, "runtime.js")], { cwd: dist, env: variables, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+  const runtimeClosed = new Promise((resolve) => runtime.once("close", resolve));
+  processes.push({ child: runtime, closed: runtimeClosed, data, runtime: true, env: variables });
+  runtime.stderr.on("data", () => {});
+  runtime.stdout.on("data", () => {});
   const child = spawn(process.execPath, [entry], { cwd: dist, env: variables, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   let output = "";
   for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => { output = (output + chunk).slice(-64_000); });
@@ -211,8 +216,13 @@ try {
   for (const instance of processes.reverse()) {
     if (instance.child.exitCode !== null) continue;
     try {
+      if (instance.runtime) {
+        const stop = spawn(process.execPath, [path.join(dist, "runtime.js"), "--shutdown"], { cwd: dist, env: instance.env, windowsHide: true, stdio: "ignore" });
+        await new Promise((resolve) => stop.once("close", resolve));
+      } else {
       const control = JSON.parse(await fs.readFile(path.join(instance.data, "control.json"), "utf8"));
       await request(control.url + "/api/control/shutdown", { method: "POST", headers: { "x-craftpanel-control": control.token }, body: {} });
+      }
     } catch { /* A failed startup may not have written a control file. */ }
     await Promise.race([instance.closed, pause(5_000)]);
     if (instance.child.exitCode === null) { instance.child.kill(); await instance.closed; }

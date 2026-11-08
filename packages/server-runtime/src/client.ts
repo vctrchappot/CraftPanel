@@ -10,6 +10,7 @@ import { channel, COMMAND_TTL_MS, emptyRuntimeInfo, RUNTIME_PROTOCOL, runtimePat
 /** A dashboard connection, never an owner of Minecraft processes. No command retries. */
 export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeAgent {
   connected = false;
+  identity: { protocol: number; build: string } | null = null;
   private socket: Socket | null = null;
   private sendFrame: ((m: object) => boolean) | null = null;
   private epoch = "";
@@ -48,6 +49,7 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
           } else if (m.type === "ready") {
             if (m.protocol !== RUNTIME_PROTOCOL || typeof m.epoch !== "string" || typeof m.session !== "string") { socket.destroy(); return; }
             this.epoch = m.epoch;
+            this.identity = { protocol: RUNTIME_PROTOCOL, build: typeof m.build === "string" ? m.build : "unknown" };
             this.session = m.session;
             this.sequence = 0;
             this.connected = true;
@@ -127,6 +129,7 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
   }
 
   async start(id: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }) { await this.call("start", id, { spec }); }
+  async configure(id: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }) { await this.call("configure", id, { spec }); }
   async stop(id: string, timeoutMs = 90_000) { return await this.call("stop", id, { timeoutMs }, timeoutMs + 5000) as boolean; }
   async kill(id: string) { await this.call("kill", id); }
   async send(id: string, command: string) { await this.call("send", id, { command }); }
@@ -162,6 +165,7 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
   async forget(id: string) { await this.call("forget", id); this.snapshots.delete(id); }
   async configureAutoStart(id: string, value: boolean) { await this.call("autoStart", id, { value }); }
   async stopAll(timeoutMs = 90_000) { return await this.call("stopAll", "", { timeoutMs }, timeoutMs + 5000) as { id: string; stopped: boolean }[]; }
+  async requestServiceShutdown() { await this.call("shutdownRuntime"); }
   /** Kept for embedded callers. Stopping all servers is always explicit. */
   async shutdown(timeoutMs?: number) { await this.stopAll(timeoutMs); }
   async disconnect() {

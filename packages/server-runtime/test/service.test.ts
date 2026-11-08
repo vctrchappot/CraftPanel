@@ -122,4 +122,17 @@ describe("independent runtime transport", () => {
     await expect.poll(() => next.agent.status("test")).toBe("running");
     expect(next.agent.info("test").pid).not.toBe(pid);
   });
+
+  it("persists updated boot policy without starting a server", async () => {
+    const { dir, runtime, client } = await fixture();
+    await client.configure("test", { ...spec, autoStart: true });
+    expect(client.owns("test")).toBe(true);
+    expect(client.isRunning("test")).toBe(false);
+    await client.disconnect();
+    await runtime.close(2000);
+    const next = new RuntimeService(dir);
+    services.push(next);
+    await next.listen();
+    await expect.poll(() => next.agent.status("test")).toBe("running");
+  });
 });

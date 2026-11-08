@@ -6,7 +6,7 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 ## Current state (handoff, 2026-11-08)
 
-The active phase is **Minecraft-Laufzeit vom Dashboard trennen** on `feat/runtime-separation`. The asynchronous runtime contract, authenticated local process service and dashboard reconnection are implemented and covered by automated child-process and database integration tests. Installer integration and real failure/player acceptance checks remain open. Read STATUS.md and CLAUDE.md and check current Git/CI state before continuing.
+The active phase is **Minecraft-Laufzeit vom Dashboard trennen**, saved on `wip/runtime-separation` at the user's request to stop for the day. Start with [RUNTIME-HANDOFF.md](RUNTIME-HANDOFF.md): it records implemented work, exact verification limits, an intermittent runtime-test disconnect and the next steps. The phase is not complete; do not merge/deploy this WIP. Main remains at the pre-phase baseline.
 
 - **Velocity proxy** is done and verified (STATUS.md); remaining points are listed under step 4.
 - **Suggested next, in order:** finish the professional-deployment verification below, publish the first release and run the real installer paths (step 1), then separate runtime ownership from the dashboard before adding remote hosts. Bedrock and Pi/VPS measurements remain planned.

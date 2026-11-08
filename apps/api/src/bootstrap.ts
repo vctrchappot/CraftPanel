@@ -35,7 +35,10 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const java = new JavaManager(L.java, L.tmp);
   const activity = new ActivityService(db, hub);
   const settings = new SettingsService(db);
-  const updates = new UpdateService(settings, opts.installRoot ?? null);
+  const updates = new UpdateService(settings, opts.installRoot ?? null, undefined, undefined, undefined, opts.agent ? {
+    build: () => agent.connected ? agent.identity?.build ?? null : null,
+    approvalFile: path.join(L.root, "runtime", "update-approval.json"),
+  } : undefined);
   const sessions = new SessionStore(db, config.sessionTtlMs, async () => (await settings.get()).twoFactorRoles);
   const servers = new ServerService(db, agent, hub, activity, java, config, settings);
   const backups = new BackupService(db, servers, hub, activity, settings, config);

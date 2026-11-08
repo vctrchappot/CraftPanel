@@ -54,6 +54,7 @@ function Install-CraftPanel {
   catch { throw "Another CraftPanel install or update is already running (or the install directory is not writable)." }
   try {
   $UpdateTask = "$TaskName Update"
+  $RuntimeName = "$TaskName Runtime"
   $LogDir = Join-Path $DataDir "logs"
   $Shortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "$TaskName.url"
   $Tar = Join-Path $env:SystemRoot "System32\tar.exe"
@@ -94,14 +95,89 @@ function Install-CraftPanel {
 
   function Test-Healthy($port) { return (Get-LocalStatus $port "/api/health") -eq 200 }
 
-  # Stops a running CraftPanel the clean way: its Minecraft servers save and stop first.
+  function Stop-Runtime {
+    $service = Get-Service -Name $RuntimeName -ErrorAction SilentlyContinue
+    if ($service -and $service.Status -ne "Stopped") {
+      Info "Saving and stopping Minecraft through the independent runtime service..."
+      Stop-Service -Name $RuntimeName -ErrorAction Stop
+      $service.WaitForStatus("Stopped", (New-TimeSpan -Seconds 120))
+      $service.Refresh()
+      if ($service.Status -ne "Stopped") { Fail "The runtime did not stop; replacement was refused." }
+    }
+  }
+
+  function Runtime-Identity($exe, $entry) {
+    $savedData = $env:CRAFTPANEL_DATA_DIR
+    try {
+      $env:CRAFTPANEL_DATA_DIR = $DataDir
+      $identity = & $exe $entry --status
+      if ($LASTEXITCODE -ne 0) { Fail "Cannot verify the running runtime; nothing was stopped." }
+      return ($identity | ConvertFrom-Json)
+    } finally { $env:CRAFTPANEL_DATA_DIR = $savedData }
+  }
+
+  function Install-Runtime($node, $changed) {
+    $hostFile = Join-Path $Root "runtime-host.exe"
+    if ($changed -or -not (Test-Path -LiteralPath $hostFile)) {
+      $job = Get-Content -LiteralPath (Join-Path $Root "apps\api\dist\windows-job.ps1") -Raw
+      $body = [regex]::Match($job, "(?s)@'\r?\n(.*?)\r?\n'@").Groups[1].Value
+      if (-not $body) { Fail "The release has no compilable Windows process owner." }
+      $source = $body + "`n" + (Get-Content -LiteralPath (Join-Path $Root "apps\api\dist\windows-runtime-service.cs") -Raw)
+      if (Test-Path -LiteralPath $hostFile) { Remove-Item -LiteralPath $hostFile -Force }
+      $compiler = Join-Path $env:SystemRoot "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+      if (-not (Test-Path -LiteralPath $compiler)) { $compiler = Join-Path $env:SystemRoot "Microsoft.NET\Framework\v4.0.30319\csc.exe" }
+      if (-not (Test-Path -LiteralPath $compiler)) { Fail "The Windows .NET Framework C# compiler is missing." }
+      $sourceFile = Join-Path $Root "runtime-host-build.cs"
+      try {
+        [IO.File]::WriteAllText($sourceFile, $source)
+        & $compiler /nologo /target:exe "/out:$hostFile" $sourceFile
+        if ($LASTEXITCODE -ne 0) { Fail "Could not compile the Windows runtime service." }
+      } finally { Remove-Item -LiteralPath $sourceFile -Force -ErrorAction SilentlyContinue }
+    }
+    $existing = Get-Service -Name $RuntimeName -ErrorAction SilentlyContinue
+    if (-not $existing) {
+      $admin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+      if (-not $admin.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { Fail "Registering the independent Minecraft runtime requires one elevated install." "Run this installer in PowerShell as administrator with the same Windows account. Your existing data is kept." }
+      $account = "NT SERVICE\$RuntimeName"
+      $arguments = @($hostFile, $RuntimeName, $node, (Join-Path $Root "apps\api\dist\runtime.js"), $Root, $DataDir, $ConfigFile)
+      foreach ($argument in $arguments) { if ($argument.Contains('"')) { Fail "Invalid quote in runtime service path." } }
+      $binary = ($arguments | ForEach-Object { '"' + $_ + '"' }) -join ' '
+      $credential = [Management.Automation.PSCredential]::new($account, [Security.SecureString]::new())
+      New-Service -Name $RuntimeName -BinaryPathName $binary -StartupType Automatic -Credential $credential -Description "Owns Minecraft independently of the CraftPanel dashboard" | Out-Null
+      & sc.exe preshutdowninfo $RuntimeName 120000 | Out-Null
+      if ($LASTEXITCODE -ne 0) { Fail "Could not configure runtime preshutdown handling." }
+      & sc.exe failure $RuntimeName reset= 86400 actions= restart/5000/restart/10000/restart/60000 | Out-Null
+      if ($LASTEXITCODE -ne 0) { Fail "Could not configure runtime recovery." }
+      $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+      # The installing user may query/start/stop it; changing service identity/configuration stays administrative.
+      & sc.exe sdset $RuntimeName "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPWPLOCRRC;;;$sid)" | Out-Null
+      if ($LASTEXITCODE -ne 0) { Fail "Could not protect runtime service control." }
+      & icacls.exe $DataDir /inheritance:r /grant:r "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' "${account}:(OI)(CI)M" | Out-Null
+      if ($LASTEXITCODE -ne 0) { Fail "Could not protect the runtime data directory." }
+      & icacls.exe $Root /grant "${account}:(OI)(CI)RX" | Out-Null
+      if ($LASTEXITCODE -ne 0) { Fail "Could not grant runtime access to its program files." }
+      # Preserve custom server locations. The DB is read-only and no migration is run by this helper.
+      $dbFile = Join-Path $DataDir "craftpanel.db"
+      if (Test-Path -LiteralPath $dbFile) {
+        $query = 'const {DatabaseSync}=require("node:sqlite"); const db=new DatabaseSync(process.argv[1],{readOnly:true}); console.log(JSON.stringify(db.prepare("SELECT directory FROM servers").all().map(r=>r.directory))); db.close();'
+        $directories = (& $node -e $query $dbFile) | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0) { Fail "Could not read existing server locations." }
+        foreach ($serverDirectory in $directories) {
+          & icacls.exe $serverDirectory /grant "${account}:(OI)(CI)M" | Out-Null
+          if ($LASTEXITCODE -ne 0) { Fail "Could not grant runtime access to $serverDirectory." }
+        }
+      }
+    }
+  }
+
+  # Stops only the dashboard. Legacy installations save and stop during their one-time migration.
   function Stop-CraftPanel {
     $control = Join-Path $DataDir "control.json"
     if (Test-Path $control) {
       $c = Get-Content $control -Raw | ConvertFrom-Json
       $proc = Get-Process -Id $c.pid -ErrorAction SilentlyContinue
       if ($proc) {
-        Info "Stopping CraftPanel (running Minecraft servers are saved and stopped)..."
+        Info "Stopping the dashboard; the independent Minecraft runtime keeps running..."
         try {
           $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
           if ($curl) {
@@ -279,6 +355,11 @@ exit `$exitCode
     Step "Removing CraftPanel..."
     Stop-CraftPanel
     Stop-TaskConfirmed
+    Stop-Runtime
+    if (Get-Service -Name $RuntimeName -ErrorAction SilentlyContinue) {
+      & sc.exe delete $RuntimeName | Out-Null
+      if ($LASTEXITCODE -ne 0) { Fail "Removing the runtime service requires administrator access; application files were kept." }
+    }
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $UpdateTask -Confirm:$false -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force $Root -ErrorAction SilentlyContinue
@@ -358,9 +439,38 @@ exit `$exitCode
     if (-not (Test-Path -LiteralPath $snapshotCli -PathType Leaf)) { Fail "This release does not support database recovery." "Use a compatible release. The running task has not been stopped." }
     $protocol = & $node $snapshotCli --protocol
     if ($LASTEXITCODE -ne 0 -or $protocol -ne "craftpanel-recovery-v1") { Fail "Unsupported database recovery protocol. The running task has not been stopped." }
-    foreach ($f in @("README.md", "LICENSE", "CHANGELOG.md", "release.json", "deploy\install.ps1", "apps\api\dist\windows-job.ps1")) {
+    foreach ($f in @("README.md", "LICENSE", "CHANGELOG.md", "release.json", "deploy\install.ps1", "apps\api\dist\windows-job.ps1", "apps\api\dist\runtime.js", "apps\api\dist\runtime-manifest.json", "apps\api\dist\windows-runtime-service.cs")) {
       if (-not (Test-Path -LiteralPath (Join-Path $src $f) -PathType Leaf)) { Fail "The release is missing $f. The running task has not been stopped." }
     }
+    $runtimeManifest = Get-Content -LiteralPath (Join-Path $src "apps\api\dist\runtime-manifest.json") -Raw | ConvertFrom-Json
+    $releaseManifest = Get-Content -LiteralPath (Join-Path $src "release.json") -Raw | ConvertFrom-Json
+    if ($runtimeManifest.protocol -ne 1 -or $runtimeManifest.sha256 -ne $releaseManifest.runtime.sha256 -or
+        (Get-FileHash -Algorithm SHA256 (Join-Path $src "apps\api\dist\runtime.js")).Hash.ToLowerInvariant() -ne $runtimeManifest.bundleSha256) { Fail "Runtime bundle/manifest mismatch; nothing was stopped." }
+    $runtimeService = Get-Service -Name $RuntimeName -ErrorAction SilentlyContinue
+    $runtimeWasActive = $runtimeService -and $runtimeService.Status -eq "Running"
+    $runtimeExisted = [bool]$runtimeService
+    $runtimeChanged = $true
+    if ($runtimeWasActive) {
+      $identity = Runtime-Identity $node (Join-Path $Root "apps\api\dist\runtime.js")
+      $runtimeChanged = $identity.build -ne $runtimeManifest.sha256
+    } elseif (Test-Path -LiteralPath (Join-Path $Root "apps\api\dist\runtime-manifest.json")) {
+      $runtimeChanged = (Get-Content -LiteralPath (Join-Path $Root "apps\api\dist\runtime-manifest.json") -Raw | ConvertFrom-Json).sha256 -ne $runtimeManifest.sha256
+    }
+    if (-not $runtimeExisted) {
+      $admin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+      if (-not $admin.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { Fail "This release introduces an independent Windows runtime service." "Run the installer once as administrator with the same Windows account. Nothing was stopped." }
+    }
+    $approvalFile = Join-Path $DataDir "runtime\update-approval.json"
+    if ($runtimeChanged -and $previous) {
+      $approved = -not $FromDashboard -and $env:CRAFTPANEL_ALLOW_RUNTIME_RESTART -eq "1"
+      if ($FromDashboard -and (Test-Path -LiteralPath $approvalFile)) {
+        $approval = Get-Content -LiteralPath $approvalFile -Raw | ConvertFrom-Json
+        $now = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+        $approved = $approval.sha256 -eq $runtimeManifest.sha256 -and $approval.expiresAt -gt $now -and $approval.expiresAt -le ($now + 600000)
+      }
+      if (-not $approved) { Fail "This update changes the Minecraft runtime and must save and stop game servers." "Review the affected servers in the dashboard, or set CRAFTPANEL_ALLOW_RUNTIME_RESTART=1 for a manual maintenance update. Nothing was stopped." }
+    }
+    Remove-Item -LiteralPath $approvalFile -Force -ErrorAction SilentlyContinue
 
     # ---- install ------------------------------------------------------------------------------
     Step "Installing CraftPanel v$version to $Root..."
@@ -385,7 +495,7 @@ exit `$exitCode
     Info "Database recovery point: $stateDir"
     $startup = Join-Path $stateDir "startup"
     New-Item -ItemType Directory $startup | Out-Null
-    $artifactPaths = @("README.md", "LICENSE", "CHANGELOG.md", "release.json", "install.json", "start.ps1", "update.ps1", "config.env") | ForEach-Object { Join-Path $Root $_ }
+    $artifactPaths = @("README.md", "LICENSE", "CHANGELOG.md", "release.json", "install.json", "start.ps1", "update.ps1", "config.env", "runtime-host.exe") | ForEach-Object { Join-Path $Root $_ }
     $artifactPaths += $Shortcut
     try {
       for ($i = 0; $i -lt $artifactPaths.Count; $i++) {
@@ -404,6 +514,11 @@ exit `$exitCode
     $appsMoved = $false
     $newActivated = $false
     try {
+    if ($runtimeChanged) {
+      $registryFile = Join-Path $DataDir "runtime\servers.json"
+      if (Test-Path -LiteralPath $registryFile) { Copy-Item -LiteralPath $registryFile -Destination (Join-Path $stateDir "runtime-servers.json") }
+      Stop-Runtime
+    }
     if (-not (Test-Path $ConfigFile)) {
       $prof = if ($env:CRAFTPANEL_PROFILE) { $env:CRAFTPANEL_PROFILE } else { "lan" }
       $port = if ($env:CRAFTPANEL_PORT) { $env:CRAFTPANEL_PORT } else { "8080" }
@@ -434,6 +549,7 @@ exit `$exitCode
       selfUpdate = @{ kind = "task"; task = $UpdateTask; log = (Join-Path $LogDir "update.log"); result = (Join-Path $LogDir "update-result.json") }
     } | ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $Root "install.json")
     Write-StartScript $node
+    Install-Runtime $node $runtimeChanged
     Register-Task
     # Re-registering the task that runs this very script could stop it; it already exists then.
     if (-not $FromDashboard) { Register-UpdateTask }
@@ -441,12 +557,14 @@ exit `$exitCode
     "[InternetShortcut]`r`nURL=http://localhost:$port/`r`n" | Set-Content -Encoding ASCII $Shortcut
 
     Step "Starting..."
+    if ($runtimeChanged -or -not $runtimeWasActive) { Start-Service -Name $RuntimeName }
     Start-ScheduledTask -TaskName $TaskName
     if (-not (Wait-Healthy $port)) { Fail "The new version did not become ready." }
     } catch {
       $failure = $_.Exception.Message
       Write-Warning "Installation failed. Restoring the previous database and startup configuration."
       Stop-TaskConfirmed
+      if ($runtimeChanged) { Stop-Runtime }
       & $node $snapshotCli restore $effectiveData $stateDir
       if ($LASTEXITCODE -ne 0) { Fail "Database recovery failed; CraftPanel remains stopped." "Recovery point: $stateDir. Do not restart against an incompatible database." }
       if ($newActivated -and (Test-Path $apps)) { Move-Item -LiteralPath $apps -Destination (Join-Path $Root ("apps.failed-" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())) }
@@ -455,6 +573,14 @@ exit `$exitCode
         $saved = Join-Path $startup "$i"
         if (Test-Path -LiteralPath $saved) { Copy-Item -LiteralPath $saved -Destination $artifactPaths[$i] -Force }
         elseif (Test-Path -LiteralPath $artifactPaths[$i]) { Remove-Item -LiteralPath $artifactPaths[$i] -Force }
+      }
+      if ($runtimeChanged) {
+        $registryFile = Join-Path $DataDir "runtime\servers.json"
+        $savedRegistry = Join-Path $stateDir "runtime-servers.json"
+        if (Test-Path -LiteralPath $savedRegistry) { Copy-Item -LiteralPath $savedRegistry -Destination $registryFile -Force }
+        else { Remove-Item -LiteralPath $registryFile -Force -ErrorAction SilentlyContinue }
+        if ($runtimeWasActive) { Start-Service -Name $RuntimeName }
+        elseif (-not $runtimeExisted -and (Get-Service -Name $RuntimeName -ErrorAction SilentlyContinue)) { & sc.exe delete $RuntimeName | Out-Null }
       }
       foreach ($name in @($TaskName, $UpdateTask)) {
         # The running updater task was not changed; re-registering it could terminate recovery itself.
@@ -487,7 +613,7 @@ exit `$exitCode
     $token = Join-Path $DataDir "setup-token.txt"
     if (Test-Path $token) { Write-Host ""; Info "Setup token  $((Get-Content $token -Raw).Trim())  (needed once to create the owner account)" }
     Write-Host ""
-    Info "CraftPanel starts when you sign in to Windows."
+    Info "Minecraft runtime starts at host boot; the dashboard starts when you sign in."
     Info "Update:    $update"
     Info "Logs:      $(Join-Path $DataDir 'logs\craftpanel.log')"
     Info "Settings:  $ConfigFile"

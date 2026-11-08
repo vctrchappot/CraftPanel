@@ -24,7 +24,7 @@ export class RuntimeService {
   private writes: Promise<void> = Promise.resolve();
   private broadcasts = new Set<(event: keyof AgentEvents, args: unknown[]) => void>();
 
-  constructor(dataDir: string) {
+  constructor(dataDir: string, private build = "development") {
     this.paths = runtimePaths(dataDir);
     // Subscribe before serving; state is sent along with every event, before its consumers run.
     for (const event of EVENTS) this.agent.on(event, (...args: unknown[]) => {
@@ -72,7 +72,9 @@ export class RuntimeService {
     }
     await new Promise<void>((resolve, reject) => {
       this.server.once("error", reject);
-      this.server.listen(this.paths.endpoint, () => { this.server.off("error", reject); resolve(); });
+      // Windows dashboard and runtime use different accounts. Pipe access is authenticated
+      // by the private token; do not rely on the creator account's default pipe DACL.
+      this.server.listen({ path: this.paths.endpoint, readableAll: process.platform === "win32", writableAll: process.platform === "win32" }, () => { this.server.off("error", reject); resolve(); });
     });
     if (process.platform !== "win32") await fs.chmod(this.paths.endpoint, 0o600);
     try {
@@ -80,6 +82,7 @@ export class RuntimeService {
       if (saved.protocol !== RUNTIME_PROTOCOL || !saved.servers) throw new Error("Incompatible runtime registry; refusing to start servers");
       this.records = Object.assign(Object.create(null), saved.servers);
       for (const [id, entry] of Object.entries(this.records)) {
+        validateSpec(entry.spec);
         // A runtime crash cannot reattach stdin. Never duplicate a possibly live process.
         if (entry.pid && await this.agent.probeOrphan(entry.pid)) {
           this.agent.setStatus(id, "orphaned", `Runtime lost ownership of PID ${entry.pid}; stop the process before starting again`);
@@ -115,7 +118,7 @@ export class RuntimeService {
         session = crypto.randomUUID();
         for (const id of Object.keys(this.records)) send({ type: "snapshot", snapshot: this.snapshot(id, true) });
         this.broadcasts.add(broadcast);
-        send({ type: "ready", protocol: RUNTIME_PROTOCOL, epoch: this.epoch, session });
+        send({ type: "ready", protocol: RUNTIME_PROTOCOL, epoch: this.epoch, session, build: this.build });
         return;
       }
       // No replay window: a command belongs to exactly this connection and runtime generation.
@@ -129,10 +132,19 @@ export class RuntimeService {
       void (async () => {
         try {
           let result: unknown = null;
-          if (!id && !["ping", "stopAll"].includes(String(m.method))) throw new Error("Invalid server id");
+          if (!id && !["ping", "stopAll", "shutdownRuntime"].includes(String(m.method))) throw new Error("Invalid server id");
           const entry = this.records[id];
           switch (m.method) {
             case "ping": break;
+            case "configure": {
+              const spec = validateSpec(m.spec);
+              this.records[id] = { spec, pid: entry?.pid ?? null };
+              await this.persist();
+              break;
+            }
+            case "shutdownRuntime":
+              setTimeout(() => void this.close().catch((err) => { console.error(err); process.exitCode = 1; }), 50);
+              break;
             case "start": {
               const spec = validateSpec(m.spec);
               if (entry?.pid && !this.agent.isRunning(id) && await this.agent.probeOrphan(entry.pid)) throw new Error("A previous runtime process is still running");

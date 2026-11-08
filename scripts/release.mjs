@@ -87,7 +87,7 @@ function pack() {
   // The source map (~8 MB) only helps when debugging a local build; names in stack traces survive minification.
   fs.cpSync(dist, path.join(stage, "apps/api/dist"), { recursive: true, filter: (src) => !src.endsWith(".js.map") });
   fs.mkdirSync(path.join(stage, "deploy"));
-  for (const file of ["craftpanel.service", "install.sh", "install.ps1"]) fs.copyFileSync(path.join(root, "deploy", file), path.join(stage, "deploy", file));
+  for (const file of ["craftpanel.service", "craftpanel-runtime.service", "install.sh", "install.ps1"]) fs.copyFileSync(path.join(root, "deploy", file), path.join(stage, "deploy", file));
   fs.chmodSync(path.join(stage, "deploy/install.sh"), 0o755);
   for (const file of ["README.md", "LICENSE", "CHANGELOG.md"]) fs.copyFileSync(path.join(root, file), path.join(stage, file));
   let commit = null;
@@ -96,7 +96,10 @@ function pack() {
   } catch {
     /* not a git checkout */
   }
-  fs.writeFileSync(path.join(stage, "release.json"), JSON.stringify({ version, commit, recoveryProtocol: 1, builtAt: new Date().toISOString() }, null, 2) + "\n");
+  const runtime = readJson(path.join(dist, "runtime-manifest.json"));
+  const manifest = JSON.stringify({ version, commit, recoveryProtocol: 1, runtime, builtAt: new Date().toISOString() }, null, 2) + "\n";
+  fs.writeFileSync(path.join(stage, "release.json"), manifest);
+  fs.writeFileSync(path.join(out, "release.json"), manifest);
 
   // Relative paths only: GNU tar on Windows would read "C:\…" as a remote host.
   const archive = `${name}.tar.gz`;
@@ -104,7 +107,7 @@ function pack() {
   fs.rmSync(stage, { recursive: true });
   // The installers are also published on their own so `…/releases/latest/download/install.sh` works.
   for (const file of ["install.sh", "install.ps1"]) fs.copyFileSync(path.join(root, "deploy", file), path.join(out, file));
-  const sums = [archive, "install.sh", "install.ps1"].map((f) => `${crypto.createHash("sha256").update(fs.readFileSync(path.join(out, f))).digest("hex")}  ${f}`);
+  const sums = [archive, "install.sh", "install.ps1", "release.json"].map((f) => `${crypto.createHash("sha256").update(fs.readFileSync(path.join(out, f))).digest("hex")}  ${f}`);
   fs.writeFileSync(path.join(out, "SHA256SUMS"), sums.join("\n") + "\n");
   console.log(`Packed ${path.join(out, archive)}`);
 }

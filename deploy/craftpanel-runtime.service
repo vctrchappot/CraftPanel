@@ -1,0 +1,34 @@
+# Process owner. Restarting craftpanel.service never stops this unit or its children.
+[Unit]
+Description=CraftPanel Minecraft runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=craftpanel
+Group=craftpanel
+WorkingDirectory=/opt/craftpanel
+ExecStart=/usr/bin/node apps/api/dist/runtime.js
+Environment=NODE_ENV=production
+Environment=CRAFTPANEL_DATA_DIR=/var/lib/craftpanel
+EnvironmentFile=-/etc/craftpanel/craftpanel.env
+KillSignal=SIGTERM
+TimeoutStopSec=120
+KillMode=mixed
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/craftpanel
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

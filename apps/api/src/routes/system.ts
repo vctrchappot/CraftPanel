@@ -192,12 +192,15 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.get<{ Querystring: { refresh?: string } }>("/api/updates", async (req) => {
     requirePermission(req, "app.configure");
-    return ctx.updates.status(req.query.refresh === "1");
+    const status = await ctx.updates.status(req.query.refresh === "1");
+    const interruption = !status.runtime || !ctx.agent.connected ? "unknown" : status.runtime.sha256 === ctx.agent.identity?.build ? "none" : "required";
+    return { ...status, interruption, affectedServers: (await ctx.servers.rows()).filter((r) => ["running", "starting", "stopping", "orphaned"].includes(ctx.servers.status(r))).map((r) => ({ id: r.id, name: r.name, autoStart: r.autoStart })) };
   });
   /** One-click update: the installer's helper stops CraftPanel (servers save and stop), installs and starts the new version. */
   app.post("/api/updates/install", async (req, reply) => {
     requirePermission(req, "app.configure");
-    const progress = await ctx.updates.startInstall();
+    const body = parse(z.object({ approvedRuntime: z.string().regex(/^[a-f0-9]{64}$/).optional() }).default({}), req.body);
+    const progress = await ctx.updates.startInstall(body.approvedRuntime);
     await ctx.activity.event(null, "craftpanel.update_started", `Updating CraftPanel from ${CRAFTPANEL_VERSION} to ${progress.target}`, { actor: actorOf(req) });
     await ctx.activity.audit(actorOf(req), "craftpanel.update", null, { from: CRAFTPANEL_VERSION, to: progress.target });
     return reply.code(202).send(progress);
