@@ -108,8 +108,24 @@ export class JavaManager {
     return ok[0] ?? null;
   }
 
-  /** Download an Eclipse Temurin JRE (or JDK fallback) from Adoptium. */
-  async install(major: number, onProgress?: (stage: string, p: DownloadProgress | null) => void, signal?: AbortSignal): Promise<JavaRuntimeInfo> {
+  private installing = new Map<number, Promise<JavaRuntimeInfo>>();
+
+  /**
+   * Download an Eclipse Temurin JRE (or JDK fallback) from Adoptium. Servers created together
+   * share one download: two installs into the same temp file would trip over each other.
+   */
+  install(major: number, onProgress?: (stage: string, p: DownloadProgress | null) => void, signal?: AbortSignal): Promise<JavaRuntimeInfo> {
+    const running = this.installing.get(major);
+    if (running) {
+      onProgress?.(`Waiting for the Java ${major} download of another server`, null);
+      return running;
+    }
+    const run = this.download(major, onProgress, signal).finally(() => this.installing.delete(major));
+    this.installing.set(major, run);
+    return run;
+  }
+
+  private async download(major: number, onProgress?: (stage: string, p: DownloadProgress | null) => void, signal?: AbortSignal): Promise<JavaRuntimeInfo> {
     const os = process.platform === "win32" ? "windows" : process.platform === "darwin" ? "mac" : "linux";
     const arch = process.arch === "x64" ? "x64" : process.arch === "arm64" ? "aarch64" : process.arch === "arm" ? "arm" : process.arch;
 
