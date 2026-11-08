@@ -291,7 +291,7 @@ function VanillaMigration({ server: s }: { server: ServerDetail }) {
           <ol className="list-decimal space-y-1.5 pl-5 text-[13px] text-muted-foreground">
             <li>A full backup of the current server is created.</li>
             <li>The latest stable Paper build for {s.mcVersion} is downloaded and verified.</li>
-            <li>On first start, Paper converts the world layout (Nether and End move into separate folders).</li>
+            <li>Up to Minecraft 1.21, Paper moves the Nether and the End into separate folders on first start; switching back moves them home again.</li>
             <li>To roll back, restore the pre-migration backup and switch back to Vanilla.</li>
           </ol>
           {running && <Callout variant="warning" icon={<AlertTriangle />}>Stop the server first.</Callout>}

@@ -27,6 +27,7 @@ import { diagnoseWan, formatAddress, lanAddresses, fetchPublicIp, isPrivateIPv4 
 import { getProvider } from "@craftpanel/minecraft-providers";
 import { actorOf, canSee, noContent, requirePermission, type AppContext } from "../context";
 import { parse } from "../validate";
+import { isDowngrade, previewSwitch } from "../services/software-switch";
 
 type IdParams = { Params: { id: string } };
 
@@ -346,12 +347,24 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     };
   });
 
-  /** Software migration (e.g. Vanilla → Paper) or version update, with an automatic backup first. */
+  const switchTarget = z.object({ software: z.enum(SERVER_SOFTWARE), version: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/) });
+
+  /** What a switch would do: backup, world upgrade or downgrade, add-ons that stop loading, folders that move. */
+  app.get<IdParams & { Querystring: { software?: string; version?: string } }>("/api/servers/:id/software/preview", async (req) => {
+    requirePermission(req, "server.configure");
+    const to = parse(switchTarget, req.query);
+    const r = await row(req.params.id);
+    return previewSwitch(servers.sandbox(r), { software: r.software, version: r.mcVersion, javaMajor: r.javaMajor }, to);
+  });
+
+  /** Software migration (e.g. Vanilla → Paper, Paper → Fabric) or version/build update, with an automatic backup first. */
   app.post<IdParams>("/api/servers/:id/software", async (req) => {
     requirePermission(req, "server.configure");
-    const body = parse(z.object({ software: z.enum(SERVER_SOFTWARE), version: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/), build: z.string().max(32).nullable().optional() }), req.body);
+    const body = parse(switchTarget.extend({ build: z.string().max(32).nullable().optional(), allowDowngrade: z.boolean().optional() }), req.body);
     const r = await row(req.params.id);
     if (servers.agent.isRunning(r.id)) throw badRequest("Stop the server first");
+    if (!body.allowDowngrade && (await isDowngrade(r.mcVersion, body.version)))
+      throw new AppError(409, "downgrade", `Minecraft ${body.version} is older than ${r.mcVersion}`, "Worlds saved by a newer version can break on an older one. Confirm the downgrade to continue anyway.");
     const backup = await ctx.backups.create(r.id, r.software !== body.software ? "pre-migration" : "pre-update", actorOf(req), `Before switching to ${body.software} ${body.version}`);
     try {
       await servers.changeSoftware(r.id, body.software, body.version, body.build ?? null, actorOf(req));

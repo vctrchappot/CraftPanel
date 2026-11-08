@@ -12,18 +12,18 @@ import { useServers } from "@/lib/queries";
 import { formatBytes } from "@/lib/format";
 import { useSystem } from "./home";
 
-interface VersionOption {
+export interface VersionOption {
   id: string;
   stable: boolean;
   releaseTime?: string;
 }
-interface VersionInfo {
+export interface VersionInfo {
   builds: { id: string; channel: string; time: string; changes: string[] }[];
   java: { major: number; recommendedFlags: string[]; available: { path: string; version: string; managed: boolean } | null };
   log4shell: string | null;
 }
 
-const SOFTWARE_CHOICES: { id: ServerSoftware; badge?: string; description: string; icon: React.ReactNode }[] = [
+export const SOFTWARE_CHOICES: { id: ServerSoftware; badge?: string; description: string; icon: React.ReactNode }[] = [
   { id: "paper", badge: "Recommended", description: "Faster than Vanilla and supports Bukkit/Paper plugins. Gameplay matches Vanilla closely.", icon: <Zap /> },
   { id: "purpur", description: "Paper with many extra gameplay and configuration options. Runs the same plugins.", icon: <Feather /> },
   { id: "fabric", description: "Mod loader for server-side Fabric mods (e.g. Lithium for performance). Most mods need Fabric API.", icon: <Puzzle /> },
@@ -431,7 +431,7 @@ export function CreateServerWizard() {
   );
 }
 
-function Choice({ selected, disabled, title, description, icon, badge, onClick }: { selected?: boolean; disabled?: boolean; title: string; description: string; icon: React.ReactNode; badge?: string; onClick: () => void }) {
+export function Choice({ selected, disabled, title, description, icon, badge, onClick }: { selected?: boolean; disabled?: boolean; title: string; description: string; icon: React.ReactNode; badge?: string; onClick: () => void }) {
   return (
     <button
       type="button"

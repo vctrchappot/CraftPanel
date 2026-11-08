@@ -33,9 +33,20 @@ export interface BuildOptions {
 
 const LOOPBACK_PEERS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 
+/**
+ * The static export writes link-prefetch payloads as `servers/new/__next.servers/new/__PAGE__.txt`,
+ * but the router requests `servers/new/__next.servers.new.__PAGE__.txt`. Without this every prefetch
+ * is a 404 and navigation loads the whole page again.
+ */
+export function nextSegmentPath(url: string): string {
+  const m = /^((?:\/[^/?]*)*\/)__next\.([^/?]+)\.__PAGE__\.txt(\?.*)?$/.exec(url);
+  return m ? `${m[1]}__next.${m[2].replace(/\./g, "/")}/__PAGE__.txt${m[3] ?? ""}` : url;
+}
+
 export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promise<FastifyInstance> {
   const tls = ctx.config.tls;
   const app = Fastify({
+    rewriteUrl: (req) => nextSegmentPath(req.url ?? "/"),
     logger: opts.logger ?? { level: ctx.config.logLevel },
     trustProxy: ctx.config.trustProxy,
     bodyLimit: 6 * 1024 * 1024,

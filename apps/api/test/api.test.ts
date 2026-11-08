@@ -7,7 +7,7 @@ import type { FastifyInstance } from "fastify";
 import { servers } from "@craftpanel/database";
 import { dataLayout } from "@craftpanel/server-runtime";
 import { createContext } from "../src/bootstrap";
-import { buildApp } from "../src/app";
+import { buildApp, nextSegmentPath } from "../src/app";
 import type { AppContext } from "../src/context";
 import type { AppConfig } from "../src/config";
 
@@ -263,5 +263,13 @@ describe("updates and installer control", () => {
     } finally {
       await controlled.close();
     }
+  });
+});
+
+describe("nextSegmentPath", () => {
+  it("maps the router's prefetch URLs onto the files the static export writes", () => {
+    expect(nextSegmentPath("/servers/new/__next.servers.new.__PAGE__.txt?_rsc=1")).toBe("/servers/new/__next.servers/new/__PAGE__.txt?_rsc=1");
+    expect(nextSegmentPath("/server/__next.server.__PAGE__.txt?id=x")).toBe("/server/__next.server/__PAGE__.txt?id=x");
+    for (const u of ["/__next.__PAGE__.txt", "/servers/__next._tree.txt", "/api/servers", "/x/__next.a.__PAGE__.txt/../../etc"]) expect(nextSegmentPath(u)).toBe(u);
   });
 });

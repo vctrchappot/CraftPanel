@@ -37,7 +37,7 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 - ✅ Log4Shell protection (Mojang guidance: flag for 1.17–1.18.0, patched config for 1.7–1.16.5, config downloaded from Mojang with SHA-1). Verified with a JNDI probe (`say ${jndi:ldap://127.0.0.1:…}` and a local listener): unprotected Vanilla 1.16.5 made 3 connections; protected Vanilla 1.16.5, 1.17.1, 1.8.9, Paper 1.16.5 and Fabric 1.17.1 made none. Own `-Dlog4j…` JVM arguments turn it off
 - ✅ Automatic Java provisioning: Java 25 for 26.x and Java 21 for 1.21.x were downloaded side by side and chosen correctly
 - 🧪 Java compatibility policy (legacy 8, 16/17, 21+)
-- ✅ Vanilla → Paper migration with pre-migration backup and old-jar cleanup (✅ also Vanilla 1.17.1 → Fabric via the API; `server.jar` is kept for the launcher). Rollback restores the DB metadata on failure; the failure path itself is 🟡
+- ✅ Software switch in every direction from Settings → Software & version (WSL 2 Ubuntu, real servers): a gold block placed in the Nether of Paper 1.21.11 was still there after Paper → Vanilla → Fabric → Paper (`execute in minecraft:the_nether if block …` → "Test passed"); Paper's `world_nether/DIM-1` and `world_the_end/DIM1` were moved back to `world/` for Vanilla and Paper split them again on the way back. Paper 26.x uses the Vanilla layout (`world/dimensions/minecraft/…`), checked on Vanilla/Paper/Fabric 26.3, so nothing moves there. Build change (#132 → #131) ✅, downgrade refused without confirmation (409) ✅, preview dialog and downgrade confirmation in the browser ✅. 🧪 dimension moves, conflicts and version ordering. Rollback restores the DB metadata on failure; the failure path itself is 🟡
 
 **Monitoring**
 - ✅ CPU and RAM per process (Windows via a persistent PowerShell probe; Linux `/proc`, macOS `ps` 🟡)
@@ -88,7 +88,7 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 - Vanilla before 1.20.3 has no TPS/MSPT; it's shown as unavailable.
 - Inbound reachability from the internet cannot be tested without a third-party service; the UI says so.
 - Modrinth is the only plugin marketplace; Hangar/Spigot are not integrated.
-- Fabric: the dashboard only offers the Vanilla→Paper migration; other switches (e.g. to Fabric or Purpur) are API-only so far. Client-only mods are not filtered beyond Modrinth's `server_side` flag.
+- Fabric: client-only mods are not filtered beyond Modrinth's `server_side` flag.
 - UI is English-only; mobile layouts are responsive by design but were only checked at desktop width.
 
 ## Planned

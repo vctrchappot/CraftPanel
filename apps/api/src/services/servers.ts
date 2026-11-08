@@ -25,6 +25,7 @@ import type { Hub } from "../hub";
 import type { AppConfig } from "../config";
 import { SYSTEM_ACTOR, type ActivityService, type Actor } from "./activity";
 import { syncInfoPack, syncInfoPlugin } from "./info-pack";
+import { mergeSplitDimensions, separateDimensionLayout } from "./software-switch";
 import type { SettingsService } from "./settings";
 
 export type ServerRow = typeof servers.$inferSelect;
@@ -499,6 +500,11 @@ export class ServerService {
     await this.install(id, actor);
     const after = await this.row(id);
     if (after.installState !== "installed") throw new AppError(500, "install_failed", after.installError ?? "Installation failed");
+    if (separateDimensionLayout(row.software) && !separateDimensionLayout(software)) {
+      for (const m of await mergeSplitDimensions(this.sandbox(row))) {
+        await this.activity.event(id, "world.dimension_moved", m.conflict ? `${m.label} of "${m.world}" left in ${m.from}: ${m.to} already has data` : `Moved the ${m.label} of "${m.world}" from ${m.from} to ${m.to}`, { actor, level: m.conflict ? "warn" : "info" });
+      }
+    }
     // Remove the previous jar when the filename changed (Fabric's launcher starts the vanilla server.jar).
     if (row.jarFile && after.jarFile !== row.jarFile && !(software === "fabric" && row.jarFile === "server.jar")) await fsp.rm(path.join(row.directory, row.jarFile), { force: true });
   }

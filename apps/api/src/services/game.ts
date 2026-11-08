@@ -244,7 +244,8 @@ export class GameService {
       const base = c.name.replace(/_(nether|the_end)$/, "");
       if (base !== c.name && names.has(base)) continue; // Paper dimension folder, grouped below
       const dims = ["overworld"];
-      for (const [dir, label] of [["DIM-1", "nether"], ["DIM1", "the_end"]] as const) {
+      // Up to 1.21: DIM-1/DIM1 (or Paper's world_nether…); from 26.1: dimensions/minecraft/<name>.
+      for (const [dir, label] of [["DIM-1", "nether"], ["DIM1", "the_end"], ["dimensions/minecraft/the_nether", "nether"], ["dimensions/minecraft/the_end", "the_end"]] as const) {
         if (await exists(path.join(row.directory, c.name, dir))) dims.push(label);
       }
       let size = await directorySize(path.join(row.directory, c.name));
