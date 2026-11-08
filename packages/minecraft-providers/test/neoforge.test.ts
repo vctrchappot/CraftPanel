@@ -62,6 +62,11 @@ config="examplemod.mixins.json"
     modId="jei"
     type="optional"
 `;
+  it("accepts the template's trailing comments on table headers", () => {
+    const r = parseModsToml('[[mods]] #mandatory\nmodId="statuseffectbars" #mandatory\n[[dependencies.statuseffectbars]] #optional\nmodId="neoforge" #mandatory\ntype="required" #mandatory\n');
+    expect(r.mods).toEqual([{ modId: "statuseffectbars" }]);
+    expect(r.dependencies).toEqual([{ modId: "neoforge", type: "required" }]);
+  });
   it("reads mods and dependencies", () => {
     const r = parseModsToml(toml);
     expect(r.mods).toEqual([{ modId: "examplemod", version: "${file.jarVersion}", displayName: "Example Mod", authors: "Alice, Bob", description: "A mod that does things." }]);

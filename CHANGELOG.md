@@ -13,6 +13,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Settings in `/etc/craftpanel/craftpanel.env` (Linux service) survive updates.
 - Purpur servers (Paper fork; same plugins, TPS/MSPT and `/craftpanel` command).
 - NeoForge servers with a choice of NeoForge version (the official installer runs during installation); NeoForge mods from Modrinth (search, install, updates, upload) with dependency checks from `neoforge.mods.toml`.
+- When NeoForge fails to load a mod, the crash reason names the jar (and says when it is a client-only mod) instead of a generic "Failed to start the minecraft server".
 - Fabric servers with a choice of loader version; Fabric mods from Modrinth (search, install, updates, upload) with dependency checks by mod id.
 - Log4Shell protection for Minecraft 1.7–1.18: CraftPanel adds Mojang's JVM flag or patched logging config on every start and shows it in the wizard and the server's runtime settings.
 - Two-factor sign-in with an authenticator app (TOTP) and recovery codes; owners can require it per role and reset it for a user.

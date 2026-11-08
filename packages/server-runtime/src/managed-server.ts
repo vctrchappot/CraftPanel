@@ -57,6 +57,9 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
   private queries: PendingQuery[] = [];
   private _players = new Map<string, OnlinePlayer>();
   private recentErrors: string[] = [];
+  /** Mods NeoForge reported as failed during this start (id → jar file), and whether one touched client-only code. */
+  private failedMods = new Map<string, string | null>();
+  private clientOnlyMod = false;
   startedAt: number | null = null;
   readyAt: number | null = null;
   lastExitCode: number | null = null;
@@ -95,6 +98,8 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
     this.killRequested = false;
     this.recentErrors = [];
     this.lastError = null;
+    this.failedMods.clear();
+    this.clientOnlyMod = false;
     this._players.clear();
     this.emit("players", []);
 
@@ -159,7 +164,7 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
       } else {
         const exit = `Process exited unexpectedly (${code !== null ? `exit code ${code}` : `signal ${signal}`})`;
         const lastLogError = this.recentErrors.slice(-1)[0];
-        const reason = this.lastError ?? (lastLogError ? `${exit}. Last error: ${lastLogError}` : exit);
+        const reason = this.lastError ?? this.modFailure() ?? (lastLogError ? `${exit}. Last error: ${lastLogError}` : exit);
         this.lastError = reason;
         this.system(`Server crashed: ${reason}`, "ERROR");
         this.setStatus("crashed", reason);
@@ -253,10 +258,30 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
       case "stopping":
         if (this._status === "running" || this._status === "starting") this.setStatus("stopping");
         break;
+      case "mod-failed":
+        if (!this.failedMods.has(signal.mod)) this.failedMods.set(signal.mod, null);
+        break;
+      case "mod-file": {
+        // The file follows its "Mod loading issue for" block.
+        const last = [...this.failedMods.keys()].at(-1);
+        if (last && !this.failedMods.get(last)) this.failedMods.set(last, signal.file);
+        break;
+      }
+      case "client-only":
+        if (this.failedMods.size) this.clientOnlyMod = true;
+        break;
     }
     this.emit("signal", signal);
   }
   private pendingUuids = new Map<string, string>();
+
+  /** "Mod loading failed: …" with the files to disable, when NeoForge reported failed mods. */
+  private modFailure(): string | null {
+    if (!this.failedMods.size) return null;
+    const names = [...this.failedMods].map(([id, file]) => file ?? id).join(", ");
+    const why = this.clientOnlyMod ? " It uses client-only code (a client mod that can't run on a server)." : "";
+    return `Mod loading failed: ${names}.${why} Disable ${this.failedMods.size === 1 ? "it" : "them"} on the Mods tab and start again.`;
+  }
 
   private push(line: Omit<ConsoleLine, "seq" | "ts">) {
     const full: ConsoleLine = { ...line, seq: ++this.seq, ts: Date.now() };
