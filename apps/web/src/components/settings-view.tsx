@@ -347,7 +347,7 @@ function About() {
               · issues and ideas welcome
             </dd>
             <dt className="text-muted-foreground">License</dt>
-            <dd>AGPL-3.0-or-later. Minecraft is a trademark of Mojang AB; CraftPanel is not affiliated with Mojang or Microsoft.</dd>
+            <dd>PolyForm Strict 1.0.0: free for personal and noncommercial use. Minecraft is a trademark of Mojang AB; CraftPanel is not affiliated with Mojang or Microsoft.</dd>
           </dl>
         </Section>
       )}

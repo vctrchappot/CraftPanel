@@ -53,7 +53,7 @@ function infoFunction(details: InfoPackDetails): string {
     bullet("Running ", [text(software, { color: "green" })]),
     bullet("Self-hosted on a ", [text("PC", { color: "aqua" }), text(", ", { color: "gray" }), text("Raspberry Pi", { color: "light_purple" }), text(" or ", { color: "gray" }), text("VPS", { color: "aqua" })]),
     bullet("One-click servers, live console, backups & plugins", []),
-    bullet("Free & open source ", [text("(AGPL-3.0)", { color: "dark_gray" })]),
+    bullet("Free for personal use ", [text("(PolyForm Strict)", { color: "dark_gray" })]),
     ["", text(" "), link("[ Get CraftPanel ]", CRAFTPANEL_REPO_URL, "Open the project on GitHub")],
     [
       "",
