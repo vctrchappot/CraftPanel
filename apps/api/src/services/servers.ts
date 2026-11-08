@@ -4,10 +4,12 @@ import path from "node:path";
 import crypto from "node:crypto";
 import {
   AppError,
+  applyPresetFlags,
   badRequest,
   conflict,
   createServerSchema,
   notFound,
+  PRESET_INFO,
   SOFTWARE_INFO,
   type InstallProgress,
   type ServerDetail,
@@ -196,6 +198,10 @@ export class ServerService {
     set("online-mode", input.onlineMode);
     set("enable-rcon", false);
     set("query.port", input.port);
+    if (input.performancePreset) {
+      set("view-distance", PRESET_INFO[input.performancePreset].viewDistance);
+      set("simulation-distance", PRESET_INFO[input.performancePreset].simulationDistance);
+    }
     await fsp.writeFile(path.join(directory, "server.properties"), "#Created by CraftPanel\n" + props.serialize());
 
     const now = Date.now();
@@ -211,7 +217,7 @@ export class ServerService {
         javaMajor: javaReq.major,
         javaPath: input.javaPath ?? null,
         memoryMb: input.memoryMb,
-        jvmArgs: input.jvmArgs,
+        jvmArgs: input.performancePreset ? applyPresetFlags(input.jvmArgs, input.performancePreset, input.memoryMb) : input.jvmArgs,
         directory,
         port: input.port,
         networkMode: input.networkMode,

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ROLES, SERVER_ROLES } from "./roles";
 import { SERVER_SOFTWARE } from "./software";
 import { NOTIFICATION_CATEGORIES } from "./types";
+import { PERFORMANCE_PRESETS } from "./performance";
 
 export const usernameSchema = z
   .string()
@@ -89,6 +90,8 @@ export const createServerSchema = z.object({
   motd: z.string().max(120).default("A CraftPanel server"),
   memoryMb: z.number().int().min(512).max(262144).default(2048),
   jvmArgs: jvmArgsSchema.default(""),
+  /** Applies GC flags and view/simulation distance (see performance.ts). */
+  performancePreset: z.enum(PERFORMANCE_PRESETS).nullable().optional(),
   javaPath: z.string().max(1024).nullable().optional(),
   networkMode: z.enum(["lan", "wan"]).default("lan"),
   bindAddress: z.string().max(64).default(""),

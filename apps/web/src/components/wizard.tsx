@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, Check, ChevronLeft, ChevronRight, Coffee, Feather, Globe, Home, Info, Package, Puzzle, ShieldCheck, Zap } from "lucide-react";
 import { Badge, Button, Callout, Field, Input, NativeSelect, PageHeader, Panel, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
-import { SOFTWARE_INFO, softwareLabel, type CreateServerInput, type ServerSoftware } from "@craftpanel/shared";
+import { PERFORMANCE_PRESETS, PRESET_INFO, recommendPreset, SOFTWARE_INFO, softwareLabel, type CreateServerInput, type ServerSoftware } from "@craftpanel/shared";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { useServers } from "@/lib/queries";
 import { formatBytes } from "@/lib/format";
@@ -68,6 +68,7 @@ export function CreateServerWizard() {
     motd: "A CraftPanel server",
     memoryMb: 2048,
     jvmArgs: "",
+    performancePreset: null,
     networkMode: "lan",
     bindAddress: "",
     port: 25565,
@@ -78,6 +79,11 @@ export function CreateServerWizard() {
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((p) => ({ ...p, [k]: v }));
   const buildLabel = SOFTWARE_INFO[f.software].buildLabel;
   React.useEffect(() => setF((p) => (p.port === 25565 && nextPort !== 25565 ? { ...p, port: nextPort } : p)), [nextPort]);
+  const recommended = system.data ? recommendPreset({ arch: system.data.arch, cpus: system.data.cpus, memoryBytes: system.data.memory.total }) : null;
+  const presetTouched = React.useRef(false);
+  React.useEffect(() => {
+    if (recommended && !presetTouched.current) setF((p) => ({ ...p, performancePreset: recommended }));
+  }, [recommended]);
 
   const versions = useQuery({ queryKey: ["catalog", f.software, "versions"], queryFn: () => api.get<VersionOption[]>(`/api/catalog/${f.software}/versions`), staleTime: 600_000 });
   React.useEffect(() => {
@@ -329,14 +335,31 @@ export function CreateServerWizard() {
                 >
                   <input id="mem" type="range" min={512} max={maxMb} step={512} value={Math.min(f.memoryMb, maxMb)} onChange={(e) => set("memoryMb", Number(e.target.value))} className="w-full accent-[var(--foreground)]" />
                 </Field>
-                <Field label="Additional JVM arguments" htmlFor="jvm" help="Optional. Each argument must start with '-'. Memory is set above." error={fieldErrors.jvmArgs}>
+                <Field
+                  label="Performance"
+                  htmlFor="preset"
+                  help={f.performancePreset ? PRESET_INFO[f.performancePreset].description : "Java's default garbage collector settings and Minecraft's default distances."}
+                >
+                  <NativeSelect
+                    id="preset"
+                    value={f.performancePreset ?? ""}
+                    onChange={(e) => {
+                      presetTouched.current = true;
+                      set("performancePreset", (e.target.value || null) as Form["performancePreset"]);
+                    }}
+                  >
+                    {PERFORMANCE_PRESETS.map((p) => (
+                      <option key={p} value={p}>
+                        {PRESET_INFO[p].label}
+                        {p === recommended ? " (recommended for this machine)" : ""}
+                      </option>
+                    ))}
+                    <option value="">None</option>
+                  </NativeSelect>
+                </Field>
+                <Field label="Additional JVM arguments" htmlFor="jvm" help="Optional. Each argument must start with '-'. Memory is set above; the performance preset adds its garbage collector flags." error={fieldErrors.jvmArgs}>
                   <Textarea id="jvm" rows={3} value={f.jvmArgs} onChange={(e) => set("jvmArgs", e.target.value)} className="font-mono text-xs" placeholder="-XX:+UseG1GC" />
                 </Field>
-                {versionInfo.data?.java.recommendedFlags.length ? (
-                  <Button variant="secondary" size="sm" onClick={() => set("jvmArgs", versionInfo.data!.java.recommendedFlags.join(" "))}>
-                    Use Paper&apos;s recommended flags
-                  </Button>
-                ) : null}
                 <ToggleRow label="Start with CraftPanel" help="Start this server automatically whenever CraftPanel starts." checked={f.autoStart} onChange={(v) => set("autoStart", v)} />
               </div>
             )}
@@ -385,6 +408,7 @@ export function CreateServerWizard() {
                     ["World", `${f.levelName}${f.seed ? ` · seed ${f.seed}` : ""} · ${f.levelType.replace("minecraft:", "")}`],
                     ["Gameplay", `${f.mode} · ${f.mode === "hardcore" ? "hard" : f.difficulty} · ${f.maxPlayers} players${f.whitelist ? " · whitelist" : ""}`],
                     ["Memory", `${(f.memoryMb / 1024).toFixed(1)} GB`],
+                    ["Performance", f.performancePreset ? PRESET_INFO[f.performancePreset].label : "Java defaults"],
                     ["Network", `${f.networkMode === "lan" ? "Local network" : "Internet"} · port ${f.port}${f.bindAddress ? ` · ${f.bindAddress}` : ""}`],
                     ["Storage", f.directory || "CraftPanel data directory"],
                   ].map(([k, v]) => (

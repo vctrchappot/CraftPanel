@@ -12,6 +12,7 @@ import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
 import { ToggleRow } from "../wizard";
 import { SoftwareSettings } from "./software";
+import { PerformanceSettings } from "./performance";
 
 interface SettingDef {
   key: string;
@@ -33,6 +34,7 @@ export function SettingsTab({ server: s }: { server: ServerDetail }) {
         <TabsTrigger value="gamerules">Game rules</TabsTrigger>
         <TabsTrigger value="runtime">Runtime</TabsTrigger>
         <TabsTrigger value="software">Software & version</TabsTrigger>
+        <TabsTrigger value="performance">Performance</TabsTrigger>
         <TabsTrigger value="raw">Raw file</TabsTrigger>
         <TabsTrigger value="danger">Danger zone</TabsTrigger>
       </TabsList>
@@ -47,6 +49,9 @@ export function SettingsTab({ server: s }: { server: ServerDetail }) {
       </TabsContent>
       <TabsContent value="software">
         <SoftwareSettings server={s} />
+      </TabsContent>
+      <TabsContent value="performance">
+        <PerformanceSettings server={s} />
       </TabsContent>
       <TabsContent value="raw">
         <RawEditor server={s} />

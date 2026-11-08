@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { ServerSandbox } from "@craftpanel/server-runtime";
 import { findSplitDimensions, isDowngrade, mergeSplitDimensions } from "../src/services/software-switch";
+import { parsePregen } from "../src/services/pregen";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -61,5 +62,29 @@ describe("isDowngrade", () => {
     expect(await isDowngrade("1.21.10", "1.21.9", [])).toBe(true);
     expect(await isDowngrade("1.21.9", "1.21.10", [])).toBe(false);
     expect(await isDowngrade("26.1", "1.21.11", [])).toBe(true);
+  });
+});
+
+describe("parsePregen", () => {
+  const l = (text: string, ts = 1) => ({ text, ts });
+  it("reads Chunky's progress, completion and pauses from the console", () => {
+    expect(parsePregen([l("[12:00:01 INFO]: Done (3.2s)!"), l("[12:00:05 INFO]: [Chunky] Task running for world. Processed: 1234 chunks (5.67%), ETA: 0:12:34, Rate: 123.4 cps, Current: 12, -3", 5)])).toEqual({
+      state: "running",
+      world: "world",
+      chunks: 1234,
+      percent: 5.67,
+      eta: "0:12:34",
+      rate: 123.4,
+      at: 5,
+    });
+    expect(parsePregen([l("[Server thread/INFO]: [Chunky] Task finished for minecraft:overworld. Processed: 4225 chunks (100.00%), Total time: 0:00:42")])).toMatchObject({ state: "finished", world: "minecraft:overworld", chunks: 4225, percent: 100, eta: null });
+    // Real Chunky 1.4 output on Paper 1.21.11 for pause, continue and cancel.
+    const run = l("[17:58:28 INFO]: [Chunky] Task running for world. Processed: 10 chunks (1.00%), ETA: 0:01:00, Rate: 5.0 cps, Current: 0, 0");
+    const paused = [run, l("[17:58:29 INFO]: [Chunky] Task paused for world."), l("[17:58:29 INFO]: [Chunky] Task stopped for world.")];
+    expect(parsePregen(paused)).toMatchObject({ state: "paused", chunks: 10, percent: 1 });
+    expect(parsePregen([...paused, l("> chunky continue"), l("[17:58:33 INFO]: [Chunky] Task continuing for world.")])).toMatchObject({ state: "running", chunks: 10 });
+    expect(parsePregen([run, l("[Chunky] Cancelling all tasks."), l("[17:58:37 INFO]: [Chunky] Task stopped for world.")])).toMatchObject({ state: "stopped" });
+    expect(parsePregen([l("[17:58:23 INFO]: [Chunky] Task started in world for the square region centered at -16, -16 with radius 3000.")])).toMatchObject({ state: "running", world: "world", chunks: 0 });
+    expect(parsePregen([l("nothing here")])).toBeNull();
   });
 });

@@ -19,6 +19,8 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Per-server access: give users a role on single servers, or limit them to selected servers (e.g. a moderator for one server).
 - Settings → Software & version: switch between Paper, Purpur, Fabric and Vanilla in any direction, change the Minecraft version or build, with a preview of what will happen (backup, world upgrade, add-ons that stop loading). Downgrades need an explicit confirmation.
 - Update CraftPanel from the dashboard: "Update now" shows the release notes and which servers restart, follows the update through the restart and reloads into the new version, with "What's new" afterwards. Failed updates are rolled back and reported in the dashboard, the activity log and notifications. Works for installs made with `install.sh` (systemd) and `install.ps1`; run the installer once more to enable it.
+- Performance presets (Raspberry Pi / small VPS, Balanced, Powerful machine): Aikar's garbage collector flags sized for the server's memory plus view and simulation distance. The wizard picks the one recommended for this machine; Settings → Performance switches between them and keeps your other JVM arguments.
+- World pre-generation with Chunky (Paper, Purpur, Fabric): install it with one click, choose a radius around spawn, follow the progress, pause, continue or cancel.
 - `CRAFTPANEL_RELEASE_DIR`: update from a local folder of release archives instead of GitHub.
 - Notifications via Discord webhook and e-mail (SMTP) when a server crashes or fails to start, a backup or scheduled task fails, or a CraftPanel update is available; with a test button.
 

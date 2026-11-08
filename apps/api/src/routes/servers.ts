@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { pipeline } from "node:stream/promises";
@@ -7,15 +8,21 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   AppError,
+  applyPresetFlags,
   badRequest,
   commandSchema,
   createServerSchema,
+  detectPreset,
   gameruleUpdateSchema,
   ipBanSchema,
   levelNameSchema,
+  PERFORMANCE_PRESETS,
   playerActionSchema,
   portSchema,
+  PRESET_INFO,
+  presetJvmFlags,
   propertiesUpdateSchema,
+  recommendPreset,
   SERVER_SOFTWARE,
   SOFTWARE_INFO,
   updateServerSchema,
@@ -180,6 +187,56 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     await game.updateProperties(await row(req.params.id), body.values, actorOf(req));
     return noContent(reply);
   });
+  // ---- performance presets ---------------------------------------------------------------
+
+  app.get<IdParams>("/api/servers/:id/performance", async (req) => {
+    requirePermission(req, "server.view");
+    const r = await row(req.params.id);
+    const values = (await game.readProperties(r)).values;
+    const num = (k: string) => (values[k] !== undefined && values[k] !== "" ? Number(values[k]) : null);
+    const viewDistance = num("view-distance");
+    const simulationDistance = num("simulation-distance");
+    return {
+      current: detectPreset(r.jvmArgs, r.memoryMb, viewDistance, simulationDistance),
+      recommended: recommendPreset({ arch: process.arch, cpus: os.cpus().length, memoryBytes: os.totalmem() }),
+      viewDistance,
+      simulationDistance,
+      presets: PERFORMANCE_PRESETS.map((id) => ({ id, ...PRESET_INFO[id], jvmFlags: presetJvmFlags(id, r.memoryMb) })),
+    };
+  });
+  app.post<IdParams>("/api/servers/:id/performance", async (req) => {
+    requirePermission(req, "server.configure");
+    const { preset } = parse(z.object({ preset: z.enum(PERFORMANCE_PRESETS) }), req.body);
+    const r = await row(req.params.id);
+    const info = PRESET_INFO[preset];
+    await servers.update(r.id, { jvmArgs: applyPresetFlags(r.jvmArgs, preset, r.memoryMb) }, actorOf(req));
+    await game.updateProperties(await row(r.id), { "view-distance": String(info.viewDistance), "simulation-distance": String(info.simulationDistance) }, actorOf(req));
+    await ctx.activity.event(r.id, "server.performance_preset", `Applied the "${info.label}" performance preset`, { actor: actorOf(req) });
+    return servers.detail(await row(r.id));
+  });
+
+  // ---- world pre-generation (Chunky) ------------------------------------------------------
+
+  app.get<IdParams>("/api/servers/:id/pregen", async (req) => {
+    requirePermission(req, "server.view");
+    return ctx.pregen.status(await row(req.params.id));
+  });
+  app.post<IdParams>("/api/servers/:id/pregen/install", async (req) => {
+    requirePermission(req, "plugins.manage");
+    const r = await row(req.params.id);
+    await ctx.pregen.install(r, actorOf(req));
+    return ctx.pregen.status(await row(r.id));
+  });
+  app.post<IdParams>("/api/servers/:id/pregen", async (req) => {
+    requirePermission(req, "console.command");
+    const body = parse(z.object({ action: z.enum(["start", "pause", "continue", "cancel"]), radius: z.number().int().min(100).max(30_000).optional() }), req.body);
+    const r = await row(req.params.id);
+    await ctx.pregen.control(r, body.action, body.radius);
+    await ctx.activity.audit(actorOf(req), `pregen.${body.action}`, r.id, body.radius ? { radius: body.radius } : undefined);
+    if (body.action === "start") await ctx.activity.event(r.id, "world.pregen_started", `Pre-generating the world within ${body.radius ?? 1000} blocks of spawn`, { actor: actorOf(req) });
+    return ctx.pregen.status(r);
+  });
+
   app.put<IdParams>("/api/servers/:id/properties/raw", async (req, reply) => {
     requirePermission(req, "server.configure");
     const body = parse(z.object({ raw: z.string().max(256 * 1024) }), req.body);
