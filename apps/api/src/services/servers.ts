@@ -527,11 +527,6 @@ export class ServerService {
     }
   }
 
-  async update(id: string, patch: Partial<Pick<ServerRow, "name" | "description" | "memoryMb" | "jvmArgs" | "javaPath" | "autoStart" | "networkMode" | "bindAddress" | "port" | "infoCommand">>, actor: Actor) {
-    const row = await this.row(id);
-    if (patch.port !== undefined && patch.port !== row.port) {
-      const others = (await this.rows()).filter((s) => s.id !== id);
-      if (others.some((s) => s.port === patch.port)) throw conflict(`Port ${patch.port} is used by another CraftPanel server`);
   /**
    * A server that kept running across a CraftPanel update still shows the card it loaded at start. Rewrite the
    * files for its next start and push the current values into the running game.
@@ -546,6 +541,11 @@ export class ServerService {
     if (this.agent.status(row.id) === "running") await this.agent.send(row.id, infoStorageCommand(details));
   }
 
+  async update(id: string, patch: Partial<Pick<ServerRow, "name" | "description" | "memoryMb" | "jvmArgs" | "javaPath" | "autoStart" | "networkMode" | "bindAddress" | "port" | "infoCommand">>, actor: Actor) {
+    const row = await this.row(id);
+    if (patch.port !== undefined && patch.port !== row.port) {
+      const others = (await this.rows()).filter((s) => s.id !== id);
+      if (others.some((s) => s.port === patch.port)) throw conflict(`Port ${patch.port} is used by another CraftPanel server`);
       if (!this.agent.isRunning(id) && !(await isPortAvailable(patch.port))) throw conflict(`Port ${patch.port} is in use on this machine`);
     }
     if (patch.memoryMb !== undefined) {
@@ -707,6 +707,7 @@ export class ServerService {
         const open = await this.db.select().from(playerSessions).where(and(eq(playerSessions.serverId, row.id), isNull(playerSessions.leftAt)));
         for (const session of open) if (!online.has(session.name)) await this.db.update(playerSessions).set({ leftAt: Date.now() }).where(eq(playerSessions.id, session.id));
         for (const player of info.players) if (!open.some((s) => s.name === player.name)) await this.db.insert(playerSessions).values({ serverId: row.id, name: player.name, uuid: player.uuid, joinedAt: player.joinedAt });
+        await this.refreshRunningInfoCommand(row).catch(() => undefined);
         continue;
       }
       const wasActive = ["starting", "running", "stopping", "orphaned"].includes(row.lastStatus);
@@ -724,7 +725,6 @@ export class ServerService {
     for (const row of await this.rows()) {
       if (row.autoStart && row.installState === "installed" && row.eulaAccepted && !this.agent.owns(row.id) && !this.agent.isRunning(row.id) && row.lastStatus !== "orphaned") {
         this.start(row.id, SYSTEM_ACTOR).catch((err) => this.activity.event(row.id, "server.autostart_failed", `Automatic start failed: ${(err as Error).message}`, { level: "error" }));
-        await this.refreshRunningInfoCommand(row).catch(() => undefined);
       } else if (row.installState === "installed" && row.lastStatus !== "orphaned" && !this.agent.owns(row.id)) {
         await this.registerRuntime(row).catch((err) => this.activity.event(row.id, "runtime.registration_failed", `Runtime registration failed: ${(err as Error).message}`, { level: "error" }));
       }
