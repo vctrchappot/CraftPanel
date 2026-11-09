@@ -12,6 +12,7 @@ import { Hub } from "../src/hub";
 import { buildApp } from "../src/app";
 import type { AppContext } from "../src/context";
 import { base32Decode, base32Encode, totpCode, totpStep, verifyTotp } from "../src/auth/totp";
+import { MAX_SESSIONS_PER_USER } from "../src/auth/sessions";
 
 describe("TOTP", () => {
   it("matches the RFC 6238 test vectors (SHA-1)", () => {
@@ -307,6 +308,22 @@ describe("signed-in devices", () => {
     // Someone else's session id is not found.
     const ownerSessions = (await call(owner, "GET", "/api/auth/sessions")).json() as { id: string }[];
     expect((await call(laptop, "DELETE", `/api/auth/sessions/${ownerSessions[0].id}`)).statusCode).toBe(404);
+  });
+
+  it("replaces the browser's own session when it signs in again, and caps the list", async () => {
+    await call(owner, "POST", "/api/users", { username: "again", password: "again-password-1", role: "viewer" });
+    const sessionsOf = async (s: Session) => (await call(s, "GET", "/api/auth/sessions")).json() as { id: string }[];
+    let browser = await login("again", "again-password-1", "Chrome");
+    for (let i = 0; i < 3; i++) {
+      const r = await call(browser, "POST", "/api/auth/login", { username: "again", password: "again-password-1" }, { "user-agent": "Chrome" });
+      expect(r.statusCode).toBe(200);
+      browser = sessionFrom(r);
+    }
+    expect(await sessionsOf(browser)).toHaveLength(1);
+    // Scripts without a cookie each get a session, but no more than the cap.
+    for (let i = 0; i < MAX_SESSIONS_PER_USER + 5; i++) await login("again", "again-password-1", "Script");
+    const last = await login("again", "again-password-1", "Last");
+    expect(await sessionsOf(last)).toHaveLength(MAX_SESSIONS_PER_USER);
   });
 
   it("lets an owner sign a user out everywhere", async () => {

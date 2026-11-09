@@ -15,6 +15,9 @@ export interface SessionUser extends Access {
 
 export const SESSION_COOKIE = "cp_session";
 
+/** Most devices one user can be signed in on; signing in beyond that ends the longest-idle sessions. */
+export const MAX_SESSIONS_PER_USER = 20;
+
 /** Sessions are keyed by the token's SHA-256; the dashboard sees only this prefix. */
 export const publicSessionId = (sessionId: string) => sessionId.slice(0, 16);
 
@@ -42,6 +45,7 @@ export class SessionStore {
       userAgent: meta.userAgent?.slice(0, 256) ?? null,
     });
     await this.db.update(users).set({ lastLoginAt: now }).where(eq(users.id, userId));
+    await this.trim(userId);
     return { token, csrfToken };
   }
 
@@ -100,6 +104,12 @@ export class SessionStore {
         ip: r.ip,
         userAgent: r.userAgent,
       }));
+  }
+
+  /** Keep a user's newest sessions by activity; scripts and repeated sign-ins would otherwise pile up for the whole session lifetime. */
+  private async trim(userId: string) {
+    const rows = await this.db.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, userId)).orderBy(desc(sessions.lastSeenAt));
+    for (const r of rows.slice(MAX_SESSIONS_PER_USER)) await this.destroy(r.id);
   }
 
   /** End one of a user's sessions by its public id. Returns the full session id, or null. */

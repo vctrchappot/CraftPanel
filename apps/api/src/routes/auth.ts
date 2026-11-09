@@ -55,6 +55,8 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext) {
 
   /** Create the session cookie and answer like /api/auth/state. */
   async function signIn(req: FastifyRequest, reply: FastifyReply, user: UserRow) {
+    // Signing in again from a browser that still holds a valid session replaces it instead of listing the same device twice.
+    if (req.user?.id === user.id) await ctx.sessions.destroy(req.user.sessionId);
     const s = await ctx.sessions.create(user.id, { ip: req.ip, userAgent: req.headers["user-agent"] });
     reply.setCookie(SESSION_COOKIE, s.token, cookieOpts);
     await ctx.activity.audit({ id: user.id, username: user.username, ip: req.ip }, "auth.login", user.id);
