@@ -5,6 +5,8 @@
 Shared tokens and Geist for the dashboard, website and docs, plus the new mark from the brand package (v1.0). Rules: [design/README.md](design/README.md).
 
 - ✅ Dashboard checked in Chromium on a throwaway instance with a running Paper server (servers, overview, console, plugins, new-server; dark and light), website and docs checked in both themes and at 390 px: no console errors, no horizontal overflow, all landing interactions pass. Text colour pairs meet WCAG AA by calculation (table in the design docs). Fonts are served from the official `geist` package; no third-party font requests.
+- ✅ Polish: landing layout checked at 1440, 1024, 768 and 390 px in both themes (commands, caption clearance, single-row preview tabs, equal-height software cards, complete feature grid). Connected feature displays and the runtime restart illustration use original code-drawn SVG hardware/worlds. Dashboard verified against the throwaway Paper instance in both themes, including 390 px: LAN before labelled VPN/virtual adapters, distinct activity icons/colours, English dates in a German-locale browser and 16 px console padding. Website product screenshots refreshed from that build.
+- 🧪 Workspace typecheck, production dashboard/API build and 21-page site build pass; 279 tests pass with four platform-specific skips, including new adapter, UI-locale and event-presentation regressions. Adapter labels use known names; renamed or unrecognised adapters can remain generic.
 
 ## Independent Minecraft runtime (2026-11-09)
 

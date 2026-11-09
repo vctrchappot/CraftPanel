@@ -7,7 +7,14 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 ## Unreleased
 
 ### Changed
-- New logo: an isometric block with a console prompt, in the dashboard, favicon and website. The dashboard uses Geist (Sans and Mono, Serif for release notes) at lighter weights and shares its design tokens with the website: warmer greys, the logo's green for the brand, gold for focus and active controls, and smaller corners.
+- New logo: an isometric block with a console prompt, in the dashboard, favicon and website. The dashboard uses Geist (Sans and Mono, Serif for release notes) at lighter weights and shares its design tokens with the website: warmer greys, Signal green for brand and running, Amber/Ember/Ash for other states, neutral focus and active controls, and smaller corners.
+- Landing page polish: connected bento displays with one outer frame and shared dividers, solid rules, active-only offset shadows, single-line scrollable install commands and preview tabs, consistent software cards, a plugin search preview and a complete six-item feature list.
+- More detailed original isometric hardware and block-world artwork, plus an interactive illustration of the Minecraft runtime staying online during a dashboard restart.
+
+### Fixed
+- Dashboard dates and relative times use the English UI locale instead of mixing in the browser's language.
+- Connection addresses list real LAN adapters first and label known VPN, WSL, Hyper-V, Docker and VirtualBox adapters separately.
+- Activity events have icons and status colours by event kind; updates and installs stay neutral. Console output has more space above the first line and uses shared status colours.
 
 ## 1.0.0 – 2026-11-09
 

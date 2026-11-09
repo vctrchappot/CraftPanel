@@ -14,6 +14,8 @@ One set of tokens and one type family for the dashboard (`apps/web`), the websit
 | `apps/site/src/styles/docs.css` | Starlight's `--sl-*` variables on the tokens. |
 | `apps/site/scripts/og.html` | Social preview image; regenerate with `node apps/site/scripts/og.mjs`. |
 | `apps/web/src/components/logo.tsx`, `apps/site/src/components/Mark.astro` | The mark, inline so its top face follows the theme. |
+| `apps/site/src/lib/scenes.ts`, `apps/site/src/components/Iso.astro` | Original, code-drawn isometric hardware and worlds; sharp at any size, no image downloads. |
+| `apps/site/src/components/RuntimeDiagram.astro` | Interactive runtime explainer: a dashboard restart leaves the illustrated Minecraft runtime running. |
 | `apps/*/public/favicon.*`, `apple-touch-icon.png`, `apps/site/src/assets/mark-on-*.svg` | Files from the brand package (v1.0), unchanged. |
 
 Fonts are self-hosted from the `geist` npm package (Vercel, SIL Open Font License). Never load them, or anything else, from a CDN: the dashboard promises no third-party requests. To update Geist, bump `geist` in `packages/ui` and `apps/web` together.
@@ -33,8 +35,9 @@ Keep weights low: nothing above 600. Large Geist at 700+ with tight tracking loo
 Warm greys ("deepslate" dark, "sandstone" light) carry the UI. Three colour roles, never mixed:
 
 - **Brand: Signal green** `#5bbf4a`, the prompt colour of the logo (`--cp-brand`, `--cp-brand-text`, `--cp-brand-button`). "Update available", setup, website calls to action, terminal prompts. Not for buttons or links inside the dashboard.
-- **Accent: gold** (`--cp-accent`). Focus rings, selection, active controls, links. The dashboard's interaction colour.
-- **Status** (`--cp-success` emerald, `--cp-warning` copper, `--cp-danger` redstone). Only for state: running, needs attention, failed. Never decoration.
+- **Accent: neutral** (`--cp-accent`). Dark ink in light mode, light ink in dark mode. Focus rings, selection and active controls; links are underlined. Amber is reserved for state.
+- **Status fills, identical in both themes:** Signal `#5bbf4a` running, Amber `#e8b04a` starting, Ember `#ef5a4f` crashed, Ash `#9aa1a8` stopped (`--cp-status-*`). Brand and running share the same green.
+- **Status text:** `--cp-success`, `--cp-warning`, `--cp-danger`, `--cp-neutral` use the same colours in dark mode and darker ink steps in light mode for readable text. Use status fills for dots and bars, ink tokens for small text.
 
 Contrast (WCAG 2.x, on background / surface):
 
@@ -42,23 +45,41 @@ Contrast (WCAG 2.x, on background / surface):
 | --- | --- | --- |
 | `fg` | #1c1b18 · 15.3 / 16.5 | #ece8df · 14.8 / 13.1 |
 | `fg-muted` | #5f5a52 · 6.1 / 6.5 | #a8a197 · 7.1 / 6.3 |
-| `brand-text` | #2f6b25 · 5.7 / 6.2 | #7ccf6a · 9.5 / 8.4 |
-| `accent` | #8a5a00 · 5.3 / 5.7 | #e8b03a · 9.2 / 8.2 |
-| `success` | #177245 · 5.3 / 5.7 | #4cc38a · 8.2 / 7.2 |
-| `warning` | #a8480c · 5.2 / 5.6 | #f0883e · 7.1 / 6.3 |
-| `danger` | #b8321f · 5.3 / 5.7 | #ef5a48 · 5.4 / 4.8 |
+| `brand-text`, `success` | #2f6b25 · 5.7 / 6.2 | #5bbf4a · 7.7 / 6.9 |
+| `accent` | #1c1b18 · 15.3 / 16.5 | #ece8df · 14.8 / 13.1 |
+| `warning` | #8a5a00 · 5.3 / 5.7 | #e8b04a · 9.2 / 8.2 |
+| `danger` | #b8321f · 5.3 / 5.7 | #ef5a4f · 5.4 / 4.8 |
+| `neutral` | #5c636a · 5.4 / 5.8 | #9aa1a8 · 6.9 / 6.1 |
 
-Buttons: brand button 7.6 (light, white text) / 7.3 (dark, dark text); accent fill 5.9 / 9.2. Any new pair must reach 4.5:1 for text and 3:1 for UI boundaries; recheck after changing a hex value.
+Buttons: brand button 7.6 (light, white text) / 7.3 (dark, dark text). Any new pair must reach 4.5:1 for text and 3:1 for essential UI boundaries; recheck after changing a hex value. Status dots have adjacent text labels; their exact palette fills are not small-text colours on light surfaces.
 
 ## Shape and spacing
 
 - Radii: `--cp-radius-sm` 2 px (badges, inputs' inner parts), `--cp-radius` 4 px (buttons, inputs), `--cp-radius-lg` 6 px (cards, panels, dialogs). Tailwind's `rounded-xl/2xl` map to 6 px, so nothing gets rounder.
 - Spacing follows Tailwind's 4 px scale. Prefer sections with dividers over nested cards.
-- The website may use hard offset shadows and block textures; the dashboard stays flat (borders, no shadows except overlays).
+- All dividers and underlines are solid. The hero underline is a 6 px Signal bar.
+- Hard offset shadows on the website mean active/selected: selected software, hover/focus on interactive cards, open hotspot tooltips. Static terminals, screenshots, panels and the avatar stay flat. The isometric scene's cast shadow is part of its illustration, an intentional exception documented in CSS.
+- The dashboard stays flat (borders, no shadows except overlays).
+- Landing-page feature displays share a single outer frame with 1 px internal dividers. Console, update, backup and add-on demos align to that grid; the runtime explanation occupies a connected full-width row. Compact features close the frame. On mobile the same frame stacks in reading order.
+
+## Dashboard presentation
+
+- UI locale is `APP_LOCALE` in `packages/shared/src/meta.ts` (currently English). Relative times and dates use it, never the browser's preferred language.
+- Activity icons follow event kind: running = Signal, starting = Amber, stopped = Ash, crashed = Ember. Updates and installs are neutral. Failures retain warning/error emphasis.
+- Connection addresses list physical LAN first, then VPN and virtual adapters with product labels. Classification uses known adapter names; renamed or unrecognised adapters can remain generic. A private IP range alone does not identify VirtualBox or Tailscale. The access policy still uses IP/CIDR rules independently of these display labels.
+- Console output has 16 px inner spacing, including above the first line; live-connection and severity colours use shared status tokens.
 
 ## The mark
 
 An isometric block with a console prompt, from the brand package. Its colours are its own and don't follow the tokens, except the top face: `#C6CBC5` on light surfaces, `#E6E8E3` on dark ones. Never colour the top face green, never distort or decorate it. The isometric Minecraft scenes on the website are the world, not the mark; their grass stays grass-block green.
+
+## Product illustrations
+
+Technical cutaways and isometric scenes explain ownership and process boundaries. Hardware has recognisable details: PCB traces, sockets and mounting pads, PC cooling fans, rack ears and screws. Small shelters, paths and terrain make the world feel inhabited without official Minecraft assets.
+
+The runtime illustration contrasts a reconnecting control panel with uninterrupted game processes. Its restart is a local demonstration; it never sends a command to an actual server. Keep the maintenance limit in the adjacent copy: updating the runtime itself requires a planned stop. The houses represent worlds, not containers or a claim of per-server OS isolation.
+
+Use semantic tokens for frames, controls and text in both themes. Materials inside the artwork may keep their own shades. Respect reduced motion, keep labels outside small SVG geometry and retain the same scene on mobile. Avoid glow effects, third-party art and extra illustration libraries.
 
 ## Rules of thumb
 

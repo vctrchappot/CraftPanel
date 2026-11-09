@@ -16,7 +16,7 @@ The dashboard, this website and these docs share one set of design tokens and on
 ## Principles
 
 - **Hardware workshop, not cloud console.** Warm greys, block textures on the website, real terminal output. Nothing glows.
-- **Calm dashboard, clear brand.** Inside the dashboard, colour means state or interaction. Signal green, the prompt in the logo, is the brand and appears only in a few brand moments.
+- **Precise dashboard, clear brand.** Inside the dashboard, colour means state. Signal green links the logo, brand moments and running servers; focus and selection use neutral ink.
 - **Self-hosted all the way down.** Fonts come from the official `geist` package and ship with CraftPanel. The dashboard never makes a third-party request.
 
 ## The mark
@@ -75,13 +75,14 @@ Three roles that never stand in for each other:
 
 <div class="ds-swatches">
   <div><span style="background: var(--cp-brand)"></span><b>brand · signal</b><code>#5bbf4a</code><small>The logo's prompt. "Update available", setup, website calls to action.</small></div>
-  <div><span style="background: var(--cp-accent)"></span><b>accent · gold</b><code>#8a5a00 · #e8b03a</code><small>Focus, selection, active controls, links. The dashboard's interaction colour.</small></div>
-  <div><span style="background: var(--cp-success)"></span><b>success · emerald</b><code>#177245 · #4cc38a</code><small>Running, done, healthy.</small></div>
-  <div><span style="background: var(--cp-warning)"></span><b>warning · copper</b><code>#a8480c · #f0883e</code><small>Needs attention.</small></div>
-  <div><span style="background: var(--cp-danger)"></span><b>danger · redstone</b><code>#b8321f · #ef5a48</code><small>Failed, crashed, destructive actions.</small></div>
+  <div><span style="background: var(--cp-accent)"></span><b>accent · neutral</b><code>#1c1b18 · #ece8df</code><small>Focus, selection and active controls. Links have an underline.</small></div>
+  <div><span style="background: var(--cp-status-running)"></span><b>running · Signal</b><code>#5bbf4a</code><small>Running, done, healthy. Same green as the brand.</small></div>
+  <div><span style="background: var(--cp-status-starting)"></span><b>starting · Amber</b><code>#e8b04a</code><small>Starting, stopping, needs attention.</small></div>
+  <div><span style="background: var(--cp-status-crashed)"></span><b>crashed · Ember</b><code>#ef5a4f</code><small>Failed, crashed, destructive actions.</small></div>
+  <div><span style="background: var(--cp-status-stopped)"></span><b>stopped · Ash</b><code>#9aa1a8</code><small>Stopped or disconnected.</small></div>
 </div>
 
-Status colours are only ever used for state, never for decoration.
+Status fills stay identical in both themes. Small text uses the semantic ink tokens: darker Signal, Amber, Ember and Ash in light mode so labels remain readable. Signal is also the brand colour; other status colours are reserved for state.
 
 ### Contrast
 
@@ -91,13 +92,13 @@ Every text colour meets WCAG AA (4.5:1) on the background and on surfaces, in bo
 | --- | --- | --- |
 | `fg` | 15.3 / 16.5 | 14.8 / 13.1 |
 | `fg-muted` | 6.1 / 6.5 | 7.1 / 6.3 |
-| `brand-text` | 5.7 / 6.2 | 9.5 / 8.4 |
-| `accent` | 5.3 / 5.7 | 9.2 / 8.2 |
-| `success` | 5.3 / 5.7 | 8.2 / 7.2 |
-| `warning` | 5.2 / 5.6 | 7.1 / 6.3 |
+| `brand-text`, `success` | 5.7 / 6.2 | 7.7 / 6.9 |
+| `accent` | 15.3 / 16.5 | 14.8 / 13.1 |
+| `warning` | 5.3 / 5.7 | 9.2 / 8.2 |
 | `danger` | 5.3 / 5.7 | 5.4 / 4.8 |
+| `neutral` | 5.4 / 5.8 | 6.9 / 6.1 |
 
-Filled buttons: brand 7.6 (light) / 7.3 (dark), gold 5.9 / 9.2.
+Filled brand buttons: 7.6 (light) / 7.3 (dark).
 
 ## Shape
 
@@ -111,7 +112,15 @@ Corners stay small, like blocks.
 
 - Spacing follows a 4 px grid.
 - The dashboard is flat: borders instead of shadows, sections with dividers instead of nested cards. Only overlays (menus, dialogs) cast a shadow.
-- The website may use hard offset shadows, block textures and isometric pixel scenes.
+- Lines and dividers are solid; the hero underline is a 6 px Signal bar.
+- Hard offset shadows mean active or selected: chosen software, interactive cards on hover/focus, open hotspot tooltips. Static panels stay flat. Cast shadows inside the isometric artwork are the intentional exception.
+- Feature displays connect under one outer frame, with 1 px internal dividers. Product demos and isometric runtime graphics share that frame; on small screens they stack in the same reading order.
+
+## Illustrations
+
+Original isometric hardware shows the physical machine behind the panel: PCB traces and sockets on the Pi, cooling fans on the PC, rack ears on the VPS. Small shelters, paths and terrain suggest inhabited worlds without official Minecraft assets.
+
+The connected runtime graphic lets you try an illustrated dashboard restart. Its Minecraft processes keep running while the controls reconnect. The illustration runs locally in the page; it does not control a real server. An update to the runtime itself still requires a planned stop, as the adjacent explanation says.
 
 ## Motion
 
