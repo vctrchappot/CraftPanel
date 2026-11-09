@@ -39,15 +39,16 @@ import { runtimeScene } from "../lib/scenes";
     </ol>
     <p class="du-result" data-result role="status">Try an update. The Minecraft process keeps running.</p>
     <div class="du-actions">
-      <button type="button" class="btn btn-small" data-run="ok">Run panel update</button>
-      <button type="button" class="btn btn-small btn-quiet" data-run="fail">Try a failed update</button>
+      <button type="button" class="btn btn-small btn-ink" data-run="ok">Run panel update</button>
+      <button type="button" class="btn btn-small btn-outline" data-run="fail">Try a failed update</button>
     </div>
+    <p class="du-note"><UiIcon name="info" size={12} />Updating the runtime itself needs a planned server stop. CraftPanel tells you before it happens.</p>
   </figcaption>
 </figure>
 
 <style>
   .runtime-figure { margin: 0; min-width: 0; border: 1px solid var(--line); background: var(--bg); display: flex; flex-direction: column; }
-  .runtime-top { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding: 10px 14px; color: var(--muted); font-size: 11px; }
+  .runtime-top { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding: 10px 14px; color: var(--muted); font-size: 12px; }
   .runtime-stage { position: relative; display: grid; grid-template-columns: minmax(0, .85fr) 22px minmax(0, 1.15fr); align-items: center; min-height: 200px; padding: 20px 14px; overflow: hidden; }
   .runtime-stage::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 24px 24px; opacity: .23; mask-image: linear-gradient(transparent, #000 60%, transparent); }
   .runtime-control { position: relative; z-index: 1; border: 1px solid var(--line-strong); background: var(--surface); }
@@ -91,6 +92,8 @@ import { runtimeScene } from "../lib/scenes";
   .is-fail .du-steps .du-rollback { display: flex; }
   .du-result { min-height: 3.1em; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
   .du-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .du-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; line-height: 1.55; --px-a: var(--muted); }
+  .du-note :global(.ui-icon) { margin-top: 3px; }
   .du-actions :global(.btn) { min-height: 36px; padding: 0 12px; font-size: 13px; font-weight: 500; }
   [data-panel-state="updating"] .runtime-control-status { color: var(--amber-text); }
   [data-panel-state="updating"] .runtime-control-status::before { background: var(--amber); }
@@ -103,7 +106,6 @@ import { runtimeScene } from "../lib/scenes";
     .runtime-control-bar { padding: 9px 8px; }
     .runtime-control-body { padding: 12px 8px; }
     .runtime-telemetry svg { display: none; }
-    .du-steps { font-size: 11px; }
     .du-steps li { padding: 9px 7px; }
   }
   @media (prefers-reduced-motion: reduce) {

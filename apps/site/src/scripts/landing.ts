@@ -327,6 +327,8 @@ if (searchEl && !reduced) {
       await wait(180);
       r.classList.add("is-in");
     }
+    await wait(180);
+    searchEl.classList.add("is-done");
   });
 }
 
@@ -336,16 +338,24 @@ if (consoleEl) {
   const lines = [...consoleEl.querySelectorAll<HTMLElement>(".dc-log li")];
   const bars = [...consoleEl.querySelectorAll<HTMLElement>("[data-spark] i")];
   const m = (k: string) => consoleEl.querySelector<HTMLElement>(`[data-m="${k}"]`)!;
+  const playerDelta = (l: HTMLElement) => (/joined the game/.test(l.textContent ?? "") ? 1 : /left the game/.test(l.textContent ?? "") ? -1 : 0);
   if (reduced) lines.forEach((l) => l.classList.add("is-in"));
   else
     onVisible(consoleEl, async () => {
+      // The first lines are the history that is already there; the rest arrive live.
+      const history = lines.length - 4;
       for (;;) {
-        lines.forEach((l) => l.classList.remove("is-in"));
         let players = 0;
-        for (const l of lines) {
+        lines.forEach((l, i) => {
+          l.classList.toggle("is-in", i < history);
+          if (i < history) players += playerDelta(l);
+        });
+        m("players").textContent = String(players);
+        for (const l of lines.slice(history)) {
+          await wait(1400);
           l.classList.add("is-in");
-          if (/joined the game/.test(l.textContent ?? "")) m("players").textContent = String(++players);
-          await wait(900);
+          players += playerDelta(l);
+          m("players").textContent = String(players);
         }
         await wait(4000);
       }

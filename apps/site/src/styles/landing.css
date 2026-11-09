@@ -251,10 +251,26 @@ p {
   padding: 0 14px;
   font-size: 14px;
 }
-.btn-quiet {
-  background: var(--surface-2);
+/* The page's primary button (same ink fill as the wizard's) and its framed secondary. The focus ring is inset,
+   because the stepped corners clip anything outside; on the ink fill it is a ring of the surface colour inside the button. */
+.btn-ink {
+  background: var(--fg);
+  color: var(--surface);
+}
+.btn-ink:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--fg), inset 0 0 0 4px var(--surface);
+}
+.btn-outline {
+  --px: 2px;
+  background: transparent;
   color: var(--fg);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 2px var(--line-strong);
+}
+.btn-outline:hover {
+  box-shadow: inset 0 0 0 2px var(--fg);
+}
+.btn-outline:focus-visible {
+  box-shadow: inset 0 0 0 3px var(--fg);
 }
 
 /* ---- nav ---- */
@@ -1625,6 +1641,9 @@ p {
 .tile-list::before {
   display: none;
 }
+.tile-label .ui-icon {
+  margin: -4px 0;
+}
 .tile-label {
   display: flex;
   align-items: center;
@@ -1650,13 +1669,8 @@ p {
   font-size: 16px;
 }
 
-.runtime-caveat {
-  margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.55;
+.tile-update .runtime-figure {
+  flex: 1;
 }
 .tile-console .demo-console {
   flex: 1;
@@ -1671,6 +1685,8 @@ p {
   border: 1px solid #000;
   border-radius: 3px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .dc-metrics {
   display: flex;
@@ -1702,27 +1718,56 @@ p {
 .dc-spark i:last-child {
   background: #5bbf4a;
 }
+/* The log never sizes the card: it fills what the tile gives it, shows the newest lines at the bottom and lets
+   older ones slide out of the top, like the real console. */
 .dc-log {
   list-style: none;
   margin: 0;
-  padding: 12px 14px 14px;
-  min-height: 252px;
+  padding: 12px 14px 10px;
+  flex: 1 1 0;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
   font-size: 12.5px;
-  line-height: 1.75;
+  line-height: 1.9;
 }
 .dc-log li {
+  flex: none;
   white-space: pre-wrap;
   word-break: break-word;
-  opacity: 0;
-  transform: translateX(-4px);
-  transition: opacity 0.15s steps(2), transform 0.15s steps(2);
 }
-.dc-log li.is-in {
-  opacity: 1;
-  transform: none;
+.motion .dc-log li:not(.is-in) {
+  display: none;
 }
 .dc-cmd {
   color: #7cc4ff;
+}
+.dc-warn {
+  color: #e8b04a;
+}
+.dc-input {
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid #2e2b27;
+  background: color-mix(in srgb, var(--term-bg) 70%, #000);
+  font-size: 12.5px;
+  color: #7cc4ff;
+}
+.dc-typed {
+  color: var(--term-fg);
+}
+.dc-typed::after {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: -0.2em;
+  background: var(--term-fg);
+  animation: blink 1.06s steps(1) infinite;
 }
 
 /* backup demo */
@@ -1771,7 +1816,7 @@ p {
 }
 .db-tag {
   grid-area: tag;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--muted);
 }
 .db-foot {
@@ -1831,7 +1876,7 @@ p {
 }
 .dp-count {
   margin-left: auto;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--muted);
 }
 .demo-plugins {
@@ -1869,7 +1914,7 @@ p {
 .dp-ok,
 .dp-warn,
 .dp-src {
-  font-size: 11.5px;
+  font-size: 12px;
   padding: 2px 6px;
 }
 .dp-ok {
@@ -1880,9 +1925,29 @@ p {
   color: var(--amber-text);
   border: 1px solid color-mix(in srgb, var(--amber) 60%, transparent);
 }
+/* Where the plugin comes from: a badge at the end of the row, not a caption. */
 .dp-src {
-  color: var(--muted);
+  min-width: 84px;
+  text-align: center;
+  padding: 3px 8px;
+  color: var(--fg);
   background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.dp-note {
+  margin: 0;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.motion .demo-search .dp-note {
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+.motion .demo-search.is-done .dp-note {
+  opacity: 1;
 }
 
 /* the six smaller features */
@@ -1898,16 +1963,17 @@ p {
   border-left: 1px solid var(--line);
   border-top: 1px solid var(--line);
 }
-.minor-label {
+.minor-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: var(--cp-tracking-heading);
   color: var(--fg);
   --px-a: var(--grass-text);
-  --px-b: var(--muted);
 }
 .minor-text {
   margin-top: 10px;
@@ -1916,10 +1982,12 @@ p {
 }
 .minor-text code {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--fg);
-  background: var(--surface-2);
-  padding: 1px 5px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+  padding: 2px 8px;
+  white-space: nowrap;
 }
 
 /* ---- 03 closer look ---- */
@@ -2773,8 +2841,8 @@ p {
     padding: 20px;
   }
   .dc-log {
-    min-height: 0;
-    font-size: 11.5px;
+    min-height: 260px;
+    font-size: 12px;
   }
   .dc-spark {
     display: none;

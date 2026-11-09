@@ -207,13 +207,13 @@ const softwareTrust: { icon: UiIconName; title: string; text: string }[] = [
   { icon: "cup", title: "Right Java, automatically", text: "CraftPanel installs the Java version your server needs." },
 ];
 
-const minor: { label: string; icon: UiIconName; text: string }[] = [
-  { label: "teams", icon: "users", text: "Owner, Administrator, Operator, Viewer. Access per server, two-factor sign-in, an audit log of who did what." },
-  { label: "java", icon: "cup", text: "Never install Java again. 1.8.9 gets Java 8, 1.21.4 gets 21, 26.3 gets 25, downloaded per server." },
-  { label: "automation", icon: "clock", text: "<code>0 4 * * *</code> restart, with a 60-second warning in chat. Backups, announcements and commands on any schedule." },
-  { label: "notifications", icon: "bell", text: "Discord or e-mail when a server crashes, a backup fails or a new release is out." },
-  { label: "networking", icon: "signal", text: "Copyable LAN and VPN addresses, port checks, CGNAT detection and DuckDNS." },
-  { label: "files & worlds", icon: "folder", text: "Edit configs in the browser. Upload a world as a zip, download one to play it in single player." },
+const minor: { title: string; icon: UiIconName; text: string }[] = [
+  { title: "Teams and permissions", icon: "users", text: "Owner, Administrator, Operator or Viewer per server, with two-factor sign-in and an audit log." },
+  { title: "Java, handled", icon: "cup", text: "1.8.9 gets Java 8, 1.21.4 gets 21, 26.3 gets 25. Downloaded per server, nothing to install." },
+  { title: "Scheduled tasks", icon: "clock", text: "<code>0 4 * * *</code> restarts with a 60-second warning in chat. Backups, announcements and commands too." },
+  { title: "Crash alerts", icon: "bell", text: "Discord or e-mail when a server crashes, a backup fails or a new release is out." },
+  { title: "Network tools", icon: "signal", text: "Copyable LAN and VPN addresses, port checks, CGNAT detection and DuckDNS." },
+  { title: "Files and worlds", icon: "folder", text: "Edit configs in the browser. Upload a world as a zip, or download one for single player." },
 ];
 
 const looks = [
@@ -561,7 +561,7 @@ const backups = [
           <div class="bento">
             <article class="tile tile-console">
               <div class="tile-copy">
-                <p class="tile-label mono"><UiIcon name="terminal" size={12} />live console · metrics</p>
+                <p class="tile-label mono"><UiIcon name="terminal" size={24} />live console · metrics</p>
                 <h3>See what your server is doing. Right now.</h3>
                 <p>The real console over WebSockets, with history, filters and command input. Players, CPU, memory and TPS update every few seconds.</p>
               </div>
@@ -573,32 +573,44 @@ const backups = [
                   <span class="dc-spark" data-spark>{Array.from({ length: 24 }, (_, i) => <i style={`--v:${(30 + ((i * 37) % 50))}%`}></i>)}</span>
                 </div>
                 <ol class="dc-log mono" aria-label="Example console output">
+                  <li>[19:57:51 INFO]: Starting minecraft server version 1.21.4</li>
+                  <li>[19:57:52 INFO]: Loading properties</li>
+                  <li>[19:57:55 INFO]: Preparing level "world"</li>
+                  <li>[19:57:58 INFO]: Preparing start region for dimension minecraft:overworld</li>
                   <li>[19:58:02 INFO]: Done (8.412s)! For help, type "help"</li>
-                  <li>[20:03:14 INFO]: Alex joined the game</li>
-                  <li>[20:03:20 INFO]: &lt;Alex&gt; who's up for the nether?</li>
-                  <li>[20:03:41 INFO]: Sam joined the game</li>
+                  <li>[19:58:41 INFO]: UUID of player Alex is 8667ba71-b85a-4004-af54-457a9734eed7</li>
+                  <li>[19:58:41 INFO]: Alex joined the game</li>
+                  <li>[19:59:07 INFO]: &lt;Alex&gt; anyone up for the nether?</li>
+                  <li>[20:00:12 INFO]: UUID of player Sam is 0ba1d6e5-61c4-4f7f-9b2c-3f2a6d1c88a0</li>
+                  <li>[20:00:12 INFO]: Sam joined the game</li>
+                  <li class="dc-warn">[20:00:30 WARN]: Can't keep up! Is the server overloaded? Running 2154ms behind, skipping 43 ticks</li>
+                  <li>[20:02:18 INFO]: UUID of player Mia is c4f8a2b0-9d3e-4c71-8a65-1e7b0d2f4a93</li>
+                  <li>[20:02:18 INFO]: Mia joined the game</li>
+                  <li>[20:02:55 INFO]: &lt;Sam&gt; yes, after the cave</li>
+                  <li>[20:03:41 INFO]: Mia left the game</li>
                   <li class="dc-cmd">&gt; say Nether trip at 9. Bring food.</li>
                   <li>[20:04:02 INFO]: [Server] Nether trip at 9. Bring food.</li>
                   <li>[20:15:00 INFO]: Saving the game (this may take a moment!)</li>
                   <li>[20:15:00 INFO]: Saved the game</li>
                   <li>[20:21:37 INFO]: Sam has made the advancement [Hot Stuff]</li>
+                  <li>[20:24:09 INFO]: &lt;Alex&gt; see you at 9</li>
                 </ol>
+                <div class="dc-input mono" aria-hidden="true"><span>&gt;</span><span class="dc-typed">say hello</span></div>
               </div>
             </article>
 
             <article class="tile tile-update">
               <div class="tile-copy">
-                <p class="tile-label mono"><UiIcon name="upload" size={12} />independent runtime</p>
+                <p class="tile-label mono"><UiIcon name="upload" size={24} />independent runtime</p>
                 <h3>Update the panel. Keep playing.</h3>
                 <p>Minecraft runs in its own service. Watch the dashboard update and reconnect while your worlds keep ticking.</p>
               </div>
               <RuntimeDiagram />
-              <p class="runtime-caveat">Updating the runtime itself needs a planned server stop. CraftPanel tells you before it happens.</p>
             </article>
 
             <article class="tile tile-backup">
               <div class="tile-copy">
-                <p class="tile-label mono"><UiIcon name="archive" size={12} />backups</p>
+                <p class="tile-label mono"><UiIcon name="archive" size={24} />backups</p>
                 <h3>23:04. Someone TNT'd the base.</h3>
                 <p>Pick last night's backup and press Restore. CraftPanel verifies the archive and saves the current mess first, just in case.</p>
               </div>
@@ -617,7 +629,7 @@ const backups = [
                   }
                 </fieldset>
                 <div class="db-foot">
-                  <button type="button" class="btn btn-small" data-restore>Restore</button>
+                  <button type="button" class="btn btn-small btn-ink" data-restore>Restore</button>
                   <ol class="db-steps mono" aria-live="polite" data-steps></ol>
                 </div>
               </div>
@@ -625,17 +637,18 @@ const backups = [
 
             <article class="tile tile-plugins">
               <div class="tile-copy">
-                <p class="tile-label mono"><UiIcon name="blocks" size={12} />plugins · mods · modpacks</p>
+                <p class="tile-label mono"><UiIcon name="blocks" size={24} />plugins · mods · modpacks</p>
                 <h3>Modrinth and Hangar, built in.</h3>
                 <p>Search, install with checksum checks and get update suggestions. Or start from a Modrinth modpack: the Minecraft and loader version come from the pack.</p>
               </div>
               <div class="demo-search">
                 <p class="dp-field mono" aria-label="Example search for luck"><UiIcon name="search" size={12} /><span class="dp-query">luck</span><span class="dp-count">3 results · Paper 1.21.4</span></p>
                 <ul class="demo-plugins" aria-label="Example search results">
-                  <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">modrinth</span></li>
-                  <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">hangar</span></li>
-                  <li><span class="dp-name">Lucky Block</span><span class="dp-warn mono">needs Fabric</span><span class="dp-src mono">modrinth</span></li>
+                  <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">Modrinth</span></li>
+                  <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">Hangar</span></li>
+                  <li><span class="dp-name">Lucky Block</span><span class="dp-warn mono">needs Fabric</span><span class="dp-src mono">Modrinth</span></li>
                 </ul>
+                <p class="dp-note">Same plugin, two sources. CraftPanel picks the one that fits your version.</p>
               </div>
             </article>
 
@@ -644,7 +657,7 @@ const backups = [
                 {
                   minor.map((m) => (
                     <li>
-                      <p class="minor-label mono"><UiIcon name={m.icon} size={12} />{m.label}</p>
+                      <h3 class="minor-title"><UiIcon name={m.icon} size={24} />{m.title}</h3>
                       <p class="minor-text" set:html={m.text} />
                     </li>
                   ))
