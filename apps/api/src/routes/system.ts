@@ -8,7 +8,7 @@ import { appSettingsSchema, backupCreateSchema, badRequest, CRAFTPANEL_VERSION, 
 import { nextRuns, validateCron } from "@craftpanel/scheduler";
 import { getProvider, log4shellMitigation, PROVIDERS } from "@craftpanel/minecraft-providers";
 import { SETTING_GROUPS, SETTINGS } from "@craftpanel/config";
-import { freeDiskSpace } from "@craftpanel/server-runtime";
+import { detectHost, freeDiskSpace } from "@craftpanel/server-runtime";
 import { dashboardUrls, isClientAllowed, isPrivateNetwork, lanAddresses, parseNetwork } from "@craftpanel/network";
 import { isSecureRequest } from "../deployment";
 import { deploymentDiagnostics } from "../diagnostics";
@@ -16,10 +16,6 @@ import { actorOf, canSee, noContent, requirePermission, requireUser, visibleServ
 import { REDACTED } from "../services/settings";
 import { isDiscordWebhook } from "../services/notifications";
 import { parse } from "../validate";
-
-// os.cpus() queries every core on each call (about 1 ms on Windows); the hardware doesn't change while we run.
-let cpuCache: { cpus: number; cpuModel: string | null } | null = null;
-const cpuInfo = () => (cpuCache ??= { cpus: os.cpus().length, cpuModel: os.cpus()[0]?.model ?? null });
 
 export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
   // ---- backups ------------------------------------------------------------------
@@ -154,15 +150,18 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
     const rows = (await ctx.servers.rows()).filter((r) => canSee(me, r.id));
     const running = rows.filter((r) => ctx.agent.isRunning(r.id));
     const addresses = lanAddresses();
+    const host = detectHost();
     return {
       version: CRAFTPANEL_VERSION,
       platform: process.platform,
       arch: process.arch,
       hostname: os.hostname(),
       node: process.version,
-      ...cpuInfo(),
+      cpus: host.cpus,
+      cpuModel: host.cpuModel,
+      board: host.board,
       loadAverage: process.platform === "win32" ? null : os.loadavg(),
-      memory: { total: os.totalmem(), free: os.freemem() },
+      memory: { total: host.memoryBytes, free: Math.min(os.freemem(), host.memoryBytes), physical: host.physicalMemoryBytes, limited: host.memoryLimited },
       allocatedMemoryMb: running.reduce((n, r) => n + r.memoryMb, 0),
       disk,
       dataDir: ctx.config.layout.root,

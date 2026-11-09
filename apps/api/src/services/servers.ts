@@ -1,5 +1,4 @@
 import fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import {
@@ -21,7 +20,7 @@ import { eq, playerSessions, servers, and, isNull, type Database } from "@craftp
 import { ensureLog4jConfig, getProvider, hasOwnLog4jSettings, installModpack, JavaManager, inspectJava, isJavaCompatible, log4shellMitigation } from "@craftpanel/minecraft-providers";
 import { PropertiesDocument } from "@craftpanel/config";
 import { isPortAvailable } from "@craftpanel/network";
-import { freeDiskSpace, type RuntimeAgent, localArgsFile, ServerSandbox } from "@craftpanel/server-runtime";
+import { detectHost, freeDiskSpace, type RuntimeAgent, localArgsFile, ServerSandbox } from "@craftpanel/server-runtime";
 import type { z } from "zod";
 import type { Hub } from "../hub";
 import type { AppConfig } from "../config";
@@ -164,7 +163,7 @@ export class ServerService {
     if (!versions.some((v) => v.id === input.mcVersion)) throw badRequest(`${provider.label} does not offer Minecraft ${input.mcVersion}`);
     const javaReq = await provider.javaRequirement(input.mcVersion);
 
-    const totalMb = Math.floor(os.totalmem() / 1024 / 1024);
+    const totalMb = Math.floor(detectHost().memoryBytes / 1024 / 1024);
     if (input.memoryMb > totalMb - 256) throw badRequest(`This machine has ${totalMb} MB of RAM. Allocate less memory to leave room for the operating system.`);
 
     const existing = await this.rows();
@@ -392,7 +391,7 @@ export class ServerService {
         throw conflict("A server process from a previous CraftPanel session is still running", "Stop or kill the orphaned process first.");
       if (!(await isPortAvailable(row.port, row.bindAddress || "0.0.0.0")))
         throw conflict(`Port ${row.port} is already in use`, "Another program (or another server) is using this port. Change it on the Network page.");
-      const totalMb = Math.floor(os.totalmem() / 1024 / 1024);
+      const totalMb = Math.floor(detectHost().memoryBytes / 1024 / 1024);
       if (row.memoryMb > totalMb - 256) throw badRequest(`Allocated memory (${row.memoryMb} MB) exceeds this machine's capacity (${totalMb} MB)`);
       const disk = await freeDiskSpace(row.directory);
       if (disk && disk.free < 256 * 1024 ** 2) throw badRequest("Less than 256 MB of disk space is free. Free up space before starting the server.");
@@ -531,7 +530,7 @@ export class ServerService {
       if (!this.agent.isRunning(id) && !(await isPortAvailable(patch.port))) throw conflict(`Port ${patch.port} is in use on this machine`);
     }
     if (patch.memoryMb !== undefined) {
-      const totalMb = Math.floor(os.totalmem() / 1024 / 1024);
+      const totalMb = Math.floor(detectHost().memoryBytes / 1024 / 1024);
       if (patch.memoryMb > totalMb - 256) throw badRequest(`This machine only has ${totalMb} MB of RAM`);
     }
     if (patch.javaPath) {

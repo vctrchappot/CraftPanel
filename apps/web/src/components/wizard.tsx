@@ -6,11 +6,12 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, Boxes, Check, Network, Hammer, ChevronLeft, ChevronRight, Coffee, Feather, Globe, Home, Info, Package, Puzzle, ShieldCheck, Zap } from "lucide-react";
 import { Badge, Button, Callout, Field, Input, NativeSelect, PageHeader, Panel, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
-import { buildFieldLabel, buildName, PERFORMANCE_PRESETS, PRESET_INFO, recommendPreset, SOFTWARE_INFO, softwareLabel, type CreateServerInput, type ServerSoftware } from "@craftpanel/shared";
+import { assessHost, buildFieldLabel, buildName, PERFORMANCE_PRESETS, PRESET_INFO, presetViewDistance, recommendPreset, SOFTWARE_INFO, softwareLabel, type CreateServerInput, type ServerSoftware } from "@craftpanel/shared";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { useServers } from "@/lib/queries";
 import { formatBytes, formatDate } from "@/lib/format";
 import { useSystem } from "./home";
+import { HostFitCard } from "./host-fit";
 import { ModpackPicker, type PreparedModpack } from "./modpack-picker";
 
 export interface VersionOption {
@@ -98,6 +99,32 @@ export function CreateServerWizard() {
     if (recommended && !presetTouched.current) setF((p) => ({ ...p, performancePreset: recommended }));
   }, [recommended]);
 
+  const memoryTouched = React.useRef(false);
+  const sys = system.data;
+  // How the planned server sits on this machine; derived from the answers above, no extra questions.
+  const fit = React.useMemo(
+    () =>
+      sys
+        ? assessHost(
+            { arch: sys.arch, cpus: sys.cpus, memoryBytes: sys.memory.total, board: sys.board, freeDiskBytes: sys.disk?.free },
+            {
+              software: f.software,
+              maxPlayers: f.maxPlayers,
+              viewDistance: presetViewDistance(f.performancePreset),
+              modpack: !!modpack,
+              amplified: f.levelType === "minecraft:amplified",
+              memoryMb: f.memoryMb,
+            },
+            { count: sys.servers.running, heapMb: sys.allocatedMemoryMb },
+          )
+        : null,
+    [sys, f.software, f.maxPlayers, f.performancePreset, f.levelType, f.memoryMb, modpack],
+  );
+  const suggestedMb = fit?.suggestedMemoryMb;
+  React.useEffect(() => {
+    if (suggestedMb && !memoryTouched.current) setF((p) => (p.memoryMb === suggestedMb ? p : { ...p, memoryMb: suggestedMb }));
+  }, [suggestedMb]);
+
   const versions = useQuery({ queryKey: ["catalog", f.software, "versions"], queryFn: () => api.get<VersionOption[]>(`/api/catalog/${f.software}/versions`), staleTime: 600_000 });
   React.useEffect(() => {
     if (!modpack && versions.data?.length && !versions.data.some((v) => v.id === f.mcVersion)) set("mcVersion", versions.data[0].id);
@@ -116,14 +143,13 @@ export function CreateServerWizard() {
   const choosePack = (p: PreparedModpack | null) => {
     setPack(p);
     if (!p) return;
-    // Modpacks run many mods; 4 GB is a common minimum.
+    // The memory suggestion follows the pack (modpacks run many mods).
     setF((prev) => ({
       ...prev,
       software: p.info.software,
       mcVersion: p.info.mcVersion,
       build: p.info.loader ?? "",
       name: prev.name || p.info.name.slice(0, 48),
-      memoryMb: Math.max(prev.memoryMb, Math.min(4096, maxMb)),
     }));
   };
 
@@ -257,7 +283,7 @@ export function CreateServerWizard() {
                       badge="Network"
                       description="Puts several of your servers behind one address; players switch with /server. Set up the servers behind it after creating it."
                       icon={<Network />}
-                      onClick={() => (setFromModpack(false), set("software", "velocity"), set("build", ""), set("memoryMb", 1024))}
+                      onClick={() => (setFromModpack(false), set("software", "velocity"), set("build", ""))}
                     />
                     <Choice
                       selected={fromModpack}
@@ -418,11 +444,12 @@ export function CreateServerWizard() {
 
             {steps[step] === "Resources" && (
               <div className="max-w-lg space-y-5">
+                {fit && <HostFitCard fit={fit} memoryMb={f.memoryMb} onUse={(mb) => (memoryTouched.current = false, set("memoryMb", Math.min(mb, maxMb)))} />}
                 <Field
                   label="Memory"
                   htmlFor="mem"
                   aside={<span className="text-[13px] font-medium tabular-nums">{(f.memoryMb / 1024).toFixed(1)} GB</span>}
-                  help={system.data ? `This machine has ${formatBytes(system.data.memory.total)} RAM. 2–4 GB suits a few players; leave room for the operating system.` : undefined}
+                  help={system.data ? `This machine has ${formatBytes(system.data.memory.total)} RAM${system.data.memory.limited ? " available to CraftPanel (container limit)" : ""}. The operating system needs some of it.` : undefined}
                   error={f.memoryMb > maxMb ? "More than this machine can provide" : null}
                 >
                   <input
@@ -432,7 +459,7 @@ export function CreateServerWizard() {
                     max={maxMb}
                     step={512}
                     value={Math.min(f.memoryMb, maxMb)}
-                    onChange={(e) => set("memoryMb", Number(e.target.value))}
+                    onChange={(e) => (memoryTouched.current = true, set("memoryMb", Number(e.target.value)))}
                     className="w-full accent-[var(--foreground)]"
                   />
                 </Field>

@@ -19,6 +19,12 @@ A preset sets Aikar's garbage-collector flags sized to the server's memory, plus
 
 The wizard preselects the preset recommended for this machine. Change it later under the server's **Settings → Performance**; your own JVM arguments are kept.
 
+## Does it fit this machine?
+
+CraftPanel looks at the machine it runs on (cores, memory, a Raspberry Pi or other board model, and a container's memory limit) and at your plan: the software, the player slots, the view distance, a modpack and the servers that already run. In the wizard's **Resources** step and under **Settings → Performance** one card says whether the plan fits, is tight or is too much, and suggests a memory size. Nothing extra is asked, and the memory slider follows the plan until you move it yourself.
+
+The numbers are rules of thumb for Paper-class servers, not a guarantee: about 60 % of the player slots are assumed to be online at once, and the CPU estimate only separates small boards from desktops and large hosts. The overview shows real heap use once the server runs.
+
 ## Memory
 
 Give the server what it needs, not everything the machine has. The operating system and CraftPanel need room too.

@@ -4,15 +4,17 @@ import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Cpu, Gauge, Info, Map as MapIcon, Pause, Play, RotateCw, Square, Zap } from "lucide-react";
 import { Badge, Button, Callout, Field, NativeSelect, Panel, Progress, Section, Skeleton } from "@craftpanel/ui";
-import { SOFTWARE_INFO, type PerformancePreset, type ServerDetail } from "@craftpanel/shared";
+import { SOFTWARE_INFO, type HostFit, type PerformancePreset, type ServerDetail } from "@craftpanel/shared";
 import { api } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction, useServerLifecycle } from "@/lib/queries";
 import { Choice } from "../wizard";
+import { HostFitCard } from "../host-fit";
 
 interface PerformanceInfo {
   current: PerformancePreset | null;
   recommended: PerformancePreset;
+  fit: HostFit;
   viewDistance: number | null;
   simulationDistance: number | null;
   presets: { id: PerformancePreset; label: string; description: string; viewDistance: number; simulationDistance: number; jvmFlags: string[] }[];
@@ -60,6 +62,7 @@ function Presets({ server: s }: { server: ServerDetail }) {
         </>
       }
     >
+      <HostFitCard fit={d.fit} />
       <div className="grid gap-3">
         {d.presets.map((p) => (
           <Choice

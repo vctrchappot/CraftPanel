@@ -19,8 +19,10 @@ export interface SystemInfo {
   hostname: string;
   cpus: number;
   cpuModel: string | null;
+  /** Board model such as "Raspberry Pi 4 Model B" (newer APIs). */
+  board?: string | null;
   loadAverage: number[] | null;
-  memory: { total: number; free: number };
+  memory: { total: number; free: number; physical?: number; limited?: boolean };
   allocatedMemoryMb: number;
   disk: { free: number; total: number } | null;
   dataDir: string;
@@ -155,8 +157,8 @@ export function HomeView() {
         <Section title="This host">
           <Panel className="divide-y divide-border text-[13px]">
             {[
-              [<Cpu key="c" />, "Processor", s?.cpuModel ?? "—"],
-              [<MemoryStick key="m" />, "Memory", s ? formatBytes(s.memory.total) : "—"],
+              [<Cpu key="c" />, s?.board ? "Board" : "Processor", s ? (s.board ? `${s.board} · ${s.cpus} cores` : (s.cpuModel ?? "—")) : "—"],
+              [<MemoryStick key="m" />, "Memory", s ? `${formatBytes(s.memory.total)}${s.memory.limited ? " (container limit)" : ""}` : "—"],
               [<HardDrive key="d" />, "Data directory", s?.dataDir ?? "—"],
             ].map(([icon, label, value]) => (
               <div key={label as string} className="flex items-start gap-3 p-4 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground">

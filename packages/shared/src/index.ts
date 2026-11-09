@@ -5,3 +5,4 @@ export * from "./errors";
 export * from "./meta";
 export * from "./software";
 export * from "./performance";
+export * from "./hardware";

@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { pipeline } from "node:stream/promises";
@@ -9,6 +8,7 @@ import { z } from "zod";
 import {
   AppError,
   applyPresetFlags,
+  assessHost,
   badRequest,
   commandSchema,
   createServerSchema,
@@ -31,7 +31,7 @@ import {
   type ConnectAddress,
 } from "@craftpanel/shared";
 import { eq, servers as serversTable } from "@craftpanel/database";
-import { directorySize, freeDiskSpace } from "@craftpanel/server-runtime";
+import { detectHost, directorySize, freeDiskSpace } from "@craftpanel/server-runtime";
 import { classifyAdapter, diagnoseWan, formatAddress, lanAddresses, fetchPublicIp, isCgnatIPv4, isPrivateIPv4 } from "@craftpanel/network";
 import { getProvider, listModpackVersions, searchModpacks } from "@craftpanel/minecraft-providers";
 import { actorOf, canSee, noContent, requirePermission, type AppContext } from "../context";
@@ -224,9 +224,19 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     const num = (k: string) => (values[k] !== undefined && values[k] !== "" ? Number(values[k]) : null);
     const viewDistance = num("view-distance");
     const simulationDistance = num("simulation-distance");
+    const host = detectHost();
+    // Memory and CPU the other running servers already take; this server counts as itself, not as a neighbour.
+    const others = (await servers.rows()).filter((o) => o.id !== r.id && servers.agent.isRunning(o.id));
+    const disk = await freeDiskSpace(r.directory);
+    const fit = assessHost(
+      { arch: host.arch, cpus: host.cpus, memoryBytes: host.memoryBytes, board: host.board, freeDiskBytes: disk?.free },
+      { software: r.software, maxPlayers: num("max-players") ?? 20, viewDistance, memoryMb: r.memoryMb },
+      { count: others.length, heapMb: others.reduce((n, o) => n + o.memoryMb, 0) },
+    );
     return {
       current: detectPreset(r.jvmArgs, r.memoryMb, viewDistance, simulationDistance),
-      recommended: recommendPreset({ arch: process.arch, cpus: os.cpus().length, memoryBytes: os.totalmem() }),
+      recommended: recommendPreset(host),
+      fit,
       viewDistance,
       simulationDistance,
       presets: PERFORMANCE_PRESETS.map((id) => ({ id, ...PRESET_INFO[id], jvmFlags: presetJvmFlags(id, r.memoryMb) })),
