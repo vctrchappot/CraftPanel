@@ -770,19 +770,33 @@ const backups = [
           <div class="trust-project">
             <p class="sec-no mono"><span>06</span>Project & source</p>
             <h2 id="trust-title" class="display">Built by Victor.</h2>
-            <p>CraftPanel is built for people running their own Minecraft server. The source, issues, release notes and implementation evidence are public.</p>
-              <div class="project-author">
-                <Image src={avatar} alt="" width={48} height={48} class="avatar" />
-                <span><b>Victor</b><br /><a class="mono" href="https://github.com/vctrchappot">@vctrchappot</a> · builds CraftPanel</span>
+            <p>CraftPanel is built for people running their own Minecraft server. The source, issues and release notes are public.</p>
+            <a class="trust-cta" href={github} rel="noopener">
+              <Pixel name="github" size={16} /> View on GitHub
+              {facts.stars !== null && facts.stars >= 10 && <span class="trust-cta-count">{facts.stars} stars</span>}
+            </a>
+            <div class="project-author">
+              <a class="avatar-link" href="https://github.com/vctrchappot" rel="noopener">
+                <Image src={avatar} alt="Victor Chappot, author of CraftPanel (GitHub profile)" width={48} height={48} class="avatar" />
+              </a>
+              <div>
+                <p class="author-name">Victor</p>
+                <a class="author-handle" href="https://github.com/vctrchappot" rel="noopener">@vctrchappot</a>
               </div>
+            </div>
           </div>
           <dl class="trust-facts">
-            <div><dt class="mono">latest release</dt><dd><a href={release.url}>{release.tag}</a>{releaseDate && <span class="muted"> · {releaseDate}</span>}</dd></div>
+            <div>
+              <dt class="mono">latest release</dt>
+              <dd>
+                <span class="fact-badge mono">{release.tag}</span>{releaseDate && <span class="muted"> {releaseDate}</span>} · <a href={release.url}>Release notes</a>
+              </dd>
+            </div>
             <div><dt class="mono">tests</dt><dd>260+ automated tests, plus real-server scenarios with a bot that joins and chats</dd></div>
             <div><dt class="mono">ci</dt><dd>Every push: Linux, Windows, macOS and ARM64</dd></div>
             <div><dt class="mono">license</dt><dd><a href={`${github}/blob/main/LICENSE`}>FSL-1.1-ALv2</a>, Apache-2.0 after two years</dd></div>
-            <div><dt class="mono">telemetry</dt><dd>None. Not even a counter.</dd></div>
-            <div><dt class="mono">github</dt><dd>{facts.stars !== null && facts.stars >= 10 ? <a href={github}>{facts.stars} stars</a> : <a href={github}>Source, issues and roadmap. A star helps.</a>}</dd></div>
+            <div><dt class="mono">telemetry</dt><dd><span class="fact-none"><Pixel name="check" size={10} /><strong>None.</strong></span> Not even a counter.</dd></div>
+            <div><dt class="mono">github</dt><dd><a href={github} rel="noopener">Source</a>, <a href={`${github}/issues`} rel="noopener">issues</a> and <a href={`${github}/blob/main/docs/ROADMAP.md`} rel="noopener">roadmap</a>. A star helps.</dd></div>
           </dl>
         </div>
       </section>
