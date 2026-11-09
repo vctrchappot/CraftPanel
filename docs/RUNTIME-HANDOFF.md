@@ -27,14 +27,14 @@
 - Legacy migration (Ubuntu) from the old combined process with real world and `server.properties` preservation, refusal without approval and rollback: `test-results/runtime-legacy-20261109/`.
 - Real tests found and fixed: root-owned registry restore after runtime rollback; installation marked complete while runtime registration still held the lock; runtime defaulting to `.data` instead of the platform data directory.
 - Windows: production deployment smoke and Chromium E2E (real Vanilla lifecycle, maintenance stop-all, the three update-preview states with controlled release metadata) pass. Elevated SCM scenarios pass in CI only (hosted runner): virtual-account identity, independent dashboard-task stop, unsupported archive, failed migrations, hanging startup, runtime update refusal/approval/rollback, SCM crash recovery, recovery retention. The cause of the earlier CI failure (`Failed to start service`, fixed by traversal/Node access grants) was inferred, not read from a service log. The local shell has no administrator token.
+- Windows real-player continuity, in CI only (run [42597968685](https://github.com/vctrchappot/CraftPanel/actions/runs/42597968685), head `a5994b0`, `scripts/real-tests/runtime-continuity-windows.mjs`): Paper 1.21.4 + mineflayer kept the same Java/service PIDs and player through dashboard task restart, forced dashboard kill, dashboard-only update and failed-migration rollback; console replay works. `Stop-Service` (same wrapper path as preshutdown) exits 0 after Minecraft saved an unsaved block; `Start-Service` restores the auto-start server and world. The first run found a real defect: Paperclip's `toRealPath` needs list access to every ancestor, and the service account only had traversal on `%LOCALAPPDATA%`'s parents, so Paper could never start in a default Windows install. Fixed in `a5994b0` (non-inherited `RD` grant, and the service path probe now checks ancestor listing).
 - `--deep-data` installer test fails on Windows because of the 260-character path limit; it passes on Linux.
 
 ## Remaining acceptance, in order
 
-1. Windows graceful host shutdown/boot with autostart (Linux is done). Needs an elevated disposable Windows VM or CI runner; never reboot the workstation. A runtime-service restart is not reboot evidence.
-2. Windows real-player continuity (Paper + mineflayer) through dashboard restart, forced stop and dashboard-only update with an installed SCM service.
-3. Dashboard-triggered update/rollback (not only controlled preview metadata) and concurrent installer runs.
-4. Re-investigate if the intermittent disconnect returns: use the diagnostic reason codes, do not just widen poll intervals.
-5. Split `3077ef7`, record final evidence in STATUS.md, tick ROADMAP.md, check CI, then merge into `main`.
+1. Windows graceful host shutdown/boot with autostart on a real or disposable virtual machine (Linux is done; CI covers the shared stop path but cannot send preshutdown or reboot). Never reboot the workstation.
+2. Dashboard-triggered update/rollback (not only controlled preview metadata) and concurrent installer runs.
+3. Re-investigate if the intermittent disconnect returns: use the diagnostic reason codes, do not just widen poll intervals.
+4. Split `3077ef7`, record final evidence in STATUS.md, tick ROADMAP.md, check CI, then merge into `main`.
 
 Out of scope for this phase: reattaching to Java processes after a runtime crash (a live PID is held as orphaned). Follow-on phases: per-server isolation/resources, complete backups and host migration, multiple hosts.

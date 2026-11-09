@@ -67,6 +67,18 @@ sudo node scripts/real-tests/runtime-continuity.mjs test-results/runtime-accepta
 
 The optional Java executable is copied into this instance's data directory; the original installation is read-only. The harness installs real Paper 1.21.4, holds a real offline player through dashboard restart/crash, successful dashboard update and migration/unit rollback, and checks unchanged PIDs, player connection, console replay and working commands. It also checks missing/expired/mismatched runtime approvals, changed-runtime rollback and successful maintenance update using a gold block in the real world, and graceful runtime-service restart with auto-start. That final scenario is not an actual host reboot. JSON evidence and installer logs remain in the fixture directory. Services are uninstalled even on failure; data is retained for diagnosis. Fixture names and ports must be unused. Playwright output is confined to `test-results/playwright` so it cannot delete these archives.
 
+## Installed runtime/player continuity (Windows)
+
+Run in an elevated shell under the account that will own the dashboard, on a disposable machine (CI uses the hosted Windows runner):
+
+```powershell
+node scripts/real-tests/installer-fixtures.mjs test-results/installer-recovery
+npm install --prefix C:\path\to\test-tools mineflayer@4.39.0
+node scripts/real-tests/runtime-continuity-windows.mjs test-results/installer-recovery C:\path\to\test-tools
+```
+
+It installs into a temporary directory with its own scheduled task, SCM service and ports. A real Paper 1.21.4 server and offline player are kept through a dashboard task restart, a forced dashboard kill, a dashboard-only update and a failed-migration rollback. The scenario checks unchanged Java and service PIDs, commands and console replay. It also checks the boot start mode and preshutdown timeout. A service stop must save the world, including a block change without an explicit save, and exit with code 0. Starting the service again must bring back the auto-start server and its world. The wrapper handles stop and preshutdown with the same code, but Windows does not let applications send preshutdown, so this is not a host reboot. On failure, the scenario prints dashboard, runtime and Minecraft logs.
+
 ## Graceful host shutdown and boot (Linux)
 
 `host-reboot.mjs` powers off its host between two phases, so run it only on a disposable systemd host. On Windows, clone the WSL test distro and remove the clone afterwards:

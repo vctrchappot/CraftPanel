@@ -6,7 +6,7 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 ## Current state (2026-11-09)
 
-The active phase is **Minecraft-Laufzeit vom Dashboard trennen** on `wip/runtime-separation`. Real Linux player continuity, legacy migration, dashboard update rollback, changed-runtime approval/world recovery, browser maintenance/preview checks and the elevated Windows SCM scenarios in CI pass. [RUNTIME-HANDOFF.md](RUNTIME-HANDOFF.md) records exact evidence and the remaining acceptance: Windows host shutdown/boot, Windows real-player continuity, dashboard-triggered rollback and concurrent installers. The earlier intermittent disconnect remains unreproduced rather than explained. The phase is incomplete; do not merge/release this WIP. Main remains at the pre-phase baseline.
+The active phase is **Minecraft-Laufzeit vom Dashboard trennen** on `wip/runtime-separation`. Real Linux player continuity, legacy migration, dashboard update rollback, changed-runtime approval/world recovery, browser maintenance/preview checks and the elevated Windows SCM scenarios in CI pass. [RUNTIME-HANDOFF.md](RUNTIME-HANDOFF.md) records exact evidence and the remaining acceptance: Windows host shutdown/boot on a real or virtual machine, dashboard-triggered rollback and concurrent installers. The earlier intermittent disconnect remains unreproduced rather than explained. The phase is incomplete; do not merge/release this WIP. Main remains at the pre-phase baseline.
 
 - **Velocity proxy** is done and verified (STATUS.md); remaining points are listed under step 4.
 - **Suggested next, in order:** finish the runtime separation, then the remaining professional-deployment verification below, publish the first release and run the real installer paths (step 1). Bedrock and Pi/VPS measurements remain planned.
@@ -40,9 +40,9 @@ afterwards its actual state, console and controls are available again.
 - [x] Separate process owner, authenticated Unix socket / Windows named pipe, bounded history and protocol handshake (automated child-process tests).
 - [x] Dashboard reconnect reconciles actual runtime snapshots, rejects controls while disconnected, and never retries expired or uncertain commands (automated integration tests).
 - [x] Ubuntu/systemd installer migration and independent dashboard/runtime update transactions (isolated Ubuntu/systemd with real Paper worlds, legacy migration and rollbacks).
-- [ ] Windows installer parity, including graceful host shutdown (SCM service, updates, rollback and crash recovery pass in CI; host shutdown and player continuity are open).
+- [ ] Windows installer parity, including graceful host shutdown (SCM service, updates, rollback, crash recovery and real-player continuity pass in CI; an actual host shutdown is open).
 - [x] Explicit maintenance action and runtime-update interruption preview in the dashboard (real-server stop-all and controlled release-preview browser checks).
-- [x] Prove a real player remains connected during dashboard restart/update and abrupt crash (isolated Ubuntu/systemd, Paper 1.21.4 + mineflayer; Windows parity remains open).
+- [x] Prove a real player remains connected during dashboard restart/update and abrupt crash (isolated Ubuntu/systemd and Windows SCM in CI, Paper 1.21.4 + mineflayer).
 - [ ] Prove disconnect/replay handling, graceful host reboot/autostart, preserved worlds/configuration and recoverable update failure on installed services (verified on Ubuntu/systemd, including graceful shutdown/boot of a disposable WSL host; Windows host shutdown is open).
 
 Commit order: interface → service → reconnect → installers → failure/acceptance tests.
