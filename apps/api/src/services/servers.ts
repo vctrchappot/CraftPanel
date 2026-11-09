@@ -648,8 +648,13 @@ export class ServerService {
         /* ignore */
       }
     });
-    this.agent.on("exit", async (id) => {
+    this.agent.on("exit", async (id, info) => {
       await this.db.update(playerSessions).set({ leftAt: Date.now() }).where(and(eq(playerSessions.serverId, id), isNull(playerSessions.leftAt))).catch(() => undefined);
+      // `restart` typed in the console: Paper has no restart script here, so CraftPanel starts the server again itself.
+      if (info.restart) {
+        await this.activity.event(id, "server.restart", "Restart requested from the console", { actor: SYSTEM_ACTOR }).catch(() => undefined);
+        await this.start(id, SYSTEM_ACTOR).catch((err) => this.activity.event(id, "server.error", `Restart failed: ${(err as Error).message}`, { level: "error" }));
+      }
     });
   }
 

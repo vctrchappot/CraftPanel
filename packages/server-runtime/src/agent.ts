@@ -12,7 +12,7 @@ export interface AgentEvents {
   players: [serverId: string, players: OnlinePlayer[]];
   metrics: [serverId: string, metrics: ServerMetrics];
   signal: [serverId: string, signal: LogSignal];
-  exit: [serverId: string, info: { code: number | null; signal: NodeJS.Signals | null; expected: boolean }];
+  exit: [serverId: string, info: { code: number | null; signal: NodeJS.Signals | null; expected: boolean; restart: boolean }];
 }
 
 /**

@@ -51,6 +51,36 @@ describe("ManagedServer lifecycle", () => {
     expect(seen).toEqual(["starting", "running", "stopping", "stopped"]);
   });
 
+  it.each(["stop", "/stop", "restart"])("treats \"%s\" typed in the console as an expected stop, not a crash", async (command) => {
+    const s = make();
+    const seen: ServerStatus[] = [];
+    const exits: { expected: boolean; restart: boolean }[] = [];
+    s.on("status", (st) => seen.push(st));
+    s.on("exit", (e) => exits.push(e));
+    s.start(spec("normal"));
+    await waitForStatus(s, "running");
+    s.send(command);
+    await waitForStatus(s, "stopped");
+    expect(seen).toEqual(["starting", "running", "stopping", "stopped"]);
+    expect(s.lastError).toBeNull();
+    expect(exits).toEqual([expect.objectContaining({ expected: true, restart: command === "restart" })]);
+  });
+
+  it("treats a clean exit after startup (/stop typed in game) as a stop", async () => {
+    const s = make();
+    s.start(spec("normal"));
+    await waitForStatus(s, "running");
+    s.send("shutdown-in-game");
+    await waitForStatus(s, "stopped");
+    expect(s.lastError).toBeNull();
+  });
+
+  it("still reports a clean exit during startup as a crash (e.g. EULA not accepted)", async () => {
+    const s = make();
+    s.start(spec("modfail"));
+    await waitForStatus(s, "crashed");
+  });
+
   it("detects a crash (unexpected exit) and records a reason", async () => {
     const s = make();
     s.start(spec("crash"));

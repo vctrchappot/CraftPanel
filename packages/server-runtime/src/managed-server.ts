@@ -25,7 +25,7 @@ export interface ManagedServerEvents {
   lines: [lines: ConsoleLine[]];
   signal: [signal: LogSignal];
   players: [players: OnlinePlayer[]];
-  exit: [info: { code: number | null; signal: NodeJS.Signals | null; expected: boolean }];
+  exit: [info: { code: number | null; signal: NodeJS.Signals | null; expected: boolean; restart: boolean }];
 }
 
 interface PendingQuery {
@@ -54,6 +54,8 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
   private pendingLines: ConsoleLine[] = [];
   private flushTimer: NodeJS.Timeout | null = null;
   private stopRequested = false;
+  /** `restart` was typed in the console: the process is meant to stop and be started again. */
+  private restartRequested = false;
   private killRequested = false;
   private queries: PendingQuery[] = [];
   private _players = new Map<string, OnlinePlayer>();
@@ -96,6 +98,7 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
   start(spec: LaunchSpec): void {
     if (this.isAlive) throw new Error("Server process is already running");
     this.stopRequested = false;
+    this.restartRequested = false;
     this.killRequested = false;
     this.recentErrors = [];
     this.lastError = null;
@@ -146,7 +149,9 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
 
     child.on("exit", (code, signal) => {
       this.flush();
-      const expected = this.stopRequested || this.killRequested;
+      // A clean exit (code 0) after the server was up is a shutdown too: /stop typed in game, by a plugin or script.
+      const expected = this.stopRequested || this.killRequested || (code === 0 && this.readyAt !== null);
+      const restart = this.restartRequested && !this.killRequested;
       this.lastExitCode = code;
       this.child = null;
       this.startedAt = null;
@@ -170,7 +175,7 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
         this.system(`Server crashed: ${reason}`, "ERROR");
         this.setStatus("crashed", reason);
       }
-      this.emit("exit", { code, signal, expected });
+      this.emit("exit", { code, signal, expected, restart });
     });
   }
 
@@ -315,6 +320,13 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
     if (!this.isAlive || !this.child) throw new Error("Server is not running");
     if (/[\r\n\0]/.test(command)) throw new Error("Commands must be a single line");
     const cmd = command.replace(/^\//, "");
+    // `stop` and `restart` typed in the console end the process on purpose; without this the exit would read as a crash.
+    const word = cmd.trim().split(/\s+/)[0];
+    if ((word === "stop" || word === "restart") && !this.stopRequested) {
+      this.stopRequested = true;
+      this.restartRequested = word === "restart";
+      this.setStatus("stopping");
+    }
     if (echo) this.push({ stream: "command", level: "INFO", text: `> ${cmd}` });
     this.child.stdin.write(cmd + "\n");
   }

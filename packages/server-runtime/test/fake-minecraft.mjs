@@ -23,11 +23,12 @@ setTimeout(() => log("INFO", 'Done (0.123s)! For help, type "help"'), mode === "
 const rl = readline.createInterface({ input: process.stdin });
 rl.on("line", (line) => {
   const cmd = line.trim();
-  if (cmd === "stop") {
+  if (cmd === "stop" || cmd === "restart") {
     if (mode === "hang") return; // simulate a server that ignores stop
     log("INFO", "Stopping the server");
     setTimeout(() => process.exit(0), 50);
   } else if (cmd === "list") log("INFO", "There are 1 of a max of 20 players online: Steve");
+  else if (cmd === "shutdown-in-game") process.exit(0); // exits cleanly without a stop command, like an operator's in-game /stop
   else if (cmd === "save-all flush") log("INFO", "System chat: Saved the game");
   else if (cmd.startsWith("join ")) {
     const n = cmd.slice(5);
