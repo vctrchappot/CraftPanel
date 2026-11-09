@@ -9,11 +9,15 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 ### Added
 - Independent Minecraft runtime service with authenticated local IPC, console replay and dashboard reconnection. Dashboard-only updates preserve running servers; runtime changes require explicit maintenance approval. Windows service registration needs one elevated installation under the dashboard owner's account.
 
+### Fixed
+- Runtime-update rollback preserves registry ownership and boot policy. Dashboard rollback leaves an unchanged Windows runtime host untouched. Manual runtime/dashboard starts share the same default data directory, and server installation is not reported complete before runtime registration is acknowledged.
+
+## 0.2.1 – 2026-11-09
+
 ### Changed
 - Settings lists its sections on the left on wide screens and as a swipeable row on narrow ones, instead of a tab bar that needed horizontal and vertical scrollbars.
 
 ### Fixed
-- Runtime-update rollback preserves registry ownership and boot policy. Dashboard rollback leaves an unchanged Windows runtime host untouched. Manual runtime/dashboard starts share the same default data directory, and server installation is not reported complete before runtime registration is acknowledged.
 - Windows: running `update.ps1` of an installation by hand always acts on that installation. Before, an installation in a custom folder updated (or, with `CRAFTPANEL_UNINSTALL=1`, removed) the default installation unless the same `CRAFTPANEL_*` variables were set again; a conflicting `CRAFTPANEL_INSTALL_DIR` is now refused.
 - Windows: a first install with `CRAFTPANEL_PORT` no longer fails with "Another CraftPanel is running" when a different CraftPanel uses port 8080.
 
