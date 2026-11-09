@@ -676,15 +676,6 @@ p {
   height: 10px;
   background: #3a3631;
 }
-.term-dots i:first-child {
-  background: #ef5a4f;
-}
-.term-dots i:nth-child(2) {
-  background: #e8b04a;
-}
-.term-dots i:nth-child(3) {
-  background: #5bbf4a;
-}
 .term-tabs {
   display: flex;
   height: 100%;
@@ -703,8 +694,15 @@ p {
 }
 .term-tabs button[aria-selected="true"] {
   color: #e4e0d7;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.term-tabs::-webkit-scrollbar {
+  display: none;
   border-bottom-color: #5bbf4a;
 }
+  flex: none;
 .term-tabs button:focus-visible {
   outline-offset: -3px;
 }
@@ -758,18 +756,33 @@ p {
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid #3a3631;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--cp-signal);
   border-radius: 2px;
-  background: #1c1b19;
-  color: #c9c3b8;
-  font: 500 12px/1 var(--font-mono);
+  background: var(--cp-signal);
+  color: var(--cp-signal-night);
+  font: 600 14.5px/1 var(--font-text);
   cursor: pointer;
 }
 .term-copy:hover {
-  border-color: #6a645b;
+  filter: brightness(1.1);
+}
+.term :focus-visible,
+.cta .term :focus-visible {
+  outline: 2px solid #f4f1ea;
+  outline-offset: 3px;
+}
+.term-source {
+  color: #d6d1c7;
+  font: 400 14px/1.3 var(--font-text);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.term-source:hover {
   color: #fff;
 }
 .term-actions {
@@ -782,6 +795,7 @@ p {
 .term-full .term-copy {
   min-width: 190px;
   height: 36px;
+  transition: filter 0.16s ease-out;
   justify-content: center;
   border-color: var(--cp-signal);
   background: var(--cp-signal);
@@ -850,10 +864,26 @@ p {
   }
 }
 .term-compact .term-body {
-  padding: 14px 14px 14px 16px;
+  padding: 18px;
 }
-.term-compact .term-cmd {
-  align-items: center;
+.term-compact .term-typed {
+  position: static;
+  display: block;
+  flex: 1;
+  min-width: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.term-compact .term-actions {
+  margin-top: 16px;
+  gap: 12px 20px;
+}
+/* the card is a mockup window: same hard offset shadow as the other mockups */
+.term-compact {
+  border-color: var(--line-strong);
+  box-shadow: 6px 6px 0 var(--surface-2);
 }
 
 /* ---- sections ---- */
@@ -2399,30 +2429,25 @@ p {
   font-size: 16px;
   font-weight: 400;
 }
-.cta-side {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 20px;
-}
 .cta-links {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 }
-.btn-dark {
+.cta-btn-primary {
   background: #10200a;
   color: #e9f5d6;
 }
-.btn-ghost-dark {
+.cta-btn-secondary {
   background: transparent;
   color: #10200a;
-  box-shadow: inset 0 0 0 2px #10200a;
+}
+.cta-btn-secondary:hover {
+  background: color-mix(in srgb, #10200a 10%, transparent);
 }
 .cta :focus-visible {
-  outline-color: #10200a;
-}
-.cta .btn:focus-visible {
-  box-shadow: inset 0 0 0 3px #e8b04a;
+  outline: 3px solid #10200a;
+  outline-offset: 3px;
 }
 
 /* ---- footer ---- */
@@ -2474,11 +2499,58 @@ p {
   font-size: 13px;
 }
 .fc-out {
+  gap: 14px 16px;
+  margin-top: 32px;
+}
+.cta-steps {
+  display: grid;
   list-style: none;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 17px;
+  line-height: 1.4;
+}
+.cta-steps li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.cta-step-no {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid #10200a;
+  font-size: 14px;
+  font-weight: 600;
+}
+.cta-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 2px solid #10200a;
+  font: 500 16.5px/1 var(--font-text);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s;
   margin: 0;
   padding: 12px 14px 0;
   min-height: 2.2em;
 }
+  box-shadow: 3px 3px 0 color-mix(in srgb, #10200a 40%, transparent);
+}
+.cta-btn-primary:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 color-mix(in srgb, #10200a 40%, transparent);
+}
+.cta-btn-primary:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 color-mix(in srgb, #10200a 40%, transparent);
 .fc-out li {
   white-space: pre-wrap;
   word-break: break-word;
@@ -2683,9 +2755,6 @@ p {
   .term-tabs button {
     padding: 0 10px;
   }
-  .term-compact .term-copy-label {
-    display: none;
-  }
   .sec {
     padding: 72px 0;
   }
@@ -2715,6 +2784,12 @@ p {
     width: 20px;
     height: 20px;
     font-size: 11px;
+  }
+  .cta-links {
+    flex-direction: column;
+  }
+  .cta-btn {
+    width: 100%;
   }
   .spot-tip {
     display: none;

@@ -829,13 +829,14 @@ const backups = [
         <div class="wrap cta-in">
           <div>
             <h2 id="cta-title" class="display">Install CraftPanel.</h2>
-            <p>Install → open the dashboard → create your first server.</p>
-          </div>
-          <div class="cta-side">
-            <Terminal version={version} id="cta-term" compact />
+            <ol class="cta-steps">
+              <li><span class="cta-step-no mono" aria-hidden="true">1</span>Run the command</li>
+              <li><span class="cta-step-no mono" aria-hidden="true">2</span>Open <span class="mono">localhost:8080</span></li>
+              <li><span class="cta-step-no mono" aria-hidden="true">3</span>Create your first server</li>
+            </ol>
             <div class="cta-links">
-              <a class="btn btn-dark" href="/docs/getting-started/installation/">Installation guide <UiIcon name="arrow-right" size={12} /></a>
-              <a class="btn btn-ghost-dark" href={github}><UiIcon name="github" size={12} /> View on GitHub</a>
+              <a class="cta-btn cta-btn-primary" href="/docs/getting-started/installation/">Installation guide <UiIcon name="arrow-right" size={12} /></a>
+              <a class="cta-btn cta-btn-secondary" href={github} rel="noopener"><UiIcon name="github" size={24} /> View on GitHub</a>
             </div>
           </div>
         </div>
@@ -844,6 +845,7 @@ const backups = [
 
     <footer class="foot">
       <div class="wrap foot-in">
+          <Terminal version={version} id="cta-term" compact />
         <div class="foot-brand">
           <a href="/" class="brand"><Mark size={26} /><span>CraftPanel</span></a>
           <p>Built for people who'd rather play than configure. Made by <a href="https://www.vctr.site">Victor</a>.</p>

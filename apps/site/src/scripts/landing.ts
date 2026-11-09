@@ -105,8 +105,20 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
         setTimeout(() => {
           btn.classList.remove("is-copied");
           label.textContent = idleLabel;
-        }, 1600);
-      } catch {}
+        }, 2000);
+      } catch {
+        // No clipboard access (insecure context, permission denied): select the command so Ctrl+C works.
+        const cmd = btn.closest<HTMLElement>("[data-panel]")?.querySelector(".term-typed");
+        if (cmd) {
+          const range = document.createRange();
+          range.selectNodeContents(cmd);
+          const sel = getSelection();
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+        label.textContent = "Selected, press Ctrl+C";
+        setTimeout(() => (label.textContent = idleLabel), 3000);
+      }
     });
   }
 }

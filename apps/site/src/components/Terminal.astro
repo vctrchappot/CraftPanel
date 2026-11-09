@@ -12,7 +12,8 @@ const { version, compact = false, id } = Astro.props;
 const tabs = [
   {
     os: "linux",
-    label: "Linux · Raspberry Pi",
+    label: "Linux and Raspberry Pi",
+    script: "install.sh",
     prompt: "pi@raspberrypi:~ $",
     command: "curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash",
     output: [
@@ -29,6 +30,7 @@ const tabs = [
   {
     os: "windows",
     label: "Windows",
+    script: "install.ps1",
     prompt: "PS C:\\>",
     command: "irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex",
     output: [
@@ -64,16 +66,25 @@ const tabs = [
         <div class="term-line term-cmd">
           {!compact && <span class="term-prompt">{t.prompt}</span>}
           {compact && <span class="term-prompt">{t.os === "windows" ? "PS>" : "$"}</span>}
-          <span class="term-typed-wrap">
-            <span class="term-ghost" aria-hidden="true">{t.command}</span>
+          {compact ? (
             <code class="term-typed" data-command={t.command}>{t.command}</code>
-          </span>
-          {compact && <button class="term-copy" type="button" data-copy={t.command} aria-label={`Copy the ${t.label} install command`}>
-            <UiIcon name="copy" size={12} class="i-copy" />
-            <UiIcon name="check" size={12} class="i-done" />
-            <span class="term-copy-label">Copy</span>
-          </button>}
+          ) : (
+            <span class="term-typed-wrap">
+              <span class="term-ghost" aria-hidden="true">{t.command}</span>
+              <code class="term-typed" data-command={t.command}>{t.command}</code>
+            </span>
+          )}
         </div>
+        {compact && (
+          <div class="term-actions">
+            <button class="term-copy" type="button" data-copy={t.command} aria-label={`Copy the ${t.label} install command`}>
+              <UiIcon name="copy" size={12} class="i-copy" />
+              <UiIcon name="check" size={12} class="i-done" />
+              <span class="term-copy-label" aria-live="polite">Copy</span>
+            </button>
+            <a class="term-source" href={`https://github.com/vctrchappot/CraftPanel/blob/main/deploy/${t.script}`} rel="noopener">Read the script first</a>
+          </div>
+        )}
         {!compact && (
           <div class="term-actions">
             <button class="term-copy" type="button" data-copy={t.command} aria-label={`Copy the ${t.label} install command`}>
