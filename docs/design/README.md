@@ -30,6 +30,8 @@ Fonts are self-hosted from the `geist` npm package (Vercel, SIL Open Font Licens
 
 Keep weights low: nothing above 600. Large Geist at 700+ with tight tracking looks blunt; precision comes from size and spacing, not weight. Serif ships a single weight and `font-synthesis-weight: none` is set globally, so give it `font-normal` instead of inheriting a bold one. The wordmark is Geist Sans 600 next to the mark (the brand package's Archivo wordmark is not used).
 
+Sans tracking is slightly negative: `--cp-tracking-body` −0.01 em for normal UI/body text, `--cp-tracking-heading` −0.035 em for headings. Mono commands and console output retain normal tracking for legibility.
+
 ## Colour
 
 Warm greys ("deepslate" dark, "sandstone" light) carry the UI. Three colour roles, never mixed:
@@ -68,6 +70,7 @@ Buttons: brand button 7.6 (light, white text) / 7.3 (dark, dark text). Any new p
 - Activity icons follow event kind: running = Signal, starting = Amber, stopped = Ash, crashed = Ember. Updates and installs are neutral. Failures retain warning/error emphasis.
 - Connection addresses list physical LAN first, then VPN and virtual adapters with product labels. Classification uses known adapter names; renamed or unrecognised adapters can remain generic. A private IP range alone does not identify VirtualBox or Tailscale. The access policy still uses IP/CIDR rules independently of these display labels.
 - Console output has 16 px inner spacing, including above the first line; live-connection and severity colours use shared status tokens.
+- Compact activity feeds stay within the neighbouring content column on desktop, with an internal keyboard-accessible scroll region. On mobile they cap at 320 px. Events arrive newest first and server events refresh the overview immediately; the full activity page remains paginated.
 
 ## The mark
 
