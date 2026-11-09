@@ -194,6 +194,30 @@ if (updateEl) {
   onVisible(updateEl, () => void run(false));
 }
 
+// ---- independent runtime illustration ------------------------------------------
+const runtimeFigure = document.querySelector<HTMLElement>("[data-runtime-figure]");
+if (runtimeFigure) {
+  const button = runtimeFigure.querySelector<HTMLButtonElement>("[data-runtime-restart]")!;
+  const status = runtimeFigure.querySelector<HTMLElement>("[data-runtime-status]")!;
+  const note = runtimeFigure.querySelector<HTMLElement>("[data-runtime-note]")!;
+  const caption = runtimeFigure.querySelector<HTMLElement>("[data-runtime-caption]")!;
+  caption.setAttribute("aria-live", "polite");
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    runtimeFigure.classList.add("is-restarting");
+    status.textContent = "Reconnecting…";
+    note.textContent = "Dashboard restarting.";
+    caption.textContent = "Dashboard offline. Minecraft is still running.";
+    await wait(1800);
+    runtimeFigure.classList.remove("is-restarting");
+    status.textContent = "Connected";
+    note.textContent = "Controls, console, settings.";
+    caption.textContent = "Reconnected. No game process restarted.";
+    button.disabled = false;
+    button.innerHTML = 'Restart again <span aria-hidden="true">↻</span>';
+  });
+}
+
 // ---- backup demo ---------------------------------------------------------------
 const backupEl = document.querySelector<HTMLElement>("[data-backup]");
 if (backupEl) {

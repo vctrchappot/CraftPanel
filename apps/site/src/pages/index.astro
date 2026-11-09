@@ -5,6 +5,7 @@ import "../styles/landing.css";
 import Pixel, { type PixelName } from "../components/Pixel.astro";
 import Iso from "../components/Iso.astro";
 import Terminal from "../components/Terminal.astro";
+import RuntimeDiagram from "../components/RuntimeDiagram.astro";
 import Shot from "../components/Shot.astro";
 import { heroScene, pcScene, piScene, vpsScene } from "../lib/scenes";
 import { repoFacts } from "../lib/github";
@@ -23,12 +24,12 @@ const description =
   "Self-hosted panel for Minecraft Java servers on a PC, a Raspberry Pi or a VPS. One command to install. Paper, Purpur, Fabric, NeoForge, Vanilla and Velocity. No rent, no telemetry.";
 
 const types: { key: string; name: string; icon: PixelName; color: string; note: string; server: string; meta: string; addons: string; tab: string | null; players: string; tps: string; mem: string }[] = [
-  { key: "paper", name: "Paper", icon: "paper", color: "#e8e2d4", note: "Plugins. Fastest Vanilla-like server.", server: "survival", meta: "Paper 1.21.4 · build 232 · Java 21", addons: "Plugins from Modrinth & Hangar", tab: "Plugins", players: "6 / 20", tps: "20.0", mem: "1.4 / 2.0 GB" },
-  { key: "purpur", name: "Purpur", icon: "purpur", color: "#b98ad0", note: "Paper plus a lot more knobs.", server: "skyblock", meta: "Purpur 1.21.11 · build 2568 · Java 21", addons: "Paper plugins from Modrinth & Hangar", tab: "Plugins", players: "11 / 30", tps: "19.9", mem: "2.3 / 3.0 GB" },
-  { key: "fabric", name: "Fabric", icon: "fabric", color: "#d9b77e", note: "Lightweight mods like Lithium.", server: "creative", meta: "Fabric 1.21.11 · loader 0.20.1 · Java 21", addons: "Fabric mods, Fabric API checked", tab: "Mods", players: "3 / 10", tps: "20.0", mem: "1.9 / 3.0 GB" },
+  { key: "paper", name: "Paper", icon: "paper", color: "#e8e2d4", note: "Plugins, fast and Vanilla-like.", server: "survival", meta: "Paper 1.21.4 · build 232 · Java 21", addons: "Plugins from Modrinth & Hangar", tab: "Plugins", players: "6 / 20", tps: "20.0", mem: "1.4 / 2.0 GB" },
+  { key: "purpur", name: "Purpur", icon: "purpur", color: "#b98ad0", note: "Paper with more settings.", server: "skyblock", meta: "Purpur 1.21.11 · build 2568 · Java 21", addons: "Paper plugins from Modrinth & Hangar", tab: "Plugins", players: "11 / 30", tps: "19.9", mem: "2.3 / 3.0 GB" },
+  { key: "fabric", name: "Fabric", icon: "fabric", color: "#d9b77e", note: "Light mods like Lithium.", server: "creative", meta: "Fabric 1.21.11 · loader 0.20.1 · Java 21", addons: "Fabric mods, Fabric API checked", tab: "Mods", players: "3 / 10", tps: "20.0", mem: "1.9 / 3.0 GB" },
   { key: "neoforge", name: "NeoForge", icon: "neoforge", color: "#f08a24", note: "Big mods and modpacks.", server: "create-pack", meta: "NeoForge 1.21.1 · 21.1.265 · Java 21", addons: "Mods & modpacks from Modrinth", tab: "Mods", players: "4 / 8", tps: "19.6", mem: "4.8 / 6.0 GB" },
-  { key: "vanilla", name: "Vanilla", icon: "vanilla", color: "#86c13a", note: "Mojang's server, untouched.", server: "vanilla-smp", meta: "Vanilla 26.3 · Java 25", addons: "No add-ons. Just Minecraft.", tab: null, players: "5 / 20", tps: "20.0", mem: "1.6 / 2.0 GB" },
-  { key: "velocity", name: "Velocity", icon: "velocity", color: "#3fb8e8", note: "One address, several servers.", server: "network", meta: "Velocity 4.3.1 · build 45 · Java 25", addons: "3 servers behind one address", tab: "Proxy", players: "14 / 100", tps: "—", mem: "0.3 / 0.5 GB" },
+  { key: "vanilla", name: "Vanilla", icon: "vanilla", color: "var(--cp-signal)", note: "Mojang's server, untouched.", server: "vanilla-smp", meta: "Vanilla 26.3 · Java 25", addons: "No add-ons. Just Minecraft.", tab: null, players: "5 / 20", tps: "20.0", mem: "1.6 / 2.0 GB" },
+  { key: "velocity", name: "Velocity", icon: "velocity", color: "#3fb8e8", note: "Several servers, one address.", server: "network", meta: "Velocity 4.3.1 · build 45 · Java 25", addons: "3 servers behind one address", tab: "Proxy", players: "14 / 100", tps: "—", mem: "0.3 / 0.5 GB" },
 ];
 
 const minor: { label: string; icon: PixelName; text: string }[] = [
@@ -37,6 +38,7 @@ const minor: { label: string; icon: PixelName; text: string }[] = [
   { label: "automation", icon: "clock", text: "<code>0 4 * * *</code> restart, with a 60-second warning in chat. Backups, announcements and commands on any schedule." },
   { label: "notifications", icon: "bell", text: "Discord or e-mail when a server crashes, a backup fails or a new release is out." },
   { label: "networking", icon: "signal", text: "Copyable LAN and VPN addresses, port checks, CGNAT detection and DuckDNS." },
+  { label: "files & worlds", icon: "folder", text: "Edit configs in the browser. Upload a world as a zip, download one to play it in single player." },
 ];
 
 const looks = [
@@ -197,8 +199,8 @@ const backups = [
                 <span class="chip-row muted">Paper 1.21.4</span>
                 <span class="chip-row"><b>6</b>/20 online · TPS <b>20.0</b></span>
               </div>
-              <p class="hero-host mono" aria-hidden="true">raspberrypi.local · 4 GB</p>
             </div>
+            <p class="hero-host mono" aria-hidden="true">raspberrypi.local · 4 GB</p>
           </div>
         </div>
       </section>
@@ -317,7 +319,7 @@ const backups = [
                   <li data-step="3"><span>Start new dashboard</span><i class="du-state"></i></li>
                   <li data-step="4" class="du-rollback"><span>Roll back to v1.0.0</span><i class="du-state"></i></li>
                 </ol>
-                <p class="du-players mono"><span class="dot-run"></span>Minecraft: <b>6 players online</b> the whole time</p>
+                <p class="du-players mono"><span class="dot-run"></span><span><b>6 players online</b> the whole time</span></p>
                 <p class="du-result mono" data-result aria-live="polite"></p>
                 <div class="du-actions">
                   <button type="button" class="btn btn-small" data-run="ok">Run update</button>
@@ -359,11 +361,24 @@ const backups = [
                 <h3>Modrinth and Hangar, built in.</h3>
                 <p>Search, install with checksum checks and get update suggestions. Or start from a Modrinth modpack: the Minecraft and loader version come from the pack.</p>
               </div>
-              <ul class="demo-plugins" aria-label="Example search results">
-                <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">modrinth</span></li>
-                <li><span class="dp-name">Chunky</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">hangar</span></li>
-                <li><span class="dp-name">Create</span><span class="dp-warn mono">needs NeoForge</span><span class="dp-src mono">modrinth</span></li>
-              </ul>
+              <div class="demo-search">
+                <p class="dp-field mono" aria-label="Example search for luck"><Pixel name="search" size={14} /><span class="dp-query">luck</span><span class="dp-count">3 results · Paper 1.21.4</span></p>
+                <ul class="demo-plugins" aria-label="Example search results">
+                  <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">modrinth</span></li>
+                  <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">hangar</span></li>
+                  <li><span class="dp-name">Lucky Block</span><span class="dp-warn mono">needs Fabric</span><span class="dp-src mono">modrinth</span></li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="tile tile-runtime runtime-story">
+              <div class="runtime-story-copy">
+                <p class="tile-label mono"><Pixel name="signal" size={14} />Built to keep playing</p>
+                <h3 class="display">Two processes.<br />One less interruption.</h3>
+                <p>The dashboard is the control room. A separate runtime service owns the Minecraft processes. Close the panel, restart it or update it: your worlds keep ticking.</p>
+                <p class="runtime-caveat">An update to the runtime itself still needs a planned server stop. CraftPanel tells you before it happens.</p>
+              </div>
+              <RuntimeDiagram />
             </article>
 
             <article class="tile tile-list">
