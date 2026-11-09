@@ -1,0 +1,57 @@
+---
+title: Maintenance
+description: Logs, services, backing up CraftPanel itself and uninstalling.
+sidebar:
+  order: 4
+---
+
+import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+## Services and logs
+
+<Tabs syncKey="os">
+<TabItem label="Linux">
+
+```bash
+systemctl status craftpanel craftpanel-runtime
+journalctl -u craftpanel -f              # dashboard
+journalctl -u craftpanel-runtime -f      # Minecraft runtime
+sudo systemctl restart craftpanel        # restart the dashboard; games keep running
+```
+
+</TabItem>
+<TabItem label="Windows">
+
+- The dashboard runs as the scheduled task **CraftPanel** and starts at sign-in.
+- Minecraft runs in the Windows service **CraftPanel Runtime** and starts at boot.
+- Logs are in `%LOCALAPPDATA%\CraftPanel\logs`.
+
+</TabItem>
+</Tabs>
+
+Restarting the dashboard never stops Minecraft. Restarting the **runtime** saves and stops all servers; those with **Start with CraftPanel** come back automatically.
+
+## Stopping everything
+
+**Settings → Security & about → Stop all servers for maintenance** saves and stops every server, for example before maintenance on the machine. Auto-start settings stay as they are for the next boot. On a normal shutdown or reboot, the runtime does this by itself.
+
+## Backing up CraftPanel
+
+Server backups protect your worlds. To back up the panel itself (accounts, settings, schedules, all servers):
+
+1. Stop the dashboard **and** the runtime.
+2. Copy the whole data directory.
+3. Copy your settings file and any TLS certificates and keys.
+
+Copying only the database file while CraftPanel runs can miss recent changes. Test a restore on another machine before you rely on it.
+
+<Aside type="note">
+Updates keep their own recovery points (database snapshot and startup files) under the installation folder and restore them if an update fails. They don't include worlds and are not a replacement for backups.
+</Aside>
+
+## Uninstalling
+
+- **Linux:** `curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash -s -- --uninstall`
+- **Windows:** `$env:CRAFTPANEL_UNINSTALL = "1"; irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex`
+
+Both keep your data directory and settings. Delete them by hand if you no longer need your servers.

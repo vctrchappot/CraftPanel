@@ -1,0 +1,45 @@
+---
+title: Automation and notifications
+description: Schedule restarts, backups and commands, and get notified on Discord or by e-mail.
+sidebar:
+  order: 4
+---
+
+## Scheduled tasks
+
+Each server's **Automation** tab holds its scheduled tasks. A task runs one action on a cron schedule:
+
+| Action | What it does |
+| --- | --- |
+| Back up | Creates a verified backup |
+| Restart | Warns players (60 seconds by default), then restarts gracefully |
+| Start / Stop | Starts a stopped server, or stops it gracefully |
+| Announce | Broadcasts a chat message (`/say`) |
+| Run command | Sends a console command |
+| Prune backups | Keeps only the newest *n* backups |
+| Clean up logs | Deletes archived logs older than *n* days |
+
+Presets cover common schedules: every day at 04:00, every 6 hours, every hour, every 30 minutes and Sundays at 03:00. The next run is previewed before you save, and each task keeps a run history with the result.
+
+Each task runs at most once per minute and never overlaps itself, even if the previous run is still going.
+
+## Notifications
+
+**Settings → Notifications** sends a message when something needs your attention:
+
+- a server **crashes** or **fails to start**,
+- a **backup** or a **scheduled task** fails,
+- a **CraftPanel update** is available.
+
+Choose the categories per channel:
+
+- **Discord**: paste a webhook URL from a channel's integration settings. Messages never mention `@everyone` or roles.
+- **E-mail**: any SMTP server (host, port, TLS, user and password).
+
+Use **Send test** to check a channel. Repeated crashes of the same server are combined, so a crash loop doesn't flood you.
+
+Messages contain server names and log excerpts; choose recipients accordingly.
+
+## Activity and audit log
+
+The **Activity** page shows what happened on your servers: starts, stops, crashes, installs, backups and changes, with who did it. Administrators also see the **audit log** under **Settings**, with sign-ins, configuration changes, console commands, file operations and user management.

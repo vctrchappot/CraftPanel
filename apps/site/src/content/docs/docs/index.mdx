@@ -1,0 +1,39 @@
+---
+title: Introduction
+description: What CraftPanel is, what it runs on and where to start.
+---
+
+import { CardGrid, LinkCard, Aside } from "@astrojs/starlight/components";
+
+CraftPanel is a self-hosted manager for **Minecraft Java Edition** servers. You install it on a computer you control (your PC, a spare machine, a Raspberry Pi or a VPS), open the dashboard in a browser and create, run and maintain real Minecraft servers. There is no cloud service, no account to sign up for and no telemetry.
+
+## What it does
+
+- **Creates servers** with Paper, Purpur, Fabric, NeoForge, Vanilla or a Velocity proxy, for any published Minecraft version. Downloads come from the official sources and are checked against their checksums.
+- **Handles Java**: the right Eclipse Temurin version (8, 17, 21 or 25) is downloaded per Minecraft version.
+- **Runs Minecraft in its own background service**, so restarting, updating or even crashing the dashboard never stops your games.
+- **Manages everything around a server**: live console, players, whitelist, ops and bans, `server.properties`, game rules, plugins and mods from Modrinth and Hangar, modpacks, worlds, files, backups, schedules and notifications.
+- **Supports teams** with roles, per-server access, two-factor sign-in and an audit log.
+
+## Requirements
+
+| | |
+| --- | --- |
+| **Operating system** | Linux with systemd (Debian, Ubuntu, Raspberry Pi OS, …), Windows 10/11, macOS |
+| **CPU** | x64 or ARM64 (ARMv7 for the dashboard; Java servers need a 64-bit OS in practice) |
+| **Memory** | ~100 MB for CraftPanel, plus what your Minecraft servers need (2 GB for a small Paper server, 4 GB+ for modpacks) |
+| **Node.js** | 22.13 or newer. The installers set it up for you if it's missing. |
+| **Java** | Nothing to install. CraftPanel downloads it per server. |
+
+<Aside type="note">
+CraftPanel manages Java Edition servers. A Bedrock Dedicated Server adapter is planned.
+</Aside>
+
+## Where to go next
+
+<CardGrid>
+  <LinkCard title="Install CraftPanel" description="One command on Linux, Raspberry Pi or Windows." href="/docs/getting-started/installation/" />
+  <LinkCard title="Create your first server" description="From the setup token to players joining." href="/docs/getting-started/first-server/" />
+  <LinkCard title="Remote access" description="Manage CraftPanel from other devices, safely." href="/docs/administration/remote-access/" />
+  <LinkCard title="Security model" description="What CraftPanel protects and what it doesn't." href="/docs/reference/security/" />
+</CardGrid>

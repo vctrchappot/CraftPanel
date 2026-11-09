@@ -1,0 +1,125 @@
+---
+title: Installation
+description: Install CraftPanel on Linux, Raspberry Pi, Windows or macOS, or run it from source.
+sidebar:
+  order: 1
+---
+
+import { Tabs, TabItem, Steps, Aside } from "@astrojs/starlight/components";
+
+The one-line installers are the recommended way to install CraftPanel. They download the latest release from GitHub, verify its checksum and set CraftPanel up to run in the background. Nothing is built on your machine.
+
+<Tabs syncKey="os">
+<TabItem label="Linux / Raspberry Pi">
+
+Works on Debian, Ubuntu, Raspberry Pi OS and other distributions with systemd, on x64, ARM64 and ARMv7.
+
+```bash
+curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash
+```
+
+What the installer sets up:
+
+- The app in `/opt/craftpanel` and your data in `/var/lib/craftpanel`.
+- Two hardened systemd services, `craftpanel` (dashboard) and `craftpanel-runtime` (Minecraft), running as an unprivileged `craftpanel` user.
+- Node.js: your system Node.js if it is 22.13 or newer, otherwise a private copy in `/opt/craftpanel/node`. Your system Node.js is not changed.
+- Settings in `/etc/craftpanel/craftpanel.env`, created once and kept on updates.
+
+Options go after `bash -s --`, for example `curl … | sudo bash -s -- --port 8090`:
+
+| Option | Effect |
+| --- | --- |
+| `--port 8090` | Dashboard port (default 8080) |
+| `--version 1.0.0` | Install a specific release |
+| `--archive file.tar.gz` | Install offline from a downloaded release (verified if `SHA256SUMS` is next to it) |
+| `--uninstall` | Remove CraftPanel; keeps your data and settings |
+
+</TabItem>
+<TabItem label="Windows">
+
+Works on Windows 10 and 11 (x64 and ARM64). Open PowerShell **as administrator**, signed in with the Windows account that should own CraftPanel, and run:
+
+```powershell
+irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex
+```
+
+What the installer sets up:
+
+- The app in `%LOCALAPPDATA%\Programs\CraftPanel` and your data in `%LOCALAPPDATA%\CraftPanel`.
+- The **CraftPanel Runtime** Windows service (runs Minecraft, starts at boot) and a **CraftPanel** task that starts the dashboard when you sign in.
+- A Start-menu entry that opens the dashboard.
+- Settings in `config.env` in the install folder.
+
+Options are environment variables set before the command, for example `$env:CRAFTPANEL_PORT = "8090"`:
+
+| Variable | Effect |
+| --- | --- |
+| `CRAFTPANEL_PORT` | Dashboard port (default 8080) |
+| `CRAFTPANEL_PROFILE` | `lan` (reachable from your network) or `local` |
+| `CRAFTPANEL_INSTALL_VERSION` | Install a specific release |
+| `CRAFTPANEL_ARCHIVE` | Install offline from a downloaded release |
+| `CRAFTPANEL_UNINSTALL = "1"` | Remove CraftPanel; keeps your data |
+
+Administrator rights are only needed to register the runtime service. Later updates run as your normal account.
+
+</TabItem>
+<TabItem label="macOS">
+
+There is no installer for macOS yet. Run the release archive with Node.js:
+
+<Steps>
+
+1. Install Node.js 22.13 or newer, for example with `brew install node`.
+2. Download `craftpanel-vX.Y.Z.tar.gz` from the [latest release](https://github.com/vctrchappot/CraftPanel/releases/latest) and unpack it.
+3. In the unpacked folder, start the runtime in one terminal:
+
+   ```bash
+   node apps/api/dist/runtime.js
+   ```
+
+4. Start the dashboard in a second terminal:
+
+   ```bash
+   node apps/api/dist/index.js --profile lan
+   ```
+
+</Steps>
+
+Data lives in `~/Library/Application Support/CraftPanel`. To start CraftPanel at login, create two LaunchAgents (runtime and dashboard).
+
+</TabItem>
+</Tabs>
+
+When the installer finishes, it prints the dashboard address and a one-time **setup token**. Continue with [your first server](/docs/getting-started/first-server/).
+
+## Raspberry Pi
+
+- Use a **64-bit** Raspberry Pi OS. Java builds for Minecraft are 64-bit.
+- A Pi 4 or 5 with 4–8 GB RAM runs a small Paper server well. Give it 1.5–3 GB and pick the **Raspberry Pi / small VPS** performance preset in the wizard.
+- Put worlds and backups on an SSD rather than the SD card.
+
+## VPS
+
+Install exactly as on Linux. Two things differ on a server in a data center:
+
+- Open the **Minecraft port** (25565 by default) in your provider's firewall. It is public by design.
+- Keep the **dashboard private**: reach it through a VPN, an SSH tunnel (`ssh -L 8080:127.0.0.1:8080 user@vps`) or an HTTPS reverse proxy. See [remote access](/docs/administration/remote-access/).
+
+## From source
+
+For development, or if you prefer to build it yourself. You need Node.js 22.13+ (24 LTS recommended), pnpm and Git.
+
+```bash
+git clone https://github.com/vctrchappot/CraftPanel.git craftpanel
+cd craftpanel
+corepack enable            # Node 25+: npm install -g pnpm
+pnpm install
+pnpm build
+pnpm start                 # or pnpm start:lan for other devices
+```
+
+`pnpm start` starts the Minecraft runtime and the dashboard together; <kbd>Ctrl</kbd>+<kbd>C</kbd> saves and stops your servers and closes both. Update a checkout with `./update.sh` (Linux/macOS) or `update.cmd` (Windows).
+
+<Aside type="tip">
+On Linux, `sudo ./deploy/install-linux.sh` turns a checkout into the same systemd service the one-line installer creates.
+</Aside>

@@ -1,0 +1,58 @@
+---
+title: Security
+description: What CraftPanel protects, how, and the limits you should know about.
+sidebar:
+  order: 1
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+CraftPanel controls processes and files on your machine. Whoever has an Owner or Administrator account can run code through plugins and read every server file, so **protecting dashboard access matters most**.
+
+## Accounts and sessions
+
+- Local accounts only. Passwords are hashed with scrypt and a per-user salt.
+- Random 256-bit session tokens in an `HttpOnly`, `SameSite=Strict` cookie; only a hash is stored. Sessions end on sign-out, password or role change and account deactivation, and open live connections close with them.
+- Network-exposed installs need a **one-time setup token** from the host for the first account.
+- Optional **two-factor sign-in** (TOTP) with recovery codes, required per role if you like.
+- Sign-in is rate-limited; the whole API is limited too.
+
+## Network and requests
+
+- By default only **private networks and VPNs** may reach the dashboard, even when it listens on all interfaces. Public clients always need HTTPS.
+- Every state-changing request needs a CSRF token, and cross-origin requests are rejected by their `Origin`, for WebSockets too.
+- Forwarding headers are only accepted from proxies you configure explicitly.
+- All input is validated. Console commands and property values must be single lines, so nothing can be smuggled in.
+
+## Processes and files
+
+- **No shell is ever used.** Java starts with an explicit argument list, and JVM arguments are restricted.
+- The browser can only send Minecraft console commands to a server. There is no host terminal.
+- Each server is confined to its own directory: absolute paths, `..`, drive letters and symlink escapes are rejected. Archive extraction has size and entry limits.
+
+## Downloads
+
+- Server software, Java and add-ons are downloaded over HTTPS from an allowlist of official hosts (Mojang, PaperMC, Fabric, NeoForge, Adoptium, Modrinth, Hangar) and verified against published checksums.
+- Modpack files must come from hosts the format allows, are checked against their SHA-512 and may only land in folders such as `mods/` or `config/`.
+- CraftPanel never runs add-ons itself. The one exception is the official NeoForge installer, verified and run without a shell.
+- Dashboard updates don't grant CraftPanel extra rights: on Linux it can only drop a request file that a root-owned unit picks up; the installer verifies the release's checksum.
+
+## Privacy
+
+No telemetry, no third-party requests from the dashboard, self-hosted fonts. CraftPanel only goes online for downloads, Modrinth and Hangar searches, Mojang player lookups, the optional update check and the public-IP check when you click it. An audit log records sign-ins, configuration changes, console commands, file operations and user management.
+
+## Limits to be aware of
+
+<Aside type="caution" title="No per-server isolation">
+Minecraft servers and their plugins run as the CraftPanel service account, not in containers. Install CraftPanel under a dedicated, unprivileged account (the Linux installer does) and never run it as root or Administrator.
+</Aside>
+
+- **Plain HTTP by default.** On a LAN, passwords travel unencrypted. Use a VPN or HTTPS beyond a trusted home network.
+- Secrets such as two-factor keys, the DuckDNS token and SMTP password are stored in the database, protected by file permissions. Protect the data directory and backups of it.
+- Rate limits live in memory per process.
+
+The full technical security notes are in [`docs/security`](https://github.com/vctrchappot/CraftPanel/blob/main/docs/security/README.md) on GitHub.
+
+## Reporting a vulnerability
+
+Please report security issues privately to the maintainer through [GitHub's private vulnerability reporting](https://github.com/vctrchappot/CraftPanel/security/advisories/new) instead of opening a public issue.

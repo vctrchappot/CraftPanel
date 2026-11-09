@@ -4,7 +4,7 @@ Self-hosted Minecraft (Java) server manager: Fastify API + Next.js dashboard in 
 
 - **What's done and how it was verified:** `docs/STATUS.md`
 - **What's next:** `docs/ROADMAP.md` (work through "Next" in order unless told otherwise; tick items off as you finish them)
-- Architecture, security, deployment, development: `docs/*/README.md`
+- Architecture, security, deployment, development: `docs/*/README.md` (contributor docs). User docs live on the website: `apps/site/src/content/docs/` → https://craftpanel.vctr.site/docs/; keep both in step when behaviour changes.
 - `apps/web/AGENTS.md`: this Next.js version differs from older ones; read its bundled docs before changing web code.
 
 ## Working agreements
@@ -28,6 +28,8 @@ node scripts/build-info-plugin.mjs [--check]   # rebuild the /craftpanel plugin 
 node scripts/release.mjs pack                   # release/ archive + installers + SHA256SUMS (after pnpm build)
 node scripts/measure.mjs [--idle 60] [--json]   # startup, idle CPU/RAM, API latency, bundle sizes of the build (own port, temp data)
 node scripts/release.mjs bump X.Y.Z && git push --follow-tags   # release: GitHub Actions publishes it
+pnpm --filter @craftpanel/site dev              # website + user docs (Astro/Starlight) on :4321; Vercel deploys main
+node scripts/site-screenshots.mjs <base> <user> <password> <serverId>   # refresh website screenshots from a throwaway instance
 ```
 
 ## Conventions

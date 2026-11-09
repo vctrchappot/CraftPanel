@@ -1,0 +1,44 @@
+---
+title: Users and roles
+description: Roles, per-server access, two-factor sign-in and signed-in devices.
+sidebar:
+  order: 1
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Owners manage users under **Settings → Users**. Give every person their own account with the lowest role that fits.
+
+## Roles
+
+| Role | Can |
+| --- | --- |
+| **Viewer** | See servers, consoles and metrics (read-only) |
+| **Operator** | Everything a Viewer can, plus start, stop and restart servers, run console commands, manage players and create backups |
+| **Administrator** | Everything an Operator can, plus create, configure and delete servers, manage files, plugins, worlds and schedules, restore backups, force-stop servers and read the audit log |
+| **Owner** | Everything, including users and application settings |
+
+Roles are enforced by the server on every request; the dashboard only hides what you can't use.
+
+<Aside type="note">
+Dashboard roles are separate from Minecraft's operator status. Granting `op` to a player in game requires an Administrator.
+</Aside>
+
+## Per-server access
+
+A user either works on **all servers** with their role, optionally with a higher role on single servers, or only on **selected servers** with a role per server. Typical uses:
+
+- A moderator who manages players on one server only.
+- A friend who may restart their own creative server but nothing else.
+
+Users limited to selected servers don't see other servers at all, and they get no application-wide rights (creating servers, settings, users, audit log).
+
+## Two-factor sign-in
+
+Every user can turn on two-factor sign-in with an authenticator app under **Settings → Account**. Setup shows a QR code and ten single-use recovery codes; keep them somewhere safe.
+
+Owners can **require** two-factor sign-in per role. Users of that role must set it up at their next sign-in before they can do anything else. If someone loses their device and recovery codes, an Owner can reset their second factor.
+
+## Signed-in devices
+
+**Settings → Account** lists your sessions with address, browser and last activity; sign out single devices or all others. Owners can sign a user out everywhere. Changing a password, a role or disabling an account ends that user's sessions immediately.

@@ -1,0 +1,92 @@
+---
+title: Remote access
+description: Manage CraftPanel from other devices with a VPN, an HTTPS reverse proxy or built-in HTTPS.
+sidebar:
+  order: 2
+---
+
+import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+Two settings decide who can reach the dashboard:
+
+- **Where it listens** is set by the start profile.
+- **Who may connect** is set live in **Settings → Remote access**, without a restart.
+
+## Start profiles
+
+| Profile | Listens on | Use it when |
+| --- | --- | --- |
+| `local` | `127.0.0.1` | You use the dashboard on the same machine or through an SSH tunnel |
+| `lan` | all interfaces | You manage a Pi, home server or second PC from other devices at home or over a VPN |
+| `proxy` | `127.0.0.1`, Secure cookies | An HTTPS reverse proxy publishes the dashboard |
+| `headless` | API and WebSocket only | Automation and scripts |
+
+Set it with `CRAFTPANEL_PROFILE` in your settings file, `--profile` on the command line, or `pnpm start:<profile>` in a checkout. The installers use `lan` on Linux.
+
+## Network access policy
+
+In **Settings → Remote access** choose:
+
+- **This computer only**: everyone else gets an "access not allowed" page.
+- **Private networks and VPNs** (default): home networks, Tailscale and other private ranges. Requests from public addresses are refused, so an accidental port forward doesn't expose the dashboard.
+- **Anywhere**: requires HTTPS.
+
+You can also allow **additional addresses** (IPs or CIDR ranges), for example an office's public IP; public ranges require HTTPS. CraftPanel refuses a change that would lock out the person making it.
+
+## Recommended setups
+
+<Tabs>
+<TabItem label="VPN (simplest)">
+
+Install [Tailscale](https://tailscale.com) or WireGuard on the CraftPanel host and on your team's devices. Use the `lan` profile and keep the default policy. Open `http://<tailscale-name>:8080`.
+
+Nothing is exposed to the internet, and the traffic is encrypted by the VPN.
+
+</TabItem>
+<TabItem label="Reverse proxy">
+
+Use Caddy or nginx with a real certificate. In your settings file:
+
+```dotenv
+CRAFTPANEL_PROFILE=proxy
+CRAFTPANEL_PUBLIC_URL=https://panel.example.com
+```
+
+Caddyfile on the same machine:
+
+```text title="Caddyfile"
+panel.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+Restart CraftPanel, open the HTTPS address, then adjust the access policy. For nginx, a proxy on another host or Cloudflare Tunnel, see the [deployment guide on GitHub](https://github.com/vctrchappot/CraftPanel/blob/main/docs/deployment/README.md#reverse-proxies-and-https).
+
+</TabItem>
+<TabItem label="Built-in HTTPS">
+
+Point CraftPanel at a PEM certificate and key, for example from `tailscale cert` or Let's Encrypt:
+
+```dotenv
+CRAFTPANEL_TLS_CERT=/etc/craftpanel/cert.pem
+CRAFTPANEL_TLS_KEY=/etc/craftpanel/key.pem
+```
+
+Secure cookies switch on automatically.
+
+</TabItem>
+</Tabs>
+
+<Aside type="caution">
+Don't port-forward the dashboard. Plain HTTP sends passwords unencrypted; use a VPN or HTTPS for anything beyond a trusted home network.
+</Aside>
+
+## Deployment checks
+
+**Settings → Remote access → Deployment checks** reports whether your current connection uses HTTPS, which proxies are trusted, data-directory access, free disk space, certificate validity and database integrity. The same checks run without the dashboard:
+
+```bash
+node apps/api/dist/index.js doctor          # add --json for scripts
+```
+
+Run it as the service account with the same settings. Exit code 1 means a check failed.

@@ -20,6 +20,15 @@ In development the dashboard calls the API cross-origin (`NEXT_PUBLIC_API_URL`),
 | `pnpm test:e2e` | Playwright: full user flow against the production build with a real Minecraft server (needs internet, ~1 min after the first download). Run `npx playwright install chromium` once. |
 | `pnpm typecheck` | `tsc` for every package |
 | `pnpm db:generate` | Generate a migration after editing `packages/database/src/schema.ts` |
+| `pnpm --filter @craftpanel/site dev` | Website and user documentation (Astro + Starlight, `apps/site`) on :4321 |
+
+## Website
+
+`apps/site` is the public website at [craftpanel.vctr.site](https://craftpanel.vctr.site): a landing page (`src/pages/index.astro`) and the user documentation (`src/content/docs/docs/*.mdx`). Vercel builds it from `main` with `apps/site` as the root directory (`apps/site/vercel.json`). It isn't part of the release archive.
+
+- Screenshots in `src/assets/screenshots` come from a throwaway instance with demo servers: `node scripts/site-screenshots.mjs <base> <user> <password> <serverId>` (dark and light).
+- The social preview `public/og.png` is rendered from `scripts/og.html` with `node apps/site/scripts/og.mjs`.
+- When behaviour that users see changes, update the matching docs page in the same commit.
 
 ## Tests
 

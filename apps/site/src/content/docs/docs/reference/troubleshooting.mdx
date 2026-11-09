@@ -1,0 +1,51 @@
+---
+title: Troubleshooting
+description: Common problems and how to solve them.
+sidebar:
+  order: 3
+---
+
+## I can't open the dashboard from another device
+
+- Is it listening beyond this computer? The `local` profile only accepts `127.0.0.1`. Use `lan` (the Linux installer's default) or a reverse proxy.
+- Is the device allowed? With the default policy only private networks and VPNs get in; others see "access not allowed". Change it in **Settings → Remote access** on the host itself.
+- Is a firewall in the way? On Linux: `sudo ufw allow from 192.168.0.0/16 to any port 8080`.
+
+## The setup page asks for a token
+
+The token is printed when CraftPanel starts and saved as `setup-token.txt` in the data directory. On Linux: `sudo cat /var/lib/craftpanel/setup-token.txt`. It's deleted once the owner account exists.
+
+## Players can't connect
+
+- Does the console say `Done`? Then the server is up.
+- On the same network, use the local address from the **Connect** card, not `localhost`.
+- On Windows, allow Java for private networks when the firewall asks.
+- From the internet, see [letting players join](/docs/guides/networking/): port forwarding, CGNAT and VPNs.
+
+## A server doesn't start
+
+Open the **Console**. CraftPanel shows the reason above the log where it can tell, for example a mod that fails to load, a port already in use, or too little memory. Common fixes:
+
+- **Port in use:** another program or server uses the game port. Change it in the server's **Network** tab.
+- **A mod fails to load:** disable it in the **Mods** tab. Client-only mods don't belong on a server.
+- **Out of memory:** raise the memory under **Settings → Java & memory**, or remove heavy mods.
+
+## The dashboard says the runtime is disconnected
+
+The runtime service isn't reachable. Server states show as unknown and controls are disabled until it's back.
+
+- **Linux:** `sudo systemctl status craftpanel-runtime`, then `sudo systemctl start craftpanel-runtime`.
+- **Windows:** start the **CraftPanel Runtime** service in `services.msc`.
+- **Checkout:** `pnpm start` starts both; if you started the dashboard alone, start the runtime with `pnpm start:runtime`.
+
+## An update failed
+
+The installer restores the previous version and the dashboard shows the installer output. Details are in `/var/log/craftpanel/update.log` (Linux) or `logs\update.log` in the data folder (Windows). Please [open an issue](https://github.com/vctrchappot/CraftPanel/issues) with that log.
+
+## "Update now" is missing
+
+The button needs an install from the one-line installers. Git checkouts update with `./update.sh` or `update.cmd`. Coming from 0.2.x, the first update to 0.3 or later must be run by hand once, see [updating](/docs/getting-started/updating/).
+
+## Still stuck?
+
+Search or open an issue on [GitHub](https://github.com/vctrchappot/CraftPanel/issues). Include your CraftPanel version (**Settings → Security & about**), your operating system and the relevant log lines.

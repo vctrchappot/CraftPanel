@@ -1,0 +1,66 @@
+/* Starlight theme matched to the CraftPanel dashboard: neutral greys, one blue accent, Inter. */
+:root {
+  --sl-font: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --sl-font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sl-content-width: 48rem;
+
+  /* dark (Starlight's default) */
+  --sl-color-accent-low: oklch(0.27 0.06 255);
+  --sl-color-accent: oklch(0.62 0.15 255);
+  --sl-color-accent-high: oklch(0.86 0.06 255);
+  --sl-color-white: oklch(0.97 0 0);
+  --sl-color-gray-1: oklch(0.9 0 0);
+  --sl-color-gray-2: oklch(0.8 0 0);
+  --sl-color-gray-3: oklch(0.66 0 0);
+  --sl-color-gray-4: oklch(0.45 0 0);
+  --sl-color-gray-5: oklch(0.28 0 0);
+  --sl-color-gray-6: oklch(0.2 0 0);
+  --sl-color-black: oklch(0.145 0 0);
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: oklch(0.93 0.03 255);
+  --sl-color-accent: oklch(0.52 0.17 255);
+  --sl-color-accent-high: oklch(0.3 0.1 255);
+  --sl-color-white: oklch(0.18 0 0);
+  --sl-color-gray-1: oklch(0.25 0 0);
+  --sl-color-gray-2: oklch(0.35 0 0);
+  --sl-color-gray-3: oklch(0.5 0 0);
+  --sl-color-gray-4: oklch(0.66 0 0);
+  --sl-color-gray-5: oklch(0.88 0 0);
+  --sl-color-gray-6: oklch(0.95 0 0);
+  --sl-color-gray-7: oklch(0.975 0 0);
+  --sl-color-black: oklch(1 0 0);
+}
+
+.site-title {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--sl-color-white);
+}
+
+/* The logo tile is near-black; outline it so it stays visible on the dark header. */
+:root:not([data-theme="light"]) .site-title img {
+  border-radius: 22%;
+  box-shadow: 0 0 0 1px var(--sl-color-gray-5);
+}
+
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  background-color: var(--sl-color-accent-low);
+  color: var(--sl-color-white);
+  font-weight: 600;
+}
+
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+h1#_top {
+  letter-spacing: -0.02em;
+}
+
+.sl-markdown-content :is(img) {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+}

@@ -1,0 +1,59 @@
+---
+title: Your first server
+description: Create the owner account, set up a Minecraft server and let your friends join.
+sidebar:
+  order: 2
+---
+
+import { Steps, Aside } from "@astrojs/starlight/components";
+
+## Create the owner account
+
+<Steps>
+
+1. Open the address the installer printed, for example `http://192.168.1.20:8080`. On the same computer, `http://127.0.0.1:8080` works too.
+2. Enter the **setup token**. It is printed by the installer and saved as `setup-token.txt` in the data directory (`/var/lib/craftpanel` on Linux, `%LOCALAPPDATA%\CraftPanel` on Windows). Only someone with access to the host can read it, so nobody else on your network can claim the owner account first.
+3. Choose a username and a strong password. This is the **Owner** account with full control.
+
+</Steps>
+
+<Aside type="note">
+The setup token is only needed when the dashboard is reachable from other devices. A local-only install lets you create the account directly.
+</Aside>
+
+## Create a server
+
+Click **New server**. The wizard walks you through eight short steps:
+
+<Steps>
+
+1. **Basics**: a name, an optional description and the message of the day shown in Minecraft's server list.
+2. **Software**: Paper (recommended for most people), Purpur, Fabric, NeoForge, Vanilla, a Velocity proxy, or a modpack. See [server software](/docs/guides/server-software/).
+3. **Version**: any published Minecraft version, and for Paper/Purpur/Fabric/NeoForge the build or loader version.
+4. **World**: world name, seed, world type and structures. You can import an existing world later.
+5. **Gameplay**: game mode, difficulty, maximum players, whitelist and online mode.
+6. **Resources**: memory, a performance preset (the one recommended for this machine is preselected), extra JVM arguments and whether the server starts automatically with CraftPanel.
+7. **Network**: who should be able to join, the game port and the bind address.
+8. **Review**: accept the [Minecraft EULA](https://aka.ms/MinecraftEULA) and create the server.
+
+</Steps>
+
+CraftPanel downloads the server software and Java, verifies both and installs the server. Then press **Start**. The console shows the server starting; when it says `Done`, players can join.
+
+## Let players join
+
+The **Connect** card on the server's overview lists the addresses to use:
+
+- **Same computer:** `localhost:25565`
+- **Same home network:** the local address, for example `192.168.1.20:25565`
+- **Over the internet:** forward the game port on your router, or use a VPN such as Tailscale. The **Network** tab checks the port and detects carrier-grade NAT. See [networking](/docs/guides/networking/).
+
+<Aside type="caution">
+Only forward the **Minecraft** port. Never expose the dashboard port (8080) to the internet directly.
+</Aside>
+
+## What's next
+
+- Install plugins or mods from the **Plugins** (or **Mods**) tab.
+- Set up a nightly backup and restart under **Automation**.
+- Invite your team under **Settings → Users** with the lowest role that fits.

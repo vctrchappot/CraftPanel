@@ -15,3 +15,7 @@ playwright-report/
 .dev-test.log
 tsconfig.tsbuildinfo
 release/
+
+# website
+.astro/
+.vercel/

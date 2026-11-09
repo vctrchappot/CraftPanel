@@ -1,0 +1,67 @@
+---
+title: Updating CraftPanel
+description: Update from the dashboard or the command line, and what happens to running servers.
+sidebar:
+  order: 3
+---
+
+import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+## From the dashboard
+
+When a new release is out, a notice appears in the sidebar and under **Settings → Security & about**. Click **Update now** to see the release notes and which servers are affected, then confirm.
+
+CraftPanel runs the installer outside its own process, follows it through the restart and reloads into the new version with a **What's new** summary. If anything fails, the previous version is restored and the dashboard tells you what went wrong.
+
+This works for installs made with the one-line installers. Only Owners and Administrators can start an update, and it is recorded in the audit log.
+
+## From the command line
+
+<Tabs syncKey="os">
+<TabItem label="Linux / Raspberry Pi">
+
+Run the install command again, or:
+
+```bash
+sudo /opt/craftpanel/update.sh
+```
+
+</TabItem>
+<TabItem label="Windows">
+
+Run the install command again in PowerShell, or `update.ps1` in the install folder. The dashboard shows the exact command for your install.
+
+</TabItem>
+<TabItem label="Git checkout">
+
+```bash
+./update.sh       # Linux / macOS
+update.cmd        # Windows
+```
+
+The script keeps your local changes, installs dependencies and rebuilds. Restart CraftPanel afterwards.
+
+</TabItem>
+</Tabs>
+
+## What happens to running servers
+
+- **Dashboard-only updates** (most releases) replace the dashboard while Minecraft keeps running. Players stay connected.
+- **Runtime updates** change the service that runs Minecraft. They save and stop running servers once and need your explicit approval; servers with auto-start come back afterwards.
+
+Either way, the database is snapshotted first. A failed update restores the previous application and database.
+
+<Aside type="caution" title="Upgrading from 0.2.x">
+Version 0.3.0 moved Minecraft into its own service. Coming from 0.2.x, update once by hand with approval:
+
+- **Linux:** `curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash -s -- --allow-runtime-restart`
+- **Windows** (PowerShell as administrator): `$env:CRAFTPANEL_ALLOW_RUNTIME_RESTART = "1"; irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex`
+
+Later updates work from the dashboard again.
+</Aside>
+
+## Offline updates
+
+Put `craftpanel-vX.Y.Z.tar.gz` and its `SHA256SUMS` into a folder and set `CRAFTPANEL_RELEASE_DIR` to that folder in your settings file. The dashboard then offers the newest archive from there, and the installers install from it.
+
+The update check itself only reads the latest release from GitHub. Turn it off in Settings or with `CRAFTPANEL_UPDATE_CHECK=false`.

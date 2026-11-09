@@ -1,0 +1,50 @@
+---
+title: How it works
+description: The dashboard, the runtime service and where your data lives.
+sidebar:
+  order: 2
+---
+
+CraftPanel consists of two processes that share one data directory.
+
+```text
+ Browser ──HTTP/WebSocket──▶ Dashboard (API + web UI)
+                                  │
+                     local socket / named pipe, authenticated
+                                  │
+                                  ▼
+                            Runtime service ──▶ Java ──▶ Minecraft servers
+```
+
+## Dashboard
+
+The dashboard serves the web interface and the API: accounts, permissions, server configuration, downloads, backups, schedules, notifications and updates. It stores its state in a SQLite database in the data directory and applies database migrations on start.
+
+## Runtime
+
+The runtime owns the Minecraft processes. It starts and stops servers, forwards console input and output, keeps a bounded console history and collects metrics.
+
+The dashboard talks to it over a private Unix socket (Linux, macOS) or a Windows named pipe, authenticated with a random token only the two can read. Because the runtime is a separate service:
+
+- Restarting, updating or even crashing the dashboard **doesn't stop your games**. Players stay connected.
+- When the dashboard comes back, it reconnects to the actual state of every server and replays the console it missed.
+- Commands are never replayed blindly. If the dashboard can't tell whether a command arrived, it reports that instead of sending it twice.
+
+On a host shutdown, the runtime saves and stops every server gracefully. At boot it starts the servers with **Start with CraftPanel** enabled.
+
+## Data directory
+
+Everything CraftPanel manages lives in one folder:
+
+| Path | Contents |
+| --- | --- |
+| `craftpanel.db` | Accounts, settings, servers, schedules, activity |
+| `servers/` | One folder per Minecraft server |
+| `backups/` | Server backups (unless you set another destination) |
+| `runtimes/` | Downloaded Java versions |
+| `runtime/` | The runtime's registry and private token |
+| `logs/` | CraftPanel logs (Windows) |
+
+## Technology
+
+A pnpm monorepo in TypeScript: a Fastify API, a Next.js dashboard exported as static files, SQLite through Node's built-in `node:sqlite` with Drizzle, and no native add-ons, so one release archive runs on every OS and CPU. Details for contributors are in [`docs/architecture`](https://github.com/vctrchappot/CraftPanel/tree/main/docs/architecture) on GitHub.

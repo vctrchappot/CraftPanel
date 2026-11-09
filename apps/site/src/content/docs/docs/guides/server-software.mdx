@@ -1,0 +1,44 @@
+---
+title: Server software
+description: Paper, Purpur, Fabric, NeoForge, Vanilla and Velocity, and how to switch between them.
+sidebar:
+  order: 1
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+CraftPanel downloads every server from its official source and verifies it against the published checksum.
+
+| Software | Best for | Add-ons | Source |
+| --- | --- | --- | --- |
+| **Paper** | Most servers. Faster than Vanilla, same gameplay. | Bukkit/Paper plugins | PaperMC |
+| **Purpur** | Paper plus many extra gameplay and configuration options | Same plugins as Paper | Purpur API |
+| **Fabric** | Lightweight server-side mods such as Lithium | Fabric mods | Fabric meta |
+| **NeoForge** | Large mods and modpacks. Plan 4 GB of memory or more. | NeoForge mods | NeoForged Maven |
+| **Vanilla** | The unmodified Mojang server | none | Mojang |
+| **Velocity** | A proxy that puts several servers behind one address | Velocity plugins | PaperMC |
+
+For Paper, Purpur, Fabric and NeoForge you choose a build or loader version; the newest stable one is preselected.
+
+## Java
+
+Each Minecraft version needs a specific Java version. CraftPanel downloads Eclipse Temurin 8, 17, 21 or 25 from Adoptium as needed and keeps one copy per version under **Settings → Java**. Nothing is installed system-wide.
+
+## Log4Shell protection
+
+Minecraft 1.7 to 1.18 is affected by the Log4Shell vulnerability. CraftPanel adds Mojang's JVM flag or a patched logging configuration on every start. The server's **Settings → Java & memory** shows that the protection is active.
+
+## Switching software or version
+
+Open the server's **Settings → Software & version** to change the software, the Minecraft version or the build, in any direction (for example Paper → Fabric or 1.21.4 → 1.21.11).
+
+Before anything changes, a preview tells you what will happen:
+
+- A **backup** of the whole server is created first. To undo the change, restore it.
+- Plugins or mods that won't load on the new software stay in their folder, and the preview counts them.
+- **Downgrades** to an older Minecraft version need an explicit confirmation, because worlds can't always be opened by older versions.
+- Switching from Paper or Purpur to Vanilla or Fabric moves the Nether and the End back into the world folder, so nothing is lost.
+
+<Aside type="note">
+Stop the server before switching. CraftPanel installs the new software, keeps your worlds and settings, and you start it again.
+</Aside>

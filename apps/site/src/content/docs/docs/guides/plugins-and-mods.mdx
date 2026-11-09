@@ -1,0 +1,50 @@
+---
+title: Plugins, mods and modpacks
+description: Install add-ons from Modrinth and Hangar, keep them updated, or start a server from a modpack.
+sidebar:
+  order: 2
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+The **Plugins** tab (called **Mods** on Fabric and NeoForge servers) lists what's installed and lets you browse, install, update, enable, disable, upload and remove add-ons.
+
+<Aside type="caution" title="Add-ons are executable code">
+Plugins and mods run with the same permissions as the Minecraft server. Install only add-ons from authors you trust. CraftPanel verifies download checksums, but it can't verify what an add-on does.
+</Aside>
+
+## Where add-ons come from
+
+| Server | Sources |
+| --- | --- |
+| Paper, Purpur | [Modrinth](https://modrinth.com) and [Hangar](https://hangar.papermc.io) (PaperMC's plugin repository) |
+| Fabric, NeoForge | Modrinth mods for that loader |
+| Velocity | Modrinth Velocity plugins |
+| Vanilla | none (switch to Paper or Fabric for add-ons) |
+
+Under **Browse**, results are filtered to your server's software and show whether each project supports your exact Minecraft version. Installing checks the file against Modrinth's SHA-512 or Hangar's SHA-256.
+
+You can also **upload a `.jar`** you got elsewhere. Changes take effect after a restart; CraftPanel shows when one is needed.
+
+## Updates
+
+The **Updates** tab checks installed add-ons against their source:
+
+- Files from Modrinth are matched by their hash, so even uploaded jars are recognised.
+- A stable release only gets stable updates. If you run a beta or alpha, you keep getting the newest prerelease.
+- Plugins installed from Hangar are checked on Hangar.
+
+## Dependencies
+
+For Fabric and NeoForge, CraftPanel reads each mod's metadata and warns when a required mod (such as Fabric API) is missing. When NeoForge fails to start because of a mod, the error names the jar and says whether it's a client-only mod, so you can disable it in the mod list.
+
+## Modpacks
+
+Choose **Modpack** in the server wizard to search Fabric and NeoForge modpacks on Modrinth, or upload a `.mrpack` file. CraftPanel:
+
+1. picks the Minecraft and loader version from the pack,
+2. downloads the pack's server-side files and checks each against its SHA-512,
+3. applies the pack's overrides (configs and similar), and
+4. keeps your own port and EULA settings.
+
+Forge and Quilt packs are refused with a clear message. Only use packs you trust: they contain code.

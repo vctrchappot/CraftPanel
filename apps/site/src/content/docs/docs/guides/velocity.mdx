@@ -1,0 +1,36 @@
+---
+title: Velocity proxy
+description: Put several servers behind one address with a Velocity proxy.
+sidebar:
+  order: 6
+---
+
+import { Steps, Aside } from "@astrojs/starlight/components";
+
+A [Velocity](https://papermc.io/software/velocity) proxy lets players join one address and move between servers, for example a lobby, survival and creative, with `/server`.
+
+## Set it up
+
+<Steps>
+
+1. Create the backend servers (Paper, Purpur or Fabric) as usual.
+2. Create a server with the software **Velocity proxy**. It gets the public game port, usually 25565.
+3. On the proxy's **Proxy** tab, add the backends in the order players should try them. Optionally give one a **forced host**, so `creative.example.com` lands directly on that server.
+4. Start the backends, then the proxy.
+
+</Steps>
+
+CraftPanel writes `velocity.toml` and sets up **modern forwarding** with a generated secret. On their next start, backends are configured to match:
+
+- **Paper and Purpur** get the forwarding secret in their config.
+- **Fabric** gets [FabricProxy-Lite](https://modrinth.com/mod/fabricproxy-lite) installed and configured.
+
+## Keep backends private
+
+Backends behind a proxy accept the proxy's forwarded player identities, so players must not reach them directly. The **Proxy** tab binds backends to this computer (`127.0.0.1`) by default, and Paper refuses players who don't come through Velocity.
+
+Removing a backend from the proxy turns forwarding off, restores online mode and resets the bind address.
+
+<Aside type="note">
+Limitations: NeoForge backends need Proxy Compatible Forge, which CraftPanel doesn't configure yet. Paper older than 1.19 isn't supported behind the proxy. Changing a backend's port while the proxy runs needs a proxy restart.
+</Aside>

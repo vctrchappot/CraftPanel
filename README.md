@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/vctrchappot/CraftPanel/actions/workflows/ci.yml/badge.svg)](https://github.com/vctrchappot/CraftPanel/actions/workflows/ci.yml)
 
+**[Website](https://craftpanel.vctr.site) · [Documentation](https://craftpanel.vctr.site/docs/) · [Releases](https://github.com/vctrchappot/CraftPanel/releases)**
+
 **Self-hosted Minecraft server management.** Install CraftPanel on your PC, a spare computer, a Raspberry Pi or a VPS, open the dashboard in a browser, and create, run and manage real Minecraft Java servers. No accounts, no subscriptions, no cloud.
 
 - Creates **Paper**, **Purpur**, **Fabric**, **NeoForge**, **Vanilla** and **Velocity** proxy servers for any published version, downloaded from the official sources and checksum-verified. Minecraft 1.7–1.18 is protected against Log4Shell automatically.

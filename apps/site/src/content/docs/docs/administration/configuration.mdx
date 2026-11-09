@@ -1,0 +1,47 @@
+---
+title: Configuration
+description: Environment variables and where the settings file lives.
+sidebar:
+  order: 3
+---
+
+CraftPanel is configured with environment variables. Most day-to-day settings live in the dashboard; these cover how it starts.
+
+## Where to put them
+
+| Install | Settings file | Apply changes |
+| --- | --- | --- |
+| Linux installer | `/etc/craftpanel/craftpanel.env` | `sudo systemctl restart craftpanel` |
+| Windows installer | `config.env` in the install folder | Sign out and in, or restart the CraftPanel task |
+| Git checkout | `.env` (copy `.env.example`) | `node --env-file=.env apps/api/dist/index.js` |
+
+The settings file is kept on updates. A checkout doesn't load `.env` by itself; pass `--env-file`.
+
+## Variables
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CRAFTPANEL_PROFILE` | `local` | Start profile: `local`, `lan`, `proxy` or `headless` |
+| `CRAFTPANEL_HOST` | from profile | Interface the dashboard listens on |
+| `CRAFTPANEL_PORT` | `8080` | Dashboard port |
+| `CRAFTPANEL_DATA_DIR` | platform default | Servers, backups, Java runtimes and the database |
+| `CRAFTPANEL_PUBLIC_URL` | none | Browser-facing origin, such as `https://panel.example.com` |
+| `CRAFTPANEL_TRUSTED_PROXIES` | loopback in proxy mode | Comma-separated proxy IPs or CIDRs allowed to send forwarding headers |
+| `CRAFTPANEL_TLS_CERT` / `CRAFTPANEL_TLS_KEY` | none | Serve HTTPS directly with these PEM files |
+| `CRAFTPANEL_SECURE_COOKIES` | automatic | Forced on for HTTPS; cannot be turned off then |
+| `CRAFTPANEL_SESSION_TTL_HOURS` | `168` | Session lifetime (sliding) |
+| `CRAFTPANEL_LOG_LEVEL` | `info` | `fatal`, `error`, `warn`, `info` or `debug` (logs every request) |
+| `CRAFTPANEL_LOG_FORMAT` | `pretty` | `json` for log collectors |
+| `CRAFTPANEL_UPDATE_CHECK` | `true` | `false` never contacts GitHub for the update notice |
+| `CRAFTPANEL_RELEASE_DIR` | none | Folder of release archives for offline updates |
+
+## Data directory
+
+| System | Default |
+| --- | --- |
+| Linux installer | `/var/lib/craftpanel` |
+| Linux checkout | `~/.local/share/craftpanel` |
+| Windows | `%LOCALAPPDATA%\CraftPanel` |
+| macOS | `~/Library/Application Support/CraftPanel` |
+
+The dashboard and the runtime must use the same data directory. If you move it on Linux, add the new path to `ReadWritePaths` in both systemd units.

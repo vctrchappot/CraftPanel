@@ -1,0 +1,42 @@
+---
+title: Worlds, files and backups
+description: Manage worlds, edit server files, and back up and restore servers.
+sidebar:
+  order: 3
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+## Worlds
+
+The **Worlds** tab lists a server's worlds with their size. You can:
+
+- **Create** a new world with its own seed and type, and **select** which one the server loads.
+- **Import** a world from a `.zip` (for example from singleplayer or another host) and **export** one as a download.
+- **Delete** a world; CraftPanel makes a backup first.
+
+## Files
+
+The **Files** tab is a file manager for the server folder: browse, edit text files, upload (also zips, which you can extract), download and delete. Every path is confined to the server's directory; symlinks are neither listed nor followed.
+
+Configuration you change often has a dedicated editor instead: **Settings** validates `server.properties` and shows the game rules your exact Minecraft version supports.
+
+## Backups
+
+Backups are zip archives of the whole server folder. CraftPanel makes them **consistent while the server runs**: it pauses world saving, flushes the world to disk, archives it and resumes saving.
+
+- **Create** one from the **Backups** tab, or schedule them under **Automation**.
+- Every backup is **verified** after it's written.
+- **Restore** replaces the server's worlds and configuration with the backup. CraftPanel verifies the archive first and creates a **safety backup** of the current state automatically.
+- Old backups can be pruned on a schedule, keeping the newest *n*.
+- **Settings → Backups** sets where backups are stored, for example a second disk.
+
+The global **Backups** page lists the backups of all servers.
+
+<Aside type="tip">
+Keep a copy of your backups on another disk or machine. A backup on the same disk doesn't help when that disk fails.
+</Aside>
+
+## Backing up CraftPanel itself
+
+Server backups cover Minecraft. To back up the panel (accounts, settings, schedules), stop both services and copy the whole data directory, together with your settings file (`/etc/craftpanel/craftpanel.env` or `config.env`) and any TLS certificates. See [maintenance](/docs/administration/maintenance/).

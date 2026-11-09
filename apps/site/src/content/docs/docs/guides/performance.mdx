@@ -1,0 +1,41 @@
+---
+title: Performance
+description: Performance presets, memory sizing and world pre-generation with Chunky.
+sidebar:
+  order: 5
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+## Presets
+
+A preset sets Aikar's garbage-collector flags sized to the server's memory, plus view and simulation distance:
+
+| Preset | For | View / simulation distance |
+| --- | --- | --- |
+| **Raspberry Pi / small VPS** | Few cores, little memory | Short |
+| **Balanced** | A typical desktop or mid-size VPS | Medium |
+| **Powerful machine** | Many cores, plenty of memory | Long |
+
+The wizard preselects the preset recommended for this machine. Change it later under the server's **Settings → Performance**; your own JVM arguments are kept.
+
+## Memory
+
+Give the server what it needs, not everything the machine has. The operating system and CraftPanel need room too.
+
+| Server | Suggested memory |
+| --- | --- |
+| Vanilla or Paper, a few friends | 2 GB |
+| Paper with many plugins, 10–20 players | 4 GB |
+| Fabric with performance mods | 2–4 GB |
+| NeoForge or a modpack | 4–8 GB |
+
+The overview shows the actual heap use, so you can see whether a server is short on memory.
+
+## Pre-generating the world
+
+Generating new chunks while players explore is the most expensive thing a server does. **Settings → Performance → Pre-generate the world** installs [Chunky](https://modrinth.com/plugin/chunky) with one click (Paper, Purpur, Fabric and NeoForge) and generates a radius around spawn ahead of time. You can follow the progress, pause, continue or cancel.
+
+<Aside type="tip">
+On a Raspberry Pi, pre-generate a modest radius (for example 1,000 blocks) overnight before inviting players.
+</Aside>

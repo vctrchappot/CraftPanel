@@ -1,0 +1,42 @@
+---
+title: Letting players join
+description: Local network, port forwarding, CGNAT, VPNs and dynamic DNS.
+sidebar:
+  order: 7
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+This page is about the **Minecraft port** that players connect to. For the dashboard, see [remote access](/docs/administration/remote-access/).
+
+## Same network
+
+Players on your Wi-Fi or LAN join with the local address from the server's **Connect** card, for example `192.168.1.20:25565`. If they can't connect:
+
+- Make sure the server is running and its console says `Done`.
+- On Windows, allow Java through the firewall for **private networks** when asked on the first start.
+- On Linux with ufw: `sudo ufw allow 25565/tcp`.
+
+## Over the internet
+
+The server's **Network** tab guides you through it and runs diagnostics.
+
+1. **Port forwarding.** In your router, forward the game port (TCP) to the CraftPanel machine's local address. Give that machine a fixed local IP first.
+2. **Public address.** Players use your public IP. The Network tab can look it up when you click the check.
+3. **Dynamic DNS.** Home IPs change. **Settings → Dynamic DNS** keeps a free [DuckDNS](https://www.duckdns.org) name pointed at your current IP.
+
+### Carrier-grade NAT (CGNAT)
+
+Many internet providers share one public IP between customers. Then port forwarding can't work, and the Network tab says so. Options:
+
+- Ask your provider for a public IPv4 address (often free or cheap).
+- Use a VPN such as [Tailscale](https://tailscale.com) and let friends join the tailnet.
+- Host on a small VPS instead.
+
+<Aside type="caution">
+Only the game port should be reachable from the internet. Never forward the dashboard port.
+</Aside>
+
+## VPN for friends
+
+With Tailscale or WireGuard, friends join your private network and connect to the server's VPN address. Nothing is exposed to the internet, and it works behind CGNAT. CraftPanel shows the VPN address on the Connect card.

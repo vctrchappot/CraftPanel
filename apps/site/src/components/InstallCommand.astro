@@ -1,0 +1,37 @@
+---
+import Icon from "./Icon.astro";
+
+interface Props {
+  large?: boolean;
+}
+const { large = false } = Astro.props;
+const id = large ? "install-lg" : "install";
+const commands = [
+  { os: "linux", label: "Linux · Raspberry Pi", prompt: "$", command: "curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash" },
+  { os: "windows", label: "Windows", prompt: "PS>", command: "irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex" },
+];
+---
+
+<div class:list={["install", { "install-lg": large }]} data-install>
+  <div class="install-tabs" role="tablist" aria-label="Operating system">
+    {commands.map((c, i) => (
+      <button role="tab" data-os={c.os} id={`${id}-tab-${c.os}`} aria-controls={`${id}-${c.os}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
+        {c.label}
+      </button>
+    ))}
+  </div>
+  {commands.map((c, i) => (
+    <div class="install-body" role="tabpanel" id={`${id}-${c.os}`} aria-labelledby={`${id}-tab-${c.os}`} hidden={i !== 0}>
+      <code><span class="install-prompt">{c.prompt}</span> {c.command}</code>
+      <button class="copy-btn" type="button" data-copy={c.command} aria-label="Copy command">
+        <Icon name="copy" size={16} class="copy-icon" />
+        <Icon name="check" size={16} class="check-icon" />
+      </button>
+    </div>
+  ))}
+  {large && (
+    <p class="install-hint">
+      Windows: run PowerShell <strong>as administrator</strong> for the first install, with your normal account. macOS: <a href="/docs/getting-started/installation/#macos">run the release with Node.js</a>.
+    </p>
+  )}
+</div>
