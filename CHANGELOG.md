@@ -8,8 +8,8 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 
 ### Changed
 - New logo: an isometric block with a console prompt, in the dashboard, favicon and website. The dashboard uses Geist (Sans and Mono, Serif for release notes) at lighter weights and shares its design tokens with the website: warmer greys, Signal green for brand and running, Amber/Ember/Ash for other states, neutral focus and active controls, and smaller corners.
-- Landing page polish: connected bento displays with one outer frame and shared dividers, solid rules, active-only offset shadows, single-line scrollable install commands and preview tabs, consistent software cards, a plugin search preview and a complete six-item feature list.
-- More detailed original isometric hardware and block-world artwork, plus an interactive illustration of the Minecraft runtime staying online during a dashboard restart.
+- Landing page polish: clearer heading hierarchy (72/48/22/16 px), connected bento displays with one outer frame and shared dividers, solid rules, active-only offset shadows, copy button and shell prerequisites in the full install terminal, `#macos` tab deep-linking in the installation guide, consistent software cards, a plugin search preview, a complete six-item feature list, and a factual project/source section.
+- More detailed original isometric hardware and block-world artwork, plus a unified interactive showcase of panel updates and rollbacks keeping the Minecraft runtime and connected players online.
 - Slightly tighter Sans letter spacing across the dashboard, website and docs; commands and console output retain their normal Mono spacing.
 
 ### Fixed

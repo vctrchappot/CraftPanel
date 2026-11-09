@@ -15,7 +15,7 @@ One set of tokens and one type family for the dashboard (`apps/web`), the websit
 | `apps/site/scripts/og.html` | Social preview image; regenerate with `node apps/site/scripts/og.mjs`. |
 | `apps/web/src/components/logo.tsx`, `apps/site/src/components/Mark.astro` | The mark, inline so its top face follows the theme. |
 | `apps/site/src/lib/scenes.ts`, `apps/site/src/components/Iso.astro` | Original, code-drawn isometric hardware and worlds; sharp at any size, no image downloads. |
-| `apps/site/src/components/RuntimeDiagram.astro` | Interactive runtime explainer: a dashboard restart leaves the illustrated Minecraft runtime running. |
+| `apps/site/src/components/RuntimeDiagram.astro` | Interactive update & runtime showcase: a panel update or rollback leaves the illustrated Minecraft runtime and players online. |
 | `apps/*/public/favicon.*`, `apple-touch-icon.png`, `apps/site/src/assets/mark-on-*.svg` | Files from the brand package (v1.0), unchanged. |
 
 Fonts are self-hosted from the `geist` npm package (Vercel, SIL Open Font License). Never load them, or anything else, from a CDN: the dashboard promises no third-party requests. To update Geist, bump `geist` in `packages/ui` and `apps/web` together.
@@ -26,11 +26,13 @@ Fonts are self-hosted from the `geist` npm package (Vercel, SIL Open Font Licens
 | --- | --- | --- |
 | **Geist** (Sans, variable) | 400 body, 500 labels and headlines (dashboard and website), 600 only for the wordmark and small emphasis | Everything by default. |
 | **Geist Mono** (variable) | 400–500 | Console, logs, commands, paths, ports, versions, metrics, section numbers and labels, comparison table. |
-| **Geist Serif** | 400 only | Human voice: the "What's new" dialog title and the developer quote on the website. Nothing else. |
+| **Geist Serif** | 400 only | Human voice: the "What's new" dialog title and the project statement on the website. Nothing else. |
 
 Keep weights low: nothing above 600. Large Geist at 700+ with tight tracking looks blunt; precision comes from size and spacing, not weight. Serif ships a single weight and `font-synthesis-weight: none` is set globally, so give it `font-normal` instead of inheriting a bold one. The wordmark is Geist Sans 600 next to the mark (the brand package's Archivo wordmark is not used).
 
 Sans tracking is slightly negative: `--cp-tracking-body` −0.01 em for normal UI/body text, `--cp-tracking-heading` −0.035 em for headings. Mono commands and console output retain normal tracking for legibility.
+
+On the landing page, keep a clear size step between levels so headings do not compete: hero `clamp(48px, 5vw, 72px)`, section headings `clamp(32px, 3.5vw, 48px)`, feature card headings `22px`, body copy `16px` (`line-height: 1.55`), and technical labels `12–13px` Geist Mono.
 
 ## Colour
 
@@ -62,7 +64,7 @@ Buttons: brand button 7.6 (light, white text) / 7.3 (dark, dark text). Any new p
 - All dividers and underlines are solid. The hero underline is a 6 px Signal bar.
 - Hard offset shadows on the website mean active/selected: selected software, hover/focus on interactive cards, open hotspot tooltips. Static terminals, screenshots, panels and the avatar stay flat. The isometric scene's cast shadow is part of its illustration, an intentional exception documented in CSS.
 - The dashboard stays flat (borders, no shadows except overlays).
-- Landing-page feature displays share a single outer frame with 1 px internal dividers. Console, update, backup and add-on demos align to that grid; the runtime explanation occupies a connected full-width row. Compact features close the frame. On mobile the same frame stacks in reading order.
+- Landing-page feature displays share a single outer frame with 1 px internal dividers. The live console, unified update & runtime continuity showcase, backup and add-on demos align to that grid; compact features close the frame. On mobile the same frame stacks in reading order.
 
 ## Dashboard presentation
 
