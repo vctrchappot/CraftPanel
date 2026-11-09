@@ -61,7 +61,7 @@ try {
   ok(live.online && live.onlineSince > 0, "profile says online while the bot is connected");
   ok(/^[0-9a-f-]{36}$/.test(live.uuid ?? ""), `uuid read from the log: ${live.uuid}`);
   console.log(`world folder: ${live.world}; saved ${live.savedAt ? Math.round((Date.now() - live.savedAt) / 1000) + " s ago" : "never"}`);
-  ok(!!live.state, "player data (.dat) was found and parsed");
+  ok(!!live.state && live.stateSource === "game", `the state of an online player is asked of the running game (${live.stateSource})`);
   if (live.state) {
     const inv = live.state.inventory;
     const sword = inv.find((i) => i.id === "minecraft:diamond_sword");
@@ -81,6 +81,17 @@ try {
   }
   ok(!!live.advancements && live.advancements.done >= 1 && live.advancements.recent.some((a) => a.id === "minecraft:story/root" && a.at > 0), `advancement read with its timestamp: ${JSON.stringify(live.advancements?.recent[0])}`);
 
+  // Live: changes show up without any save, because the running game is asked, not the file.
+  await c.command(s.id, `give ${NAME} minecraft:bread 3`);
+  await c.command(s.id, `xp set ${NAME} 9 levels`);
+  await c.command(s.id, `effect give ${NAME} minecraft:speed 30 0`);
+  await c.sleep(3000);
+  const fresh = await profile();
+  ok(fresh.stateSource === "game" && fresh.state.xpLevel === 9 && fresh.state.inventory.some((i) => i.id === "minecraft:bread" && i.count === 3), `a change shows up immediately without a save: XP level ${fresh.state?.xpLevel}, bread in the inventory`);
+  ok(live.state.xpLevel === 5, "(the earlier answer still had the old level, so this is not a cached result)");
+  const stale = await c.call("GET", `/api/servers/${s.id}/players/${NAME}/profile?tz=0`);
+  ok(stale.stats.playTicks >= live.stats.playTicks, "statistics are still read from the file");
+
   const kicked = c.call("POST", `/api/servers/${s.id}/players/kick`, { name: NAME, reason: "profile test" });
   await kicked;
   bot.end();
@@ -90,6 +101,7 @@ try {
   ok(after.activity.heat.flat().some((ms) => ms > 0) && after.activity.daily[29].ms > 0, "the heatmap and today's bar show the session");
   ok(after.events.some((e) => e.kind === "player.kick"), `the kick shows in the player's activity: ${after.events[0]?.message}`);
   ok(!!after.state && after.state.inventory.some((i) => i.id === "minecraft:apple"), "player data is still readable after the player left");
+  ok(after.stateSource === "file" && after.state.xpLevel === 9, `after leaving the saved file takes over and has the live changes (${after.stateSource}, level ${after.state?.xpLevel})`);
 
   // Item pictures: Mojang's client for this version is downloaded to the cache, only item/block PNGs are kept.
   const raw = async (url) => {

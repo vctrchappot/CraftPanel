@@ -1,8 +1,8 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import { badRequest, conflict, findInstalledAddon, notFound, planWorldImport, SOFTWARE_INFO, softwareLabel, type AddonKind, type GameRuleInfo, type PlayerProfile, type PlayerRosterEntry, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
-import { PropertiesDocument, SETTINGS, SETTINGS_BY_KEY, parseJsonList, parseNbtFile, validateSetting, type BanEntry, type OpEntry, type WhitelistEntry } from "@craftpanel/config";
+import { badRequest, conflict, findInstalledAddon, notFound, planWorldImport, SOFTWARE_INFO, softwareLabel, type AddonKind, type GameRuleInfo, type PlayerProfile, type PlayerRosterEntry, type PlayerState, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
+import { PropertiesDocument, SETTINGS, SETTINGS_BY_KEY, parseJsonList, parseNbtFile, parseSnbt, isCompound, validateSetting, type BanEntry, type OpEntry, type WhitelistEntry } from "@craftpanel/config";
 import { and, desc, asc, eq, events, playerSessions, servers as serversTable, sql, type Database } from "@craftpanel/database";
 import { createZip, extractZip, listZip, readZipEntry } from "@craftpanel/backup";
 import { directorySize } from "@craftpanel/server-runtime";
@@ -272,12 +272,20 @@ export class GameService {
       }
     };
     let state: PlayerProfile["state"] = null;
+    let stateSource: PlayerProfile["stateSource"] = null;
     if (dataFile) {
       try {
         state = readPlayerState(parseNbtFile(await fsp.readFile(dataFile.abs)));
+        stateSource = "file";
       } catch {
         /* a file written mid-save or in a format we don't know: show the rest */
       }
+    }
+
+    // The file lags behind a player who is online; the running game doesn't.
+    if (live) {
+      const now = await this.liveState(row, name);
+      if (now) [state, stateSource] = [now, "game"];
     }
 
     const mention = new RegExp(`(^|[^A-Za-z0-9_])${lower}($|[^A-Za-z0-9_])`, "i");
@@ -303,6 +311,7 @@ export class GameService {
       stats: normalizeStats(await json(statsFile)),
       advancements: normalizeAdvancements(await json(advFile)),
       state,
+      stateSource,
       events: recent.filter((e) => mention.test(e.message)).slice(0, 40),
       world: level,
       savedAt: Math.max(statsFile?.mtime ?? 0, advFile?.mtime ?? 0, dataFile?.mtime ?? 0) || null,
@@ -314,6 +323,32 @@ export class GameService {
     this.requireGameServer(row);
     const dir = await ensureTextures({ mcVersion: row.mcVersion, cacheDir: this.config.layout.cache });
     return findItemTexture(dir, name);
+  }
+
+  private liveStates = new Map<string, { at: number; state: Promise<PlayerState | null> }>();
+
+  /**
+   * An online player's state as the running game has it right now (position, health, inventory, …), read with
+   * `data get entity`. Minecraft only writes the player's file on saves, so this is what keeps the profile current.
+   * Answers are shared for a couple of seconds so several open dashboards cost the server one query.
+   */
+  liveState(row: ServerRow, name: string): Promise<PlayerState | null> {
+    if (!this.running(row) || !/^[A-Za-z0-9_]{1,16}$/.test(name)) return Promise.resolve(null);
+    const key = `${row.id}:${name.toLowerCase()}`;
+    const hit = this.liveStates.get(key);
+    if (hit && Date.now() - hit.at < 2500) return hit.state;
+    const state = (async () => {
+      const m = await this.servers.agent.query(row.id, `data get entity ${name}`, new RegExp(`^${name} has the following entity data: (.*)$`), { timeoutMs: 3000 });
+      if (!m) return null;
+      try {
+        const nbt = parseSnbt(m[1]);
+        return isCompound(nbt) ? readPlayerState(nbt) : null;
+      } catch {
+        return null;
+      }
+    })();
+    this.liveStates.set(key, { at: Date.now(), state });
+    return state;
   }
 
   skin(uuid: string) {

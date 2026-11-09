@@ -140,6 +140,8 @@ export interface PlayerProfile {
   stats: PlayerStats | null;
   advancements: PlayerAdvancements | null;
   state: PlayerState | null;
+  /** "game": asked the running server just now (current to the second); "file": what Minecraft last saved. */
+  stateSource: "game" | "file" | null;
   events: PlayerEvent[];
   /** The world folder the files were read from. */
   world: string;

@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Ban, ChevronDown, Crown, LogOut, ShieldOff, UserMinus, UserPlus } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Ban, ChevronDown, Crown, LogOut, Save, ShieldOff, UserMinus, UserPlus } from "lucide-react";
 import {
   Badge,
   Button,
@@ -27,6 +27,7 @@ import { prettyId, type ItemStack, type PlayerProfile, type PlayerState, type Pl
 import { api, ApiError } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useRealtimeEvent } from "@/lib/realtime";
+import { useAction } from "@/lib/queries";
 import { formatDate, formatDateTime, formatDistance, formatNumber, formatPlaytime, timeAgo } from "@/lib/format";
 import { advancementName, mainKiller, playerInsights, travelDistances } from "@/lib/player-insights";
 import { eventStyle } from "@/lib/activity";
@@ -46,11 +47,13 @@ export function PlayerProfileView({ server: s, name }: { server: ServerDetail; n
   const q = useQuery({
     queryKey: ["player", s.id, name],
     queryFn: () => api.get<PlayerProfile>(`/api/servers/${s.id}/players/${encodeURIComponent(name)}/profile?tz=${new Date().getTimezoneOffset()}`),
-    // Minecraft rewrites a player's files on saves, so a player who is online is worth re-reading now and then.
-    refetchInterval: (query) => (query.state.data?.online ? 30_000 : false),
+    // An online player is asked of the running game every few seconds; otherwise the files only change on a save.
+    refetchInterval: (query) => (query.state.data?.online ? 5_000 : s.status === "running" ? 20_000 : false),
     retry: (count, err) => !(err instanceof ApiError && err.status === 404) && count < 2,
   });
   useRealtimeEvent((m) => m.type === "players" && m.serverId === s.id && void q.refetch());
+  // "5 minutes ago" and "online for 49 min" keep moving between refreshes.
+  useTick(30_000);
   const [dialog, setDialog] = React.useState<{ action: "kick" | "ban"; name: string } | null>(null);
   const [confirmOp, setConfirmOp] = React.useState(false);
 
@@ -169,10 +172,10 @@ export function PlayerProfileView({ server: s, name }: { server: ServerDetail; n
           <Overview p={p} />
         </TabsContent>
         <TabsContent value="inventory">
-          <Inventory p={p} live={live} />
+          <Inventory p={p} live={live} serverId={s.id} />
         </TabsContent>
         <TabsContent value="statistics">
-          <Statistics p={p} live={live} />
+          <Statistics p={p} live={live} serverId={s.id} />
         </TabsContent>
         <TabsContent value="activity">
           <Activity p={p} />
@@ -193,13 +196,64 @@ export function PlayerProfileView({ server: s, name }: { server: ServerDetail; n
   );
 }
 
-/** Where the numbers come from and how fresh they are; Minecraft only writes them on saves and when a player leaves. */
-function SavedNote({ p, live }: { p: PlayerProfile; live: boolean }) {
+/** Re-render every `ms`, so relative times stay right on a page that isn't refetching. */
+function useTick(ms: number) {
+  const [, set] = React.useState(0);
+  React.useEffect(() => {
+    const t = setInterval(() => set((n) => n + 1), ms);
+    return () => clearInterval(t);
+  }, [ms]);
+}
+
+/** A pulsing dot and the word "live": the numbers beside it come from the running game. */
+function LiveTag() {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="relative flex size-2">
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-status-running opacity-60 motion-reduce:animate-none" />
+        <span className="relative inline-flex size-2 rounded-full bg-status-running" />
+      </span>
+      live
+    </span>
+  );
+}
+
+/** Asks the server to write everything to disk now, so files-based figures catch up. */
+function SaveNow({ serverId }: { serverId: string }) {
+  const qc = useQueryClient();
+  const save = useAction(() => api.post(`/api/servers/${serverId}/command`, { command: "save-all flush" }), {
+    success: "Saving the world…",
+    // The command returns before the files are written.
+    onSuccess: () => void setTimeout(() => void qc.invalidateQueries({ queryKey: ["player", serverId] }), 2500),
+  });
+  return (
+    <Button size="xs" variant="ghost" onClick={() => save.mutate()} loading={save.isPending}>
+      <Save /> Save now
+    </Button>
+  );
+}
+
+/**
+ * Where the numbers come from and how fresh they are. `kind` "state" (inventory, position) is live for an online
+ * player; "stats" (statistics, advancements) only exist in Minecraft's files, which it writes on saves and when a
+ * player leaves.
+ */
+function SavedNote({ p, live, serverId, kind }: { p: PlayerProfile; live: boolean; serverId: string; kind: "state" | "stats" }) {
+  const canCommand = useCan("console.command");
+  if (kind === "state" && p.stateSource === "game")
+    return (
+      <p className="text-xs text-muted-foreground">
+        <LiveTag /> · asked of the running game every few seconds.
+      </p>
+    );
   if (!p.savedAt) return null;
   return (
-    <p className="text-xs text-muted-foreground">
-      From Minecraft's files in “{p.world}”, as of the last save {timeAgo(p.savedAt)}.{live && p.online ? " They update when the world saves and when the player leaves." : ""}
-    </p>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <p>
+        From Minecraft's files in “{p.world}”, as of the last save {timeAgo(p.savedAt)}.{live && p.online ? " They follow every world save and when the player leaves." : ""}
+      </p>
+      {live && p.online && canCommand && <SaveNow serverId={serverId} />}
+    </div>
   );
 }
 
@@ -247,7 +301,7 @@ function Overview({ p }: { p: PlayerProfile }) {
           )}
         </div>
         <div className="space-y-6">
-          {p.state ? <Vitals state={p.state} online={p.online} /> : null}
+          {p.state ? <Vitals state={p.state} source={p.stateSource} online={p.online} /> : null}
           <Details p={p} />
         </div>
       </div>
@@ -255,9 +309,9 @@ function Overview({ p }: { p: PlayerProfile }) {
   );
 }
 
-function Vitals({ state, online }: { state: PlayerState; online: boolean }) {
+function Vitals({ state, source, online }: { state: PlayerState; source: PlayerProfile["stateSource"]; online: boolean }) {
   return (
-    <Card title="Status" aside={online ? "as of last save" : "when last saved"}>
+    <Card title="Status" aside={source === "game" ? <LiveTag /> : online ? "as of last save" : "when last saved"}>
       <div className="space-y-4">
         {state.health !== null && (
           <div className="space-y-1.5">
@@ -353,7 +407,7 @@ function Details({ p }: { p: PlayerProfile }) {
 
 // ---- inventory ------------------------------------------------------------------------------------
 
-function Inventory({ p, live }: { p: PlayerProfile; live: boolean }) {
+function Inventory({ p, live, serverId }: { p: PlayerProfile; live: boolean; serverId: string }) {
   const st = p.state;
   if (!st) return <NoGameData what="inventory data" />;
   const all = [...st.inventory, ...st.armor.filter((i): i is ItemStack => !!i), ...(st.offhand ? [st.offhand] : []), ...st.enderChest];
@@ -366,7 +420,7 @@ function Inventory({ p, live }: { p: PlayerProfile; live: boolean }) {
 
   return (
     <div className="space-y-6">
-      <SavedNote p={p} live={live} />
+      <SavedNote p={p} live={live} serverId={serverId} kind="state" />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           <Card title="Carrying" aside={`${carried} ${carried === 1 ? "stack" : "stacks"}`}>
@@ -435,13 +489,13 @@ const HIGHLIGHT_LABEL: Record<string, string> = {
   clean_armor: "Armor washed",
 };
 
-function Statistics({ p, live }: { p: PlayerProfile; live: boolean }) {
+function Statistics({ p, live, serverId }: { p: PlayerProfile; live: boolean; serverId: string }) {
   const s = p.stats;
   const adv = p.advancements;
   if (!s && !adv) return <NoGameData what="statistics" />;
   return (
     <div className="space-y-6">
-      <SavedNote p={p} live={live} />
+      <SavedNote p={p} live={live} serverId={serverId} kind="stats" />
       {s && <StatsBody s={s} />}
       {adv && (
         <div className="grid gap-6 md:grid-cols-2">

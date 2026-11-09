@@ -3,3 +3,4 @@ export * from "./catalog";
 export * from "./jsonlists";
 export * from "./proxy";
 export * from "./nbt";
+export * from "./snbt";

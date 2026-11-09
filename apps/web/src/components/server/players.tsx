@@ -35,7 +35,8 @@ export function PlayersTab({ server: s }: { server: ServerDetail }) {
 
 function PlayersList({ server: s }: { server: ServerDetail }) {
   const key = ["players", s.id];
-  const q = useQuery({ queryKey: key, queryFn: () => api.get<PlayersData>(`/api/servers/${s.id}/players`) });
+  // Joins and leaves arrive as events; the interval keeps playtimes and "last seen" current in between.
+  const q = useQuery({ queryKey: key, queryFn: () => api.get<PlayersData>(`/api/servers/${s.id}/players`), refetchInterval: s.status === "running" ? 15_000 : false });
   const canManage = useCan("players.manage");
   const canOp = useCan("server.configure");
   useRealtimeEvent((m) => m.type === "players" && m.serverId === s.id && void q.refetch());

@@ -61,6 +61,7 @@ describe("player presentation", () => {
       stats: null,
       advancements: null,
       state: null,
+      stateSource: null,
       events: [],
       world: "world",
       savedAt: null,
