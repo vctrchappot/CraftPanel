@@ -148,8 +148,11 @@ function Install-CraftPanel {
       $arguments = @($hostFile, $RuntimeName, $node, (Join-Path $Root "apps\api\dist\runtime.js"), $Root, $DataDir, $ConfigFile)
       foreach ($argument in $arguments) { if ($argument.Contains('"')) { Fail "Invalid quote in runtime service path." } }
       $binary = ($arguments | ForEach-Object { '"' + $_ + '"' }) -join ' '
-      $credential = [Management.Automation.PSCredential]::new($account, [Security.SecureString]::new())
-      New-Service -Name $RuntimeName -BinaryPathName $binary -StartupType Automatic -Credential $credential -Description "Owns Minecraft independently of the CraftPanel dashboard" | Out-Null
+      # The virtual account is resolved only after SCM knows the service. Keep it disabled
+      # until the identity is configured; never start a wrapper under LocalSystem.
+      New-Service -Name $RuntimeName -BinaryPathName $binary -StartupType Disabled -Description "Owns Minecraft independently of the CraftPanel dashboard" | Out-Null
+      & sc.exe config $RuntimeName obj= $account start= auto | Out-Null
+      if ($LASTEXITCODE -ne 0) { Fail "Could not configure the virtual runtime service account." }
       & sc.exe preshutdowninfo $RuntimeName 120000 | Out-Null
       if ($LASTEXITCODE -ne 0) { Fail "Could not configure runtime preshutdown handling." }
       & sc.exe failure $RuntimeName reset= 86400 actions= restart/5000/restart/10000/restart/60000 | Out-Null

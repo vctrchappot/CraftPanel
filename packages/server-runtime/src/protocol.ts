@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import type { Socket } from "node:net";
@@ -23,12 +24,31 @@ export interface RuntimeSnapshot {
 export function runtimePaths(dataDir: string) {
   const directory = path.join(path.resolve(dataDir), "runtime");
   const hash = crypto.createHash("sha256").update(process.platform === "win32" ? directory.toLowerCase() : directory).digest("hex").slice(0, 24);
+  // macOS permits only 103 bytes in sockaddr_un.sun_path (Linux normally 107).
+  // A short alias still places the actual socket inside the private runtime directory.
+  const socket = path.join(directory, "control.sock");
+  const socketAlias = process.platform !== "win32" && Buffer.byteLength(socket) > 100
+    ? `/tmp/craftpanel-${process.getuid!()}-${hash}` : null;
   return {
     directory,
     token: path.join(directory, "token"),
     registry: path.join(directory, "servers.json"),
-    endpoint: process.platform === "win32" ? `\\\\.\\pipe\\craftpanel-runtime-${hash}` : path.join(directory, "control.sock"),
+    endpoint: process.platform === "win32" ? `\\\\.\\pipe\\craftpanel-runtime-${hash}` : socketAlias ? path.join(socketAlias, "control.sock") : socket,
+    socketAlias,
   };
+}
+
+/** Each systemd PrivateTmp namespace can have its own alias to the same protected directory. */
+export async function prepareRuntimeEndpoint(dataDir: string) {
+  const paths = runtimePaths(dataDir);
+  if (paths.socketAlias) {
+    try { await fs.symlink(paths.directory, paths.socketAlias); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
+    const stat = await fs.lstat(paths.socketAlias);
+    if (!stat.isSymbolicLink() || stat.uid !== process.getuid!() || await fs.readlink(paths.socketAlias) !== paths.directory)
+      throw new Error("Runtime socket alias is not owned by this account or points elsewhere");
+  }
+  return paths;
 }
 
 /** Newline-delimited JSON with bounded input AND output; slow peers reconnect. */

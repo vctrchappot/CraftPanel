@@ -5,7 +5,7 @@ import net from "node:net";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runtimeReporter } from "../src/diagnostics";
-import { RuntimeClient, RuntimeService, runtimePaths, RUNTIME_PROTOCOL, channel } from "../src/index";
+import { RuntimeClient, RuntimeService, runtimePaths, prepareRuntimeEndpoint, RUNTIME_PROTOCOL, channel } from "../src/index";
 
 const fake = path.join(path.dirname(fileURLToPath(import.meta.url)), "fake-minecraft.mjs");
 const spec = { javaPath: "unused", directory: os.tmpdir(), jarFile: "unused", memoryMb: 512, jvmArgs: [], software: "vanilla" as const,
@@ -32,6 +32,40 @@ afterEach(async () => {
 });
 
 describe("independent runtime transport", () => {
+  it("connects safely when the data directory exceeds Unix socket path limits", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cp-ipc-long-"));
+    roots.push(root);
+    const dir = path.join(root, "nested-" + "x".repeat(100));
+    const runtime = new RuntimeService(dir);
+    services.push(runtime);
+    await runtime.listen();
+    const client = new RuntimeClient(dir);
+    clients.push(client);
+    await client.connect();
+    await client.configure("test", spec);
+    expect(client.owns("test")).toBe(true);
+    const paths = runtimePaths(dir);
+    if (paths.socketAlias) {
+      expect(Buffer.byteLength(paths.endpoint)).toBeLessThan(104);
+      expect(await fs.readlink(paths.socketAlias)).toBe(paths.directory);
+      expect((await fs.stat(paths.directory)).mode & 0o777).toBe(0o700);
+    }
+    await client.disconnect();
+    await runtime.close();
+    if (paths.socketAlias) await expect(fs.lstat(paths.socketAlias)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it.skipIf(process.platform === "win32")("refuses an existing socket alias pointing outside the runtime directory", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cp-ipc-alias-"));
+    roots.push(root);
+    const dir = path.join(root, "nested-" + "x".repeat(100));
+    const paths = runtimePaths(dir);
+    expect(paths.socketAlias).not.toBeNull();
+    await fs.symlink(root, paths.socketAlias!);
+    try { await expect(prepareRuntimeEndpoint(dir)).rejects.toThrow(/points elsewhere/); }
+    finally { await fs.unlink(paths.socketAlias!); }
+  });
+
   it("bounds diagnostic output and never includes error messages or credentials", () => {
     const sink = vi.fn();
     const report = runtimeReporter("service", sink);
@@ -64,6 +98,7 @@ describe("independent runtime transport", () => {
     roots.push(relayDir);
     const relayPaths = runtimePaths(relayDir);
     await fs.mkdir(relayPaths.directory);
+    await prepareRuntimeEndpoint(relayDir);
     await fs.copyFile(runtimePaths(dir).token, relayPaths.token);
     const sockets = new Set<net.Socket>();
     const relay = net.createServer((downstream) => {

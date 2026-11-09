@@ -5,7 +5,7 @@ import { SOFTWARE_INFO, type ServerSoftware } from "@craftpanel/shared";
 import { LocalAgent, type AgentEvents } from "./agent";
 import type { LaunchSpec } from "./managed-server";
 import { runtimeReporter, type RuntimeDiagnosticSink } from "./diagnostics";
-import { channel, COMMAND_TTL_MS, RUNTIME_PROTOCOL, runtimePaths, type RuntimeSnapshot } from "./protocol";
+import { channel, COMMAND_TTL_MS, RUNTIME_PROTOCOL, runtimePaths, prepareRuntimeEndpoint, type RuntimeSnapshot } from "./protocol";
 
 const EVENTS = ["status", "lines", "players", "metrics", "signal", "exit"] as const;
 type Spec = LaunchSpec & { software: ServerSoftware; autoStart?: boolean };
@@ -27,7 +27,7 @@ export class RuntimeService {
   private report: ReturnType<typeof runtimeReporter>;
   private closePromise: Promise<void> | null = null;
 
-  constructor(dataDir: string, private build = "development", diagnostics?: RuntimeDiagnosticSink) {
+  constructor(private dataDir: string, private build = "development", diagnostics?: RuntimeDiagnosticSink) {
     this.paths = runtimePaths(dataDir);
     this.report = runtimeReporter("service", diagnostics);
     // Subscribe before serving; state is sent along with every event, before its consumers run.
@@ -59,6 +59,7 @@ export class RuntimeService {
   async listen() {
     await fs.mkdir(this.paths.directory, { recursive: true, mode: 0o700 });
     if (process.platform !== "win32") await fs.chmod(this.paths.directory, 0o700);
+    this.paths = await prepareRuntimeEndpoint(this.dataDir);
     try {
       this.token = (await fs.readFile(this.paths.token, "utf8")).trim();
       if (!/^[a-f0-9]{64}$/.test(this.token)) throw new Error("Invalid runtime token; restore runtime/token before starting");
@@ -222,7 +223,14 @@ export class RuntimeService {
     try {
       await this.agent.shutdown(timeoutMs);
       if (this.initialized) await this.persist();
-    } finally { await closed; }
+    } finally {
+      await closed;
+      if (this.paths.socketAlias) {
+        const alias = this.paths.socketAlias;
+        const stat = await fs.lstat(alias).catch((error) => { if (error.code !== "ENOENT") throw error; return null; });
+        if (stat?.isSymbolicLink() && stat.uid === process.getuid!() && await fs.readlink(alias) === this.paths.directory) await fs.unlink(alias);
+      }
+    }
   }
 }
 

@@ -7,7 +7,7 @@ import type { LaunchSpec } from "./managed-server";
 import { isJavaProcess, isPidAlive } from "./process-info";
 import { runtimeReporter, type RuntimeDiagnosticSink } from "./diagnostics";
 import type { RuntimePathAccess } from "./access";
-import { channel, COMMAND_TTL_MS, emptyRuntimeInfo, RUNTIME_PROTOCOL, runtimePaths, type RuntimeSnapshot } from "./protocol";
+import { channel, COMMAND_TTL_MS, emptyRuntimeInfo, RUNTIME_PROTOCOL, prepareRuntimeEndpoint, type RuntimeSnapshot } from "./protocol";
 
 /** A dashboard connection, never an owner of Minecraft processes. No command retries. */
 export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeAgent {
@@ -38,7 +38,7 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
 
   private async open() {
     try {
-      const paths = runtimePaths(this.dataDir);
+      const paths = await prepareRuntimeEndpoint(this.dataDir);
       const token = (await fs.readFile(paths.token, "utf8")).trim();
       if (this.closed) throw this.unavailable();
       await new Promise<void>((resolve, reject) => {
