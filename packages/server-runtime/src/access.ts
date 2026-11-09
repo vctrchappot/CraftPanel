@@ -17,6 +17,13 @@ export async function checkRuntimePaths(directory: string, javaPath: string): Pr
     await fs.unlink(probe);
     writable = true;
   } catch { /* The dashboard may grant the service access and retry. */ }
+  // Java's toRealPath (used by Paperclip) looks up each component's exact name on Windows,
+  // which needs listing access to every ancestor, not just traversal.
+  if (writable && process.platform === "win32") {
+    for (let parent = path.dirname(path.resolve(directory)); parent !== path.dirname(parent); parent = path.dirname(parent)) {
+      try { await (await fs.opendir(parent)).close(); } catch { writable = false; break; }
+    }
+  }
   let java = false;
   try { await run(javaPath, ["-version"], { windowsHide: true, timeout: 10_000, maxBuffer: 64 * 1024 }); java = true; }
   catch { /* Java needs executable, DLL and module access under the service account. */ }

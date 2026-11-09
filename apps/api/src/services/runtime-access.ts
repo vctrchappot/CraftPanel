@@ -30,8 +30,9 @@ export function runtimeAccess(installRoot: string | undefined, agent: RuntimeAge
           if (!parents.has(parent)) {
             parents.add(parent);
             // Public/system ancestors may already be accessible but not writable by the
-            // dashboard owner. The subsequent service probe is authoritative.
-            await run(executable, [parent, "/grant", `${account}:(X,RA,REA,RC,S)`], { windowsHide: true, timeout: 10_000 }).catch(() => undefined);
+            // dashboard owner. The subsequent service probe is authoritative. Listing (RD) lets
+            // Java resolve exact component names (toRealPath); it is not inherited.
+            await run(executable, [parent, "/grant", `${account}:(RD,X,RA,REA,RC,S)`], { windowsHide: true, timeout: 10_000 }).catch(() => undefined);
           }
           parent = path.dirname(parent);
         }

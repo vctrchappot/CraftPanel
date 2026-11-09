@@ -174,8 +174,9 @@ function Install-CraftPanel {
           if ($LASTEXITCODE -ne 0) { Fail "Could not grant runtime access to Node.js." }
         }
       }
-      # Node resolves every path component before loading its entry point. The service
-      # needs attributes/traversal on private profile ancestors, without inherited file access.
+      # Node resolves every path component before loading its entry point, and Java's
+      # toRealPath (Paperclip) looks up each component's exact name. The service needs
+      # listing/attributes/traversal on private profile ancestors only, without inherited file access.
       # System ancestors (C:\Users, C:\Program Files) are protected and usually already
       # traversable, so a failed grant is only a warning; starting the service is authoritative.
       $grantedParents = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
@@ -183,7 +184,7 @@ function Install-CraftPanel {
         $parent = Split-Path -Parent ([IO.Path]::GetFullPath($target))
         while ($parent -and $parent.TrimEnd('\') -ne [IO.Path]::GetPathRoot($parent).TrimEnd('\')) {
           if ($grantedParents.Add($parent)) {
-            & icacls.exe $parent /grant "${account}:(X,RA,REA,RC,S)" | Out-Null
+            & icacls.exe $parent /grant "${account}:(RD,X,RA,REA,RC,S)" | Out-Null
             if ($LASTEXITCODE -ne 0) { Write-Warning "Could not grant runtime traversal of $parent; continuing." }
           }
           $parent = Split-Path -Parent $parent
