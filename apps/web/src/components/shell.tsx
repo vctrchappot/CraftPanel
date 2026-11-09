@@ -100,7 +100,7 @@ function Frame({ children }: { children: React.ReactNode }) {
             {mobileOpen ? <X /> : <Menu />}
           </Button>
           <Logo className="h-5 w-[18px]" />
-          <span className="text-[15px] font-semibold tracking-tight">CraftPanel</span>
+          <span className="font-display text-[15px] font-semibold tracking-tight">CraftPanel</span>
           <Button variant="ghost" size="icon-sm" className="ml-auto" onClick={() => setPaletteOpen(true)} aria-label="Search">
             <Search />
           </Button>
@@ -126,7 +126,7 @@ function Sidebar({ onSearch }: { onSearch: () => void }) {
     <>
       <div className="flex h-14 items-center gap-2.5 px-4">
         <Logo className="h-6 w-[21px]" />
-        <span className="text-base font-semibold tracking-tight">CraftPanel</span>
+        <span className="font-display text-base font-semibold tracking-tight">CraftPanel</span>
         <span
           className={cn("ml-auto size-1.5 rounded-full", connection === "open" ? "bg-success" : connection === "connecting" ? "bg-warning animate-pulse" : "bg-destructive")}
           title={connection === "open" ? "Live updates connected" : connection === "connecting" ? "Connecting…" : "Disconnected — reconnecting"}

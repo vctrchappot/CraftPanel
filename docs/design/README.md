@@ -7,8 +7,8 @@ One set of tokens and one type family for the dashboard (`apps/web`), the websit
 | File | What |
 | --- | --- |
 | `packages/ui/src/styles/tokens.css` | Palette, semantic colours (light default, dark under `.dark` / `[data-theme="dark"]`), font stacks, radii. The single source. |
-| `packages/ui/src/styles/fonts.css` | `@font-face` for the website and the OG image, pointing at the official `geist` package in `packages/ui/node_modules`. |
-| `apps/web/src/app/layout.tsx` | The dashboard loads the same fonts through the package's own `geist/font/*` (next/font: preloading, fallback metrics). |
+| `packages/ui/src/styles/fonts.css`, `packages/ui/src/styles/fonts/` | `@font-face` for the website and the OG image: Inter, Mona Sans and Mona Sans Mono as committed variable WOFF2 files (with their licences), Geist Serif from the official `geist` package in `packages/ui/node_modules`. |
+| `apps/web/src/app/layout.tsx` | The dashboard loads the same files through `next/font/local` and Geist Serif through `geist/font/serif` (next/font: preloading, fallback metrics). |
 | `apps/web/src/app/globals.css` | Maps the tokens to the dashboard's Tailwind theme (`bg-background`, `text-brand-text`, `font-serif`, `rounded-lg`, …). |
 | `apps/site/src/styles/landing.css` | The landing page's names for the tokens (top of the file). |
 | `apps/site/src/styles/docs.css` | Starlight's `--sl-*` variables on the tokens. |
@@ -18,22 +18,22 @@ One set of tokens and one type family for the dashboard (`apps/web`), the websit
 | `apps/site/src/components/RuntimeDiagram.astro` | Interactive update & runtime showcase: a panel update or rollback leaves the illustrated Minecraft runtime and players online. |
 | `apps/*/public/favicon.*`, `apple-touch-icon.png`, `apps/site/src/assets/mark-on-*.svg` | Files from the brand package (v1.0), unchanged. |
 
-Fonts are self-hosted from the `geist` npm package (Vercel, SIL Open Font License). Never load them, or anything else, from a CDN: the dashboard promises no third-party requests. To update Geist, bump `geist` in `packages/ui` and `apps/web` together.
+All fonts are self-hosted (SIL Open Font License). Never load them, or anything else, from a CDN: the dashboard promises no third-party requests. Inter comes from the official [Inter 4.1 release](https://github.com/rsms/inter/releases/tag/v4.1) (`web/InterVariable.woff2`), Mona Sans and Mona Sans Mono from the official [Mona Sans 2.0.27 webfonts](https://github.com/github/mona-sans/releases/tag/v2.0.27) (`MonaSansVF[opsz,wght].woff2`, `MonaSansMonoVF[wght].woff2`); to update them, replace the files in `packages/ui/src/styles/fonts/` and their licences. To update Geist Serif, bump `geist` in `packages/ui` and `apps/web` together.
 
 ## Type
 
 | Family | Weight | Used for |
 | --- | --- | --- |
-| **Inter Display** (static WOFF2, v4.1) | 500 | Large display headers (`--cp-font-display`, `.display`, hero and section titles). |
-| **Geist** (Sans, variable) | 400 body, 500 labels and UI headlines, 600 only for the wordmark and small emphasis | Everything by default. |
-| **Geist Mono** (variable) | 400–500 | Console, logs, commands, paths, ports, versions, metrics, section numbers and labels, comparison table. |
+| **Mona Sans** (variable, optical size) | 500 headers, 600 only for the wordmark | Headers and displays (`--cp-font-display`): page, section, card and dialog titles (`h1`–`h3`), hero and `.display` titles, the wordmark. |
+| **Inter** (variable, optical size) | 400 body, 500 labels, 600 only for small emphasis | Everything else by default: body text, UI labels, buttons, forms, tables. |
+| **Mona Sans Mono** (variable) | 400–500 | Console, logs, commands, paths, ports, versions, metrics, section numbers and labels, comparison table. |
 | **Geist Serif** | 400 only | Human voice: the "What's new" dialog title and the project statement on the website. Nothing else. |
 
-Keep weights low: nothing above 600. Large display headers use **Inter Display** at 500 with tighter negative tracking; precision comes from size and spacing, not weight. Serif ships a single weight and `font-synthesis-weight: none` is set globally, so give it `font-normal` instead of inheriting a bold one. The wordmark is Geist Sans 600 next to the mark (the brand package's Archivo wordmark is not used).
+Keep weights low: nothing above 600. Headers use **Mona Sans** at 500 with negative tracking; precision comes from size and spacing, not weight. Serif ships a single weight and `font-synthesis-weight: none` is set globally, so give it `font-normal` instead of inheriting a bold one. The wordmark is Mona Sans 600 next to the mark (the brand package's Archivo wordmark is not used).
 
-Sans tracking is negative: `--cp-tracking-body` −0.01 em for normal UI/body text, `--cp-tracking-heading` −0.035 em for standard headings, and `--cp-tracking-display` −0.045 em (−0.05 em on the hero H1) for large display headers. Mono commands and console output retain normal tracking for legibility.
+Sans tracking is negative: `--cp-tracking-body` −0.01 em for Inter body and UI text, `--cp-tracking-heading` −0.02 em for Mona Sans headings, and `--cp-tracking-display` −0.03 em (−0.035 em on the hero H1) for large display headers. Mona Sans already tightens at large sizes through its optical-size axis, so keep its tracking milder than Inter Display's used to be. Mono commands and console output retain normal tracking for legibility.
 
-On the landing page, keep a clear size step between levels so headings do not compete: hero `clamp(48px, 5vw, 72px)`, section headings `clamp(32px, 3.5vw, 48px)`, feature card headings `22px`, body copy `16px` (`line-height: 1.55`), and technical labels `12–13px` Geist Mono.
+On the landing page, keep a clear size step between levels so headings do not compete: hero `clamp(48px, 5vw, 72px)`, section headings `clamp(32px, 3.5vw, 48px)`, feature card headings `22px`, body copy `16px` (`line-height: 1.55`), and technical labels `12–13px` Mona Sans Mono.
 
 ## Colour
 

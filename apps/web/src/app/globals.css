@@ -62,9 +62,9 @@
   --color-status-starting: var(--status-starting);
   --color-status-stopped: var(--status-stopped);
   --color-status-crashed: var(--status-crashed);
-  --font-display: var(--font-inter-display), var(--cp-font-display);
-  --font-sans: var(--font-geist-sans), var(--cp-font-sans);
-  --font-mono: var(--font-geist-mono), var(--cp-font-mono);
+  --font-display: var(--font-mona-sans), var(--cp-font-display);
+  --font-sans: var(--font-inter), var(--cp-font-sans);
+  --font-mono: var(--font-mona-sans-mono), var(--cp-font-mono);
   --font-serif: var(--font-geist-serif), var(--cp-font-serif);
   --tracking-tight: var(--cp-tracking-heading);
   --tracking-display: var(--cp-tracking-display);
@@ -99,11 +99,8 @@
     font-family: var(--font-sans);
     letter-spacing: var(--cp-tracking-body);
   }
-  h1 {
+  h1, h2, h3 {
     font-family: var(--font-display);
-    letter-spacing: var(--cp-tracking-heading);
-  }
-  h2, h3 {
     letter-spacing: var(--cp-tracking-heading);
   }
   code, pre, kbd, samp, [class~="font-mono"] {

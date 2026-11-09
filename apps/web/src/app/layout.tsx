@@ -1,21 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
 import { GeistSerif } from "geist/font/serif";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
-const InterDisplay = localFont({
-  variable: "--font-inter-display",
-  display: "swap",
-  src: [
-    { path: "../../../../packages/ui/src/styles/fonts/InterDisplay-Regular.woff2", weight: "400", style: "normal" },
-    { path: "../../../../packages/ui/src/styles/fonts/InterDisplay-Medium.woff2", weight: "500", style: "normal" },
-    { path: "../../../../packages/ui/src/styles/fonts/InterDisplay-SemiBold.woff2", weight: "600", style: "normal" },
-    { path: "../../../../packages/ui/src/styles/fonts/InterDisplay-Bold.woff2", weight: "700", style: "normal" },
-  ],
-});
+// The same self-hosted files as packages/ui/src/styles/fonts.css (the website's @font-face).
+const Inter = localFont({ variable: "--font-inter", display: "swap", weight: "100 900", src: "../../../../packages/ui/src/styles/fonts/Inter-Variable.woff2" });
+const MonaSans = localFont({ variable: "--font-mona-sans", display: "swap", weight: "200 900", src: "../../../../packages/ui/src/styles/fonts/MonaSans-Variable.woff2" });
+const MonaSansMono = localFont({ variable: "--font-mona-sans-mono", display: "swap", weight: "200 900", src: "../../../../packages/ui/src/styles/fonts/MonaSansMono-Variable.woff2" });
 
 export const metadata: Metadata = {
   title: { default: "CraftPanel", template: "%s · CraftPanel" },
@@ -31,8 +23,8 @@ export const viewport: Viewport = {
   ],
 };
 
-/** Official Geist families from Vercel's `geist` package plus self-hosted Inter Display; globals.css maps their variables onto the font tokens. */
-const fonts = [InterDisplay.variable, GeistSans.variable, GeistMono.variable, GeistSerif.variable].join(" ");
+/** Inter for text, Mona Sans for headers, Mona Sans Mono for machine text, Geist Serif for editorial accents; globals.css maps their variables onto the font tokens. */
+const fonts = [Inter.variable, MonaSans.variable, MonaSansMono.variable, GeistSerif.variable].join(" ");
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

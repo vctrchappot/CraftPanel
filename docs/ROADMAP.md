@@ -11,7 +11,7 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 - **Open verification gaps** (not blockers, listed honestly in STATUS.md): an actual Windows host shutdown on a disposable VM; dashboard-triggered updates and concurrent installers on Windows; the `curl | sudo bash` / `irm | iex` path on a physical Pi and a small VPS.
 - **Suggested next, in order:** run the installers on a physical Pi and a small VPS and announce (step 1), then per-server isolation and resource limits. Bedrock, Pi/VPS measurements and the Velocity open points (step 4) remain planned.
 - **Real-server test scenarios** used for the ✅ entries live in `scripts/real-tests/` (see its README).
-- **Design and polish:** dashboard, website and docs share Geist and the Signal/Amber/Ember/Ash palette. Connected landing-page displays and original isometric hardware/runtime graphics are implemented; locale, adapter labels, activity icons and console spacing are verified on a throwaway Paper instance. Rules and evidence: [design/README.md](design/README.md), [STATUS.md](STATUS.md).
+- **Design and polish:** dashboard, website and docs share Inter, Mona Sans and Mona Sans Mono and the Signal/Amber/Ember/Ash palette. Connected landing-page displays and original isometric hardware/runtime graphics are implemented; locale, adapter labels, activity icons and console spacing are verified on a throwaway Paper instance. Rules and evidence: [design/README.md](design/README.md), [STATUS.md](STATUS.md).
 
 ## Done
 

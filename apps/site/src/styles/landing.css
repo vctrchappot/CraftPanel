@@ -270,7 +270,7 @@ p {
   align-items: center;
   gap: 10px;
   text-decoration: none;
-  font-family: var(--font-text);
+  font-family: var(--font-display);
   font-weight: 600;
   letter-spacing: -0.02em;
   font-size: 19px;
@@ -353,7 +353,7 @@ p {
 .hero h1 {
   font-size: clamp(48px, 5vw, 72px);
   line-height: 1.02;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.035em;
 }
 .mark {
   position: relative;

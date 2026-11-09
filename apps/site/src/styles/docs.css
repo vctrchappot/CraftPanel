@@ -1,4 +1,4 @@
-/* Starlight theme on the shared design tokens (packages/ui/src/styles/tokens.css): Geist, warm greys,
+/* Starlight theme on the shared design tokens (packages/ui/src/styles/tokens.css): Inter, Mona Sans, warm greys,
    grass green as the docs accent. Starlight's dark theme is the default; light sets data-theme="light". */
 :root {
   --sl-font: var(--cp-font-sans);
@@ -34,6 +34,7 @@
 }
 
 .site-title {
+  font-family: var(--cp-font-display);
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--sl-color-white);
