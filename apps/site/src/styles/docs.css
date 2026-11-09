@@ -1,42 +1,52 @@
-/* Starlight theme matched to the CraftPanel dashboard: neutral greys, one blue accent, Inter. */
+/* Starlight theme in the landing page's palette: warm deepslate greys, grass green, Archivo headings. */
 :root {
-  --sl-font: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --sl-font: "IBM Plex Sans Variable", ui-sans-serif, system-ui, sans-serif;
   --sl-font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
   --sl-content-width: 48rem;
 
   /* dark (Starlight's default) */
-  --sl-color-accent-low: oklch(0.27 0.06 255);
-  --sl-color-accent: oklch(0.62 0.15 255);
-  --sl-color-accent-high: oklch(0.86 0.06 255);
-  --sl-color-white: oklch(0.97 0 0);
-  --sl-color-gray-1: oklch(0.9 0 0);
-  --sl-color-gray-2: oklch(0.8 0 0);
-  --sl-color-gray-3: oklch(0.66 0 0);
-  --sl-color-gray-4: oklch(0.45 0 0);
-  --sl-color-gray-5: oklch(0.28 0 0);
-  --sl-color-gray-6: oklch(0.2 0 0);
-  --sl-color-black: oklch(0.145 0 0);
+  --sl-color-accent-low: #26331a;
+  --sl-color-accent: #86c13a;
+  --sl-color-accent-high: #c4e59a;
+  --sl-color-white: #f4f1ea;
+  --sl-color-gray-1: #ece8df;
+  --sl-color-gray-2: #cfc9bf;
+  --sl-color-gray-3: #a8a197;
+  --sl-color-gray-4: #6f6a62;
+  --sl-color-gray-5: #3a3631;
+  --sl-color-gray-6: #23211e;
+  --sl-color-black: #171614;
 }
 
 :root[data-theme="light"] {
-  --sl-color-accent-low: oklch(0.93 0.03 255);
-  --sl-color-accent: oklch(0.52 0.17 255);
-  --sl-color-accent-high: oklch(0.3 0.1 255);
-  --sl-color-white: oklch(0.18 0 0);
-  --sl-color-gray-1: oklch(0.25 0 0);
-  --sl-color-gray-2: oklch(0.35 0 0);
-  --sl-color-gray-3: oklch(0.5 0 0);
-  --sl-color-gray-4: oklch(0.66 0 0);
-  --sl-color-gray-5: oklch(0.88 0 0);
-  --sl-color-gray-6: oklch(0.95 0 0);
-  --sl-color-gray-7: oklch(0.975 0 0);
-  --sl-color-black: oklch(1 0 0);
+  --sl-color-accent-low: #e3efd2;
+  --sl-color-accent: #2f5f10;
+  --sl-color-accent-high: #234a0b;
+  --sl-color-white: #1c1b18;
+  --sl-color-gray-1: #2a2824;
+  --sl-color-gray-2: #3d3a35;
+  --sl-color-gray-3: #5f5a52;
+  --sl-color-gray-4: #8a847a;
+  --sl-color-gray-5: #d9d3c7;
+  --sl-color-gray-6: #ece8de;
+  --sl-color-gray-7: #f4f1ea;
+  --sl-color-black: #fbfaf6;
 }
 
 .site-title {
-  font-weight: 650;
+  font-family: "Archivo Variable", sans-serif;
+  font-stretch: 80%;
+  font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--sl-color-white);
+}
+
+.sl-markdown-content :is(h1, h2, h3),
+h1#_top {
+  font-family: "Archivo Variable", sans-serif;
+  font-stretch: 78%;
+  font-weight: 800;
+  letter-spacing: -0.015em;
 }
 
 /* The logo tile is near-black; outline it so it stays visible on the dark header. */
@@ -51,16 +61,15 @@
   background-color: var(--sl-color-accent-low);
   color: var(--sl-color-white);
   font-weight: 600;
-}
-
-.sl-markdown-content h1,
-.sl-markdown-content h2,
-.sl-markdown-content h3,
-h1#_top {
-  letter-spacing: -0.02em;
+  box-shadow: inset 3px 0 0 var(--sl-color-accent);
 }
 
 .sl-markdown-content :is(img) {
   border: 1px solid var(--sl-color-gray-5);
-  border-radius: 0.75rem;
+  border-radius: 4px;
+}
+
+.sl-markdown-content :is(.card, .sl-link-card),
+.sl-markdown-content .expressive-code .frame {
+  border-radius: 4px;
 }

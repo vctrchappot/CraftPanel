@@ -1,0 +1,87 @@
+---
+// The install command as a terminal window. The full variant types itself once and prints the installer's real
+// output; the compact variant is just the command with tabs and a copy button.
+import Pixel from "./Pixel.astro";
+
+interface Props {
+  version: string;
+  compact?: boolean;
+  id: string;
+}
+const { version, compact = false, id } = Astro.props;
+const tabs = [
+  {
+    os: "linux",
+    label: "Linux · Raspberry Pi",
+    prompt: "pi@raspberrypi:~ $",
+    command: "curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash",
+    output: [
+      ["step", "› Looking up the latest release…"],
+      ["step", `› Downloading CraftPanel v${version}…`],
+      ["info", "  Checksum verified."],
+      ["step", "› Checking Node.js…"],
+      ["step", `› Installing CraftPanel v${version} to /opt/craftpanel…`],
+      ["step", "› Starting…"],
+      ["ok", `✔ CraftPanel v${version} is installed and running`],
+      ["info", "  On this machine  http://127.0.0.1:8080"],
+    ],
+  },
+  {
+    os: "windows",
+    label: "Windows",
+    prompt: "PS C:\\>",
+    command: "irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex",
+    output: [
+      ["step", "› Looking up the latest release..."],
+      ["step", `› Downloading CraftPanel v${version}...`],
+      ["info", "  Checksum verified."],
+      ["step", "› Checking Node.js..."],
+      ["step", `› Installing CraftPanel v${version}...`],
+      ["step", "› Starting..."],
+      ["ok", `✔ CraftPanel v${version} is installed and running`],
+      ["info", "  On this computer  http://localhost:8080"],
+    ],
+  },
+] as const;
+---
+
+<div class:list={["term", { "term-compact": compact }]} data-term={compact ? "compact" : "full"}>
+  <div class="term-bar">
+    <span class="term-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <div class="term-tabs" role="tablist" aria-label="Operating system">
+      {
+        tabs.map((t, i) => (
+          <button role="tab" type="button" data-os={t.os} id={`${id}-tab-${t.os}`} aria-controls={`${id}-${t.os}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
+            {t.label}
+          </button>
+        ))
+      }
+    </div>
+  </div>
+  {
+    tabs.map((t, i) => (
+      <div class="term-body" role="tabpanel" id={`${id}-${t.os}`} aria-labelledby={`${id}-tab-${t.os}`} hidden={i !== 0} data-panel={t.os}>
+        <div class="term-line term-cmd">
+          {!compact && <span class="term-prompt">{t.prompt}</span>}
+          {compact && <span class="term-prompt">{t.os === "windows" ? "PS>" : "$"}</span>}
+          <span class="term-typed-wrap">
+            <span class="term-ghost" aria-hidden="true">{t.command}</span>
+            <code class="term-typed" data-command={t.command}>{t.command}</code>
+          </span>
+          <button class="term-copy" type="button" data-copy={t.command} aria-label={`Copy the ${t.label} install command`}>
+            <Pixel name="copy" size={14} class="i-copy" />
+            <Pixel name="check" size={14} class="i-done" />
+            <span class="term-copy-label">Copy</span>
+          </button>
+        </div>
+        {!compact && (
+          <div class="term-out" aria-live="off">
+            {t.output.map(([kind, text]) => (
+              <div class={`term-line term-${kind}`}>{text}</div>
+            ))}
+          </div>
+        )}
+      </div>
+    ))
+  }
+</div>

@@ -1,0 +1,73 @@
+---
+// Hand-drawn pixel icons. "a" uses --px-a (default currentColor), "b" uses --px-b, "c" is "a" at reduced opacity.
+const icons = {
+  paper: ["..aaaaaaa...", "..a.....aa..", "..a.....aba.", "..a.....aaaa", "..a........a", "..a.bbbbb..a", "..a........a", "..a.bbbbbb.a", "..a........a", "..a.bbbb...a", "..a........a", "..aaaaaaaaaa"],
+  purpur: ["aaaaaaaaaaaa", "a..........a", "a.bbbbbbbb.a", "a.b......b.a", "a.b.aaaa.b.a", "a.b.a..a.b.a", "a.b.a..a.b.a", "a.b.aaaa.b.a", "a.b......b.a", "a.bbbbbbbb.a", "a..........a", "aaaaaaaaaaaa"],
+  fabric: ["..aaaaaaaa..", "...aaaaaa...", "....bbbb....", "....bbbb....", "....bbbb....", "....bbbb....", "....bbbb....", "....bbbb..b.", "...aaaaaa.b.", "..aaaaaaaab.", "..........b.", "........bb.."],
+  neoforge: ["........b.b.", ".........b..", "aaaaaaaaaaa.", ".aaaaaaaaaaa", "...aaaaaaa..", ".....aaa....", ".....aaa....", "....aaaaa...", "..aaaaaaaaa.", "..aaaaaaaaa.", "............", "............"],
+  vanilla: ["aaaaaaaaaaaa", "aaaaaaaaaaaa", "aaaaaaaaaaaa", "baabaaabaaba", "bbbabbbbabbb", "bbbbbbbbbbbb", "bcbbbbbcbbbb", "bbbbbbbbbbbb", "bbbbbcbbbbcb", "bbbbbbbbbbbb", "bbcbbbbbbbbb", "bbbbbbbbbbbb"],
+  velocity: ["............", "aa....bb....", ".aa....bb...", "..aa....bb..", "...aa....bb.", "....aa....bb", "....aa....bb", "...aa....bb.", "..aa....bb..", ".aa....bb...", "aa....bb....", "............"],
+  terminal: ["aaaaaaaaaaaa", "a..........a", "a.b........a", "a..b.......a", "a...b......a", "a..b.......a", "a.b..bbbb..a", "a..........a", "aaaaaaaaaaaa"],
+  chest: ["aaaaaaaaaaaa", "a..........a", "a..........a", "aaaaabbaaaaa", "a....bb....a", "a..........a", "a..........a", "aaaaaaaaaaaa"],
+  update: [".....aa.....", "....aaaa....", "...aaaaaa...", "..aa.aa.aa..", ".....aa.....", ".....aa.....", ".....aa.....", "............", "bbbbbbbbbbbb", "b.b........b", "bbbbbbbbbbbb"],
+  puzzle: ["....aa......", "...aaaa.....", "aaaaaaaaaa..", "aaaaaaaaaa..", "aaaaaaaaaaa.", "aaaaaaaaaaaa", "aaaaaaaaaaaa", "aaaaaaaaaaa.", "aaaaaaaaaa..", "aaaaaaaaaa.."],
+  people: ["..aa....bb..", ".aaaa..bbbb.", ".aaaa..bbbb.", "..aa....bb..", "............", ".aaaa..bbbb.", "aaaaaabbbbbb", "aaaaaabbbbbb", "aaaaaabbbbbb"],
+  cup: ["..b..b......", "...b..b.....", "..b..b......", "............", "aaaaaaaaa...", "a.......aaa.", "a.......a.a.", "a.......aaa.", ".a.....a....", "..aaaaa.....", "bbbbbbbbbb.."],
+  clock: ["...aaaaaa...", "..a......a..", ".a...b....a.", "a....b.....a", "a....b.....a", "a....bbbb..a", "a..........a", ".a........a.", "..a......a..", "...aaaaaa..."],
+  bell: [".....aa.....", "....aaaa....", "...aaaaaa...", "...aaaaaa...", "...aaaaaa...", "..aaaaaaaa..", ".aaaaaaaaaa.", "aaaaaaaaaaaa", "............", ".....bb....."],
+  signal: ["..........aa", "..........aa", ".......aa.aa", ".......aa.aa", "....aa.aa.aa", "....aa.aa.aa", ".aa.aa.aa.aa", ".aa.aa.aa.aa", "bbbbbbbbbbbb"],
+  check: ["......a", ".....aa", "a...aa.", "aa.aa..", ".aaa...", "..a...."],
+  cross: ["a...a", ".a.a.", "..a..", ".a.a.", "a...a"],
+  star: ["....a....", "....a....", "...aaa...", "aaaaaaaaa", ".aaaaaaa.", "..aaaaa..", "..aa.aa..", ".aa...aa."],
+  sun: ["....a....", ".a.....a.", "...aaa...", "..aaaaa..", "a.aaaaa.a", "..aaaaa..", "...aaa...", ".a.....a.", "....a...."],
+  moon: ["...aaa...", ".aaa.....", ".aa......", "aa.......", "aa.......", "aa......a", ".aa....aa", ".aaaaaaa.", "...aaa..."],
+  copy: ["..aaaaaaa", "..a.....a", "aaaaaaa.a", "a.....a.a", "a.....a.a", "a.....aaa", "a.....a..", "aaaaaaa.."],
+  arrow: ["....a...", "....aa..", "aaaaaaa.", "aaaaaaaa", "aaaaaaa.", "....aa..", "....a..."],
+  github: ["...aaaa...", ".aaaaaaaa.", "aa.aaaa.aa", "aaaaaaaaaa", "aa.aaaa.aa", "aaa....aaa", ".aaa..aaa.", "..aa..aa..", "aa.a..a...", ".aaa..a..."],
+  book: ["aaaa..aaaa", "a..aaaa..a", "a.b.aa.b.a", "a..b.ab..a", "a.b.aa.b.a", "a...aa...a", "aaaaaaaaaa"],
+} as const;
+
+export type PixelName = keyof typeof icons;
+
+interface Props {
+  name: PixelName;
+  size?: number;
+  class?: string;
+  label?: string;
+}
+
+const { name, size = 24, class: className, label } = Astro.props;
+const rows = icons[name];
+const h = rows.length;
+const w = Math.max(...rows.map((r) => r.length));
+// Merge horizontal runs of the same colour into one rect.
+const rects: { x: number; y: number; w: number; k: string }[] = [];
+rows.forEach((row, y) => {
+  let x = 0;
+  while (x < row.length) {
+    const k = row[x];
+    if (k === ".") {
+      x++;
+      continue;
+    }
+    let end = x;
+    while (end < row.length && row[end] === k) end++;
+    rects.push({ x, y, w: end - x, k });
+    x = end;
+  }
+});
+const scale = size / Math.max(w, h);
+---
+
+<svg
+  class:list={["px-icon", className]}
+  width={Math.round(w * scale)}
+  height={Math.round(h * scale)}
+  viewBox={`0 0 ${w} ${h}`}
+  shape-rendering="crispEdges"
+  aria-hidden={label ? undefined : "true"}
+  role={label ? "img" : undefined}
+  aria-label={label}
+>
+  {rects.map((r) => <rect x={r.x} y={r.y} width={r.w} height="1" class={`px-${r.k}`} />)}
+</svg>

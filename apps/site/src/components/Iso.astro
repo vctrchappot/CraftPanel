@@ -1,0 +1,60 @@
+---
+// Isometric (2:1) box renderer for the block-world illustrations. One unit is 16 px on the page grid.
+// Boxes are drawn in the order given, so pass them back to front.
+export interface Box {
+  x: number;
+  y: number;
+  z: number;
+  w: number;
+  d: number;
+  h: number;
+  /** top, left (+y side) and right (+x side) face colours */
+  c: [string, string, string];
+  class?: string;
+}
+
+interface Props {
+  boxes: Box[];
+  label: string;
+  class?: string;
+  pad?: number;
+}
+
+const { boxes, label, class: className, pad = 4 } = Astro.props;
+const S = 16;
+const p = (x: number, y: number, z: number) => [(x - y) * S, ((x + y) * S) / 2 - z * S] as const;
+const poly = (pts: (readonly [number, number])[]) => pts.map(([a, b]) => `${+a.toFixed(2)},${+b.toFixed(2)}`).join(" ");
+
+const faces = boxes.map((b) => {
+  const { x, y, z, w, d, h } = b;
+  const top = [p(x, y, z + h), p(x + w, y, z + h), p(x + w, y + d, z + h), p(x, y + d, z + h)];
+  const left = [p(x, y + d, z + h), p(x + w, y + d, z + h), p(x + w, y + d, z), p(x, y + d, z)];
+  const right = [p(x + w, y, z + h), p(x + w, y + d, z + h), p(x + w, y + d, z), p(x + w, y, z)];
+  return { b, top, left, right };
+});
+
+const all = faces.flatMap((f) => [...f.top, ...f.left, ...f.right]);
+const minX = Math.min(...all.map((q) => q[0])) - pad;
+const maxX = Math.max(...all.map((q) => q[0])) + pad;
+const minY = Math.min(...all.map((q) => q[1])) - pad;
+const maxY = Math.max(...all.map((q) => q[1])) + pad;
+---
+
+<svg
+  class={className}
+  viewBox={`${minX.toFixed(1)} ${minY.toFixed(1)} ${(maxX - minX).toFixed(1)} ${(maxY - minY).toFixed(1)}`}
+  role="img"
+  aria-label={label}
+  shape-rendering="crispEdges"
+>
+  {
+    faces.map(({ b, top, left, right }) => (
+      <g class={b.class}>
+        <polygon points={poly(left)} fill={b.c[1]} />
+        <polygon points={poly(right)} fill={b.c[2]} />
+        <polygon points={poly(top)} fill={b.c[0]} />
+      </g>
+    ))
+  }
+  <slot />
+</svg>

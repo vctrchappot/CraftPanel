@@ -8,7 +8,9 @@ const { chromium } = createRequire(path.join(here, "../../../package.json"))("@p
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
 await page.goto(pathToFileURL(path.join(here, "og.html")).href);
-await page.addStyleTag({ url: pathToFileURL(path.join(here, "../node_modules/@fontsource-variable/inter/index.css")).href });
+for (const css of ["archivo/standard.css", "ibm-plex-sans/index.css", "jetbrains-mono/index.css"]) {
+  await page.addStyleTag({ url: pathToFileURL(path.join(here, "../node_modules/@fontsource-variable", css)).href });
+}
 await page.evaluate(() => document.fonts.ready);
 await page.screenshot({ path: path.join(here, "../public/og.png") });
 await browser.close();
