@@ -1,47 +1,39 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/jetbrains-mono";
+/* Shared with the website and docs (packages/ui/src/styles, documented in docs/design/README.md).
+   The fonts come from next/font (geist/font/*, see layout.tsx) instead of the shared fonts.css. */
+@import "../../../../packages/ui/src/styles/tokens.css";
 
 @source "../../../../packages/ui/src";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* The dashboard's names for the shared tokens. The dashboard stays calm: brand green only for brand
+   moments, gold for interaction, the status colours only for status. */
 :root {
   /* Lets native controls (select popups, scrollbars, date pickers) follow the theme. */
   color-scheme: light;
-  --background: oklch(0.985 0 0);
-  --surface: oklch(1 0 0);
-  --foreground: oklch(0.18 0 0);
-  --muted: oklch(0.955 0 0);
-  --muted-foreground: oklch(0.5 0 0);
-  --border: oklch(0.915 0 0);
-  --ring: oklch(0.55 0.15 255);
-  --accent: oklch(0.55 0.17 255);
-  --accent-foreground: oklch(0.99 0 0);
-  --success: oklch(0.58 0.14 155);
-  --warning: oklch(0.66 0.15 65);
-  --destructive: oklch(0.58 0.21 27);
-  --console: oklch(0.17 0 0);
-  --console-foreground: oklch(0.9 0 0);
+  --background: var(--cp-bg);
+  --surface: var(--cp-surface);
+  --foreground: var(--cp-fg);
+  --muted: var(--cp-surface-muted);
+  --muted-foreground: var(--cp-fg-muted);
+  --border: var(--cp-border);
+  --ring: var(--cp-accent);
+  --accent: var(--cp-accent);
+  --accent-foreground: var(--cp-accent-fg);
+  --brand: var(--cp-brand);
+  --brand-foreground: var(--cp-brand-ink);
+  --brand-text: var(--cp-brand-text);
+  --success: var(--cp-success);
+  --warning: var(--cp-warning);
+  --destructive: var(--cp-danger);
+  --console: var(--cp-console);
+  --console-foreground: var(--cp-console-fg);
 }
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.145 0 0);
-  --surface: oklch(0.175 0 0);
-  --foreground: oklch(0.96 0 0);
-  --muted: oklch(0.225 0 0);
-  --muted-foreground: oklch(0.66 0 0);
-  --border: oklch(0.26 0 0);
-  --ring: oklch(0.65 0.14 255);
-  --accent: oklch(0.68 0.14 255);
-  --accent-foreground: oklch(0.15 0 0);
-  --success: oklch(0.72 0.15 155);
-  --warning: oklch(0.79 0.14 75);
-  --destructive: oklch(0.66 0.2 25);
-  --console: oklch(0.12 0 0);
-  --console-foreground: oklch(0.88 0 0);
 }
 
 @theme inline {
@@ -59,8 +51,25 @@
   --color-destructive: var(--destructive);
   --color-console: var(--console);
   --color-console-foreground: var(--console-foreground);
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-text: var(--brand-text);
+  --font-sans: var(--font-geist-sans), var(--cp-font-sans);
+  --font-mono: var(--font-geist-mono), var(--cp-font-mono);
+  --font-serif: var(--font-geist-serif), var(--cp-font-serif);
+  /* Tailwind's radius scale mapped onto the 2/4/6 px system: cards (xl) and panels (lg) stay at 6 px. */
+  --radius-xs: var(--cp-radius-sm);
+  --radius-sm: var(--cp-radius-sm);
+  --radius: var(--cp-radius);
+  --radius-md: var(--cp-radius);
+  --radius-lg: var(--cp-radius-lg);
+  --radius-xl: var(--cp-radius-lg);
+  --radius-2xl: var(--cp-radius-lg);
+  /* The console uses Tailwind's neutral scale; make it the warm deepslate greys. */
+  --color-neutral-400: var(--cp-deepslate-300);
+  --color-neutral-500: #8a847a;
+  --color-neutral-600: var(--cp-deepslate-400);
+  --color-neutral-800: var(--cp-deepslate-750);
 }
 
 @layer base {
@@ -68,9 +77,10 @@
     border-color: var(--border);
   }
   html {
+    /* Geist Serif has a single weight; don't let the browser fake bold. */
+    font-synthesis-weight: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: "cv11", "ss01";
   }
   body {
     background: var(--background);

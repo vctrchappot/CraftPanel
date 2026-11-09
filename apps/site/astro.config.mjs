@@ -8,7 +8,7 @@ export default defineConfig({
     starlight({
       title: "CraftPanel",
       description: "Self-hosted Minecraft server management for your PC, Raspberry Pi or VPS.",
-      logo: { src: "./src/assets/logo.svg", replacesTitle: false },
+      logo: { light: "./src/assets/mark-on-light.svg", dark: "./src/assets/mark-on-dark.svg", replacesTitle: false },
       favicon: "/favicon.svg",
       customCss: ["./src/styles/fonts.css", "./src/styles/docs.css"],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/vctrchappot/CraftPanel" }],
@@ -52,6 +52,7 @@ export default defineConfig({
             { slug: "docs/reference/security" },
             { slug: "docs/reference/architecture" },
             { slug: "docs/reference/troubleshooting" },
+            { slug: "docs/reference/design-system" },
             { label: "Changelog", link: "https://github.com/vctrchappot/CraftPanel/blob/main/CHANGELOG.md", attrs: { target: "_blank" } },
           ],
         },

@@ -91,9 +91,9 @@ export function UpdateNotice() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mx-3 mb-2 flex items-center gap-2 rounded-md border border-accent/30 bg-accent/5 px-2.5 py-2 text-left text-[12px] text-foreground transition-colors hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="mx-3 mb-2 flex items-center gap-2 rounded-md border border-brand/40 bg-brand/10 px-2.5 py-2 text-left text-[12px] text-foreground transition-colors hover:bg-brand/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <ArrowUpCircle className="size-4 shrink-0 text-accent" />
+        <ArrowUpCircle className="size-4 shrink-0 text-brand-text" />
         <span>
           CraftPanel <span className="font-medium">v{q.data.latest}</span> is available
         </span>
@@ -338,8 +338,8 @@ export function WhatsNew() {
       <DialogContent wide>
         <DialogHeader
           title={
-            <span className="flex items-center gap-2">
-              <Sparkles className="size-4 text-accent" /> What&apos;s new in CraftPanel v{q.data.version}
+            <span className="flex items-center gap-2 font-serif text-lg font-normal">
+              <Sparkles className="size-4 text-brand-text" /> What&apos;s new in CraftPanel v{q.data.version}
             </span>
           }
           description="CraftPanel was updated since your last visit."
@@ -453,7 +453,7 @@ export function UpdateSection() {
                 </>
               )}
             </span>
-            {s.available ? <span className="font-medium text-accent">Update available</span> : !s.error && s.latest && <span className="text-success">Up to date</span>}
+            {s.available ? <span className="font-medium text-brand-text">Update available</span> : !s.error && s.latest && <span className="text-success">Up to date</span>}
             <div className="ml-auto flex gap-2">
               <Button variant="ghost" size="sm" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
                 <RefreshCw className={refresh.isPending ? "animate-spin" : undefined} />

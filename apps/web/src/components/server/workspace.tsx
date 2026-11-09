@@ -122,7 +122,7 @@ function Header({ server: s }: { server: ServerDetail }) {
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0 space-y-1.5">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="truncate text-2xl font-semibold tracking-tight">{s.name}</h1>
+          <h1 className="truncate text-2xl font-medium tracking-tight">{s.name}</h1>
           <StatusBadge status={s.status} />
         </div>
         <p className="text-[13px] text-muted-foreground">

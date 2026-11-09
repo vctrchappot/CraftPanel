@@ -14,9 +14,9 @@ function AuthLayout({ title, subtitle, children }: { title: string; subtitle: st
     <div className="flex min-h-dvh items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm space-y-8">
         <div className="space-y-3 text-center">
-          <Logo className="mx-auto size-10" />
+          <Logo className="mx-auto h-11 w-[38px]" />
           <div className="space-y-1">
-            <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+            <h1 className="text-xl font-medium tracking-tight">{title}</h1>
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           </div>
         </div>

@@ -1,27 +1,27 @@
-/* Starlight theme in the landing page's palette: warm deepslate greys, grass green, Archivo headings. */
+/* Starlight theme on the shared design tokens (packages/ui/src/styles/tokens.css): Geist, warm greys,
+   grass green as the docs accent. Starlight's dark theme is the default; light sets data-theme="light". */
 :root {
-  --sl-font: "IBM Plex Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --sl-font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sl-font: var(--cp-font-sans);
+  --sl-font-mono: var(--cp-font-mono);
   --sl-content-width: 48rem;
 
-  /* dark (Starlight's default) */
-  --sl-color-accent-low: #26331a;
-  --sl-color-accent: #86c13a;
-  --sl-color-accent-high: #c4e59a;
-  --sl-color-white: #f4f1ea;
+  --sl-color-accent-low: #1f3319;
+  --sl-color-accent: var(--cp-grass-500);
+  --sl-color-accent-high: #b9e6ae;
+  --sl-color-white: var(--cp-sandstone-50);
   --sl-color-gray-1: #ece8df;
   --sl-color-gray-2: #cfc9bf;
-  --sl-color-gray-3: #a8a197;
-  --sl-color-gray-4: #6f6a62;
+  --sl-color-gray-3: var(--cp-deepslate-300);
+  --sl-color-gray-4: var(--cp-deepslate-400);
   --sl-color-gray-5: #3a3631;
   --sl-color-gray-6: #23211e;
-  --sl-color-black: #171614;
+  --sl-color-black: var(--cp-deepslate-900);
 }
 
 :root[data-theme="light"] {
-  --sl-color-accent-low: #e3efd2;
-  --sl-color-accent: #2f5f10;
-  --sl-color-accent-high: #234a0b;
+  --sl-color-accent-low: #ddf0d6;
+  --sl-color-accent: var(--cp-grass-800);
+  --sl-color-accent-high: #22501b;
   --sl-color-white: #1c1b18;
   --sl-color-gray-1: #2a2824;
   --sl-color-gray-2: #3d3a35;
@@ -29,30 +29,24 @@
   --sl-color-gray-4: #8a847a;
   --sl-color-gray-5: #d9d3c7;
   --sl-color-gray-6: #ece8de;
-  --sl-color-gray-7: #f4f1ea;
+  --sl-color-gray-7: var(--cp-sandstone-50);
   --sl-color-black: #fbfaf6;
 }
 
 .site-title {
-  font-family: "Archivo Variable", sans-serif;
-  font-stretch: 80%;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   color: var(--sl-color-white);
+}
+
+.site-title img {
+  width: auto;
 }
 
 .sl-markdown-content :is(h1, h2, h3),
 h1#_top {
-  font-family: "Archivo Variable", sans-serif;
-  font-stretch: 78%;
-  font-weight: 800;
-  letter-spacing: -0.015em;
-}
-
-/* The logo tile is near-black; outline it so it stays visible on the dark header. */
-:root:not([data-theme="light"]) .site-title img {
-  border-radius: 22%;
-  box-shadow: 0 0 0 1px var(--sl-color-gray-5);
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
 .sidebar-content a[aria-current="page"],
@@ -66,10 +60,86 @@ h1#_top {
 
 .sl-markdown-content :is(img) {
   border: 1px solid var(--sl-color-gray-5);
-  border-radius: 4px;
+  border-radius: var(--cp-radius);
 }
 
 .sl-markdown-content :is(.card, .sl-link-card),
 .sl-markdown-content .expressive-code .frame {
-  border-radius: 4px;
+  border-radius: var(--cp-radius);
+}
+
+/* Design system page (reference/design-system.mdx). */
+.ds-type {
+  display: grid;
+  gap: 1.5rem;
+}
+.ds-type > div {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: var(--cp-radius-lg);
+}
+.sl-markdown-content .ds-type p {
+  margin: 0;
+}
+.ds-label {
+  font-family: var(--cp-font-mono);
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+}
+.sl-markdown-content .ds-specimen {
+  margin: 0.4rem 0 0.5rem;
+  font-size: 2rem;
+  line-height: 1.15;
+  color: var(--sl-color-white);
+}
+.ds-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: 0.75rem;
+}
+.ds-swatches > div,
+.ds-radii > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0 !important;
+  font-size: var(--sl-text-sm);
+}
+.ds-swatches span {
+  display: block;
+  height: 3.5rem;
+  margin-bottom: 0.35rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: var(--cp-radius);
+}
+.ds-swatches code {
+  font-size: var(--sl-text-xs);
+  background: none;
+  padding: 0;
+}
+.ds-swatches small,
+.ds-radii small {
+  color: var(--sl-color-gray-3);
+  line-height: 1.4;
+}
+.ds-radii {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.75rem;
+}
+.ds-radii > div {
+  padding: 1rem;
+  border: 1px solid var(--sl-color-gray-4);
+  background: var(--sl-color-gray-6);
+}
+.ds-marks {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: var(--cp-radius-lg);
+}
+.sl-markdown-content .ds-marks img {
+  border: 0;
+  margin: 0;
 }

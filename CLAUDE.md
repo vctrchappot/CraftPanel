@@ -4,7 +4,7 @@ Self-hosted Minecraft (Java) server manager: Fastify API + Next.js dashboard in 
 
 - **What's done and how it was verified:** `docs/STATUS.md`
 - **What's next:** `docs/ROADMAP.md` (work through "Next" in order unless told otherwise; tick items off as you finish them)
-- Architecture, security, deployment, development: `docs/*/README.md` (contributor docs). User docs live on the website: `apps/site/src/content/docs/` → https://craftpanel.vctr.site/docs/; keep both in step when behaviour changes.
+- Architecture, security, deployment, development, design system: `docs/*/README.md` (contributor docs; tokens and type rules in `docs/design/README.md`). User docs live on the website: `apps/site/src/content/docs/` → https://craftpanel.vctr.site/docs/; keep both in step when behaviour changes.
 - `apps/web/AGENTS.md`: this Next.js version differs from older ones; read its bundled docs before changing web code.
 
 ## Working agreements

@@ -1,0 +1,111 @@
+/* CraftPanel design tokens: the single source for the dashboard, the website and the docs.
+   Light is the default; dark applies with class="dark" (dashboard) or data-theme="dark" (website, docs).
+   Rules for using them, contrast values and examples: docs/design/README.md and /docs/reference/design-system/. */
+
+:root {
+  /* ---- palette (theme-independent names) ---- */
+  --cp-deepslate-950: #0f0e0d;
+  --cp-deepslate-900: #171614;
+  --cp-deepslate-850: #1e1c1a;
+  --cp-deepslate-800: #23211e;
+  --cp-deepslate-750: #2a2824;
+  --cp-deepslate-700: #37332e;
+  --cp-deepslate-600: #4f4a43;
+  --cp-deepslate-400: #6f6a62;
+  --cp-deepslate-300: #a8a197;
+  --cp-deepslate-100: #ece8df;
+
+  --cp-sandstone-50: #fbfaf6;
+  --cp-sandstone-100: #f4f1ea;
+  --cp-sandstone-200: #ece8de;
+  --cp-sandstone-300: #e3ddd0;
+  --cp-sandstone-400: #d9d3c7;
+  --cp-sandstone-500: #b9b1a3;
+  --cp-sandstone-700: #5f5a52;
+  --cp-sandstone-900: #1c1b18;
+
+  --cp-grass-500: #5bbf4a; /* the logo's Signal green */
+  --cp-grass-400: #7ccf6a;
+  --cp-grass-700: #2f6b25;
+  --cp-grass-800: #2a5f21;
+  --cp-grass-950: #10200a;
+  --cp-gold-400: #e8b03a;
+  --cp-gold-700: #8a5a00;
+  --cp-emerald-400: #4cc38a;
+  --cp-emerald-700: #177245;
+  --cp-copper-400: #f0883e;
+  --cp-copper-700: #a8480c;
+  --cp-redstone-400: #ef5a48;
+  --cp-redstone-700: #b8321f;
+
+  /* ---- type ---- */
+  --cp-font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --cp-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --cp-font-serif: "Geist Serif", ui-serif, Georgia, serif;
+
+  /* ---- shape: everything sits on a 4 px grid, corners stay small ---- */
+  --cp-radius-sm: 2px;
+  --cp-radius: 4px;
+  --cp-radius-lg: 6px;
+
+  /* ---- semantic, light ---- */
+  --cp-bg: var(--cp-sandstone-100);
+  --cp-bg-subtle: var(--cp-sandstone-200);
+  --cp-surface: var(--cp-sandstone-50);
+  --cp-surface-muted: var(--cp-sandstone-200);
+  --cp-stone: var(--cp-sandstone-300);
+  --cp-border: var(--cp-sandstone-400);
+  --cp-border-strong: var(--cp-sandstone-500);
+  --cp-fg: var(--cp-sandstone-900);
+  --cp-fg-muted: var(--cp-sandstone-700);
+
+  /* brand: logo moments, setup, empty states, "update available" */
+  --cp-brand: var(--cp-grass-500);
+  --cp-brand-ink: var(--cp-grass-950);
+  --cp-brand-text: var(--cp-grass-700);
+  --cp-brand-button: var(--cp-grass-800);
+  --cp-brand-button-fg: #ffffff;
+
+  /* accent: focus, links, selection, info */
+  --cp-accent: var(--cp-gold-700);
+  --cp-accent-fg: #ffffff;
+
+  /* status: never use these for decoration */
+  --cp-success: var(--cp-emerald-700);
+  --cp-warning: var(--cp-copper-700);
+  --cp-danger: var(--cp-redstone-700);
+
+  --cp-console: #1a1917;
+  --cp-console-fg: var(--cp-deepslate-100);
+  --cp-shadow: #cfc8b8;
+}
+
+.dark,
+[data-theme="dark"] {
+  --cp-bg: var(--cp-deepslate-900);
+  --cp-bg-subtle: var(--cp-deepslate-850);
+  --cp-surface: var(--cp-deepslate-800);
+  --cp-surface-muted: var(--cp-deepslate-750);
+  --cp-stone: #2c2925;
+  --cp-border: var(--cp-deepslate-700);
+  --cp-border-strong: var(--cp-deepslate-600);
+  --cp-fg: var(--cp-deepslate-100);
+  --cp-fg-muted: var(--cp-deepslate-300);
+
+  --cp-brand: var(--cp-grass-500);
+  --cp-brand-ink: var(--cp-grass-950);
+  --cp-brand-text: var(--cp-grass-400);
+  --cp-brand-button: var(--cp-grass-500);
+  --cp-brand-button-fg: var(--cp-grass-950);
+
+  --cp-accent: var(--cp-gold-400);
+  --cp-accent-fg: #1c1508;
+
+  --cp-success: var(--cp-emerald-400);
+  --cp-warning: var(--cp-copper-400);
+  --cp-danger: var(--cp-redstone-400);
+
+  --cp-console: var(--cp-deepslate-950);
+  --cp-console-fg: #e4e0d7;
+  --cp-shadow: #0a0908;
+}

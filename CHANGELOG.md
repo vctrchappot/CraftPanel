@@ -6,6 +6,9 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 
 ## Unreleased
 
+### Changed
+- New logo: an isometric block with a console prompt, in the dashboard, favicon and website. The dashboard uses Geist (Sans and Mono, Serif for release notes) at lighter weights and shares its design tokens with the website: warmer greys, the logo's green for the brand, gold for focus and active controls, and smaller corners.
+
 ## 1.0.0 – 2026-11-09
 
 ### Upgrading

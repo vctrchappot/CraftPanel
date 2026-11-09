@@ -1,5 +1,11 @@
 # Implementation status
 
+## Design system and brand (2026-11-09)
+
+Shared tokens and Geist for the dashboard, website and docs, plus the new mark from the brand package (v1.0). Rules: [design/README.md](design/README.md).
+
+- ✅ Dashboard checked in Chromium on a throwaway instance with a running Paper server (servers, overview, console, plugins, new-server; dark and light), website and docs checked in both themes and at 390 px: no console errors, no horizontal overflow, all landing interactions pass. Text colour pairs meet WCAG AA by calculation (table in the design docs). Fonts are served from the official `geist` package; no third-party font requests.
+
 ## Independent Minecraft runtime (2026-11-09)
 
 Minecraft servers run in a separate runtime service. The dashboard can restart, crash or update while games continue, and it reconnects to their actual state, console and controls. Protocol and recovery boundary: [architecture/runtime.md](architecture/runtime.md).

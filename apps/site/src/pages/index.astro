@@ -10,7 +10,7 @@ import { heroScene, pcScene, piScene, vpsScene } from "../lib/scenes";
 import { repoFacts } from "../lib/github";
 // release.mjs bumps every workspace package, so this matches the latest release.
 import pkg from "../../package.json";
-import logo from "../assets/logo.svg";
+import Mark from "../components/Mark.astro";
 import avatar from "../assets/victor.jpg";
 
 const facts = await repoFacts();
@@ -151,7 +151,7 @@ const backups = [
 
     <header class="nav">
       <div class="wrap nav-in">
-        <a href="/" class="brand"><Image src={logo} alt="" width={28} height={28} /><span>CraftPanel</span></a>
+        <a href="/" class="brand"><Mark size={30} /><span>CraftPanel</span></a>
         <nav aria-label="Main" class="nav-links">
           <a href="#install">Install</a>
           <a href="#features">Features</a>
@@ -239,7 +239,7 @@ const backups = [
               <div class="pv-bar"><span class="pv-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="mono">localhost:8080/server</span></div>
               <div class="pv-body">
                 <aside class="pv-side" aria-hidden="true">
-                  <span class="pv-brand"><Image src={logo} alt="" width={16} height={16} />CraftPanel</span>
+                  <span class="pv-brand"><Mark size={17} />CraftPanel</span>
                   <span class="pv-side-label mono">SERVERS</span>
                   <span class="pv-side-item is-on"><span class="dot-run"></span><span data-pv="server">{types[0].server}</span></span>
                   <span class="pv-side-item"><span class="dot-off"></span>lobby</span>
@@ -559,7 +559,7 @@ const backups = [
     <footer class="foot">
       <div class="wrap foot-in">
         <div class="foot-brand">
-          <a href="/" class="brand"><Image src={logo} alt="" width={24} height={24} /><span>CraftPanel</span></a>
+          <a href="/" class="brand"><Mark size={26} /><span>CraftPanel</span></a>
           <p>Built for people who'd rather play than configure. Made by <a href="https://www.vctr.site">Victor</a>.</p>
         </div>
         <nav class="foot-cols" aria-label="Footer">
