@@ -4,7 +4,7 @@
 
 ## Git
 
-- Work on `wip/runtime-separation` (16 commits on top of `main` at `ce16c90`; `main` is unchanged).
+- Work on `wip/runtime-separation` (on top of `main` at `ce16c90`; `main` is unchanged).
 - Last CI run with all jobs green: [42587950885](https://github.com/vctrchappot/CraftPanel/actions/runs/42587950885) on `192ceb4`. Later commits only change documentation.
 - `3077ef7` is still a combined `WIP:` commit (installer, updates, maintenance action, Windows service). Split it into reviewed logical commits before merging; do not rewrite the other, already descriptive commits.
 - The earlier feature worktrees and branches (`feat/runtime-*`, `test/runtime-reconnect`, `feat/database-recovery-helper`, `docs/professional-deployment`, `test/deployment-package`) were removed. Their content is in this branch; their uncommitted early drafts are archived as patches in `../CraftPanel-worktrees/_archive-20261109/`.
@@ -23,6 +23,7 @@
 
 - Windows typecheck and full suite: 261 passed, 4 Unix-specific skipped. The intermittent disconnect seen once under a concurrent typecheck did not reproduce in twelve complete runs; its cause is unproven.
 - Ubuntu/systemd (WSL distro `craftpanel-test`, Node 24.22.2), `scripts/real-tests/runtime-continuity.mjs` with real Paper 1.21.4 and a mineflayer player: dashboard restart, forced crash/recovery, dashboard-only update, failed migration and invalid-unit rollback keep the same Java/runtime PIDs and player connection; commands and console replay work afterwards. Missing, expired and wrong-runtime approvals leave the player connected. A failed changed-runtime migration rolls back; an approved runtime update and a graceful runtime-service restart preserve a world sentinel and restore auto-start. Evidence (ignored): `test-results/runtime-verified-20261109/`.
+- Host shutdown/boot (Ubuntu, disposable WSL clone of `craftpanel-test`, `scripts/real-tests/host-reboot.mjs`): `systemctl poweroff` stopped the runtime in 1.5 s without SIGKILL; both Paper servers logged a graceful stop and world save; after boot only the auto-start server ran (new Java PID), the manual one stayed stopped, a player joined, and a block placed without explicit save survived (no autosave had run yet). Systemd-level shutdown/boot of the distro, not a kernel/firmware reboot. Evidence (ignored): `test-results/host-reboot-20261109/`. Lesson: in WSL `journalctl -b -1` does not separate distro boots (journal boot IDs follow the shared kernel).
 - Legacy migration (Ubuntu) from the old combined process with real world and `server.properties` preservation, refusal without approval and rollback: `test-results/runtime-legacy-20261109/`.
 - Real tests found and fixed: root-owned registry restore after runtime rollback; installation marked complete while runtime registration still held the lock; runtime defaulting to `.data` instead of the platform data directory.
 - Windows: production deployment smoke and Chromium E2E (real Vanilla lifecycle, maintenance stop-all, the three update-preview states with controlled release metadata) pass. Elevated SCM scenarios pass in CI only (hosted runner): virtual-account identity, independent dashboard-task stop, unsupported archive, failed migrations, hanging startup, runtime update refusal/approval/rollback, SCM crash recovery, recovery retention. The cause of the earlier CI failure (`Failed to start service`, fixed by traversal/Node access grants) was inferred, not read from a service log. The local shell has no administrator token.
@@ -30,7 +31,7 @@
 
 ## Remaining acceptance, in order
 
-1. Graceful host reboot with autostart in a disposable VM/WSL environment, Linux and Windows. Never reboot the workstation; a runtime-service restart is not reboot evidence.
+1. Windows graceful host shutdown/boot with autostart (Linux is done). Needs an elevated disposable Windows VM or CI runner; never reboot the workstation. A runtime-service restart is not reboot evidence.
 2. Windows real-player continuity (Paper + mineflayer) through dashboard restart, forced stop and dashboard-only update with an installed SCM service.
 3. Dashboard-triggered update/rollback (not only controlled preview metadata) and concurrent installer runs.
 4. Re-investigate if the intermittent disconnect returns: use the diagnostic reason codes, do not just widen poll intervals.

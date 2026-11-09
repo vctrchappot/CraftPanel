@@ -67,6 +67,24 @@ sudo node scripts/real-tests/runtime-continuity.mjs test-results/runtime-accepta
 
 The optional Java executable is copied into this instance's data directory; the original installation is read-only. The harness installs real Paper 1.21.4, holds a real offline player through dashboard restart/crash, successful dashboard update and migration/unit rollback, and checks unchanged PIDs, player connection, console replay and working commands. It also checks missing/expired/mismatched runtime approvals, changed-runtime rollback and successful maintenance update using a gold block in the real world, and graceful runtime-service restart with auto-start. That final scenario is not an actual host reboot. JSON evidence and installer logs remain in the fixture directory. Services are uninstalled even on failure; data is retained for diagnosis. Fixture names and ports must be unused. Playwright output is confined to `test-results/playwright` so it cannot delete these archives.
 
+## Graceful host shutdown and boot (Linux)
+
+`host-reboot.mjs` powers off its host between two phases, so run it only on a disposable systemd host. On Windows, clone the WSL test distro and remove the clone afterwards:
+
+```powershell
+wsl --export craftpanel-test C:\cpwsl\craftpanel-test.tar
+wsl --import craftpanel-reboot C:\cpwsl\reboot C:\cpwsl\craftpanel-test.tar
+wsl -d craftpanel-reboot -u root -- systemctl disable --now craftpanel   # keep the cloned instance off its ports
+# keep the clone alive in another terminal: wsl -d craftpanel-reboot -u root -- sleep infinity
+wsl -d craftpanel-reboot -u root -- node scripts/real-tests/host-reboot.mjs prepare FIXTURES craftpanel-ops-NAME PORT /path/to/test-tools [/path/to/java]
+wsl -d craftpanel-reboot -u root -- systemctl poweroff
+# boot it again (start the keep-alive), then:
+wsl -d craftpanel-reboot -u root -- node scripts/real-tests/host-reboot.mjs verify FIXTURES craftpanel-ops-NAME PORT /path/to/test-tools
+wsl --unregister craftpanel-reboot
+```
+
+Run the `node` commands from the checkout (`/mnt/c/...`). Generate fixtures with `installer-fixtures.mjs` as above. `prepare` installs the instance and two real Paper 1.21.4 servers, one with auto-start and one without. It connects a player, flushes a gold block and then places a diamond block without a save. `verify` checks for a new systemd boot (PID 1 start time; WSL journal boot IDs follow the shared kernel). It checks the journal since preparation for a runtime stop without SIGKILL or stop timeout and the previous Minecraft logs for a graceful stop and world save. It also checks that both units are enabled, only the auto-start server is running again, a player can join, and both blocks still exist. It then uninstalls the instance and writes `host-reboot-evidence.json`. A WSL distro poweroff is a full systemd shutdown and boot, not a kernel or firmware reboot.
+
 ## Conventions
 
 - Ports: don't use 8080/25565 or anything a real instance on the machine uses. Pick e.g. 8130+ for the API and 25820+ for Minecraft.
