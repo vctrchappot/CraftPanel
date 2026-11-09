@@ -165,6 +165,26 @@ function Install-CraftPanel {
       if ($LASTEXITCODE -ne 0) { Fail "Could not protect the runtime data directory." }
       & icacls.exe $Root /grant "${account}:(OI)(CI)RX" | Out-Null
       if ($LASTEXITCODE -ne 0) { Fail "Could not grant runtime access to its program files." }
+      $nodeDir = Split-Path -Parent ([IO.Path]::GetFullPath($node))
+      if ($node -notlike "$Root\*") {
+        & icacls.exe $nodeDir /grant "${account}:(OI)(CI)RX" | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+          & icacls.exe $node /grant "${account}:RX" | Out-Null
+          if ($LASTEXITCODE -ne 0) { Fail "Could not grant runtime access to Node.js." }
+        }
+      }
+      # Node resolves every path component before loading its entry point. The service
+      # needs attributes/traversal on private profile ancestors, without inherited file access.
+      $grantedParents = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+      foreach ($target in @($Root, $DataDir, $node)) {
+        $parent = Split-Path -Parent ([IO.Path]::GetFullPath($target))
+        while ($parent -and $parent.TrimEnd('\') -ne [IO.Path]::GetPathRoot($parent).TrimEnd('\')) {
+          if ($grantedParents.Add($parent)) {
+            & icacls.exe $parent /grant "${account}:(X,RA,REA,RC,S)" | Out-Null
+          }
+          $parent = Split-Path -Parent $parent
+        }
+      }
       # Preserve custom server locations. The DB is read-only and no migration is run by this helper.
       $dbFile = Join-Path $DataDir "craftpanel.db"
       if (Test-Path -LiteralPath $dbFile) {

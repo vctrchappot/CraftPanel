@@ -23,6 +23,19 @@ export function runtimeAccess(installRoot: string | undefined, agent: RuntimeAge
     const javaRoot = path.basename(path.dirname(javaPath)).toLowerCase() === "bin" ? path.dirname(path.dirname(javaPath)) : path.dirname(javaPath);
     const executable = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "icacls.exe");
     try {
+      const parents = new Set<string>();
+      for (const target of [directory, javaRoot]) {
+        let parent = path.dirname(path.resolve(target));
+        while (parent !== path.parse(parent).root) {
+          if (!parents.has(parent)) {
+            parents.add(parent);
+            // Public/system ancestors may already be accessible but not writable by the
+            // dashboard owner. The subsequent service probe is authoritative.
+            await run(executable, [parent, "/grant", `${account}:(X,RA,REA,RC,S)`], { windowsHide: true, timeout: 10_000 }).catch(() => undefined);
+          }
+          parent = path.dirname(parent);
+        }
+      }
       if (!access.directory) await run(executable, [path.resolve(directory), "/grant", `${account}:(OI)(CI)M`], { windowsHide: true, timeout: 10_000 });
       if (!access.java) await run(executable, [path.resolve(javaRoot), "/grant", `${account}:(OI)(CI)RX`], { windowsHide: true, timeout: 10_000 });
       const verified = await agent.checkPaths(directory, javaPath);
