@@ -116,6 +116,7 @@ export function RealtimeProvider({ children, enabled }: { children: React.ReactN
         qc.setQueryData<ServerSummary[]>(["servers"], (prev) => prev?.map((s) => (s.id === msg.serverId ? { ...s, playersOnline: msg.players.length } : s)));
       } else if (msg.type === "event") {
         void qc.invalidateQueries({ queryKey: ["activity"] });
+        if (msg.event.serverId) void qc.invalidateQueries({ queryKey: ["overview", msg.event.serverId] });
       } else if (msg.type === "backup" && ["completed", "failed", "restored"].includes(msg.status)) {
         void qc.invalidateQueries({ queryKey: ["backups"] });
       } else if (msg.type === "install" && msg.progress.done) {

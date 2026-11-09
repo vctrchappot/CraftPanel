@@ -142,8 +142,15 @@ export function HomeView() {
       </Section>
 
       <div className="grid gap-10 lg:grid-cols-3">
-        <Section title="Recent activity" className="lg:col-span-2" actions={<Link href="/activity/" className="flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground">View all <ArrowRight className="size-3.5" /></Link>}>
-          <Panel>{activity.data ? <EventList events={activity.data} showServer /> : <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-8" />)}</div>}</Panel>
+        <Section title="Recent activity" className="flex min-h-0 flex-col lg:col-span-2" actions={<Link href="/activity/" className="flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground">View all <ArrowRight className="size-3.5" /></Link>}>
+          <Panel
+            className="scrollbar-thin min-h-0 max-h-80 flex-1 overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:max-h-none lg:[contain:size]"
+            role="region"
+            aria-label="Recent activity"
+            tabIndex={0}
+          >
+            {activity.data ? <EventList events={activity.data} showServer /> : <div className="space-y-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-8" />)}</div>}
+          </Panel>
         </Section>
         <Section title="This host">
           <Panel className="divide-y divide-border text-[13px]">
