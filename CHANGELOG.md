@@ -6,6 +6,8 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 
 ## Unreleased
 
+## 0.2.1 – 2026-11-09
+
 ### Changed
 - Settings lists its sections on the left on wide screens and as a swipeable row on narrow ones, instead of a tab bar that needed horizontal and vertical scrollbars.
 
