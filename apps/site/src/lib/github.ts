@@ -18,6 +18,23 @@ async function get<T>(path: string): Promise<T | null> {
   }
 }
 
+const parts = (v: string) => v.replace(/^v/, "").split(".").map((n) => Number.parseInt(n, 10) || 0);
+function compareVersions(a: string, b: string): number {
+  const [x, y] = [parts(a), parts(b)];
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) < (y[i] ?? 0) ? -1 : 1;
+  return 0;
+}
+
+/**
+ * The release to show. A deploy runs when the release commit is pushed, before GitHub Actions has published the
+ * release, so "latest" is still the previous one then. This build's own version is never older than the latest
+ * release, so show it instead of an outdated tag.
+ */
+export function shownRelease(latest: RepoFacts["release"], version: string): NonNullable<RepoFacts["release"]> {
+  if (latest && compareVersions(latest.tag, version) >= 0) return latest;
+  return { tag: `v${version}`, date: "", url: `https://github.com/${REPO}/releases/tag/v${version}` };
+}
+
 let cached: Promise<RepoFacts> | null = null;
 
 export function repoFacts(): Promise<RepoFacts> {

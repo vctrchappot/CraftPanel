@@ -12,6 +12,7 @@ scripts/real-tests/run.sh <api-port> <data-dir> <scenario.mjs> [args…]
 | Scenario | Args | What it checks |
 |---|---|---|
 | `software-switch.mjs` | – | A block placed in Paper's Nether survives Paper → Vanilla → Fabric → Paper; downgrade guard. |
+| `info-card.mjs` | `<phase> <state-file> <tools-dir> [mcVersion] [mcPort]` | `/craftpanel` card with a real player (mineflayer): current version and software, read from the running game; two phases around a dashboard-only restart. |
 | `host-fit.mjs` | `[mcVersion] [mcPort]` | Host detection (board, usable memory, cores) in `/api/system` and the hardware fit of a server plan against this machine. |
 | `performance.mjs` | `[software] [mcVersion] [mcPort]` | Wizard preset applied (JVM flags, distances), preset switch, Chunky install and pre-generation with pause/continue/cancel. |
 | `neoforge.mjs` | `<mcVersion> <mcPort>` | NeoForge catalogue, install, start, Chunky as a NeoForge mod, mod list from `neoforge.mods.toml`, pre-generation, switch preview. |

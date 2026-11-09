@@ -2,7 +2,8 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { INFO_PACK_DIR, INFO_PLUGIN_FILE, isInfoPlugin, syncInfoPack, syncInfoPlugin } from "../src/services/info-pack";
+import { CRAFTPANEL_VERSION } from "@craftpanel/shared";
+import { INFO_PACK_DIR, INFO_PLUGIN_FILE, infoStorageCommand, isInfoPlugin, syncInfoPack, syncInfoPlugin } from "../src/services/info-pack";
 import { createZip } from "@craftpanel/backup";
 
 const BUNDLED = path.resolve(__dirname, "../assets", INFO_PLUGIN_FILE);
@@ -34,7 +35,19 @@ describe("info datapack", () => {
     // Every tellraw argument must be valid JSON on a single line.
     for (const line of info.split("\n").filter((l) => l.startsWith("tellraw @s "))) expect(() => JSON.parse(line.slice("tellraw @s ".length))).not.toThrow();
     expect(info).toContain("scoreboard players set @s craftpanel 0");
-    expect(info).toContain("Paper 1.21.11");
+    // Version and software come from command storage, so a running server can be refreshed without a restart:
+    expect(info).toContain('"storage":"craftpanel:info"');
+    expect(info).not.toContain(CRAFTPANEL_VERSION);
+    const load = await fsp.readFile(path.join(p, "data", "craftpanel", "function", "load.mcfunction"), "utf8");
+    expect(load).toContain(`data merge storage craftpanel:info {version:"${CRAFTPANEL_VERSION}",software:"Paper 1.21.11"}`);
+  });
+
+  it("rewrites the files and the live command when the version or software changes", async () => {
+    await syncInfoPack(dir, true, D);
+    expect(await syncInfoPack(dir, true, { software: "paper", mcVersion: "26.3" })).toBe(true);
+    const load = await fsp.readFile(path.join(pack(), "data", "craftpanel", "function", "load.mcfunction"), "utf8");
+    expect(load).toContain("Paper 26.3");
+    expect(infoStorageCommand({ software: "purpur", mcVersion: "1.21.4" })).toBe(`data merge storage craftpanel:info {version:"${CRAFTPANEL_VERSION}",software:"Purpur 1.21.4"}`);
   });
 
   it("is idempotent and removes only its own pack when disabled", async () => {

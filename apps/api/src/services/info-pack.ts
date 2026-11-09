@@ -12,10 +12,16 @@ import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, CRAFTPANEL_VERSION, softwareLab
  *    no operator rights needed). It holds the card itself.
  *  - On Paper, a ~2 KB plugin (plugins/craftpanel-info) adds the nicer `/craftpanel`, which
  *    simply runs the datapack's function for the player. Datapacks can't register commands.
+ *
+ * The card reads CraftPanel's version and the server software from command storage instead of having them
+ * written into its text. A running server keeps the datapack it loaded at start, and servers outlive
+ * CraftPanel updates, so CraftPanel pushes fresh values into the storage of running servers (see
+ * infoStorageCommand) while load.mcfunction sets them again on every start and reload.
  */
 export const INFO_PACK_DIR = "craftpanel-info";
 export const INFO_TRIGGER = "craftpanel";
 const MARKER = ".craftpanel-managed";
+const INFO_STORAGE = "craftpanel:info";
 
 /** What the info card says about the server it runs on. */
 export interface InfoPackDetails {
@@ -45,12 +51,23 @@ function link(label: string, url: string, tip: string, bold = true) {
 const rule = (width: number) => text(" ".repeat(width), { color: "dark_gray", strikethrough: true });
 const bullet = (label: string, value: unknown[]) => ["", text(" » ", { color: "gold" }), text(label, { color: "gray" }), ...value];
 
-function infoFunction(details: InfoPackDetails): string {
-  const software = `${softwareLabel(details.software)} ${details.mcVersion}`;
+/** Values the card shows, as the SNBT compound merged into the card's command storage. */
+function infoStorageValue(details: InfoPackDetails): string {
+  return `{version:${JSON.stringify(CRAFTPANEL_VERSION)},software:${JSON.stringify(`${softwareLabel(details.software)} ${details.mcVersion}`)}}`;
+}
+
+/** Console command that updates the card of a server that is already running. */
+export function infoStorageCommand(details: InfoPackDetails): string {
+  return `data merge storage ${INFO_STORAGE} ${infoStorageValue(details)}`;
+}
+
+const stored = (path: string, color: string) => ({ nbt: path, storage: INFO_STORAGE, color });
+
+function infoFunction(): string {
   const lines: unknown[] = [
     ["", rule(14), text(" ✦ ", { color: "gold" }), text("CraftPanel", { color: "gold", bold: true }), text(" ✦ ", { color: "gold" }), rule(14)],
-    ["", text("Hey ", { color: "white" }), { selector: "@s", color: "yellow" }, text("! This server is powered by ", { color: "white" }), text("CraftPanel", { color: "gold" }), text(` v${CRAFTPANEL_VERSION}`, { color: "dark_gray" })],
-    bullet("Running ", [text(software, { color: "green" })]),
+    ["", text("Hey ", { color: "white" }), { selector: "@s", color: "yellow" }, text("! This server is powered by ", { color: "white" }), text("CraftPanel", { color: "gold" }), text(" v", { color: "dark_gray" }), stored("version", "dark_gray")],
+    bullet("Running ", [stored("software", "green")]),
     bullet("Self-hosted on a ", [text("PC", { color: "aqua" }), text(", ", { color: "gray" }), text("Raspberry Pi", { color: "light_purple" }), text(" or ", { color: "gray" }), text("VPS", { color: "aqua" })]),
     bullet("One-click servers, live console, backups & plugins", []),
     bullet("Free to use and modify ", [text("(FSL-1.1-ALv2)", { color: "dark_gray" })]),
@@ -75,7 +92,7 @@ function infoFunction(details: InfoPackDetails): string {
 }
 
 function packFiles(details: InfoPackDetails): Record<string, string> {
-  const load = [`scoreboard objectives add ${INFO_TRIGGER} trigger`, `schedule function craftpanel:poll 10t replace`, ""].join("\n");
+  const load = [`data merge storage ${INFO_STORAGE} ${infoStorageValue(details)}`, `scoreboard objectives add ${INFO_TRIGGER} trigger`, `schedule function craftpanel:poll 10t replace`, ""].join("\n");
   // Re-enable the trigger for everyone (triggers lock after each use) and answer pending requests.
   const poll = [
     `scoreboard players enable @a ${INFO_TRIGGER}`,
@@ -83,7 +100,7 @@ function packFiles(details: InfoPackDetails): Record<string, string> {
     `schedule function craftpanel:poll 10t replace`,
     "",
   ].join("\n");
-  const functions = { "load.mcfunction": load, "poll.mcfunction": poll, "info.mcfunction": infoFunction(details) };
+  const functions = { "load.mcfunction": load, "poll.mcfunction": poll, "info.mcfunction": infoFunction() };
   const loadTag = JSON.stringify({ values: ["craftpanel:load"] });
 
   const files: Record<string, string> = {

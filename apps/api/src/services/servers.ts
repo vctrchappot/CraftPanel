@@ -25,7 +25,7 @@ import type { z } from "zod";
 import type { Hub } from "../hub";
 import type { AppConfig } from "../config";
 import { SYSTEM_ACTOR, type ActivityService, type Actor } from "./activity";
-import { syncInfoPack, syncInfoPlugin } from "./info-pack";
+import { infoStorageCommand, syncInfoPack, syncInfoPlugin } from "./info-pack";
 import { mergeSplitDimensions, separateDimensionLayout } from "./software-switch";
 import { MODPACK_RECORD, ModpackStaging, PENDING_MODPACK } from "./modpacks";
 import type { SettingsService } from "./settings";
@@ -527,6 +527,20 @@ export class ServerService {
     if (patch.port !== undefined && patch.port !== row.port) {
       const others = (await this.rows()).filter((s) => s.id !== id);
       if (others.some((s) => s.port === patch.port)) throw conflict(`Port ${patch.port} is used by another CraftPanel server`);
+  /**
+   * A server that kept running across a CraftPanel update still shows the card it loaded at start. Rewrite the
+   * files for its next start and push the current values into the running game.
+   */
+  private async refreshRunningInfoCommand(row: ServerRow) {
+    if (SOFTWARE_INFO[row.software].proxy) return;
+    const enabled = row.infoCommand ?? (await this.settings.get()).infoCommand;
+    if (!enabled) return;
+    const details = { software: row.software, mcVersion: row.mcVersion };
+    // Only the datapack: the plugin jar is locked by the running server on Windows and changes rarely.
+    await syncInfoPack(row.directory, true, details);
+    if (this.agent.status(row.id) === "running") await this.agent.send(row.id, infoStorageCommand(details));
+  }
+
       if (!this.agent.isRunning(id) && !(await isPortAvailable(patch.port))) throw conflict(`Port ${patch.port} is in use on this machine`);
     }
     if (patch.memoryMb !== undefined) {
@@ -693,6 +707,7 @@ export class ServerService {
     for (const row of await this.rows()) {
       if (row.autoStart && row.installState === "installed" && row.eulaAccepted && !this.agent.owns(row.id) && !this.agent.isRunning(row.id) && row.lastStatus !== "orphaned") {
         this.start(row.id, SYSTEM_ACTOR).catch((err) => this.activity.event(row.id, "server.autostart_failed", `Automatic start failed: ${(err as Error).message}`, { level: "error" }));
+        await this.refreshRunningInfoCommand(row).catch(() => undefined);
       } else if (row.installState === "installed" && row.lastStatus !== "orphaned" && !this.agent.owns(row.id)) {
         await this.registerRuntime(row).catch((err) => this.activity.event(row.id, "runtime.registration_failed", `Runtime registration failed: ${(err as Error).message}`, { level: "error" }));
       }
