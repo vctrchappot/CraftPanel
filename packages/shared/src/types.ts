@@ -250,6 +250,11 @@ export interface PluginInfo {
   size: number;
   sha1: string;
   missingDependencies: string[];
+  /** Another jar in the same directory that provides the same plugin or mod. */
+  duplicateOf?: string | null;
+  /** Marketplace project id or slug when installed through CraftPanel. */
+  projectId?: string | null;
+  source?: "modrinth" | "hangar" | null;
 }
 
 export interface WorldInfo {

@@ -1,7 +1,8 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
+import crypto from "node:crypto";
 import { download, fetchJson } from "./download";
-import type { MarketplaceProject } from "./plugins";
+import { DuplicateAddonError, findDuplicateAddon, inspectPluginJar, listAddonMetas, type MarketplaceProject } from "./plugins";
 
 /** PaperMC's plugin repository (https://hangar.papermc.io/api-docs). */
 const HANGAR = "https://hangar.papermc.io/api/v1";
@@ -109,12 +110,31 @@ function safeHost(url: string) {
   }
 }
 
-export async function installHangarVersion(versionId: string, pluginsDir: string): Promise<{ file: string; version: string; requiredDependencies: string[] }> {
+export async function installHangarVersion(
+  versionId: string,
+  pluginsDir: string,
+  opts: { replaceFile?: string } = {},
+): Promise<{ file: string; version: string; requiredDependencies: string[] }> {
   if (!HANGAR_VERSION_ID.test(versionId)) throw new Error("Invalid Hangar version id");
   const v = await fetchJson<HangarVersionRaw>(`${HANGAR}/versions/${versionId}`);
   const file = hangarPaperFile(v);
   await fsp.mkdir(pluginsDir, { recursive: true });
-  await download({ url: file.url, destination: path.join(pluginsDir, file.name), checksum: { algorithm: "sha256", value: file.sha256 }, maxBytes: 200 * 1024 * 1024 });
+
+  const existing = await listAddonMetas(pluginsDir, "plugins", "fabric");
+  const preDup = findDuplicateAddon({ file: file.name, name: null, main: null, sha1: "" }, existing, "plugins", "fabric", opts.replaceFile);
+  if (preDup) throw new DuplicateAddonError(preDup.name ?? file.name, preDup.file);
+
+  const stage = path.join(pluginsDir, `.${file.name}.${crypto.randomUUID()}.staging`);
+  try {
+    await download({ url: file.url, destination: stage, checksum: { algorithm: "sha256", value: file.sha256 }, maxBytes: 200 * 1024 * 1024 });
+    const candidate = { ...(await inspectPluginJar(stage)), file: file.name };
+    const current = await listAddonMetas(pluginsDir, "plugins", "fabric");
+    const dup = findDuplicateAddon(candidate, current, "plugins", "fabric", opts.replaceFile);
+    if (dup) throw new DuplicateAddonError(dup.name ?? candidate.name ?? file.name, dup.file);
+    await fsp.rename(stage, path.join(pluginsDir, file.name));
+  } finally {
+    await fsp.rm(stage, { force: true });
+  }
   const deps = (v.pluginDependencies?.PAPER ?? []).filter((d) => d.required).map((d) => d.name);
   return { file: file.name, version: v.name, requiredDependencies: deps };
 }

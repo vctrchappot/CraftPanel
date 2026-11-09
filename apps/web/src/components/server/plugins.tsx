@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowUpCircle, Download, Puzzle, Search, ShieldAlert, Trash2, Upload, Zap } from "lucide-react";
+import { AlertTriangle, ArrowUpCircle, Check, Download, Puzzle, Search, ShieldAlert, Trash2, Upload, Zap } from "lucide-react";
 import { toast } from "sonner";
 import {
   Badge,
@@ -25,7 +25,7 @@ import {
   TabsTrigger,
   cn,
 } from "@craftpanel/ui";
-import { SOFTWARE_INFO, softwareLabel, type PluginInfo, type ServerDetail } from "@craftpanel/shared";
+import { findInstalledAddon, SOFTWARE_INFO, softwareLabel, type PluginInfo, type ServerDetail } from "@craftpanel/shared";
 import { api, errorMessage, upload } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
@@ -41,6 +41,9 @@ interface MarketHit {
   iconUrl: string | null;
   compatible: boolean;
   source: "modrinth" | "hangar";
+  installed?: boolean;
+  installedVersion?: string | null;
+  installedFile?: string | null;
 }
 
 type Source = "modrinth" | "hangar";
@@ -81,7 +84,7 @@ export function PluginsTab({ server: s }: { server: ServerDetail }) {
           <Installed server={s} plugins={q.data.plugins} canManage={canManage} />
         </TabsContent>
         <TabsContent value="browse">
-          <Browse server={s} />
+          <Browse server={s} plugins={q.data.plugins} />
         </TabsContent>
         <TabsContent value="updates">
           <Updates server={s} />
@@ -94,6 +97,8 @@ export function PluginsTab({ server: s }: { server: ServerDetail }) {
 function Installed({ server: s, plugins, canManage }: { server: ServerDetail; plugins: PluginInfo[]; canManage: boolean }) {
   const key = [
     ["plugins", s.id],
+    ["plugin-updates", s.id],
+    ["market", s.id],
     ["server", s.id],
   ];
   const t = addonTerms(s);
@@ -123,12 +128,17 @@ function Installed({ server: s, plugins, canManage }: { server: ServerDetail; pl
                 const f = e.target.files?.[0];
                 e.target.value = "";
                 if (!f) return;
+                const safeName = f.name.replace(/[^A-Za-z0-9 ._+()-]/g, "_");
+                const existing = plugins.find((p) => p.file.replace(/\.disabled$/i, "").toLowerCase() === safeName.toLowerCase());
+                if (existing) {
+                  toast.error(`${existing.name ?? safeName} is already installed (${existing.file}). Remove or update the existing file first.`);
+                  return;
+                }
                 setPct(0);
                 try {
                   await upload(`/api/servers/${s.id}/plugins/upload`, f, setPct);
                   toast.success(`${f.name} uploaded. Restart to load it.`);
-                  void qc.invalidateQueries({ queryKey: ["plugins", s.id] });
-                  void qc.invalidateQueries({ queryKey: ["server", s.id] });
+                  for (const k of key) void qc.invalidateQueries({ queryKey: k });
                 } catch (err) {
                   toast.error(errorMessage(err));
                 } finally {
@@ -154,6 +164,7 @@ function Installed({ server: s, plugins, canManage }: { server: ServerDetail; pl
                     {p.name ?? p.file}
                     {p.version && <span className="font-normal text-muted-foreground">{p.version}</span>}
                     {!p.enabled && <Badge>Disabled</Badge>}
+                    {p.duplicateOf && <Badge variant="warning">Duplicate</Badge>}
                     {p.name === null && <Badge variant="danger">Invalid {t.one}</Badge>}
                   </p>
                   {p.description && <p className="text-muted-foreground">{p.description}</p>}
@@ -163,6 +174,11 @@ function Installed({ server: s, plugins, canManage }: { server: ServerDetail; pl
                     {p.apiVersion ? ` · API ${p.apiVersion}` : ""}
                     {p.depend.length ? ` · requires ${p.depend.join(", ")}` : ""}
                   </p>
+                  {p.duplicateOf && (
+                    <p className="flex items-center gap-1.5 text-xs text-warning">
+                      <AlertTriangle className="size-3.5" /> Duplicate of {p.duplicateOf}. Remove one copy so the server does not load the {t.one} twice.
+                    </p>
+                  )}
                   {p.enabled && p.missingDependencies.length > 0 && (
                     <p className="flex items-center gap-1.5 text-xs text-destructive">
                       <AlertTriangle className="size-3.5" /> Missing dependencies: {p.missingDependencies.join(", ")}. The {t.one} will fail to load.
@@ -197,7 +213,7 @@ function Installed({ server: s, plugins, canManage }: { server: ServerDetail; pl
   );
 }
 
-function Browse({ server: s }: { server: ServerDetail }) {
+function Browse({ server: s, plugins }: { server: ServerDetail; plugins: PluginInfo[] }) {
   const t = addonTerms(s);
   // Hangar is PaperMC's repository: plugins only.
   const sources: Source[] = t.one === "plugin" ? ["modrinth", "hangar"] : ["modrinth"];
@@ -223,6 +239,8 @@ function Browse({ server: s }: { server: ServerDetail }) {
       success: (r) => `Installed ${r.file}${r.requiredDependencies.length ? ` — also needs ${r.requiredDependencies.length} dependency ${t.one}(s)` : ""}. Restart to load it.`,
       invalidate: [
         ["plugins", s.id],
+        ["plugin-updates", s.id],
+        ["market", s.id],
         ["server", s.id],
       ],
     },
@@ -267,24 +285,49 @@ function Browse({ server: s }: { server: ServerDetail }) {
       ) : (
         <Panel>
           <ul className="divide-y divide-border">
-            {q.data?.hits.map((h) => (
-              <li key={h.id} className="flex items-start gap-4 px-4 py-3.5 text-[13px]">
-                <div className="min-w-0 flex-1 space-y-1">
-                  <p className="flex flex-wrap items-center gap-2 font-medium">
-                    <a href={SOURCES[h.source].url(h, t.page)} target="_blank" rel="noreferrer" className="hover:underline">
-                      {h.title}
-                    </a>
-                    <span className="font-normal text-muted-foreground">by {h.author}</span>
-                    {h.compatible ? <Badge variant="success">Supports {s.mcVersion}</Badge> : <Badge variant="warning">Not listed for {s.mcVersion}</Badge>}
-                  </p>
-                  <p className="text-muted-foreground">{h.description}</p>
-                  <p className="text-xs text-muted-foreground">{h.downloads.toLocaleString()} downloads</p>
-                </div>
-                <Button size="sm" variant="secondary" disabled={!h.compatible} onClick={() => setConfirm(h)}>
-                  <Download /> Install
-                </Button>
-              </li>
-            ))}
+            {q.data?.hits.map((h) => {
+              const installed = findInstalledAddon(h, plugins);
+              const isInstalled = Boolean(installed || h.installed);
+              const installedVer = installed?.version ?? h.installedVersion;
+              const isInstalling = install.isPending && install.variables?.id === h.id;
+              return (
+                <li key={h.id} className="flex items-start gap-4 px-4 py-3.5 text-[13px]">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="flex flex-wrap items-center gap-2 font-medium">
+                      <a href={SOURCES[h.source].url(h, t.page)} target="_blank" rel="noreferrer" className="hover:underline">
+                        {h.title}
+                      </a>
+                      <span className="font-normal text-muted-foreground">by {h.author}</span>
+                      {h.compatible ? <Badge variant="success">Supports {s.mcVersion}</Badge> : <Badge variant="warning">Not listed for {s.mcVersion}</Badge>}
+                      {isInstalled && (
+                        <Badge variant="info">
+                          {installed && !installed.enabled ? "Installed (disabled)" : `Installed${installedVer ? ` · ${installedVer}` : ""}`}
+                        </Badge>
+                      )}
+                    </p>
+                    <p className="text-muted-foreground">{h.description}</p>
+                    <p className="text-xs text-muted-foreground">{h.downloads.toLocaleString()} downloads</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={!h.compatible || isInstalled || isInstalling}
+                    loading={isInstalling}
+                    onClick={() => !isInstalled && setConfirm(h)}
+                  >
+                    {isInstalled ? (
+                      <>
+                        <Check /> Installed
+                      </>
+                    ) : (
+                      <>
+                        <Download /> Install
+                      </>
+                    )}
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         </Panel>
       )}

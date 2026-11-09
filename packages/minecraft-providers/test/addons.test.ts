@@ -1,10 +1,12 @@
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import crypto from "node:crypto";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { createZip } from "@craftpanel/backup";
+import { findInstalledAddon } from "@craftpanel/shared";
 import { hasOwnLog4jSettings, log4shellMitigation } from "../src/log4shell";
-import { listPlugins } from "../src/plugins";
+import { DuplicateAddonError, findDuplicateAddon, inspectPluginJar, installModrinthVersion, listPlugins } from "../src/plugins";
 import { assertTrustedUrl } from "../src/download";
 import { fabricLauncherUrl } from "../src/fabric";
 
@@ -44,22 +46,26 @@ describe("Fabric", () => {
 describe("listPlugins (mods)", () => {
   const root = path.join(os.tmpdir(), `cp-mods-${process.pid}`);
   afterAll(() => fsp.rm(root, { recursive: true, force: true }));
+  afterEach(() => vi.unstubAllGlobals());
 
-  async function jar(file: string, entries: Record<string, string>) {
-    const src = path.join(root, "src", file);
+  async function jar(dir: string, file: string, entries: Record<string, string>) {
+    const src = path.join(root, "src", `${dir}-${file}`);
     await fsp.mkdir(src, { recursive: true });
     for (const [name, content] of Object.entries(entries)) await fsp.writeFile(path.join(src, name), content);
-    await createZip({ sourceDir: src, destination: path.join(root, "mods", file) });
+    const dest = path.join(root, dir, file);
+    await fsp.mkdir(path.dirname(dest), { recursive: true });
+    await createZip({ sourceDir: src, destination: dest });
+    return dest;
   }
 
   it("reads fabric.mod.json and resolves dependencies by mod id", async () => {
-    await jar("fabric-api.jar", { "fabric.mod.json": JSON.stringify({ id: "fabric-api", name: "Fabric API", version: "0.140.0", authors: ["FabricMC"], depends: { fabricloader: ">=0.17" } }) });
-    await jar("lithium.jar", {
+    await jar("mods", "fabric-api.jar", { "fabric.mod.json": JSON.stringify({ id: "fabric-api", name: "Fabric API", version: "0.140.0", authors: ["FabricMC"], depends: { fabricloader: ">=0.17" } }) });
+    await jar("mods", "lithium.jar", {
       "fabric.mod.json": JSON.stringify({ id: "lithium", name: "Lithium", version: "0.18.0", authors: [{ name: "jellysquid3" }], depends: { minecraft: "1.21.11", "fabric-api-base": "*", java: ">=21" } }),
     });
     // Raw line breaks inside strings are common in hand-written fabric.mod.json files.
-    await jar("needs-cloth.jar", { "fabric.mod.json": '{ "id": "needs-cloth", "description": "line one\nline two", "depends": { "cloth-config": "*" }, "suggests": { "modmenu": "*" } }' });
-    await jar("not-a-mod.jar", { "readme.txt": "hi" });
+    await jar("mods", "needs-cloth.jar", { "fabric.mod.json": '{ "id": "needs-cloth", "description": "line one\nline two", "depends": { "cloth-config": "*" }, "suggests": { "modmenu": "*" } }' });
+    await jar("mods", "not-a-mod.jar", { "readme.txt": "hi" });
 
     const mods = await listPlugins(path.join(root, "mods"), "mods");
     const byFile = Object.fromEntries(mods.map((m) => [m.file, m]));
@@ -72,4 +78,78 @@ describe("listPlugins (mods)", () => {
     const again = await listPlugins(path.join(root, "mods"), "mods");
     expect(again.find((m) => m.file === "lithium.jar")?.missingDependencies).toEqual(["fabric-api-base"]);
   });
+
+  it("flags duplicate plugin jars and prevents installing a second copy of the same plugin", async () => {
+    const pluginsDir = path.join(root, "plugins");
+    await jar("plugins", "LuckPerms-Bukkit-5.4.100.jar", {
+      "plugin.yml": "name: LuckPerms\nversion: 5.4.100\nmain: me.lucko.luckperms.bukkit.LPBukkitBootstrap\n",
+    });
+    const candidatePath = await jar("tmp", "LuckPerms-Bukkit-5.4.102.jar", {
+      "plugin.yml": "name: LuckPerms\nversion: 5.4.102\nmain: me.lucko.luckperms.bukkit.LPBukkitBootstrap\n",
+    });
+
+    const existing = await listPlugins(pluginsDir, "plugins");
+    const candidate = await inspectPluginJar(candidatePath);
+    expect(findDuplicateAddon(candidate, existing, "plugins")?.file).toBe("LuckPerms-Bukkit-5.4.100.jar");
+    expect(findDuplicateAddon(candidate, existing, "plugins", "fabric", "LuckPerms-Bukkit-5.4.100.jar")).toBeUndefined();
+
+    // Even when a new version has a different filename and hash, installModrinthVersion refuses to place a duplicate jar alongside the existing one.
+    const buf = await fsp.readFile(candidatePath);
+    const sha1 = crypto.createHash("sha1").update(buf).digest("hex");
+    const sha512 = crypto.createHash("sha512").update(buf).digest("hex");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.endsWith("/version/v102")) {
+          return new Response(
+            JSON.stringify({
+              id: "v102",
+              project_id: "Vebnzrzj",
+              name: "5.4.102",
+              version_number: "5.4.102",
+              game_versions: ["1.21.11"],
+              loaders: ["paper"],
+              version_type: "release",
+              date_published: "2026-11-01T00:00:00Z",
+              dependencies: [],
+              files: [{ url: "https://cdn.modrinth.com/data/Vebnzrzj/versions/v102/LuckPerms-Bukkit-5.4.102.jar", filename: "LuckPerms-Bukkit-5.4.102.jar", primary: true, size: buf.length, hashes: { sha1, sha512 } }],
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        return new Response(buf, { status: 200, headers: { "content-length": String(buf.length) } });
+      }),
+    );
+
+    await expect(installModrinthVersion("v102", pluginsDir, { kind: "plugins" })).rejects.toThrow(DuplicateAddonError);
+    expect(await fsp.readdir(pluginsDir)).toEqual(["LuckPerms-Bukkit-5.4.100.jar"]);
+
+    // Updating the existing jar with replaceFile succeeds.
+    const updated = await installModrinthVersion("v102", pluginsDir, { kind: "plugins", replaceFile: "LuckPerms-Bukkit-5.4.100.jar" });
+    expect(updated.file).toBe("LuckPerms-Bukkit-5.4.102.jar");
+
+    // When both jars remain on disk (e.g. copied manually), listPlugins marks each with duplicateOf.
+    const both = await listPlugins(pluginsDir, "plugins");
+    expect(both).toHaveLength(2);
+    expect(both.find((p) => p.file === "LuckPerms-Bukkit-5.4.100.jar")?.duplicateOf).toBe("LuckPerms-Bukkit-5.4.102.jar");
+    expect(both.find((p) => p.file === "LuckPerms-Bukkit-5.4.102.jar")?.duplicateOf).toBe("LuckPerms-Bukkit-5.4.100.jar");
+  });
+
+  it("matches marketplace hits against installed plugins without false positives", () => {
+    const installed = [
+      { file: "ViaVersion-5.12.2.jar", name: "ViaVersion", main: "com.viaversion.viaversion.ViaVersionPlugin", projectId: "P1OZGk5p" },
+      { file: "simple-voice-chat-paper-2.5.0.jar.disabled", name: "voicechat", main: "de.maxhenkel.voicechat.Voicechat", projectId: "9eGKb6K1" },
+      { file: "fabric-api-0.140.0.jar", name: "Fabric API", main: "fabric-api", projectId: null },
+    ];
+    expect(findInstalledAddon({ id: "P1OZGk5p", slug: "viaversion", title: "ViaVersion", source: "modrinth" }, installed)?.file).toBe("ViaVersion-5.12.2.jar");
+    // Hangar hit for ViaVersion matches even when installed from Modrinth:
+    expect(findInstalledAddon({ id: "ViaVersion", slug: "ViaVersion", title: "ViaVersion", source: "hangar" }, installed)?.file).toBe("ViaVersion-5.12.2.jar");
+    // ViaBackwards must NOT false-match ViaVersion:
+    expect(findInstalledAddon({ id: "ViaBackwards", slug: "viabackwards", title: "ViaBackwards", source: "modrinth" }, installed)).toBeUndefined();
+    // Matched by recorded projectId even when plugin.yml name ("voicechat") differs from title ("Simple Voice Chat"):
+    expect(findInstalledAddon({ id: "9eGKb6K1", slug: "simple-voice-chat", title: "Simple Voice Chat", source: "modrinth" }, installed)?.file).toBe("simple-voice-chat-paper-2.5.0.jar.disabled");
+    // Matched by normalized name/modId:
+    expect(findInstalledAddon({ id: "P7dR8mSH", slug: "fabric-api", title: "Fabric API", source: "modrinth" }, installed)?.file).toBe("fabric-api-0.140.0.jar");
+  });
 });
+

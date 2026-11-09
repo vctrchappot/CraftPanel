@@ -218,9 +218,18 @@ export class ProxyService {
 
   private async ensureFabricProxy(r: ServerRow, actor: Actor): Promise<boolean> {
     const plugins = await this.game.plugins(r);
-    if (plugins.some((p) => p.enabled && /fabricproxy-lite/i.test(`${p.main ?? ""} ${p.file}`))) return false;
+    const existing = plugins.find((p) => /fabricproxy-lite/i.test(`${p.main ?? ""} ${p.file}`));
+    if (existing?.enabled) return false;
+    if (existing && !existing.enabled) {
+      await this.game.togglePlugin(r, existing.file, true, actor);
+      return true;
+    }
     const res = await this.game.installFromModrinth(r, FABRIC_PROXY_LITE, undefined, actor);
-    if (res.requiredDependencies.includes(FABRIC_API) && !plugins.some((p) => /fabric api/i.test(p.name ?? ""))) await this.game.installFromModrinth(r, FABRIC_API, undefined, actor);
+    if (res.requiredDependencies.includes(FABRIC_API)) {
+      const fab = plugins.find((p) => /fabric api/i.test(p.name ?? "") || p.main === "fabric-api");
+      if (fab && !fab.enabled) await this.game.togglePlugin(r, fab.file, true, actor);
+      else if (!fab) await this.game.installFromModrinth(r, FABRIC_API, undefined, actor);
+    }
     return true;
   }
 

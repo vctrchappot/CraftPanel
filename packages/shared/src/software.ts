@@ -1,3 +1,5 @@
+import type { PluginInfo } from "./types";
+
 /** Server software CraftPanel can install. The order is the order shown in the dashboard. */
 export const SERVER_SOFTWARE = ["paper", "purpur", "fabric", "neoforge", "vanilla", "velocity"] as const;
 export type ServerSoftware = (typeof SERVER_SOFTWARE)[number];
@@ -45,4 +47,32 @@ export function buildName(software: ServerSoftware, build: string): string {
 /** Label of the build choice: "Paper build", "Fabric Loader", "NeoForge version". */
 export function buildFieldLabel(software: ServerSoftware): string {
   return software === "fabric" ? "Fabric Loader" : software === "neoforge" ? "NeoForge version" : `${SOFTWARE_INFO[software].label} build`;
+}
+
+/** Canonical alphanumeric key for matching an add-on's name, id or slug across sources. */
+export function normalizeAddonKey(value: string | null | undefined): string {
+  return (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+/** Find an already-installed plugin or mod matching a marketplace entry (by project id, slug, name, mod id or jar stem). */
+export function findInstalledAddon<T extends Pick<PluginInfo, "file" | "name" | "main" | "projectId">>(
+  project: { id: string; slug: string; title: string; source?: "modrinth" | "hangar" },
+  plugins: T[],
+): T | undefined {
+  const idLower = project.id.trim().toLowerCase();
+  const slugLower = project.slug.trim().toLowerCase();
+  const titleKey = normalizeAddonKey(project.title);
+  const slugKey = normalizeAddonKey(project.slug);
+  return plugins.find((p) => {
+    const pid = p.projectId?.trim().toLowerCase();
+    if (pid && (pid === idLower || pid === slugLower)) return true;
+    const nameKey = normalizeAddonKey(p.name);
+    if (nameKey && (nameKey === titleKey || nameKey === slugKey)) return true;
+    if (p.main && !p.main.includes(".")) {
+      const mainKey = normalizeAddonKey(p.main);
+      if (mainKey && (mainKey === titleKey || mainKey === slugKey)) return true;
+    }
+    const fileStemKey = normalizeAddonKey(p.file.replace(/\.jar(\.disabled)?$/i, ""));
+    return Boolean(fileStemKey && (fileStemKey === slugKey || fileStemKey === titleKey));
+  });
 }

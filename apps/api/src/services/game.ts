@@ -1,20 +1,25 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import { badRequest, conflict, notFound, SOFTWARE_INFO, softwareLabel, type AddonKind, type GameRuleInfo, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
+import { badRequest, conflict, findInstalledAddon, notFound, SOFTWARE_INFO, softwareLabel, type AddonKind, type GameRuleInfo, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
 import { PropertiesDocument, SETTINGS, SETTINGS_BY_KEY, parseJsonList, validateSetting, type BanEntry, type OpEntry, type WhitelistEntry } from "@craftpanel/config";
 import { desc, eq, playerSessions, servers as serversTable, type Database } from "@craftpanel/database";
 import { createZip, extractZip, listZip, readZipEntry } from "@craftpanel/backup";
 import { directorySize } from "@craftpanel/server-runtime";
 import {
+  baseAddonFile,
   checkModrinthUpdates,
   compatibleModrinthVersions,
   detectGamerules,
+  DuplicateAddonError,
+  findDuplicateAddon,
   HANGAR_SLUG,
   HANGAR_VERSION_ID,
   hangarVersions,
+  inspectAddonJar,
   installHangarVersion,
   installModrinthVersion,
+  listAddonMetas,
   listPlugins,
   lookupProfile,
   searchHangarPlugins,
@@ -38,6 +43,9 @@ export function offlineUuid(name: string): string {
 
 /** Which jars in plugins/ came from Hangar (project + version), for update checks. */
 const HANGAR_INDEX = ".craftpanel-hangar.json";
+/** Which jars in plugins/ or mods/ came from Modrinth (project + version), for duplicate detection. */
+const MODRINTH_INDEX = ".craftpanel-modrinth.json";
+const MODRINTH_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 const MANAGED_KEYS = new Set(SETTINGS.filter((s) => s.managed).map((s) => s.key));
 
@@ -389,7 +397,17 @@ export class GameService {
   async plugins(row: ServerRow): Promise<PluginInfo[]> {
     const kind = SOFTWARE_INFO[row.software].addons;
     if (!kind) return [];
-    return listPlugins(this.pluginsDir(row), kind, this.loader(row));
+    const [list, hangar, modrinth] = await Promise.all([
+      listPlugins(this.pluginsDir(row), kind, this.loader(row)),
+      kind === "plugins" ? this.hangarIndex(row) : Promise.resolve({} as Record<string, { project: string; versionId: string }>),
+      this.modrinthIndex(row),
+    ]);
+    return list.map((p) => {
+      const base = baseAddonFile(p.file);
+      if (hangar[base]) return { ...p, source: "hangar" as const, projectId: hangar[base].project };
+      if (modrinth[base]) return { ...p, source: "modrinth" as const, projectId: modrinth[base].project };
+      return p;
+    });
   }
 
   private safePluginFile(file: string) {
@@ -398,13 +416,21 @@ export class GameService {
   }
 
   async togglePlugin(row: ServerRow, file: string, enabled: boolean, actor: Actor) {
-    this.requireAddons(row);
+    const kind = this.requireAddons(row);
     this.safePluginFile(file);
     const dir = this.pluginsDir(row);
-    const base = file.replace(/\.disabled$/, "");
+    const base = baseAddonFile(file);
     const from = path.join(dir, file);
     const to = path.join(dir, enabled ? base : `${base}.disabled`);
     if (from === to) return;
+    if (!(await exists(from))) throw notFound(this.addonLabel(row));
+    if (await exists(to)) throw conflict(`${path.basename(to)} already exists`, "Remove the duplicate file first.");
+    if (enabled) {
+      const loader = this.loader(row);
+      const [candidate, existing] = await Promise.all([inspectAddonJar(from, kind, loader), listAddonMetas(dir, kind, loader)]);
+      const dup = findDuplicateAddon(candidate, existing.filter((p) => p.enabled), kind, loader, file);
+      if (dup) throw conflict(`${dup.name ?? base} is already enabled (${dup.file})`, "Disable or remove the other copy first.");
+    }
     await fsp.rename(from, to);
     // Disabling/enabling CraftPanel's own info plugin is remembered, so it isn't reinstalled on the next start.
     if (base === INFO_PLUGIN_FILE) await this.servers.update(row.id, { infoCommand: enabled }, actor);
@@ -415,9 +441,9 @@ export class GameService {
   async removePlugin(row: ServerRow, file: string, actor: Actor) {
     this.requireAddons(row);
     this.safePluginFile(file);
-    const isOwnInfoPlugin = file.replace(/.disabled$/, "") === INFO_PLUGIN_FILE && (await isInfoPlugin(path.join(this.pluginsDir(row), file)));
+    const isOwnInfoPlugin = baseAddonFile(file) === INFO_PLUGIN_FILE && (await isInfoPlugin(path.join(this.pluginsDir(row), file)));
     await fsp.rm(path.join(this.pluginsDir(row), file));
-    await this.forgetHangar(row, file);
+    await Promise.all([this.forgetHangar(row, file), this.forgetModrinth(row, file)]);
     if (isOwnInfoPlugin) await this.servers.update(row.id, { infoCommand: false }, actor);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
     await this.activity.event(row.id, "plugin.removed", `${this.addonLabel(row)} ${file} removed`, { actor });
@@ -427,21 +453,28 @@ export class GameService {
   /** Validate and move an uploaded jar into plugins/ (or mods/). */
   async installUploadedPlugin(row: ServerRow, tmpFile: string, filename: string, actor: Actor) {
     const kind = this.requireAddons(row);
+    const loader = this.loader(row);
     const name = path.basename(filename).replace(/[^A-Za-z0-9 ._+()-]/g, "_");
     if (!name.endsWith(".jar")) throw badRequest(`Only .jar files can be installed as ${kind}`);
-    if (kind === "mods" && this.loader(row) === "neoforge") {
+    if (kind === "mods" && loader === "neoforge") {
       if (!(await readZipEntry(tmpFile, "META-INF/neoforge.mods.toml").catch(() => null))) throw badRequest("This jar is not a NeoForge mod (no META-INF/neoforge.mods.toml)");
     } else if (kind === "mods") {
       if (!(await readZipEntry(tmpFile, "fabric.mod.json").catch(() => null))) throw badRequest("This jar is not a Fabric mod (no fabric.mod.json)");
-    } else if (this.loader(row) === "velocity") {
+    } else if (loader === "velocity") {
       if (!(await readZipEntry(tmpFile, "velocity-plugin.json").catch(() => null))) throw badRequest("This jar is not a Velocity plugin (no velocity-plugin.json)");
     } else {
       const meta = (await readZipEntry(tmpFile, "plugin.yml").catch(() => null)) ?? (await readZipEntry(tmpFile, "paper-plugin.yml").catch(() => null));
       if (!meta) throw badRequest("This jar is not a Bukkit/Paper plugin (no plugin.yml or paper-plugin.yml)");
     }
-    await fsp.mkdir(this.pluginsDir(row), { recursive: true });
-    const dest = path.join(this.pluginsDir(row), name);
-    if (await exists(dest)) throw conflict(`${name} is already installed`);
+    const dir = this.pluginsDir(row);
+    await fsp.mkdir(dir, { recursive: true });
+    const [candidate, existing] = await Promise.all([inspectAddonJar(tmpFile, kind, loader).then((c) => ({ ...c, file: name })), listAddonMetas(dir, kind, loader)]);
+    const dup = findDuplicateAddon(candidate, existing, kind, loader);
+    if (dup) {
+      if (dup.file.toLowerCase() === name.toLowerCase()) throw conflict(`${name} is already installed`);
+      throw conflict(`${dup.name ?? candidate.name ?? name} is already installed (${dup.file})`, "Remove or update the existing file first instead of installing a second copy.");
+    }
+    const dest = path.join(dir, name);
     await fsp.copyFile(tmpFile, dest);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
     await this.activity.event(row.id, "plugin.installed", `${this.addonLabel(row)} ${name} uploaded`, { actor, level: "warn" });
@@ -450,22 +483,90 @@ export class GameService {
 
   async installFromModrinth(row: ServerRow, projectId: string, versionId: string | undefined, actor: Actor) {
     const kind = this.requireAddons(row);
-    const versions = await compatibleModrinthVersions(projectId, this.gameVersion(row), kind, this.loader(row));
+    const loader = this.loader(row);
+    const installed = await this.plugins(row);
+    const existingByInput = findInstalledAddon({ id: projectId, slug: projectId, title: projectId, source: "modrinth" }, installed);
+    if (existingByInput) {
+      throw conflict(
+        `${existingByInput.name ?? existingByInput.file} is already installed (${existingByInput.file})`,
+        "Use the Updates tab to install a newer version, or remove the existing file first.",
+      );
+    }
+    const versions = await compatibleModrinthVersions(projectId, this.gameVersion(row), kind, loader);
     const chosen = versionId ? versions.find((v) => v.id === versionId) : versions.find((v) => v.version_type === "release") ?? versions[0];
     if (!chosen) throw conflict(`This ${this.addonLabel(row).toLowerCase()} has no version marked compatible with ${SOFTWARE_INFO[row.software].proxy ? "" : `Minecraft ${row.mcVersion} on `}${softwareLabel(row.software)}`);
-    const res = await installModrinthVersion(chosen.id, this.pluginsDir(row));
+    const existingByCanonical = installed.find((p) => p.projectId?.toLowerCase() === chosen.project_id.toLowerCase());
+    if (existingByCanonical) {
+      throw conflict(
+        `${existingByCanonical.name ?? existingByCanonical.file} is already installed (${existingByCanonical.file})`,
+        "Use the Updates tab to install a newer version, or remove the existing file first.",
+      );
+    }
+    let res;
+    try {
+      res = await installModrinthVersion(chosen.id, this.pluginsDir(row), { kind, loader });
+    } catch (err) {
+      if (err instanceof DuplicateAddonError) {
+        throw conflict(err.message, "Use the Updates tab to install a newer version, or remove the existing file first.");
+      }
+      throw err;
+    }
+    await this.rememberModrinth(row, res.file, res.projectId || projectId, chosen.id);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
     await this.activity.event(row.id, "plugin.installed", `${this.addonLabel(row)} ${res.file} installed from Modrinth`, { actor });
-    await this.activity.audit(actor, "plugin.install", row.id, { projectId, versionId: chosen.id, file: res.file });
+    await this.activity.audit(actor, "plugin.install", row.id, { projectId: res.projectId || projectId, versionId: chosen.id, file: res.file });
     return { ...res, version: chosen.version_number };
   }
 
   async searchModrinth(row: ServerRow, query: string, offset: number) {
-    return searchModrinthPlugins(query, this.gameVersion(row), offset, this.requireAddons(row), this.loader(row));
+    const [res, installed] = await Promise.all([
+      searchModrinthPlugins(query, this.gameVersion(row), offset, this.requireAddons(row), this.loader(row)),
+      this.plugins(row),
+    ]);
+    return {
+      ...res,
+      hits: res.hits.map((h) => {
+        const match = findInstalledAddon(h, installed);
+        return { ...h, installed: !!match, installedVersion: match?.version ?? null, installedFile: match?.file ?? null };
+      }),
+    };
   }
 
   async modrinthVersions(row: ServerRow, projectId: string) {
     return compatibleModrinthVersions(projectId, this.gameVersion(row), this.requireAddons(row), this.loader(row));
+  }
+
+  private modrinthIndexFile(row: ServerRow) {
+    return path.join(this.pluginsDir(row), MODRINTH_INDEX);
+  }
+
+  private async modrinthIndex(row: ServerRow): Promise<Record<string, { project: string; versionId: string }>> {
+    try {
+      const raw = JSON.parse(await fsp.readFile(this.modrinthIndexFile(row), "utf8")) as Record<string, { project?: unknown; versionId?: unknown }>;
+      const out: Record<string, { project: string; versionId: string }> = {};
+      for (const [file, e] of Object.entries(raw)) {
+        if (typeof e?.project === "string" && MODRINTH_ID.test(e.project) && typeof e.versionId === "string" && MODRINTH_ID.test(e.versionId)) {
+          out[file] = { project: e.project, versionId: e.versionId };
+        }
+      }
+      return out;
+    } catch {
+      return {};
+    }
+  }
+
+  private async rememberModrinth(row: ServerRow, file: string, project: string, versionId: string) {
+    const index = await this.modrinthIndex(row);
+    index[baseAddonFile(file)] = { project, versionId };
+    await fsp.writeFile(this.modrinthIndexFile(row), JSON.stringify(index, null, 2));
+  }
+
+  private async forgetModrinth(row: ServerRow, file: string) {
+    const index = await this.modrinthIndex(row);
+    const key = baseAddonFile(file);
+    if (!(key in index)) return;
+    delete index[key];
+    await fsp.writeFile(this.modrinthIndexFile(row), JSON.stringify(index, null, 2));
   }
 
   // Hangar (PaperMC's repository): plugin servers only. Hangar can't look files up by hash, so
@@ -493,13 +594,13 @@ export class GameService {
 
   private async rememberHangar(row: ServerRow, file: string, project: string, versionId: string) {
     const index = await this.hangarIndex(row);
-    index[file] = { project, versionId };
+    index[baseAddonFile(file)] = { project, versionId };
     await fsp.writeFile(this.hangarIndexFile(row), JSON.stringify(index, null, 2));
   }
 
   private async forgetHangar(row: ServerRow, file: string) {
     const index = await this.hangarIndex(row);
-    const key = file.replace(/\.disabled$/, "");
+    const key = baseAddonFile(file);
     if (!(key in index)) return;
     delete index[key];
     await fsp.writeFile(this.hangarIndexFile(row), JSON.stringify(index, null, 2));
@@ -507,7 +608,17 @@ export class GameService {
 
   async searchHangar(row: ServerRow, query: string, offset: number) {
     this.requirePluginServer(row);
-    return searchHangarPlugins(query, row.mcVersion, offset);
+    const [res, installed] = await Promise.all([
+      searchHangarPlugins(query, row.mcVersion, offset),
+      this.plugins(row),
+    ]);
+    return {
+      ...res,
+      hits: res.hits.map((h) => {
+        const match = findInstalledAddon(h, installed);
+        return { ...h, installed: !!match, installedVersion: match?.version ?? null, installedFile: match?.file ?? null };
+      }),
+    };
   }
 
   async hangarVersions(row: ServerRow, project: string) {
@@ -520,12 +631,23 @@ export class GameService {
     this.requirePluginServer(row);
     if (!HANGAR_SLUG.test(project)) throw badRequest("Invalid Hangar project");
     if (versionId && !HANGAR_VERSION_ID.test(versionId)) throw badRequest("Invalid Hangar version");
+    const installed = await this.plugins(row);
+    const existing = findInstalledAddon({ id: project, slug: project, title: project, source: "hangar" }, installed);
+    if (existing) {
+      throw conflict(
+        `${existing.name ?? project} is already installed (${existing.file})`,
+        "Use the Updates tab to install a newer version, or remove the existing plugin first.",
+      );
+    }
     const chosen = versionId ?? (await hangarVersions(project, row.mcVersion))[0]?.id.toString();
     if (!chosen) throw conflict(`This plugin has no Hangar version marked compatible with Minecraft ${row.mcVersion}`);
     let res;
     try {
       res = await installHangarVersion(chosen, this.pluginsDir(row));
     } catch (err) {
+      if (err instanceof DuplicateAddonError) {
+        throw conflict(err.message, "Use the Updates tab to install a newer version, or remove the existing plugin first.");
+      }
       throw badRequest((err as Error).message);
     }
     await this.rememberHangar(row, res.file, project, chosen);
@@ -540,7 +662,7 @@ export class GameService {
     const plugins = await listPlugins(this.pluginsDir(row), kind, this.loader(row));
     // Jars installed from Hangar are checked there only; the same jar is often on Modrinth too, with other channels.
     const index = kind === "plugins" ? await this.hangarIndex(row) : {};
-    const fromHangar = (p: { file: string }) => index[p.file.replace(/\.disabled$/, "")];
+    const fromHangar = (p: { file: string }) => index[baseAddonFile(p.file)];
     const updates = await checkModrinthUpdates(plugins.filter((p) => !fromHangar(p)).map((p) => p.sha1), this.gameVersion(row), kind, this.loader(row));
     const out: { file: string; name: string | null; current: string | null; versionId: string; versionNumber: string; projectId: string; source: "modrinth" | "hangar" }[] = plugins
       .filter((p) => !fromHangar(p) && updates[p.sha1])
@@ -559,20 +681,42 @@ export class GameService {
   }
 
   async updatePlugin(row: ServerRow, file: string, versionId: string, actor: Actor, source: "modrinth" | "hangar" = "modrinth") {
-    this.requireAddons(row);
+    const kind = this.requireAddons(row);
+    const loader = this.loader(row);
     this.safePluginFile(file);
+    const dir = this.pluginsDir(row);
     if (source === "hangar") {
-      const known = (await this.hangarIndex(row))[file.replace(/\.disabled$/, "")];
+      const known = (await this.hangarIndex(row))[baseAddonFile(file)];
       if (!known) throw badRequest(`${file} was not installed from Hangar`);
-      const res = await this.installFromHangar(row, known.project, versionId, actor);
-      if (res.file !== file) {
-        await fsp.rm(path.join(this.pluginsDir(row), file), { force: true });
-        await this.forgetHangar(row, file);
+      let res;
+      try {
+        res = await installHangarVersion(versionId, dir, { replaceFile: file });
+      } catch (err) {
+        if (err instanceof DuplicateAddonError) throw conflict(err.message);
+        throw badRequest((err as Error).message);
       }
+      if (res.file !== file) {
+        await fsp.rm(path.join(dir, file), { force: true });
+        if (res.file !== baseAddonFile(file)) await this.forgetHangar(row, file);
+      }
+      await this.rememberHangar(row, res.file, known.project, versionId);
+      if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
+      await this.activity.event(row.id, "plugin.updated", `${this.addonLabel(row)} ${file} updated to ${res.file}`, { actor });
+      await this.activity.audit(actor, "plugin.update", row.id, { source: "hangar", file, versionId });
       return;
     }
-    const res = await installModrinthVersion(versionId, this.pluginsDir(row));
-    if (res.file !== file) await fsp.rm(path.join(this.pluginsDir(row), file), { force: true });
+    let res;
+    try {
+      res = await installModrinthVersion(versionId, dir, { kind, loader, replaceFile: file });
+    } catch (err) {
+      if (err instanceof DuplicateAddonError) throw conflict(err.message);
+      throw err;
+    }
+    if (res.file !== file) {
+      await fsp.rm(path.join(dir, file), { force: true });
+      if (res.file !== baseAddonFile(file)) await this.forgetModrinth(row, file);
+    }
+    await this.rememberModrinth(row, res.file, res.projectId, versionId);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
     await this.activity.event(row.id, "plugin.updated", `${this.addonLabel(row)} ${file} updated to ${res.file}`, { actor });
     await this.activity.audit(actor, "plugin.update", row.id, { file, versionId });

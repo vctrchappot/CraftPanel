@@ -42,7 +42,7 @@ function unquote(s: string): string {
 
 const asList = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : typeof v === "string" && v ? [v] : []);
 
-type AddonMeta = Omit<PluginInfo, "missingDependencies"> & { provides: string[] };
+export type AddonMeta = Omit<PluginInfo, "missingDependencies" | "duplicateOf" | "projectId" | "source"> & { provides: string[] };
 
 export async function inspectPluginJar(file: string): Promise<AddonMeta> {
   const st = await fsp.stat(file);
@@ -228,19 +228,77 @@ export async function inspectVelocityPluginJar(file: string): Promise<AddonMeta>
   };
 }
 
-/**
- * List plugins or mods (enabled *.jar and disabled *.jar.disabled) and resolve
- * dependencies. Plugins depend on plugin names, mods on mod ids.
- */
-export async function listPlugins(dir: string, kind: AddonKind = "plugins", loader: ModLoader = "fabric"): Promise<PluginInfo[]> {
+export function inspectAddonJar(file: string, kind: AddonKind = "plugins", loader: ModLoader = "fabric"): Promise<AddonMeta> {
+  const inspect = kind === "plugins" ? (loader === "velocity" ? inspectVelocityPluginJar : inspectPluginJar) : loader === "neoforge" ? inspectNeoForgeModJar : inspectModJar;
+  return inspect(file);
+}
+
+export async function listAddonMetas(dir: string, kind: AddonKind = "plugins", loader: ModLoader = "fabric"): Promise<AddonMeta[]> {
   let files: string[] = [];
   try {
     files = (await fsp.readdir(dir)).filter((f) => f.endsWith(".jar") || f.endsWith(".jar.disabled"));
   } catch {
     return [];
   }
-  const inspect = kind === "plugins" ? (loader === "velocity" ? inspectVelocityPluginJar : inspectPluginJar) : loader === "neoforge" ? inspectNeoForgeModJar : inspectModJar;
-  const infos = await Promise.all(files.map((f) => inspect(path.join(dir, f))));
+  return Promise.all(files.map((f) => inspectAddonJar(path.join(dir, f), kind, loader)));
+}
+
+export function baseAddonFile(file: string): string {
+  return file.replace(/\.disabled$/i, "");
+}
+
+export type AddonCandidate = Pick<PluginInfo, "file" | "name" | "main" | "sha1"> & { provides?: string[] };
+
+/** Whether two addon jars provide the same plugin or mod. */
+export function sameAddon(a: AddonCandidate, b: AddonCandidate, _kind: AddonKind = "plugins", loader: ModLoader = "fabric"): boolean {
+  if (baseAddonFile(a.file).toLowerCase() === baseAddonFile(b.file).toLowerCase()) return true;
+  if (a.sha1 && b.sha1 && a.sha1 === b.sha1) return true;
+  if (a.main && b.main && a.main.trim().toLowerCase() === b.main.trim().toLowerCase()) return true;
+  if (a.name && b.name && a.name.trim().toLowerCase() === b.name.trim().toLowerCase()) return true;
+  if ((loader === "velocity" || loader === "neoforge") && a.provides?.length && b.provides?.length) {
+    const aIds = new Set(a.provides.map((id) => id.trim().toLowerCase()).filter(Boolean));
+    if (b.provides.some((id) => aIds.has(id.trim().toLowerCase()))) return true;
+  }
+  return false;
+}
+
+export function findDuplicateAddon<T extends AddonCandidate>(
+  candidate: AddonCandidate,
+  existing: T[],
+  kind: AddonKind = "plugins",
+  loader: ModLoader = "fabric",
+  ignoreFile?: string,
+): T | undefined {
+  const ignoredBase = ignoreFile ? baseAddonFile(ignoreFile).toLowerCase() : null;
+  return existing.find((e) => {
+    if (ignoredBase && baseAddonFile(e.file).toLowerCase() === ignoredBase) return false;
+    return sameAddon(candidate, e, kind, loader);
+  });
+}
+
+export class DuplicateAddonError extends Error {
+  constructor(
+    public readonly addonName: string,
+    public readonly existingFile: string,
+  ) {
+    super(`${addonName} is already installed (${existingFile})`);
+    this.name = "DuplicateAddonError";
+  }
+}
+
+export interface InstallAddonOptions {
+  kind?: AddonKind;
+  loader?: ModLoader;
+  /** Existing jar file being replaced during an update. */
+  replaceFile?: string;
+}
+
+/**
+ * List plugins or mods (enabled *.jar and disabled *.jar.disabled) and resolve
+ * dependencies. Plugins depend on plugin names, mods on mod ids.
+ */
+export async function listPlugins(dir: string, kind: AddonKind = "plugins", loader: ModLoader = "fabric"): Promise<PluginInfo[]> {
+  const infos = await listAddonMetas(dir, kind, loader);
   const available = new Set(
     infos
       .filter((p) => p.enabled)
@@ -251,7 +309,15 @@ export async function listPlugins(dir: string, kind: AddonKind = "plugins", load
   const fabricApi = kind === "mods" && loader === "fabric" && available.has("fabric-api");
   const satisfied = (d: string) => available.has(d.toLowerCase()) || (fabricApi && (d === "fabric" || d.startsWith("fabric-")));
   return infos
-    .map(({ provides: _, ...p }) => ({ ...p, missingDependencies: p.depend.filter((d) => !satisfied(d)) }))
+    .map((info) => {
+      const dup = infos.find((other) => other.file !== info.file && sameAddon(info, other, kind, loader));
+      const { provides: _, ...p } = info;
+      return {
+        ...p,
+        missingDependencies: p.depend.filter((d) => !satisfied(d)),
+        ...(dup ? { duplicateOf: dup.file } : {}),
+      };
+    })
     .sort((a, b) => (a.name ?? a.file).localeCompare(b.name ?? b.file));
 }
 
@@ -269,6 +335,9 @@ export interface MarketplaceProject {
   versions: string[];
   compatible: boolean;
   source: "modrinth" | "hangar";
+  installed?: boolean;
+  installedVersion?: string | null;
+  installedFile?: string | null;
 }
 
 /** Modrinth loaders whose files a server of this kind can load. */
@@ -325,15 +394,41 @@ export async function compatibleModrinthVersions(projectId: string, mcVersion: s
   return versions.filter((v) => (mcVersion === null || v.game_versions.includes(mcVersion)) && v.loaders.some((l) => LOADERS(kind, loader).includes(l)));
 }
 
-export async function installModrinthVersion(versionId: string, pluginsDir: string): Promise<{ file: string; requiredDependencies: string[] }> {
+export async function installModrinthVersion(
+  versionId: string,
+  pluginsDir: string,
+  opts: InstallAddonOptions = {},
+): Promise<{ file: string; projectId: string; version: string; requiredDependencies: string[] }> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(versionId)) throw new Error("Invalid version id");
+  const kind = opts.kind ?? "plugins";
+  const loader = opts.loader ?? "fabric";
   const v = await fetchJson<ModrinthVersion>(`${MODRINTH}/version/${versionId}`);
   const file = v.files.find((f) => f.primary) ?? v.files[0];
   if (!file) throw new Error("This version has no downloadable file");
   if (!/^[A-Za-z0-9 ._+()-]+\.jar$/.test(file.filename)) throw new Error("Unexpected plugin file name");
   await fsp.mkdir(pluginsDir, { recursive: true });
-  await download({ url: file.url, destination: path.join(pluginsDir, file.filename), checksum: { algorithm: "sha512", value: file.hashes.sha512 }, maxBytes: 200 * 1024 * 1024 });
-  return { file: file.filename, requiredDependencies: v.dependencies.filter((d) => d.dependency_type === "required" && d.project_id).map((d) => d.project_id!) };
+
+  const existing = await listAddonMetas(pluginsDir, kind, loader);
+  const preDup = findDuplicateAddon({ file: file.filename, name: null, main: null, sha1: file.hashes.sha1 }, existing, kind, loader, opts.replaceFile);
+  if (preDup) throw new DuplicateAddonError(preDup.name ?? file.filename, preDup.file);
+
+  const stage = path.join(pluginsDir, `.${file.filename}.${crypto.randomUUID()}.staging`);
+  try {
+    await download({ url: file.url, destination: stage, checksum: { algorithm: "sha512", value: file.hashes.sha512 }, maxBytes: 200 * 1024 * 1024 });
+    const candidate = { ...(await inspectAddonJar(stage, kind, loader)), file: file.filename };
+    const current = await listAddonMetas(pluginsDir, kind, loader);
+    const dup = findDuplicateAddon(candidate, current, kind, loader, opts.replaceFile);
+    if (dup) throw new DuplicateAddonError(dup.name ?? candidate.name ?? file.filename, dup.file);
+    await fsp.rename(stage, path.join(pluginsDir, file.filename));
+  } finally {
+    await fsp.rm(stage, { force: true });
+  }
+  return {
+    file: file.filename,
+    projectId: v.project_id,
+    version: v.version_number,
+    requiredDependencies: v.dependencies.filter((d) => d.dependency_type === "required" && d.project_id).map((d) => d.project_id!),
+  };
 }
 
 /** Ask Modrinth for a newer compatible version of an installed file (identified by SHA-1). */

@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
+import { createZip } from "@craftpanel/backup";
 import { servers } from "@craftpanel/database";
 import { dataLayout } from "@craftpanel/server-runtime";
 import { createContext } from "../src/bootstrap";
@@ -282,3 +283,67 @@ describe("nextSegmentPath", () => {
     for (const u of ["/__next.__PAGE__.txt", "/servers/__next._tree.txt", "/api/servers", "/x/__next.a.__PAGE__.txt/../../etc"]) expect(nextSegmentPath(u)).toBe(u);
   });
 });
+
+describe("duplicate plugin prevention", () => {
+  let paperId: string;
+  let paperDir: string;
+
+  async function makeJar(name: string, pluginYml: string): Promise<string> {
+    const src = path.join(root, "jar-src", name);
+    const out = path.join(root, "jar-out", name);
+    await fs.mkdir(src, { recursive: true });
+    await fs.mkdir(path.dirname(out), { recursive: true });
+    await fs.writeFile(path.join(src, "plugin.yml"), pluginYml);
+    await createZip({ sourceDir: src, destination: out });
+    return out;
+  }
+
+  beforeAll(async () => {
+    paperId = crypto.randomUUID();
+    paperDir = path.join(root, "servers", "paper-dup");
+    await fs.mkdir(path.join(paperDir, "plugins"), { recursive: true });
+    await fs.writeFile(path.join(paperDir, ".craftpanel"), "{}");
+    const now = Date.now();
+    await ctx.database.db.insert(servers).values({
+      id: paperId, name: "PaperDup", software: "paper", mcVersion: "1.21.11", javaMajor: 21, memoryMb: 1024, directory: paperDir, port: 25600,
+      installState: "installed", jarFile: "server.jar", createdAt: now, updatedAt: now,
+    });
+  });
+
+  it("refuses duplicate uploads and marketplace installs even across different filenames or disabled state", async () => {
+    const row = await ctx.servers.row(paperId);
+    const actor = { id: "owner", username: "owner", ip: "127.0.0.1" };
+    const jarV1 = await makeJar("WorldEdit-7.3.0.jar", "name: WorldEdit\nversion: 7.3.0\nmain: com.sk89q.worldedit.bukkit.WorldEditPlugin\n");
+    const jarV2 = await makeJar("WorldEdit-7.3.1.jar", "name: WorldEdit\nversion: 7.3.1\nmain: com.sk89q.worldedit.bukkit.WorldEditPlugin\n");
+
+    await ctx.game.installUploadedPlugin(row, jarV1, "WorldEdit-7.3.0.jar", actor);
+
+    // Uploading another version of the same plugin with a different filename is rejected with 409 Conflict.
+    await expect(ctx.game.installUploadedPlugin(row, jarV2, "WorldEdit-7.3.1.jar", actor)).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining("WorldEdit is already installed (WorldEdit-7.3.0.jar)"),
+    });
+
+    // Disabling the plugin still prevents installing a second copy via upload, Modrinth or Hangar.
+    await ctx.game.togglePlugin(row, "WorldEdit-7.3.0.jar", false, actor);
+    await expect(ctx.game.installUploadedPlugin(row, jarV1, "WorldEdit-7.3.0.jar", actor)).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining("WorldEdit is already installed (WorldEdit-7.3.0.jar.disabled)"),
+    });
+
+    const modrinthDup = await call(owner, "POST", `/api/servers/${paperId}/plugins/install`, { projectId: "WorldEdit" });
+    expect(modrinthDup.statusCode).toBe(409);
+    expect(modrinthDup.json().error.message).toContain("WorldEdit is already installed");
+
+    const hangarDup = await call(owner, "POST", `/api/servers/${paperId}/plugins/hangar/install`, { project: "WorldEdit" });
+    expect(hangarDup.statusCode).toBe(409);
+    expect(hangarDup.json().error.message).toContain("WorldEdit is already installed");
+
+    // If a second jar was placed manually on disk, enabling the disabled duplicate is blocked while the other is enabled.
+    await fs.copyFile(jarV2, path.join(paperDir, "plugins", "WorldEdit-7.3.1.jar"));
+    const enableDup = await call(owner, "PATCH", `/api/servers/${paperId}/plugins/${encodeURIComponent("WorldEdit-7.3.0.jar.disabled")}`, { enabled: true });
+    expect(enableDup.statusCode).toBe(409);
+    expect(enableDup.json().error.message).toContain("WorldEdit is already enabled (WorldEdit-7.3.1.jar)");
+  });
+});
+

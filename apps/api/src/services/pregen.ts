@@ -81,10 +81,16 @@ export class PregenService {
   async install(row: ServerRow, actor: Actor) {
     if (SOFTWARE_INFO[row.software].proxy) throw conflict("A proxy has no world to pre-generate. Pre-generate on the servers behind it.");
     if (!SOFTWARE_INFO[row.software].addons) throw conflict("Vanilla servers can't load Chunky. Switch to Paper, Purpur, Fabric or NeoForge first.");
-    if (await this.chunky(row)) return;
+    const existing = await this.chunky(row);
+    if (existing) {
+      if (!existing.enabled) await this.game.togglePlugin(row, existing.file, true, actor);
+      return;
+    }
     const res = await this.game.installFromModrinth(row, CHUNKY_PROJECT, undefined, actor);
-    if (row.software === "fabric" && res.requiredDependencies.includes(FABRIC_API_PROJECT) && !(await this.game.plugins(row)).some((p) => /fabric api/i.test(p.name ?? ""))) {
-      await this.game.installFromModrinth(row, FABRIC_API_PROJECT, undefined, actor);
+    if (row.software === "fabric" && res.requiredDependencies.includes(FABRIC_API_PROJECT)) {
+      const fab = (await this.game.plugins(row)).find((p) => /fabric api/i.test(p.name ?? "") || p.main === "fabric-api");
+      if (fab && !fab.enabled) await this.game.togglePlugin(row, fab.file, true, actor);
+      else if (!fab) await this.game.installFromModrinth(row, FABRIC_API_PROJECT, undefined, actor);
     }
   }
 
