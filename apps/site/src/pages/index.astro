@@ -23,13 +23,184 @@ const title = "CraftPanel – Your Minecraft server, on your hardware";
 const description =
   "Self-hosted panel for Minecraft Java servers on a PC, a Raspberry Pi or a VPS. Paper, Purpur, Fabric, NeoForge, Vanilla and Velocity. No panel fee, no telemetry.";
 
-const types: { key: string; name: string; icon: PixelName; color: string; note: string; server: string; meta: string; addons: string; tab: string | null; players: string; tps: string; mem: string }[] = [
-  { key: "paper", name: "Paper", icon: "paper", color: "#e8e2d4", note: "Plugins, fast and Vanilla-like.", server: "survival", meta: "Paper 1.21.4 · build 232 · Java 21", addons: "Plugins from Modrinth & Hangar", tab: "Plugins", players: "6 / 20", tps: "20.0", mem: "1.4 / 2.0 GB" },
-  { key: "purpur", name: "Purpur", icon: "purpur", color: "#b98ad0", note: "Paper with more settings.", server: "skyblock", meta: "Purpur 1.21.11 · build 2568 · Java 21", addons: "Paper plugins from Modrinth & Hangar", tab: "Plugins", players: "11 / 30", tps: "19.9", mem: "2.3 / 3.0 GB" },
-  { key: "fabric", name: "Fabric", icon: "fabric", color: "#d9b77e", note: "Light mods like Lithium.", server: "creative", meta: "Fabric 1.21.11 · loader 0.20.1 · Java 21", addons: "Fabric mods, Fabric API checked", tab: "Mods", players: "3 / 10", tps: "20.0", mem: "1.9 / 3.0 GB" },
-  { key: "neoforge", name: "NeoForge", icon: "neoforge", color: "#f08a24", note: "Big mods and modpacks.", server: "create-pack", meta: "NeoForge 1.21.1 · 21.1.265 · Java 21", addons: "Mods & modpacks from Modrinth", tab: "Mods", players: "4 / 8", tps: "19.6", mem: "4.8 / 6.0 GB" },
-  { key: "vanilla", name: "Vanilla", icon: "vanilla", color: "var(--cp-signal)", note: "Mojang's server, untouched.", server: "vanilla-smp", meta: "Vanilla 26.3 · Java 25", addons: "No add-ons. Just Minecraft.", tab: null, players: "5 / 20", tps: "20.0", mem: "1.6 / 2.0 GB" },
-  { key: "velocity", name: "Velocity", icon: "velocity", color: "#3fb8e8", note: "Several servers, one address.", server: "network", meta: "Velocity 4.3.1 · build 45 · Java 25", addons: "3 servers behind one address", tab: "Proxy", players: "14 / 100", tps: "—", mem: "0.3 / 0.5 GB" },
+const software = {
+  paper: {
+    key: "paper",
+    name: "Paper",
+    icon: "paper" as PixelName,
+    color: "#e8e2d4",
+    note: "Plugins, fast and Vanilla-like.",
+    rec: true,
+    title: "survival",
+    versions: [
+      ["1.21.4", "build 232"],
+      ["1.21.3", "build 81"],
+      ["1.20.6", "build 151"],
+    ],
+    java: "Java 21",
+    tabs: ["Overview", "Console", "Players", "Plugins", "Backups", "Settings"],
+    highlightTab: "Plugins",
+    servers: [
+      { name: "survival", status: "on" },
+      { name: "lobby", status: "off" },
+    ],
+    players: "6 / 20",
+    middleStat: ["TPS", "20.0"],
+    memRatio: 0.7,
+    sourceIcon: "plug" as const,
+    source: "Plugins from Modrinth & Hangar",
+  },
+  purpur: {
+    key: "purpur",
+    name: "Purpur",
+    icon: "purpur" as PixelName,
+    color: "#b98ad0",
+    note: "Paper with more settings.",
+    rec: false,
+    title: "survival",
+    versions: [
+      ["1.21.4", "build 2417"],
+      ["1.21.3", "build 2385"],
+      ["1.20.6", "build 2250"],
+    ],
+    java: "Java 21",
+    tabs: ["Overview", "Console", "Players", "Plugins", "Backups", "Settings"],
+    highlightTab: "Plugins",
+    servers: [
+      { name: "survival", status: "on" },
+      { name: "lobby", status: "off" },
+    ],
+    players: "8 / 30",
+    middleStat: ["TPS", "20.0"],
+    memRatio: 0.7,
+    sourceIcon: "plug" as const,
+    source: "Plugins from Modrinth & Hangar",
+  },
+  fabric: {
+    key: "fabric",
+    name: "Fabric",
+    icon: "fabric" as PixelName,
+    color: "#d9b77e",
+    note: "Light mods like Lithium.",
+    rec: false,
+    title: "survival",
+    versions: [
+      ["1.21.4", "loader 0.16.10"],
+      ["1.21.3", "loader 0.16.9"],
+      ["1.20.6", "loader 0.16.5"],
+    ],
+    java: "Java 21",
+    tabs: ["Overview", "Console", "Players", "Mods", "Backups", "Settings"],
+    highlightTab: "Mods",
+    servers: [
+      { name: "survival", status: "on" },
+      { name: "lobby", status: "off" },
+    ],
+    players: "4 / 20",
+    middleStat: ["TPS", "20.0"],
+    memRatio: 0.7,
+    sourceIcon: "plug" as const,
+    source: "Mods from Modrinth",
+  },
+  neoforge: {
+    key: "neoforge",
+    name: "NeoForge",
+    icon: "neoforge" as PixelName,
+    color: "#f08a24",
+    note: "Big mods and modpacks.",
+    rec: false,
+    title: "modpack",
+    versions: [
+      ["1.21.4", "21.4.80"],
+      ["1.21.3", "21.3.60"],
+      ["1.20.6", "20.6.119"],
+    ],
+    java: "Java 21",
+    tabs: ["Overview", "Console", "Players", "Mods", "Backups", "Settings"],
+    highlightTab: "Mods",
+    servers: [
+      { name: "modpack", status: "on" },
+      { name: "lobby", status: "off" },
+    ],
+    players: "3 / 10",
+    middleStat: ["TPS", "20.0"],
+    memRatio: 0.7,
+    sourceIcon: "plug" as const,
+    source: "Mods and modpacks from Modrinth",
+  },
+  vanilla: {
+    key: "vanilla",
+    name: "Vanilla",
+    icon: "vanilla" as PixelName,
+    color: "var(--cp-signal)",
+    note: "Mojang's server, untouched.",
+    rec: false,
+    title: "survival",
+    versions: [
+      ["1.21.4", ""],
+      ["1.21.3", ""],
+      ["1.20.6", ""],
+    ],
+    java: "Java 21",
+    tabs: ["Overview", "Console", "Players", "Backups", "Settings"],
+    highlightTab: null,
+    servers: [
+      { name: "survival", status: "on" },
+      { name: "lobby", status: "off" },
+    ],
+    players: "5 / 20",
+    middleStat: ["TPS", "20.0"],
+    memRatio: 0.7,
+    sourceIcon: "cube" as const,
+    source: "No add-ons. Straight from Mojang.",
+  },
+  velocity: {
+    key: "velocity",
+    name: "Velocity",
+    icon: "velocity" as PixelName,
+    color: "#3fb8e8",
+    note: "Several servers, one address.",
+    rec: false,
+    title: "network",
+    versions: [
+      ["3.4.0", "build 4"],
+      ["3.3.0", "build 410"],
+      ["3.2.0", "build 296"],
+    ],
+    java: "Java 21",
+    tabs: ["Overview", "Console", "Servers", "Plugins", "Settings"],
+    highlightTab: "Plugins",
+    servers: [
+      { name: "network", status: "on" },
+      { name: "survival", status: "up" },
+      { name: "lobby", status: "up" },
+    ],
+    players: "14 / 100",
+    middleStat: ["Servers", "3 / 3"],
+    memRatio: 0.25,
+    sourceIcon: "plug" as const,
+    source: "Plugins from Hangar",
+  },
+} as const;
+
+const softwareGroups: { label: string; wide: boolean; items: (keyof typeof software)[] }[] = [
+  { label: "Plugin servers", wide: true, items: ["paper", "purpur"] },
+  { label: "Mod loaders", wide: true, items: ["fabric", "neoforge"] },
+  { label: "Unmodified", wide: false, items: ["vanilla"] },
+  { label: "Proxy", wide: false, items: ["velocity"] },
+];
+
+const memoryOptions = [1, 2, 4, 8] as const;
+const defaultSw = software.paper;
+const defaultVer = defaultSw.versions[0];
+const defaultMem = 2;
+const defaultMeta = [`${defaultSw.name} ${defaultVer[0]}`, defaultVer[1], defaultSw.java].filter(Boolean).join(" · ");
+const defaultMemText = `${(defaultMem * defaultSw.memRatio).toFixed(1)} / ${defaultMem.toFixed(1)} GB`;
+
+const softwareTrust: { icon: PixelName; title: string; text: string }[] = [
+  { icon: "shield", title: "Official source", text: "Every server comes straight from the project that makes it." },
+  { icon: "hash", title: "Checksum checked", text: "The download is verified before anything starts." },
+  { icon: "cup", title: "Right Java, automatically", text: "CraftPanel installs the Java version your server needs." },
 ];
 
 const minor: { label: string; icon: PixelName; text: string }[] = [
@@ -211,63 +382,157 @@ const backups = [
       <hr class="px-rule" />
 
       <!-- 01 Server software -->
-      <section class="sec" aria-labelledby="types-title">
+      <section class="sec" aria-labelledby="types-title" data-types data-software={JSON.stringify(software)}>
         <div class="wrap">
           <header class="sec-head">
             <p class="sec-no mono"><span>01</span>Server software</p>
             <h2 id="types-title" class="display">Six kinds of server. One wizard.</h2>
-            <p class="sec-lead">Pick the software, the version and the memory. CraftPanel fetches the server from its official source, checks the checksum, downloads the right Java and starts it.</p>
+            <p class="sec-lead">Pick the software, the version and the memory. CraftPanel does the rest and shows you what you'll get.</p>
           </header>
-          <div class="types" data-types>
-            <div class="type-list" role="radiogroup" aria-label="Server software">
+
+          <div class="types">
+            <div class="type-groups" role="radiogroup" aria-label="Server software">
               {
-                types.map((t, i) => (
-                  <button
-                    type="button"
-                    role="radio"
-                    class="type"
-                    aria-checked={i === 0 ? "true" : "false"}
-                    tabindex={i === 0 ? 0 : -1}
-                    data-type={JSON.stringify(t)}
-                    style={`--type:${t.color}`}
-                  >
-                    <span class="type-icon"><Pixel name={t.icon} size={28} /></span>
-                    <span class="type-text">
-                      <span class="type-name">{t.name}</span>
-                      <span class="type-note">{t.note}</span>
-                    </span>
-                  </button>
+                softwareGroups.map((group) => (
+                  <div class:list={["type-group", { "is-wide": group.wide }]}>
+                    <p class="type-group-label">{group.label}</p>
+                    <div class="type-cards">
+                      {group.items.map((key) => {
+                        const t = software[key];
+                        return (
+                          <label class:list={["type", { "has-badge": t.rec }]} style={`--type:${t.color}`}>
+                            <input type="radio" name="sw" value={t.key} checked={t.key === "paper"} />
+                            <span class="type-body">
+                              <span class="type-icon"><Pixel name={t.icon} size={32} /></span>
+                              <span class="type-text">
+                                <span class="type-name">
+                                  {t.name}
+                                  {t.rec && <span class="type-rec mono">Recommended</span>}
+                                </span>
+                                <span class="type-note">{t.note}</span>
+                              </span>
+                            </span>
+                            <span class="type-check" aria-hidden="true"><Pixel name="check" size={14} /></span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ))
               }
             </div>
-            <div class="preview" aria-live="polite" style={`--type:${types[0].color}`}>
-              <div class="pv-bar"><span class="pv-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="mono">localhost:8080/server</span></div>
-              <div class="pv-body">
-                <aside class="pv-side" aria-hidden="true">
-                  <span class="pv-brand"><Mark size={17} />CraftPanel</span>
-                  <span class="pv-side-label mono">SERVERS</span>
-                  <span class="pv-side-item is-on"><span class="dot-run"></span><span data-pv="server">{types[0].server}</span></span>
-                  <span class="pv-side-item"><span class="dot-off"></span>lobby</span>
-                </aside>
-                <div class="pv-main">
-                  <div class="pv-head">
-                    <span class="pv-name" data-pv="server">{types[0].server}</span>
-                    <span class="pv-status"><span class="dot-run"></span>Running</span>
-                    <span class="pv-badge mono" data-pv="name">{types[0].name}</span>
+
+            <div class="preview-col">
+              <div class="pv-cap mono">
+                <span>Your panel</span>
+                <span data-pv="cap">{defaultSw.name} {defaultVer[0]} selected</span>
+              </div>
+              <div class="preview" style={`--type:${defaultSw.color}`}>
+                <div class="pv-bar">
+                  <span class="pv-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <span class="mono">localhost:8080/server</span>
+                </div>
+                <div class="pv-body">
+                  <aside class="pv-side" aria-hidden="true">
+                    <span class="pv-brand"><Mark size={20} />CraftPanel</span>
+                    <span class="pv-side-label mono">Servers</span>
+                    <div class="pv-side-list" data-pv="servers">
+                      {
+                        defaultSw.servers.map((srv) => (
+                          <span class:list={["pv-side-item", `is-${srv.status}`]}>
+                            <span class="pv-srv-dot"></span>
+                            <span>{srv.name}</span>
+                          </span>
+                        ))
+                      }
+                    </div>
+                  </aside>
+                  <div class="pv-main" aria-live="polite">
+                    <div class="pv-head">
+                      <span class="pv-name" data-pv="title">{defaultSw.title}</span>
+                      <span class="pv-status"><span class="dot-run"></span>Running</span>
+                      <span class="pv-badge" data-pv="name">{defaultSw.name}</span>
+                    </div>
+                    <p class="pv-meta mono" data-pv="meta">{defaultMeta}</p>
+                    <div class="pv-tabs" aria-hidden="true" data-pv="tabs">
+                      {
+                        defaultSw.tabs.map((tab, idx) => (
+                          <span class:list={["pv-tab", { "is-on": idx === 0, "is-new": tab === defaultSw.highlightTab }]}>{tab}</span>
+                        ))
+                      }
+                    </div>
+                    <dl class="pv-stats" data-pv="stats">
+                      <div><dt>Players</dt><dd class="mono" data-pv="players">{defaultSw.players}</dd></div>
+                      <div><dt data-pv="mid-label">{defaultSw.middleStat[0]}</dt><dd class="mono" data-pv="mid-val">{defaultSw.middleStat[1]}</dd></div>
+                      <div><dt>Memory</dt><dd class="mono" data-pv="mem">{defaultMemText}</dd></div>
+                    </dl>
+                    <div class="pv-addons" data-pv="source-wrap">
+                      <span class="pv-source-icon" data-source-icon="plug"><Pixel name="plug" size={18} /></span>
+                      <span class="pv-source-icon" data-source-icon="cube" hidden><Pixel name="cube" size={18} /></span>
+                      <span data-pv="addons">{defaultSw.source}</span>
+                    </div>
                   </div>
-                  <p class="pv-meta mono" data-pv="meta">{types[0].meta}</p>
-                  <div class="pv-tabs mono" aria-hidden="true">
-                    <span class="is-on">Overview</span><span>Console</span><span>Players</span><span data-pv="tab">{types[0].tab}</span><span>Backups</span><span>Settings</span>
-                  </div>
-                  <dl class="pv-stats">
-                    <div><dt>Players</dt><dd class="mono" data-pv="players">{types[0].players}</dd></div>
-                    <div><dt>TPS</dt><dd class="mono" data-pv="tps">{types[0].tps}</dd></div>
-                    <div><dt>Memory</dt><dd class="mono" data-pv="mem">{types[0].mem}</dd></div>
-                  </dl>
-                  <p class="pv-addons"><Pixel name="puzzle" size={12} /><span data-pv="addons">{types[0].addons}</span></p>
                 </div>
               </div>
             </div>
+          </div>
+
+          <div class="wizard" aria-label="Your server setup">
+            <div class="wz-step">
+              <div class="wz-step-head"><b class="mono">1</b><span>Software</span></div>
+              <div class="wz-step-val">
+                {
+                  Object.values(software).map((s) => (
+                    <span class="type-icon wz-sw-icon" data-wz-icon={s.key} style={`--type:${s.color}`} hidden={s.key !== "paper"}>
+                      <Pixel name={s.icon} size={24} />
+                    </span>
+                  ))
+                }
+                <span data-wz="sw-name">{defaultSw.name}</span>
+              </div>
+            </div>
+            <div class="wz-step">
+              <div class="wz-step-head"><b class="mono">2</b><label for="wz-ver">Version</label></div>
+              <div class="wz-select">
+                <select id="wz-ver" data-wz-ver>
+                  {defaultSw.versions.map((v, idx) => <option value={String(idx)} selected={idx === 0}>{v[0]}</option>)}
+                </select>
+              </div>
+            </div>
+            <div class="wz-step">
+              <div class="wz-step-head"><b class="mono">3</b><span>Memory</span></div>
+              <div class="wz-step-val">
+                <div class="wz-seg" role="radiogroup" aria-label="Memory in gigabytes" data-wz-mem>
+                  {
+                    memoryOptions.map((m) => (
+                      <label>
+                        <input type="radio" name="wz-mem" value={String(m)} checked={m === defaultMem} aria-label={`${m} gigabytes`} />
+                        <span class="mono">{m}</span>
+                      </label>
+                    ))
+                  }
+                </div>
+                <span class="wz-unit">GB</span>
+              </div>
+            </div>
+            <div class="wz-cta-wrap">
+              <button class="wz-btn" type="button" data-wz-cta>Create a {defaultSw.name} server</button>
+              <a class="wz-link" href="/docs/guides/server-software/">See all supported versions</a>
+            </div>
+          </div>
+
+          <div class="sw-trust">
+            {
+              softwareTrust.map((item) => (
+                <div class="sw-trust-item">
+                  <span class="sw-trust-icon"><Pixel name={item.icon} size={28} /></span>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.text}</p>
+                  </div>
+                </div>
+              ))
+            }
           </div>
         </div>
       </section>

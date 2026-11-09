@@ -112,26 +112,105 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
 }
 
 // ---- server software picker --------------------------------------------------
+interface SoftwareEntry {
+  key: string;
+  name: string;
+  color: string;
+  title: string;
+  versions: [string, string][];
+  java: string;
+  tabs: string[];
+  highlightTab: string | null;
+  servers: { name: string; status: "on" | "up" | "off" }[];
+  players: string;
+  middleStat: [string, string];
+  memRatio: number;
+  sourceIcon: "plug" | "cube";
+  source: string;
+}
+
 const typesEl = document.querySelector<HTMLElement>("[data-types]");
 if (typesEl) {
-  const radios = [...typesEl.querySelectorAll<HTMLButtonElement>("[role=radio]")];
+  const softwareMap = JSON.parse(typesEl.dataset.software!) as Record<string, SoftwareEntry>;
   const preview = typesEl.querySelector<HTMLElement>(".preview")!;
-  roving(radios, (el) => {
-    const t = JSON.parse(el.dataset.type!) as Record<string, string | null>;
-    for (const r of radios) {
-      const on = r === el;
-      r.setAttribute("aria-checked", String(on));
-      r.tabIndex = on ? 0 : -1;
+  const verSelect = typesEl.querySelector<HTMLSelectElement>("[data-wz-ver]")!;
+  const ctaBtn = typesEl.querySelector<HTMLButtonElement>("[data-wz-cta]")!;
+  const wzSwName = typesEl.querySelector<HTMLElement>('[data-wz="sw-name"]')!;
+  const wzIcons = [...typesEl.querySelectorAll<HTMLElement>("[data-wz-icon]")];
+  const sourceIcons = [...typesEl.querySelectorAll<HTMLElement>("[data-source-icon]")];
+  const pv = (k: string) => typesEl.querySelector<HTMLElement>(`[data-pv="${k}"]`)!;
+
+  const state = { sw: "paper", ver: 0, mem: 2 };
+
+  function flash(el: HTMLElement) {
+    if (reduced) return;
+    el.classList.remove("is-swap");
+    void el.offsetWidth;
+    el.classList.add("is-swap");
+  }
+
+  function render(changed: "sw" | "ver" | "mem") {
+    const s = softwareMap[state.sw];
+    const v = s.versions[state.ver] ?? s.versions[0];
+    const usedMem = (state.mem * s.memRatio).toFixed(1);
+    const totalMem = state.mem.toFixed(1);
+
+    preview.style.setProperty("--type", s.color);
+    wzSwName.textContent = s.name;
+    for (const icon of wzIcons) icon.hidden = icon.dataset.wzIcon !== state.sw;
+    ctaBtn.textContent = `Create a ${s.name} server`;
+    pv("cap").textContent = `${s.name} ${v[0]} selected`;
+
+    if (changed === "sw") {
+      verSelect.innerHTML = s.versions.map((ver, i) => `<option value="${i}">${ver[0]}</option>`).join("");
+      verSelect.value = String(state.ver);
     }
-    preview.style.setProperty("--type", t.color!);
-    preview.classList.remove("is-swap");
-    void preview.offsetWidth;
-    preview.classList.add("is-swap");
-    for (const field of preview.querySelectorAll<HTMLElement>("[data-pv]")) {
-      const value = t[field.dataset.pv!];
-      field.textContent = value ?? "";
-      field.hidden = value === null;
+
+    pv("title").textContent = s.title;
+    pv("name").textContent = s.name;
+    pv("meta").textContent = [`${s.name} ${v[0]}`, v[1], s.java].filter(Boolean).join(" · ");
+
+    pv("tabs").innerHTML = s.tabs
+      .map((t, i) => `<span class="pv-tab${i === 0 ? " is-on" : ""}${t === s.highlightTab ? " is-new" : ""}">${t}</span>`)
+      .join("");
+
+    pv("players").textContent = s.players;
+    pv("mid-label").textContent = s.middleStat[0];
+    pv("mid-val").textContent = s.middleStat[1];
+    pv("mem").textContent = `${usedMem} / ${totalMem} GB`;
+
+    for (const icon of sourceIcons) icon.hidden = icon.dataset.sourceIcon !== s.sourceIcon;
+    pv("addons").textContent = s.source;
+
+    pv("servers").innerHTML = s.servers
+      .map((srv) => `<span class="pv-side-item is-${srv.status}"><span class="pv-srv-dot"></span><span>${srv.name}</span></span>`)
+      .join("");
+
+    const targets: Record<typeof changed, string[]> = {
+      sw: ["name", "meta", "tabs", "stats", "source-wrap", "servers"],
+      ver: ["meta"],
+      mem: ["stats"],
+    };
+    targets[changed].forEach((k) => flash(pv(k)));
+  }
+
+  typesEl.addEventListener("change", (e) => {
+    const target = e.target as HTMLInputElement | HTMLSelectElement;
+    if (target.name === "sw") {
+      state.sw = target.value;
+      state.ver = 0;
+      render("sw");
+    } else if (target === verSelect) {
+      state.ver = Number(verSelect.value);
+      render("ver");
+    } else if (target.name === "wz-mem") {
+      state.mem = Number(target.value);
+      render("mem");
     }
+  });
+
+  ctaBtn.addEventListener("click", () => {
+    document.getElementById("install")?.scrollIntoView({ behavior: reduced ? "auto" : "smooth" });
   });
 }
 
