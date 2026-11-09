@@ -347,10 +347,28 @@ export async function checkModrinthUpdates(sha1s: string[], mcVersion: string | 
   });
   if (!res.ok) throw new Error(`Modrinth update check failed (HTTP ${res.status})`);
   const body = (await res.json()) as Record<string, ModrinthVersion>;
+  const primarySha1 = (v: ModrinthVersion) => (v.files.find((f) => f.primary) ?? v.files[0])?.hashes.sha1;
+  // Modrinth suggests the newest version of any type. Someone running a stable release only gets
+  // stable updates; someone already on a beta/alpha keeps getting the newest one.
+  const prerelease = Object.entries(body).filter(([hash, v]) => v.version_type !== "release" && primarySha1(v) !== hash);
+  const installed: Record<string, ModrinthVersion> = prerelease.length
+    ? await fetch(`${MODRINTH}/version_files`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "User-Agent": USER_AGENT },
+        body: JSON.stringify({ hashes: prerelease.map(([hash]) => hash), algorithm: "sha1" }),
+        signal: AbortSignal.timeout(15000),
+      }).then((r) => (r.ok ? (r.json() as Promise<Record<string, ModrinthVersion>>) : {}))
+    : {};
   const out: Record<string, { versionId: string; versionNumber: string; projectId: string }> = {};
-  for (const [hash, v] of Object.entries(body)) {
-    const primary = v.files.find((f) => f.primary) ?? v.files[0];
-    if (primary && primary.hashes.sha1 !== hash) out[hash] = { versionId: v.id, versionNumber: v.version_number, projectId: v.project_id };
+  for (const [hash, suggested] of Object.entries(body)) {
+    let v: ModrinthVersion | undefined = suggested;
+    const current = installed[hash];
+    if (v.version_type !== "release" && current?.version_type === "release") {
+      const releases = (await compatibleModrinthVersions(v.project_id, mcVersion, kind, loader)).filter((r) => r.version_type === "release");
+      v = releases.sort((a, b) => Date.parse(b.date_published) - Date.parse(a.date_published))[0];
+      if (v && Date.parse(v.date_published) <= Date.parse(current.date_published)) v = undefined;
+    }
+    if (v && primarySha1(v) !== undefined && primarySha1(v) !== hash) out[hash] = { versionId: v.id, versionNumber: v.version_number, projectId: v.project_id };
   }
   return out;
 }

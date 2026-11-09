@@ -114,7 +114,7 @@ export async function previewSwitch(sb: ServerSandbox, from: { software: ServerS
   const sameAddons = fromInfo.addons === toInfo.addons && fromInfo.modLoader === toInfo.modLoader;
   if (fromInfo.addons && !sameAddons) {
     const count = await countJars(sb, fromInfo.addons);
-    if (count) notes.push({ level: "warn", text: `${count} ${fromInfo.addons === "mods" ? "mod" : "plugin"}${count === 1 ? "" : "s"} in ${fromInfo.addons}/ won't load on ${toInfo.label}. They stay in the folder.` });
+    if (count) notes.push({ level: "warn", text: `${count} ${fromInfo.addons === "mods" ? "mod" : "plugin"}${count === 1 ? "" : "s"} in ${fromInfo.addons}/ won't load on ${toInfo.label}. ${count === 1 ? "It stays" : "They stay"} in the folder.` });
   }
   if (fromInfo.addons && sameAddons && to.version !== from.version) {
     const count = await countJars(sb, fromInfo.addons);

@@ -14,6 +14,7 @@ scripts/real-tests/run.sh <api-port> <data-dir> <scenario.mjs> [args…]
 | `software-switch.mjs` | – | A block placed in Paper's Nether survives Paper → Vanilla → Fabric → Paper; downgrade guard. |
 | `performance.mjs` | `[software] [mcVersion] [mcPort]` | Wizard preset applied (JVM flags, distances), preset switch, Chunky install and pre-generation with pause/continue/cancel. |
 | `neoforge.mjs` | `<mcVersion> <mcPort>` | NeoForge catalogue, install, start, Chunky as a NeoForge mod, mod list from `neoforge.mods.toml`, pre-generation, switch preview. |
+| `neoforge-update.mjs` | `[mcVersion] [mcPort]` | In-place NeoForge update from the second-newest to the newest build: old version folder removed, shared libraries kept, server starts. |
 | `modpack.mjs` | `search <query>` or `run <modrinthProjectId> <mcPort> [versionId]` | Modrinth modpack search; prepare, create, install, start, mods loaded. |
 | `modpack-upload.mjs` | `<mcPort>` | `.mrpack` upload: overrides vs. the server's port/EULA, Forge pack and junk refused, a used pack can't be reused. Needs `python3`. |
 | `modpack-fix-crash.mjs` | – | After `modpack.mjs run` with a pack that crashes (`KEEP_DATA=1`): the crash names the mod, disabling it via the mod list lets the server start. |

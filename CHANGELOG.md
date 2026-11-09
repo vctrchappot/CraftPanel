@@ -1,10 +1,19 @@
 # Changelog
 
-All notable changes to CraftPanel. Versions follow [semantic versioning](https://semver.org); while the version starts with 0, minor versions may change behaviour.
+All notable changes to CraftPanel. Versions follow [semantic versioning](https://semver.org): from 1.0.0 on, minor and patch releases keep existing installs, data and settings working, and changes that need manual steps come only with a new major version. (Before 1.0, minor versions could change behaviour.)
 
 `scripts/release.mjs <version>` turns the "Unreleased" section into the release notes for that version.
 
 ## Unreleased
+
+### Upgrading
+First stable release. From 0.3.x, update from the dashboard or re-run the installer. From 0.2.x or older, follow "Upgrading from 0.2.x" under 0.3.0 once.
+
+### Fixed
+- Plugin and mod updates from Modrinth no longer suggest beta or alpha versions for an installed stable release; installs that already run a beta keep getting the newest one.
+- Updating NeoForge to another version removes the previous version's libraries instead of leaving them in `libraries/`.
+- Removing a plugin installed from Hangar also forgets it in `plugins/.craftpanel-hangar.json`.
+- The software switch preview says "It stays in the folder" for a single mod or plugin.
 
 ## 0.3.0 – 2026-11-09
 

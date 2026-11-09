@@ -593,6 +593,9 @@ export class ServerService {
     // Remove the previous jar when the filename changed (Fabric's launcher starts the vanilla server.jar;
     // NeoForge's argument files live in libraries/, which the installer manages).
     if (row.jarFile && after.jarFile !== row.jarFile && !(software === "fabric" && row.jarFile === "server.jar") && !row.jarFile.endsWith("_args.txt")) await fsp.rm(path.join(row.directory, row.jarFile), { force: true });
+    // A NeoForge version change leaves the previous version's own folder behind; libraries it shares stay.
+    const oldNeoForge = row.jarFile?.match(/^libraries\/net\/neoforged\/neoforge\/([\w.+-]+)\/(unix|win)_args\.txt$/)?.[1];
+    if (oldNeoForge && after.jarFile !== row.jarFile && oldNeoForge !== ".." && oldNeoForge !== ".") await fsp.rm(path.join(row.directory, "libraries", "net", "neoforged", "neoforge", oldNeoForge), { recursive: true, force: true });
   }
 
   // ---- agent events & recovery ---------------------------------------------

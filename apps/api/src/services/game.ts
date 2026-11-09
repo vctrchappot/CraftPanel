@@ -417,6 +417,7 @@ export class GameService {
     this.safePluginFile(file);
     const isOwnInfoPlugin = file.replace(/.disabled$/, "") === INFO_PLUGIN_FILE && (await isInfoPlugin(path.join(this.pluginsDir(row), file)));
     await fsp.rm(path.join(this.pluginsDir(row), file));
+    await this.forgetHangar(row, file);
     if (isOwnInfoPlugin) await this.servers.update(row.id, { infoCommand: false }, actor);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
     await this.activity.event(row.id, "plugin.removed", `${this.addonLabel(row)} ${file} removed`, { actor });
@@ -496,6 +497,14 @@ export class GameService {
     await fsp.writeFile(this.hangarIndexFile(row), JSON.stringify(index, null, 2));
   }
 
+  private async forgetHangar(row: ServerRow, file: string) {
+    const index = await this.hangarIndex(row);
+    const key = file.replace(/\.disabled$/, "");
+    if (!(key in index)) return;
+    delete index[key];
+    await fsp.writeFile(this.hangarIndexFile(row), JSON.stringify(index, null, 2));
+  }
+
   async searchHangar(row: ServerRow, query: string, offset: number) {
     this.requirePluginServer(row);
     return searchHangarPlugins(query, row.mcVersion, offset);
@@ -558,9 +567,7 @@ export class GameService {
       const res = await this.installFromHangar(row, known.project, versionId, actor);
       if (res.file !== file) {
         await fsp.rm(path.join(this.pluginsDir(row), file), { force: true });
-        const index = await this.hangarIndex(row);
-        delete index[file.replace(/\.disabled$/, "")];
-        await fsp.writeFile(this.hangarIndexFile(row), JSON.stringify(index, null, 2));
+        await this.forgetHangar(row, file);
       }
       return;
     }
