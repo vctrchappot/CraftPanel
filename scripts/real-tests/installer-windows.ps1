@@ -36,6 +36,23 @@ function Assert-Database {
 try {
   Install-Fixture "99.0.0" $true
   Assert-Ready
+  $runtimeName = "$taskName Runtime"
+  $runtime = Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")
+  if ($runtime.State -ne "Running" -or $runtime.StartName -ne "NT SERVICE\$runtimeName") { throw "Runtime is not running under its virtual service account" }
+  $runtimeProcess = $runtime.ProcessId
+  # Stopping the dashboard task must not stop the independent SCM owner.
+  Stop-ScheduledTask -TaskName $taskName
+  $taskDeadline = (Get-Date).AddSeconds(30)
+  while ((Get-ScheduledTask -TaskName $taskName).State -eq "Running") {
+    if ((Get-Date) -gt $taskDeadline) { throw "Dashboard task did not stop" }
+    Start-Sleep -Milliseconds 100
+  }
+  if ((Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")).ProcessId -ne $runtimeProcess) { throw "Dashboard task stop restarted the runtime service" }
+  Start-ScheduledTask -TaskName $taskName
+  $readyDeadline = (Get-Date).AddSeconds(30)
+  do {
+    try { Assert-Ready; break } catch { if ((Get-Date) -gt $readyDeadline) { throw }; Start-Sleep -Milliseconds 250 }
+  } while ($true)
   $before = (Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw | ConvertFrom-Json).pid
   Install-Fixture "98.0.0" $false
   $after = (Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw | ConvertFrom-Json).pid
@@ -43,6 +60,7 @@ try {
   foreach ($version in @("99.0.1", "99.0.2", "99.0.3")) {
     Install-Fixture $version $false
     Assert-Ready
+    if ((Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")).ProcessId -ne $runtimeProcess) { throw "Dashboard rollback restarted the runtime service" }
     Assert-Database
     $childFile = Join-Path $dataRoot "failed-child-pid.txt"
     if (Test-Path -LiteralPath $childFile) {
@@ -53,6 +71,28 @@ try {
     if ((Get-Content -LiteralPath (Join-Path $installRoot "release.json") -Raw | ConvertFrom-Json).version -ne "99.0.0") { throw "Release metadata was not restored" }
   }
   1..2 | ForEach-Object { Install-Fixture "99.0.0" $true; Assert-Ready }
+  if ((Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")).ProcessId -ne $runtimeProcess) { throw "Dashboard update restarted the runtime service" }
+  Install-Fixture "99.0.4" $false
+  Assert-Ready
+  if ((Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")).ProcessId -ne $runtimeProcess) { throw "Unapproved runtime update stopped the service" }
+  $env:CRAFTPANEL_ALLOW_RUNTIME_RESTART = "1"
+  Install-Fixture "99.0.5" $false
+  Assert-Ready
+  Assert-Database
+  Install-Fixture "99.0.4" $true
+  Remove-Item Env:CRAFTPANEL_ALLOW_RUNTIME_RESTART
+  Assert-Ready
+  # SCM recovery must replace a crashed wrapper; its Job Object also owns the child runtime.
+  $runtimeProcess = (Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")).ProcessId
+  Stop-Process -Id $runtimeProcess -Force
+  $recoveryDeadline = (Get-Date).AddSeconds(45)
+  do {
+    Start-Sleep -Milliseconds 250
+    $service = Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")
+    if ((Get-Date) -gt $recoveryDeadline) { throw "SCM did not recover the crashed runtime service" }
+  } while ($service.State -ne "Running" -or $service.ProcessId -eq $runtimeProcess)
+  $readyDeadline = (Get-Date).AddSeconds(30)
+  do { try { Assert-Ready; break } catch { if ((Get-Date) -gt $readyDeadline) { throw }; Start-Sleep -Milliseconds 250 } } while ($true)
   $points = @(Get-ChildItem -LiteralPath $installRoot -Directory -Filter 'state-*' | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "committed") })
   if ($points.Count -ne 2) { throw "Successful recovery retention is not bounded" }
   $passed = $true
@@ -68,6 +108,13 @@ try {
       Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
       Unregister-ScheduledTask -TaskName $name -Confirm:$false
     }
+  }
+  # First-install failures may leave a service before update.ps1 was activated.
+  $runtimeName = "$taskName Runtime"
+  if (Get-Service -Name $runtimeName -ErrorAction SilentlyContinue) {
+    Stop-Service -Name $runtimeName -ErrorAction Stop
+    & sc.exe delete $runtimeName | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Could not clean up the isolated runtime service" }
   }
   if ($passed -and (Test-Path -LiteralPath $testRoot)) {
     $resolved = (Resolve-Path -LiteralPath $testRoot).Path

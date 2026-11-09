@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import crypto from "node:crypto";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const [outputArg, instance = "craftpanel"] = process.argv.slice(2);
@@ -14,7 +15,7 @@ const rewrite = (text) => instance === "craftpanel" ? text : text.replace(/\bcra
 await fs.writeFile(path.join(output, "install.sh"), rewrite(await fs.readFile(path.join(root, "deploy/install.sh"), "utf8")));
 await fs.copyFile(path.join(root, "deploy/install.ps1"), path.join(output, "install.ps1"));
 const archives = {};
-for (const [kind, version] of [["good", "99.0.0"], ["unsupported", "98.0.0"], ["migration", "99.0.1"], ["unit", "99.0.2"], ["hang", "99.0.3"]]) {
+for (const [kind, version] of [["good", "99.0.0"], ["unsupported", "98.0.0"], ["migration", "99.0.1"], ["unit", "99.0.2"], ["hang", "99.0.3"], ["runtime", "99.0.4"], ["runtime-migration", "99.0.5"]]) {
   const name = `${instance}-v${version}`;
   const stage = path.join(output, name);
   const dist = path.join(stage, "apps/api/dist");
@@ -25,15 +26,14 @@ for (const [kind, version] of [["good", "99.0.0"], ["unsupported", "98.0.0"], ["
   for (const file of ["install.sh", "craftpanel.service", "craftpanel-runtime.service"])
     await fs.writeFile(path.join(stage, "deploy", rewrite(file)), rewrite(await fs.readFile(path.join(root, "deploy", file), "utf8")));
   await fs.copyFile(path.join(root, "deploy/install.ps1"), path.join(stage, "deploy/install.ps1"));
-  const runtime = JSON.parse(await fs.readFile(path.join(dist, "runtime-manifest.json"), "utf8"));
-  await fs.writeFile(path.join(stage, "release.json"), JSON.stringify({ version, fixture: kind, recoveryProtocol: 1, runtime }));
   if (kind === "unsupported") await fs.rm(path.join(dist, "recovery.js"));
   if (kind === "unit") {
     const file = path.join(stage, "deploy", rewrite("craftpanel.service"));
     await fs.writeFile(file, (await fs.readFile(file, "utf8")).replace(/^ExecStart=.*$/m, () => "ExecStart=/does-not-exist/craftpanel-test-failure"));
-    await fs.appendFile(path.join(dist, "windows-job.ps1"), "\nthrow 'Intentional launcher fixture failure'\n");
+    const dashboard = path.join(dist, "index.js");
+    await fs.writeFile(dashboard, "if (process.platform === 'win32') throw new Error('Intentional dashboard fixture failure');\n" + await fs.readFile(dashboard, "utf8"));
   }
-  if (kind === "migration" || kind === "hang") {
+  if (kind === "migration" || kind === "hang" || kind === "runtime-migration") {
     await fs.writeFile(path.join(dist, "index.js"), `import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -46,6 +46,16 @@ fs.writeFileSync(path.join(process.env.CRAFTPANEL_DATA_DIR, 'failed-child-pid.tx
 setInterval(() => {}, 1000);` : "process.exit(1);"}
 `);
   }
+  if (kind.startsWith("runtime")) await fs.appendFile(path.join(dist, "runtime.js"), `\n// Runtime update acceptance fixture ${version}\n`);
+  // Keep identity honest, including renamed systemd templates in isolated fixtures.
+  const bundle = await fs.readFile(path.join(dist, "runtime.js"));
+  const runtime = { protocol: 1, bundleSha256: crypto.createHash("sha256").update(bundle).digest("hex"),
+    sha256: crypto.createHash("sha256").update(bundle)
+      .update(await fs.readFile(path.join(dist, "windows-job.ps1")))
+      .update(await fs.readFile(path.join(dist, "windows-runtime-service.cs")))
+      .update(await fs.readFile(path.join(stage, "deploy", rewrite("craftpanel-runtime.service")))).digest("hex") };
+  await fs.writeFile(path.join(dist, "runtime-manifest.json"), JSON.stringify(runtime));
+  await fs.writeFile(path.join(stage, "release.json"), JSON.stringify({ version, fixture: kind, recoveryProtocol: 1, runtime }));
   const archive = path.join(output, name + ".tar.gz");
   execFileSync("tar", ["-czf", archive, name], { cwd: output, windowsHide: true });
   archives[kind] = archive;

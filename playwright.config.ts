@@ -9,6 +9,7 @@ const dataDir = process.env.E2E_DATA_DIR ?? path.join(os.tmpdir(), `craftpanel-e
 // directory. They download real server software and start a real server.
 export default defineConfig({
   testDir: "tests/e2e",
+  outputDir: "test-results/playwright",
   timeout: 15 * 60 * 1000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
