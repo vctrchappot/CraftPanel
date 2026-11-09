@@ -6,10 +6,10 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 ## Current state (2026-11-09)
 
-The active phase is **Minecraft-Laufzeit vom Dashboard trennen** on `wip/runtime-separation`. Real Linux player continuity, dashboard update rollback, changed-runtime approval/world recovery and browser maintenance/preview checks now pass. [RUNTIME-HANDOFF.md](RUNTIME-HANDOFF.md) records exact evidence and outstanding Windows, host-reboot and legacy-migration work. The earlier intermittent disconnect remains unreproduced rather than explained. The phase is incomplete; do not merge/release this WIP. Main remains at the pre-phase baseline.
+The active phase is **Minecraft-Laufzeit vom Dashboard trennen** on `wip/runtime-separation`. Real Linux player continuity, legacy migration, dashboard update rollback, changed-runtime approval/world recovery, browser maintenance/preview checks and the elevated Windows SCM scenarios in CI pass. [RUNTIME-HANDOFF.md](RUNTIME-HANDOFF.md) records exact evidence and the remaining acceptance: host reboot/autostart, Windows real-player continuity, dashboard-triggered rollback and concurrent installers. The earlier intermittent disconnect remains unreproduced rather than explained. The phase is incomplete; do not merge/release this WIP. Main remains at the pre-phase baseline.
 
 - **Velocity proxy** is done and verified (STATUS.md); remaining points are listed under step 4.
-- **Suggested next, in order:** finish the professional-deployment verification below, publish the first release and run the real installer paths (step 1), then separate runtime ownership from the dashboard before adding remote hosts. Bedrock and Pi/VPS measurements remain planned.
+- **Suggested next, in order:** finish the runtime separation, then the remaining professional-deployment verification below, publish the first release and run the real installer paths (step 1). Bedrock and Pi/VPS measurements remain planned.
 - **Known small issues** (not yet tracked elsewhere):
   - Modrinth update checks also offer beta/alpha versions (`checkModrinthUpdates` doesn't filter by `version_type`).
   - Removing a plugin installed from Hangar leaves its entry in `plugins/.craftpanel-hangar.json` (harmless; only existing jars are checked).
@@ -39,11 +39,11 @@ afterwards its actual state, console and controls are available again.
 - [x] Asynchronous runtime interface; orchestration depends on the contract.
 - [x] Separate process owner, authenticated Unix socket / Windows named pipe, bounded history and protocol handshake (automated child-process tests).
 - [x] Dashboard reconnect reconciles actual runtime snapshots, rejects controls while disconnected, and never retries expired or uncertain commands (automated integration tests).
-- [ ] Ubuntu/systemd installer migration and independent dashboard/runtime update transactions.
-- [ ] Windows installer parity, including graceful host shutdown.
+- [x] Ubuntu/systemd installer migration and independent dashboard/runtime update transactions (isolated Ubuntu/systemd with real Paper worlds, legacy migration and rollbacks).
+- [ ] Windows installer parity, including graceful host shutdown (SCM service, updates, rollback and crash recovery pass in CI; host shutdown and player continuity are open).
 - [x] Explicit maintenance action and runtime-update interruption preview in the dashboard (real-server stop-all and controlled release-preview browser checks).
 - [x] Prove a real player remains connected during dashboard restart/update and abrupt crash (isolated Ubuntu/systemd, Paper 1.21.4 + mineflayer; Windows parity remains open).
-- [ ] Prove disconnect/replay handling, graceful host reboot/autostart, preserved worlds/configuration and recoverable update failure on installed services.
+- [ ] Prove disconnect/replay handling, graceful host reboot/autostart, preserved worlds/configuration and recoverable update failure on installed services (all but host reboot/autostart verified on Ubuntu/systemd).
 
 Commit order: interface → service → reconnect → installers → failure/acceptance tests.
 Do not mark this phase complete from mocked or child-process-only evidence.
@@ -56,7 +56,7 @@ Following phases: per-server isolation/resources → complete backups and host m
 - [x] Standalone recovery protocol, consistent database snapshots and startup-artifact rollback verified through isolated Linux/Windows package installs, including failed migrations, unsupported targets and hanging startup. Linux also covers an invalid systemd unit. Source installs share the release installer transaction.
 - [x] Real HTTPS reverse-proxy, built-in TLS and WebSocket package tests on Windows and Ubuntu/WSL2, plus the Remote access UI in Chromium.
 - [ ] Extend verification to dashboard-triggered rollback, concurrent installers and a physical separate-host HTTPS proxy; keep STATUS.md evidence specific to each environment.
-- [ ] Separate the runtime service from the API so panel updates do not stop game servers and reconnect restores control.
+- [ ] Separate the runtime service from the API so panel updates do not stop game servers and reconnect restores control (in progress, see "Minecraft-Laufzeit vom Dashboard trennen" above).
 - [ ] Add per-server OS isolation and resource limits.
 - [ ] Add complete application backup/restore and host migration, including configuration and secrets outside the panel database.
 - [ ] Add persistent monitoring and recoverable background jobs, then authenticated remote agents and multiple hosts.
