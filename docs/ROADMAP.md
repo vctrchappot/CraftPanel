@@ -6,15 +6,10 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 ## Current state (2026-11-09)
 
-**Minecraft-Laufzeit vom Dashboard trennen** is done and merged: games run in their own runtime service and survive dashboard restarts, crashes and updates (evidence in STATUS.md). One verification gap stays open: an actual Windows host shutdown on a disposable VM. Releases v0.1.0–v0.2.1 are published on GitHub; the runtime separation ships with the next release.
+**CraftPanel 1.0.0 is the first stable release.** Everything below "Done" and every ticked item ships in it, including the independent runtime service (games survive dashboard restarts, crashes and updates). Releases v0.1.0–v0.3.0 and v1.0.0 are on GitHub; 0.x installs update with the commands in the changelog. No known small issues are open.
 
-- **Velocity proxy** is done and verified (STATUS.md); remaining points are listed under step 4.
-- **Suggested next, in order:** release the runtime separation, run the real installer paths on a physical Pi and a small VPS and announce (step 1), then per-server isolation and resource limits. Bedrock and Pi/VPS measurements remain planned.
-- **Known small issues** (not yet tracked elsewhere):
-  - Modrinth update checks also offer beta/alpha versions (`checkModrinthUpdates` doesn't filter by `version_type`).
-  - Removing a plugin installed from Hangar leaves its entry in `plugins/.craftpanel-hangar.json` (harmless; only existing jars are checked).
-  - Updating NeoForge in place re-runs the installer; old library versions stay in `libraries/`.
-  - The switch preview says "They stay in the folder" also for a single mod/plugin.
+- **Open verification gaps** (not blockers, listed honestly in STATUS.md): an actual Windows host shutdown on a disposable VM; dashboard-triggered updates and concurrent installers on Windows; the `curl | sudo bash` / `irm | iex` path on a physical Pi and a small VPS.
+- **Suggested next, in order:** run the installers on a physical Pi and a small VPS and announce (step 1), then per-server isolation and resource limits. Bedrock, Pi/VPS measurements and the Velocity open points (step 4) remain planned.
 - **Real-server test scenarios** used for the ✅ entries live in `scripts/real-tests/` (see its README).
 
 ## Done
@@ -73,7 +68,7 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 - [x] Update notice in the dashboard (GitHub latest release, opt-out; shows the update command for the install method).
 - [x] One-click update from the dashboard (systemd path unit / scheduled task run the installer; progress, reload, "What's new", rollback reported), local release folder for offline installs.
 - [x] Version bump process: `package.json` is the single source, `node scripts/release.mjs bump X.Y.Z` dates the changelog, commits and tags.
-- [x] Publish releases (v0.1.0–v0.2.1); a v0.1.0 → v0.2.0 Windows package update was verified in an isolated install.
+- [x] Publish releases (v0.1.0–v0.3.0, stable v1.0.0); a v0.1.0 → v0.2.0 Windows package update was verified in an isolated install.
 - [ ] Run the real `curl | sudo bash` / `irm | iex` path against a release on a physical Pi and a small VPS.
 - [ ] macOS: a LaunchAgent installer (today: run the release archive with Node.js by hand).
 - [ ] Optional: multi-arch Docker image (amd64/arm64) with a data volume.

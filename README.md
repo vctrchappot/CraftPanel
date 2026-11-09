@@ -4,11 +4,12 @@
 
 **Self-hosted Minecraft server management.** Install CraftPanel on your PC, a spare computer, a Raspberry Pi or a VPS, open the dashboard in a browser, and create, run and manage real Minecraft Java servers. No accounts, no subscriptions, no cloud.
 
-- Creates **Paper**, **Purpur**, **Fabric** and **Vanilla** servers for any published version, downloaded from the official sources and checksum-verified. Minecraft 1.7–1.18 is protected against Log4Shell automatically.
+- Creates **Paper**, **Purpur**, **Fabric**, **NeoForge**, **Vanilla** and **Velocity** proxy servers for any published version, downloaded from the official sources and checksum-verified. Minecraft 1.7–1.18 is protected against Log4Shell automatically.
 - Provisions the **right Java version automatically** (Eclipse Temurin 8/17/21/25 from Adoptium) for Windows, Linux and macOS on x64 and ARM64.
+- Minecraft runs in its **own background service**: dashboard restarts, crashes and updates don't stop your games.
 - **Live console** over WebSockets, real CPU/RAM/TPS/MSPT metrics, player tracking.
-- Validated **server.properties editor**, version-aware **game rules**, whitelist/ops/bans.
-- **Plugins** (Paper, Purpur) and **Fabric mods** from Modrinth with compatibility checks, uploads, updates and a Vanilla→Paper migration.
+- Validated **server.properties editor**, version-aware **game rules**, whitelist/ops/bans, **performance presets** and world pre-generation.
+- **Plugins and mods** from Modrinth and Hangar with compatibility checks, uploads and updates; **Modrinth modpacks** with one click; switching between server software and versions with a preview and automatic backup.
 - **Worlds, file manager, backups** (consistent live backups, verification, restore with automatic safety backup) and **scheduled tasks**.
 - **LAN/WAN guidance** with diagnostics (CGNAT detection), optional DuckDNS.
 - **Notifications** via Discord or e-mail when a server crashes, a backup fails or an update is available.
@@ -18,9 +19,7 @@
 
 ## Install
 
-**Ubuntu home server or second PC? Start with the [Ubuntu quickstart](docs/deployment/ubuntu.md).** It covers installation, automatic startup, opening the dashboard from another device, the setup token and firewall checks.
-
-**Release installers require a published GitHub release.** Until the first release is published, use the Ubuntu quickstart or [run from source](#run-from-source). The commands below become available after a release is published.
+Ubuntu home server or second PC? The [Ubuntu quickstart](docs/deployment/ubuntu.md) walks through installation, automatic startup, opening the dashboard from another device, the setup token and firewall checks.
 
 The release installer keeps CraftPanel running in the background. Nothing is built on your machine, and Node.js is set up automatically if needed. Java is installed per Minecraft version.
 
@@ -77,7 +76,7 @@ See [docs/deployment](docs/deployment/README.md) for Windows, macOS, Raspberry P
 
 ## Updating
 
-Installed with the one-line installer? Run the install command again (Linux also: `sudo /opt/craftpanel/update.sh`).
+Installed with the one-line installer? The dashboard shows when a new release is out; click **Update now**, or run the install command again (Linux also: `sudo /opt/craftpanel/update.sh`). A failed update rolls back to the previous version.
 
 Running a git checkout? One command brings it to the newest version:
 

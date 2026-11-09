@@ -2,7 +2,7 @@
 
 Use this guide for a **fresh Ubuntu installation**. CraftPanel and your Minecraft servers run on Ubuntu. You open the dashboard in a browser on your laptop, desktop or another device on the same home network. No desktop environment, Docker or manual Java installation is needed.
 
-This guide installs from Git, so it works even before the first downloadable CraftPanel release is published. Run the terminal commands **on the Ubuntu machine**, either directly or through SSH. Use your normal Ubuntu account; only commands starting with `sudo` need administrator rights.
+This guide installs from Git and builds on the machine. The [one-line installer](README.md#one-line-install-recommended) is faster and needs no build; the sections on opening the dashboard, the setup token and the firewall apply to both. Run the terminal commands **on the Ubuntu machine**, either directly or through SSH. Use your normal Ubuntu account; only commands starting with `sudo` need administrator rights.
 
 ## 1. Install the prerequisites
 

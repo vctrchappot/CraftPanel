@@ -2,13 +2,11 @@
 
 CraftPanel needs **Node.js 22.13+** (24 LTS recommended) on the host. Java is downloaded automatically per Minecraft version. A production build is a single folder, `apps/api/dist`, that contains the server bundle, database migrations and the dashboard. It has no native add-ons, so one build runs on every OS and CPU.
 
-**Installing on a fresh Ubuntu machine? Follow the [Ubuntu quickstart](ubuntu.md).** It installs a permanent background service from the repository and explains how to open the dashboard on another device. This route also works before the first GitHub release is published.
+**Installing on a fresh Ubuntu machine? Follow the [Ubuntu quickstart](ubuntu.md).** It installs a permanent background service from the repository and explains how to open the dashboard on another device.
 
 ## One-line install (recommended)
 
 Every release on GitHub publishes `craftpanel-vX.Y.Z.tar.gz` (the built app plus these docs), the two installers and `SHA256SUMS`. The installers download the release, verify its checksum, and set CraftPanel up to run in the background.
-
-The download commands below require a published release. If GitHub has no release yet, use the Ubuntu quickstart above or a git checkout instead.
 
 **Linux** (Debian, Ubuntu, Raspberry Pi OS, other systemd distributions; x64, ARM64, ARMv7):
 
