@@ -153,7 +153,7 @@ function Install-CraftPanel {
       New-Service -Name $RuntimeName -BinaryPathName $binary -StartupType Disabled -Description "Owns Minecraft independently of the CraftPanel dashboard" | Out-Null
       & sc.exe config $RuntimeName obj= $account start= auto | Out-Null
       if ($LASTEXITCODE -ne 0) { Fail "Could not configure the virtual runtime service account." }
-      & sc.exe preshutdowninfo $RuntimeName 120000 | Out-Null
+      & $hostFile --configure-preshutdown $RuntimeName
       if ($LASTEXITCODE -ne 0) { Fail "Could not configure runtime preshutdown handling." }
       & sc.exe failure $RuntimeName reset= 86400 actions= restart/5000/restart/10000/restart/60000 | Out-Null
       if ($LASTEXITCODE -ne 0) { Fail "Could not configure runtime recovery." }

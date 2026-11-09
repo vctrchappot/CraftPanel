@@ -24,8 +24,31 @@ public static class CraftPanelRuntimeService {
     static extern System.IntPtr RegisterServiceCtrlHandlerEx(string serviceName, ControlHandler handler, System.IntPtr context);
     [System.Runtime.InteropServices.DllImport("advapi32.dll", SetLastError = true)]
     static extern bool SetServiceStatus(System.IntPtr statusHandle, ref Status status);
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    struct PreshutdownInfo { public uint Timeout; }
+    [System.Runtime.InteropServices.DllImport("advapi32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern System.IntPtr OpenSCManager(string machine, string database, uint access);
+    [System.Runtime.InteropServices.DllImport("advapi32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern System.IntPtr OpenService(System.IntPtr manager, string service, uint access);
+    [System.Runtime.InteropServices.DllImport("advapi32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern bool ChangeServiceConfig2(System.IntPtr service, uint level, ref PreshutdownInfo info);
+    [System.Runtime.InteropServices.DllImport("advapi32.dll")]
+    static extern bool CloseServiceHandle(System.IntPtr handle);
 
     public static int Main(string[] args) {
+        if (args.Length == 2 && args[0] == "--configure-preshutdown") {
+            System.IntPtr manager = System.IntPtr.Zero, service = System.IntPtr.Zero;
+            try {
+                manager = OpenSCManager(null, null, 1); // SC_MANAGER_CONNECT
+                if (manager == System.IntPtr.Zero) throw new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+                service = OpenService(manager, args[1], 2); // SERVICE_CHANGE_CONFIG
+                if (service == System.IntPtr.Zero) throw new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+                var info = new PreshutdownInfo { Timeout = 120000 };
+                if (!ChangeServiceConfig2(service, 7, ref info)) throw new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+                return 0;
+            } catch (System.Exception error) { System.Console.Error.WriteLine(error.Message); return 1; }
+            finally { if (service != System.IntPtr.Zero) CloseServiceHandle(service); if (manager != System.IntPtr.Zero) CloseServiceHandle(manager); }
+        }
         if (args.Length != 6) return 2;
         name = args[0]; node = args[1]; entry = args[2]; directory = args[3]; data = args[4]; config = args[5];
         var table = new TableEntry[] { new TableEntry { Name = name, Main = main }, new TableEntry() };
