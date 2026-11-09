@@ -41,17 +41,31 @@ try {
   if ($runtime.State -ne "Running" -or $runtime.StartName -ne "NT SERVICE\$runtimeName") { throw "Runtime is not running under its virtual service account" }
   $runtimeProcess = $runtime.ProcessId
   # Stopping the dashboard task must not stop the independent SCM owner.
+  $firstDashboard = (Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw | ConvertFrom-Json).pid
   Stop-ScheduledTask -TaskName $taskName
   $taskDeadline = (Get-Date).AddSeconds(30)
   while ((Get-ScheduledTask -TaskName $taskName).State -eq "Running") {
     if ((Get-Date) -gt $taskDeadline) { throw "Dashboard task did not stop" }
     Start-Sleep -Milliseconds 100
   }
+  # The task leaves "Running" before its Job Object has finished killing the dashboard. A readiness
+  # probe in that window is answered by the dying process and control.json still holds its PID.
+  $deathDeadline = (Get-Date).AddSeconds(30)
+  while (Get-Process -Id $firstDashboard -ErrorAction SilentlyContinue) {
+    if ((Get-Date) -gt $deathDeadline) { throw "The first dashboard process $firstDashboard survived the task stop" }
+    Start-Sleep -Milliseconds 100
+  }
   if ((Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")).ProcessId -ne $runtimeProcess) { throw "Dashboard task stop restarted the runtime service" }
   Start-ScheduledTask -TaskName $taskName
   $readyDeadline = (Get-Date).AddSeconds(30)
   do {
-    try { Assert-Ready; break } catch { if ((Get-Date) -gt $readyDeadline) { throw }; Start-Sleep -Milliseconds 250 }
+    try {
+      Assert-Ready
+      # Only the restarted dashboard counts: it replaces control.json before it reports ready.
+      if ((Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw | ConvertFrom-Json).pid -ne $firstDashboard) { break }
+    } catch { if ((Get-Date) -gt $readyDeadline) { throw } }
+    if ((Get-Date) -gt $readyDeadline) { throw "The restarted dashboard did not replace control.json" }
+    Start-Sleep -Milliseconds 250
   } while ($true)
   $before = (Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw | ConvertFrom-Json).pid
   Install-Fixture "98.0.0" $false
