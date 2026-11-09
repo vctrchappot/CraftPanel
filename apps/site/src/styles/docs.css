@@ -39,6 +39,14 @@
   color: var(--sl-color-white);
 }
 
+body {
+  letter-spacing: var(--cp-tracking-body);
+}
+
+code, pre, kbd, samp, .ds-label {
+  letter-spacing: 0;
+}
+
 .site-title img {
   width: auto;
 }
@@ -46,7 +54,7 @@
 .sl-markdown-content :is(h1, h2, h3),
 h1#_top {
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--cp-tracking-heading);
 }
 
 .sidebar-content a[aria-current="page"],

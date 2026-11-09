@@ -41,6 +41,8 @@
   --cp-font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
   --cp-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --cp-font-serif: "Geist Serif", ui-serif, Georgia, serif;
+  --cp-tracking-body: -0.01em;
+  --cp-tracking-heading: -0.035em;
 
   /* ---- shape: everything sits on a 4 px grid, corners stay small ---- */
   --cp-radius-sm: 2px;

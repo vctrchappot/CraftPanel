@@ -65,6 +65,7 @@
   --font-sans: var(--font-geist-sans), var(--cp-font-sans);
   --font-mono: var(--font-geist-mono), var(--cp-font-mono);
   --font-serif: var(--font-geist-serif), var(--cp-font-serif);
+  --tracking-tight: var(--cp-tracking-heading);
   /* Tailwind's radius scale mapped onto the 2/4/6 px system: cards (xl) and panels (lg) stay at 6 px. */
   --radius-xs: var(--cp-radius-sm);
   --radius-sm: var(--cp-radius-sm);
@@ -94,6 +95,13 @@
     background: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
+    letter-spacing: var(--cp-tracking-body);
+  }
+  h1, h2, h3 {
+    letter-spacing: var(--cp-tracking-heading);
+  }
+  code, pre, kbd, samp, [class~="font-mono"] {
+    letter-spacing: 0;
   }
   /* Native select popups don't inherit the page colors on every platform (e.g. Chrome on Windows). */
   select option,

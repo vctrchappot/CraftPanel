@@ -62,6 +62,7 @@ body {
   font-size: 17px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: var(--cp-tracking-body);
   overflow-x: hidden;
 }
 
@@ -119,6 +120,10 @@ a {
 
 .mono {
   font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+code, pre, kbd, samp {
+  letter-spacing: 0;
 }
 .muted {
   color: var(--muted);
@@ -126,7 +131,7 @@ a {
 .display {
   font-family: var(--font-display);
   font-weight: 500;
-  letter-spacing: -0.03em;
+  letter-spacing: var(--cp-tracking-heading);
   line-height: 1;
 }
 
@@ -994,7 +999,7 @@ p {
 .tile h3 {
   font-family: var(--font-display);
   font-weight: 500;
-  letter-spacing: -0.025em;
+  letter-spacing: var(--cp-tracking-heading);
   font-size: clamp(1.6rem, 2.4vw, 2.1rem);
   line-height: 1;
 }
