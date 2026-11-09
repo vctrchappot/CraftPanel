@@ -214,6 +214,51 @@ if (typesEl) {
   });
 }
 
+// ---- scene motion ----------------------------------------------------------------
+// Looping scenes pause while they are off-screen; tiles and device cards settle in once.
+const sceneIo = new IntersectionObserver((entries) => {
+  for (const e of entries) (e.target as HTMLElement).toggleAttribute("data-paused", !e.isIntersecting);
+});
+document.querySelectorAll(".iso, .runtime-figure").forEach((el) => sceneIo.observe(el));
+
+if (!reduced) {
+  root.classList.add("motion");
+  const reveal = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add("is-in");
+      reveal.unobserve(e.target);
+    }
+  }, { threshold: 0.15 });
+  for (const group of document.querySelectorAll(".bento, .devices")) {
+    [...group.children].forEach((el, i) => {
+      (el as HTMLElement).style.setProperty("--i", String(i));
+      reveal.observe(el);
+    });
+  }
+}
+
+// ---- plugin search demo -----------------------------------------------------------
+const searchEl = document.querySelector<HTMLElement>(".demo-search");
+if (searchEl && !reduced) {
+  const query = searchEl.querySelector<HTMLElement>(".dp-query")!;
+  const results = [...searchEl.querySelectorAll<HTMLElement>(".demo-plugins li")];
+  const text = query.textContent ?? "";
+  query.textContent = "";
+  onVisible(searchEl, async () => {
+    await wait(400);
+    for (const ch of text) {
+      query.textContent += ch;
+      await wait(140);
+    }
+    searchEl.classList.add("is-typed");
+    for (const r of results) {
+      await wait(180);
+      r.classList.add("is-in");
+    }
+  });
+}
+
 // ---- console demo -------------------------------------------------------------
 const consoleEl = document.querySelector<HTMLElement>("[data-console]");
 if (consoleEl) {

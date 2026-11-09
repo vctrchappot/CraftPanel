@@ -449,6 +449,163 @@ p {
     opacity: 0.35;
   }
 }
+
+/* ---- scene motion ----
+   Every loop shows the machine doing its job: the world floats above the Pi it runs on and data reaches
+   it, drives blink, players walk and chimneys smoke while the dashboard updates. Moves are short and
+   pixel-sized; nothing glows. Transforms go on a box's <g>, colour and opacity on its polygons, so the
+   two never fight. Reduced motion stops all of it (end of this file); landing.ts pauses scenes off-screen. */
+.iso .float {
+  animation: iso-float 6s ease-in-out infinite;
+}
+@keyframes iso-float {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+.iso .led-act polygon {
+  animation: led-act 1.9s steps(1) infinite;
+}
+.iso .unit-0 polygon {
+  animation-duration: 2.6s;
+  animation-delay: -0.9s;
+}
+.iso .unit-2 polygon {
+  animation-duration: 1.4s;
+}
+@keyframes led-act {
+  12%,
+  41%,
+  63% {
+    opacity: 0.3;
+  }
+  18%,
+  46%,
+  70% {
+    opacity: 1;
+  }
+}
+.iso .water polygon:last-of-type {
+  animation: water 3.6s ease-in-out infinite;
+}
+@keyframes water {
+  50% {
+    fill: #5d9de9;
+  }
+}
+.iso .window polygon {
+  animation: window 7s steps(1) infinite;
+}
+.iso .window-1 polygon {
+  animation-delay: -2.3s;
+}
+.iso .window-2 polygon {
+  animation-delay: -4.6s;
+}
+@keyframes window {
+  61%,
+  80% {
+    opacity: 0.55;
+  }
+  63%,
+  83% {
+    opacity: 1;
+  }
+}
+.iso .smoke {
+  opacity: 0;
+  animation: smoke 4.2s ease-out infinite;
+}
+.iso .smoke-1 {
+  animation-delay: -1.4s;
+}
+.iso .smoke-2 {
+  animation-delay: -2.8s;
+}
+.iso .chimney-1 {
+  animation-duration: 4.7s;
+}
+.iso .chimney-2 {
+  animation-duration: 5.1s;
+}
+@keyframes smoke {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  15% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-5px, -26px);
+  }
+}
+.iso .packet {
+  opacity: 0;
+  animation: packet 2.4s ease-in infinite;
+}
+.iso .packet-1 {
+  animation-delay: -0.8s;
+}
+.iso .packet-2 {
+  animation-delay: -1.6s;
+}
+@keyframes packet {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  20%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-34px);
+  }
+}
+/* Walkers follow the path along the iso x axis: one block is 16 px right and 8 px down. */
+.iso .walker-0 {
+  animation: walk-east 14s linear infinite;
+}
+.iso .walker-1 {
+  animation: walk-west 17s linear infinite;
+  animation-delay: -6s;
+}
+@keyframes walk-east {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  6%,
+  94% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(102px, 51px);
+  }
+}
+@keyframes walk-west {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  6%,
+  94% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-102px, -51px);
+  }
+}
+[data-paused] *,
+[data-paused] *::before,
+[data-paused] *::after {
+  animation-play-state: paused !important;
+}
 .hero-chip {
   position: absolute;
   right: 0;
@@ -1334,6 +1491,20 @@ p {
 .tile::before {
   content: none;
 }
+/* Tiles and device cards settle in once when they scroll into view (landing.ts adds .motion and .is-in;
+   without JavaScript or with reduced motion they are simply there). */
+.motion .bento .tile,
+.motion .devices .device {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+.motion .bento .tile.is-in,
+.motion .devices .device.is-in {
+  opacity: 1;
+  transform: none;
+}
 .tile-console {
   grid-column: span 7;
   grid-row: span 2;
@@ -1580,6 +1751,18 @@ p {
 }
 .demo-plugins li:first-child {
   border-top: 0;
+}
+/* Search demo: landing.ts types the query, then the results arrive one by one. */
+.motion .demo-search .dp-count,
+.motion .demo-plugins li {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+.motion .demo-search.is-typed .dp-count,
+.motion .demo-plugins li.is-in {
+  opacity: 1;
+  transform: none;
 }
 .dp-name {
   font-weight: 500;
@@ -1835,6 +2018,10 @@ p {
   width: auto;
   max-width: 100%;
   max-height: 170px;
+  transition: transform 0.2s ease-out;
+}
+.device:hover .device-art .iso {
+  transform: translateY(-4px);
 }
 .device h3 {
   font-family: var(--font-display);

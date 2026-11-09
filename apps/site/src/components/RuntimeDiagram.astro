@@ -23,7 +23,10 @@ import { runtimeScene } from "../lib/scenes";
   <div class="runtime-telemetry mono">
     <span><i class="dot-run"></i> Minecraft · 6 online</span>
     <span>20.0 TPS</span>
-    <svg viewBox="0 0 180 24" aria-hidden="true"><path d="M0 17H16V15H29V16H46V12H61V14H79V13H96V15H113V12H130V13H147V11H165V12H180" /></svg>
+    <svg viewBox="0 0 180 24" aria-hidden="true">
+      <!-- Two copies of a line that starts and ends at the same height scroll left: the TPS graph keeps ticking. -->
+      <g class="runtime-spark"><path id="runtime-spark-line" d="M0 17H16V15H29V16H46V12H61V14H79V13H96V15H113V12H130V13H147V11H165V14H172V17H180" /><use href="#runtime-spark-line" x="180" /></g>
+    </svg>
     <span class="runtime-keeps-running">Still running.</span>
   </div>
   <figcaption class="demo-update">
@@ -58,11 +61,19 @@ import { runtimeScene } from "../lib/scenes";
   .runtime-window-skeleton i:last-child { grid-column: span 2; height: 4px; background: var(--line); }
   .runtime-control-note { display: block; font-size: 12px; color: var(--muted); line-height: 1.6; }
   .runtime-link { position: relative; display: grid; gap: 10px; }
-  .runtime-link span { display: block; height: 1px; background: var(--signal); }
+  .runtime-link span { position: relative; display: block; height: 1px; background: var(--signal); overflow: visible; }
+  /* Requests out, responses back: a pixel travels each line while the dashboard is connected. */
+  .runtime-link span::after { content: ""; position: absolute; top: -2px; left: 0; width: 5px; height: 5px; background: var(--signal); animation: link-out 1.6s linear infinite; }
+  .runtime-link span + span::after { animation-name: link-back; animation-delay: -.8s; }
+  @keyframes link-out { from { left: -2px; } to { left: calc(100% - 3px); } }
+  @keyframes link-back { from { left: calc(100% - 3px); } to { left: -2px; } }
+  [data-panel-state="updating"] .runtime-link span::after, [data-panel-state="failed"] .runtime-link span::after { display: none; }
   .runtime-world { position: relative; z-index: 1; min-width: 0; padding-top: 8px; }
   .runtime-telemetry { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
   .runtime-telemetry > span:first-child { display: flex; align-items: center; gap: 7px; color: var(--fg); }
-  .runtime-telemetry svg { flex: 1; min-width: 40px; max-width: 90px; height: 20px; overflow: visible; }
+  .runtime-telemetry svg { flex: 1; min-width: 40px; max-width: 90px; height: 20px; overflow: hidden; }
+  .runtime-spark { animation: spark 9s linear infinite; }
+  @keyframes spark { to { transform: translateX(-180px); } }
   .runtime-telemetry path { stroke: var(--signal); stroke-width: 1.5; fill: none; }
   .runtime-keeps-running { color: var(--run); }
   .demo-update { display: grid; gap: 14px; margin: 0; padding: 14px; border-top: 1px solid var(--line); background: var(--surface); }
@@ -97,5 +108,6 @@ import { runtimeScene } from "../lib/scenes";
   }
   @media (prefers-reduced-motion: reduce) {
     .runtime-window-skeleton { transition: none; }
+    .runtime-spark, .runtime-link span::after { animation: none; }
   }
 </style>

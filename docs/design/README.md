@@ -85,6 +85,8 @@ Technical cutaways and isometric scenes explain ownership and process boundaries
 
 The runtime illustration contrasts a reconnecting control panel with uninterrupted game processes. Its restart is a local demonstration; it never sends a command to an actual server. Keep the maintenance limit in the adjacent copy: updating the runtime itself requires a planned stop. The houses represent worlds, not containers or a claim of per-server OS isolation.
 
+Scenes move in small loops that show the product working (floating island and rising data packets on the Pi, activity LEDs, smoke, walking players, the dashboard link pulse that stops during an update, a scrolling TPS line). Motion hooks are classes on boxes in `apps/site/src/lib/scenes.ts` (`float`, `packet`, `smoke`, `walker`, `window`, `water`, `led`, `led-act`), styled under "scene motion" in `landing.css`: transforms on a box's `<g>`, colour and opacity on its polygons. `landing.ts` pauses scenes off-screen (`data-paused`) and reveals bento tiles and hardware cards once (`.motion` / `.is-in`).
+
 Use semantic tokens for frames, controls and text in both themes. Materials inside the artwork may keep their own shades. Respect reduced motion, keep labels outside small SVG geometry and retain the same scene on mobile. Avoid glow effects, third-party art and extra illustration libraries.
 
 ## Rules of thumb
