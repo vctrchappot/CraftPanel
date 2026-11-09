@@ -286,8 +286,9 @@ NODE
     if $new_activated && [[ -d $INSTALL_DIR/apps ]]; then mv "$INSTALL_DIR/apps" "$INSTALL_DIR/apps.failed-$(date +%s)-$$" || die "Could not move the failed application aside."; fi
     if $apps_moved; then mv "$INSTALL_DIR/apps.previous" "$INSTALL_DIR/apps" || die "Could not restore the previous application."; fi
     if $runtime_changed; then
-      if [[ -f $state_dir/runtime-servers.json ]]; then cp -p "$state_dir/runtime-servers.json" "$effective_data/runtime/servers.json" || die "Could not restore runtime configuration.";
-      else rm -f "$effective_data/runtime/servers.json"; fi
+      if [[ -f $state_dir/runtime-manifest.json ]]; then
+        "$node" "$snapshot_cli" restore-runtime "$effective_data" "$state_dir" || die "Could not restore runtime configuration."
+      fi
       $runtime_was_active && systemctl start craftpanel-runtime
     fi
     if [[ -d $INSTALL_DIR/apps && -f $UNIT_FILE ]]; then
@@ -305,11 +306,11 @@ NODE
   # ERR is inherited by called functions. Rollback covers copy, unit registration, start and readiness failures.
   trap rollback_transaction ERR
   if $runtime_changed; then
-    [[ ! -f $effective_data/runtime/servers.json ]] || cp -p "$effective_data/runtime/servers.json" "$state_dir/runtime-servers.json"
     if [[ -f $RUNTIME_UNIT ]]; then
       info "Runtime update: saving and stopping game servers…"
       stop_confirmed craftpanel-runtime
     fi
+    "$node" "$snapshot_cli" snapshot-runtime "$effective_data" "$state_dir"
   fi
   write_env_file "$port"
   rm -rf "$INSTALL_DIR/apps.previous"

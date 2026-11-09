@@ -25,4 +25,4 @@ else
   sudo -u "$BUILD_USER" -H env "PATH=$PATH" node scripts/release.mjs pack
 fi
 VERSION=$(node -p 'require("./package.json").version')
-exec bash "$REPO_DIR/deploy/install.sh" --archive "$REPO_DIR/release/craftpanel-v$VERSION.tar.gz" --checkout "$REPO_DIR"
+exec bash "$REPO_DIR/deploy/install.sh" --archive "$REPO_DIR/release/craftpanel-v$VERSION.tar.gz" --checkout "$REPO_DIR" "$@"

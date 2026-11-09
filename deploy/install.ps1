@@ -3,7 +3,7 @@
 #   irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex
 #
 # Installs the latest release to %LOCALAPPDATA%\Programs\CraftPanel and starts CraftPanel whenever
-# you sign in to Windows. No administrator rights needed, nothing is built on this computer, and
+# you sign in to Windows. The independent Minecraft service needs one elevated installation, and
 # Node.js is downloaded into the install folder when no suitable version is installed.
 # Run it again, or update.ps1 in the install folder, to update.
 #
@@ -98,11 +98,17 @@ function Install-CraftPanel {
   function Stop-Runtime {
     $service = Get-Service -Name $RuntimeName -ErrorAction SilentlyContinue
     if ($service -and $service.Status -ne "Stopped") {
+      $serviceProcess = (Get-CimInstance Win32_Service -Filter ("Name='" + $RuntimeName.Replace("'", "''") + "'")).ProcessId
       Info "Saving and stopping Minecraft through the independent runtime service..."
       Stop-Service -Name $RuntimeName -ErrorAction Stop
       $service.WaitForStatus("Stopped", (New-TimeSpan -Seconds 120))
       $service.Refresh()
       if ($service.Status -ne "Stopped") { Fail "The runtime did not stop; replacement was refused." }
+      # SCM's stopped notification can precede the wrapper's final exit/file release.
+      if ($serviceProcess -and (Get-Process -Id $serviceProcess -ErrorAction SilentlyContinue)) {
+        Wait-Process -Id $serviceProcess -Timeout 10 -ErrorAction SilentlyContinue
+        if (Get-Process -Id $serviceProcess -ErrorAction SilentlyContinue) { Fail "The runtime host is still exiting; replacement was refused." }
+      }
     }
   }
 
@@ -515,9 +521,9 @@ exit `$exitCode
     $newActivated = $false
     try {
     if ($runtimeChanged) {
-      $registryFile = Join-Path $DataDir "runtime\servers.json"
-      if (Test-Path -LiteralPath $registryFile) { Copy-Item -LiteralPath $registryFile -Destination (Join-Path $stateDir "runtime-servers.json") }
       Stop-Runtime
+      & $node $snapshotCli snapshot-runtime $effectiveData $stateDir
+      if ($LASTEXITCODE -ne 0) { Fail "Could not snapshot runtime configuration; nothing was replaced." }
     }
     if (-not (Test-Path $ConfigFile)) {
       $prof = if ($env:CRAFTPANEL_PROFILE) { $env:CRAFTPANEL_PROFILE } else { "lan" }
@@ -545,7 +551,7 @@ exit `$exitCode
     Copy-Item -Force (Join-Path $src "deploy\install.ps1") (Join-Path $Root "update.ps1")
     $update = "powershell -ExecutionPolicy Bypass -File `"$(Join-Path $Root 'update.ps1')`""
     @{
-      method = "windows"; updateCommand = $update; taskName = $TaskName; dataDir = $DataDir
+      method = "windows"; updateCommand = $update; taskName = $TaskName; dataDir = $DataDir; runtimeService = $RuntimeName
       selfUpdate = @{ kind = "task"; task = $UpdateTask; log = (Join-Path $LogDir "update.log"); result = (Join-Path $LogDir "update-result.json") }
     } | ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $Root "install.json")
     Write-StartScript $node
@@ -570,15 +576,16 @@ exit `$exitCode
       if ($newActivated -and (Test-Path $apps)) { Move-Item -LiteralPath $apps -Destination (Join-Path $Root ("apps.failed-" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())) }
       if ($appsMoved) { Move-Item -LiteralPath $old -Destination $apps }
       for ($i = 0; $i -lt $artifactPaths.Count; $i++) {
+        if (-not $runtimeChanged -and $artifactPaths[$i] -eq (Join-Path $Root "runtime-host.exe")) { continue }
         $saved = Join-Path $startup "$i"
         if (Test-Path -LiteralPath $saved) { Copy-Item -LiteralPath $saved -Destination $artifactPaths[$i] -Force }
         elseif (Test-Path -LiteralPath $artifactPaths[$i]) { Remove-Item -LiteralPath $artifactPaths[$i] -Force }
       }
       if ($runtimeChanged) {
-        $registryFile = Join-Path $DataDir "runtime\servers.json"
-        $savedRegistry = Join-Path $stateDir "runtime-servers.json"
-        if (Test-Path -LiteralPath $savedRegistry) { Copy-Item -LiteralPath $savedRegistry -Destination $registryFile -Force }
-        else { Remove-Item -LiteralPath $registryFile -Force -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath (Join-Path $stateDir "runtime-manifest.json")) {
+          & $node $snapshotCli restore-runtime $effectiveData $stateDir
+          if ($LASTEXITCODE -ne 0) { Fail "Could not restore runtime configuration; the service remains stopped." }
+        }
         if ($runtimeWasActive) { Start-Service -Name $RuntimeName }
         elseif (-not $runtimeExisted -and (Get-Service -Name $RuntimeName -ErrorAction SilentlyContinue)) { & sc.exe delete $RuntimeName | Out-Null }
       }

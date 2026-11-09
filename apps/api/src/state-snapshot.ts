@@ -156,19 +156,24 @@ export async function restoreState(dataDir: string, snapshot: string): Promise<v
   await assertStopped(source);
   const dir = await fs.realpath(path.resolve(snapshot));
   const manifest = parseManifest(await readJson(path.join(dir, "manifest.json")), source);
-  const file = path.join(source, "craftpanel.db");
+  await restoreFile(path.join(source, "craftpanel.db"), path.join(dir, "database.sqlite"), manifest.database, true);
+}
+
+/** Shared atomic replacement: never follow a destination symlink, preserve the original owner. */
+async function restoreFile(file: string, saved: string, metadata: SnapshotManifest["database"], removeWal = false) {
+  const parent = path.dirname(file);
   let temp: string | undefined;
   let output: FileHandle | undefined;
   try {
-    if (manifest.database) {
-      const input = await openRegular(path.join(dir, "database.sqlite"));
+    if (metadata) {
+      const input = await openRegular(saved);
       try {
-        temp = path.join(source, `.craftpanel-restore-${randomUUID()}`);
+        temp = path.join(parent, `.craftpanel-restore-${randomUUID()}`);
         output = await fs.open(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NOFOLLOW, 0o600);
-        if (await copyToHandle(input, output) !== manifest.database.sha256)
+        if (await copyToHandle(input, output) !== metadata.sha256)
           throw new Error("Update snapshot checksum mismatch; refusing to restore");
-        await output.chmod(manifest.database.mode & 0o700);
-        if (process.platform !== "win32") await output.chown(manifest.database.uid, manifest.database.gid);
+        await output.chmod(metadata.mode & 0o700);
+        if (process.platform !== "win32") await output.chown(metadata.uid, metadata.gid);
         await output.sync();
         const inode = await output.stat();
         const named = await fs.lstat(temp);
@@ -177,11 +182,49 @@ export async function restoreState(dataDir: string, snapshot: string): Promise<v
       } finally { await input.close(); }
     }
     // Never reuse WAL from the failed version with the previous database.
-    for (const suffix of ["-wal", "-shm"]) await fs.rm(file + suffix, { force: true });
+    if (removeWal) for (const suffix of ["-wal", "-shm"]) await fs.rm(file + suffix, { force: true });
     // Windows requires the restore handle to be closed before replacement.
     await output?.close(); output = undefined;
     if (temp) { await fs.rename(temp, file); temp = undefined; }
     else await fs.rm(file, { force: true });
-    await syncDirectory(source);
+    await syncDirectory(parent);
   } finally { await output?.close(); if (temp) await fs.rm(temp, { force: true }); }
+}
+
+async function runtimeDirectory(source: string) {
+  const directory = path.join(source, "runtime");
+  if (!(await fs.lstat(directory)).isDirectory() || await fs.realpath(directory) !== directory)
+    throw new Error("Runtime registry directory must not be a symbolic link");
+  return directory;
+}
+
+/** Called after stopping the runtime; token/endpoint are intentionally not rolled back. */
+export async function snapshotRuntime(dataDir: string, snapshot: string): Promise<void> {
+  const source = await dataDirectory(dataDir);
+  await assertStopped(source);
+  const dir = await fs.realpath(snapshot);
+  // Reuse only a private, validated recovery point belonging to this data directory.
+  parseManifest(await readJson(path.join(dir, "manifest.json")), source);
+  let registry: SnapshotManifest["database"] = null;
+  try {
+    const directory = await runtimeDirectory(source);
+    const copied = await copyRegular(path.join(directory, "servers.json"), path.join(dir, "runtime-servers.json"), true);
+    if (copied) registry = { sha256: copied.hash, uid: copied.stat.uid, gid: copied.stat.gid, mode: copied.stat.mode & 0o777 };
+  } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  const handle = await fs.open(path.join(dir, "runtime-manifest.json"), constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NOFOLLOW, 0o600);
+  try { await handle.writeFile(JSON.stringify({ format: 1, source, registry }) + "\n"); await handle.sync(); }
+  finally { await handle.close(); }
+  await syncDirectory(dir);
+}
+
+export async function restoreRuntime(dataDir: string, snapshot: string): Promise<void> {
+  const source = await dataDirectory(dataDir);
+  await assertStopped(source);
+  const dir = await fs.realpath(snapshot);
+  const raw = await readJson(path.join(dir, "runtime-manifest.json")) as { format?: unknown; source?: unknown; registry?: unknown } | null;
+  const metadata = parseManifest(raw && { format: raw.format, source: raw.source, database: raw.registry }, source).database;
+  let directory: string;
+  try { directory = await runtimeDirectory(source); }
+  catch (error) { if (!metadata && (error as NodeJS.ErrnoException).code === "ENOENT") return; throw error; }
+  await restoreFile(path.join(directory, "servers.json"), path.join(dir, "runtime-servers.json"), metadata);
 }
