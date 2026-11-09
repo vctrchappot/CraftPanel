@@ -18,9 +18,11 @@ interface Props {
   label: string;
   class?: string;
   pad?: number;
+  /** Technical-drawing register: outlined faces that hide what is behind them, styled by .iso-line in landing.css. */
+  outline?: boolean;
 }
 
-const { boxes, label, class: className, pad = 4 } = Astro.props;
+const { boxes, label, class: className, pad = 4, outline = false } = Astro.props;
 const S = 16;
 const p = (x: number, y: number, z: number) => [(x - y) * S, ((x + y) * S) / 2 - z * S] as const;
 const poly = (pts: (readonly [number, number])[]) => pts.map(([a, b]) => `${+a.toFixed(2)},${+b.toFixed(2)}`).join(" ");
@@ -45,16 +47,19 @@ const maxY = Math.max(...all.map((q) => q[1])) + pad;
   viewBox={`${minX.toFixed(1)} ${minY.toFixed(1)} ${(maxX - minX).toFixed(1)} ${(maxY - minY).toFixed(1)}`}
   role="img"
   aria-label={label}
-  shape-rendering="crispEdges"
+  shape-rendering={outline ? "auto" : "crispEdges"}
 >
   {
-    faces.map(({ b, top, left, right }) => (
-      <g class={b.class}>
-        <polygon points={poly(left)} fill={b.c[1]} />
-        <polygon points={poly(right)} fill={b.c[2]} />
-        <polygon points={poly(top)} fill={b.c[0]} />
-      </g>
-    ))
+    faces
+      // "ghost" boxes only reserve space, so differently tall drawings share one scale and baseline.
+      .filter(({ b }) => !b.class?.split(" ").includes("ghost"))
+      .map(({ b, top, left, right }) => (
+        <g class={b.class}>
+          <polygon points={poly(left)} fill={outline ? undefined : b.c[1]} />
+          <polygon points={poly(right)} fill={outline ? undefined : b.c[2]} />
+          <polygon points={poly(top)} fill={outline ? undefined : b.c[0]} />
+        </g>
+      ))
   }
   <slot />
 </svg>

@@ -204,3 +204,39 @@ export function vpsScene(): Box[] {
   }
   return parts;
 }
+
+// ---- process band ----------------------------------------------------------------------------
+// Outline icons: every one stands on the same 5×5 plate and carries a tall invisible "ghost" box, so
+// all of them render at one scale and share a baseline. Boxes marked "hl" are what the step is about.
+const plate = (): Box[] => [box(0, 0, 0, 5, 5, 0.25, C.case), box(0, 0, 0, 0.01, 0.01, 4, C.case, "ghost")];
+const hl = (x: number, y: number, z: number, w: number, d: number, h: number): Box => box(x, y, z, w, d, h, C.case, "hl");
+const part = (x: number, y: number, z: number, w: number, d: number, h: number): Box => box(x, y, z, w, d, h, C.case);
+const figure = (x: number, y: number, mark = true): Box[] => [part(x, y, 0.25, 0.6, 0.4, 1), part(x, y, 1.25, 0.6, 0.4, 1), mark ? hl(x - 0.05, y - 0.05, 2.25, 0.7, 0.5, 0.65) : part(x - 0.05, y - 0.05, 2.25, 0.7, 0.5, 0.65)];
+
+export const processScenes: Record<string, () => Box[]> = {
+  /** A release arriving on disk. */
+  install: () => [...plate(), part(1, 1.5, 0.25, 3, 2, 0.5), part(2.45, 2.45, 0.75, 0.1, 0.1, 1.25), hl(2, 2, 2, 1, 1, 1)],
+  /** A chip: the Java each server brings along. */
+  java: () => {
+    const pins = (fixed: "x" | "y", at: number) => [0, 1, 2].map((i) => (fixed === "x" ? part(at, 1.4 + i * 0.9, 0.35, 0.25, 0.3, 0.15) : part(1.4 + i * 0.9, at, 0.35, 0.3, 0.25, 0.15)));
+    return [...plate(), ...pins("y", 0.75), ...pins("x", 0.75), part(1, 1, 0.25, 3, 3, 0.45), ...pins("x", 4), ...pins("y", 4), hl(1.8, 1.8, 0.7, 1.4, 1.4, 0.25)];
+  },
+  /** Three kinds of server to choose from. */
+  pick: () => [...plate(), part(0.5, 2.4, 0.25, 1.2, 1.2, 1.1), hl(1.9, 2.4, 0.25, 1.2, 1.2, 2.1), part(3.3, 2.4, 0.25, 1.2, 1.2, 1.6)],
+  /** One raised block in a patch of world. */
+  create: () => {
+    const cells: Box[] = [];
+    for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) cells.push(x === 1 && y === 1 ? hl(1 + x, 1 + y, 0.25, 0.9, 0.9, 1.5) : part(1 + x, 1 + y, 0.25, 0.9, 0.9, 0.35));
+    return [...plate(), ...cells.sort(byDepth)];
+  },
+  /** A player next to a world block. */
+  join: () => [...plate(), part(0.6, 0.6, 0.25, 1.2, 1.2, 0.6), ...figure(2.4, 2.4)],
+  /** Archive layers, pulled apart. */
+  backup: () => [...plate(), ...[0, 1, 2, 3].map((i) => (i === 3 ? hl(1, 1, 0.25 + i * 0.75, 3, 3, 0.3) : part(1, 1, 0.25 + i * 0.75, 3, 3, 0.3)))],
+  /** A new block lifted onto the old one. */
+  update: () => [...plate(), part(1, 1, 0.25, 3, 3, 1.1), part(2.45, 2.45, 1.35, 0.1, 0.1, 0.95), hl(1, 1, 2.3, 3, 3, 0.9)],
+  /** Outside the frame: the browser you manage it from... */
+  browser: () => [...plate(), part(0.8, 1.8, 0.25, 3.4, 2.6, 0.3), part(0.8, 1.8, 0.55, 3.4, 0.25, 2.2), hl(1.1, 2.05, 0.85, 2.8, 0.05, 1.6)],
+  /** ...and the players who connect to it. */
+  players: () => [...plate(), ...figure(1, 1), ...figure(3, 2.6, false)],
+};

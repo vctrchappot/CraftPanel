@@ -2697,6 +2697,265 @@ p {
   }
 }
 
+/* ---- drawing language ----
+   Datasheet look for the technical graphics: one outer frame, hairline dividers, a tab on the frame edge
+   and small registration squares in the corners. Outline drawings (Iso with "outline") hide what is
+   behind them by filling with the surface colour. Signal green marks only what is active. */
+.dl-marks {
+  position: relative;
+  background:
+    linear-gradient(var(--fg), var(--fg)) 0 0 / 5px 5px no-repeat border-box,
+    linear-gradient(var(--fg), var(--fg)) 100% 0 / 5px 5px no-repeat border-box,
+    linear-gradient(var(--fg), var(--fg)) 0 100% / 5px 5px no-repeat border-box,
+    linear-gradient(var(--fg), var(--fg)) 100% 100% / 5px 5px no-repeat border-box,
+    var(--surface);
+}
+.dl-tab {
+  position: absolute;
+  top: 100%;
+  left: 16px;
+  margin-top: -1px;
+  padding: 3px 9px 4px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.3;
+  list-style: none;
+}
+.iso-line {
+  display: block;
+  position: relative;
+  height: var(--ih, 96px);
+  width: auto;
+  overflow: visible;
+}
+.iso-line polygon {
+  fill: var(--iso-fill, var(--bg));
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 0.25s ease-out;
+}
+.iso-line .hl polygon {
+  stroke: var(--muted);
+}
+
+/* ---- process band ---- */
+.sec-band {
+  padding: 0 0 72px;
+}
+.pb {
+  --ih: clamp(64px, 8vw, 96px);
+  --ow: clamp(88px, 10vw, 128px);
+  display: grid;
+  grid-template-columns: var(--ow) minmax(0, 1fr) var(--ow);
+  align-items: start;
+}
+.pb-main {
+  margin-top: 40px;
+  min-width: 0;
+}
+.pb-frame {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  --iso-fill: var(--surface);
+}
+.pb-step {
+  position: relative;
+  min-width: 0;
+}
+.pb-step + .pb-step {
+  border-left: 1px solid var(--line);
+}
+.pb-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 28px 6px 14px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+.pb-btn:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: -4px;
+}
+.pb-label {
+  position: absolute;
+  top: -30px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color 0.25s ease-out;
+}
+.pb-n {
+  margin-right: 7px;
+  opacity: 0.55;
+}
+.pb-cap {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+  transition: color 0.25s ease-out;
+}
+.pb-step .iso-line {
+  transition: transform 0.3s ease-out;
+}
+.pb-step.is-on .iso-line {
+  transform: translateY(-4px);
+}
+.pb-step.is-on .iso-line polygon {
+  stroke: var(--fg);
+}
+.pb-step.is-on .iso-line .hl polygon {
+  stroke: var(--signal);
+}
+.pb-step.is-on .pb-label,
+.pb-step.is-on .pb-cap {
+  color: var(--fg);
+}
+/* The marker sits on the frame's top edge above the active step. */
+.pb-frame::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: calc((var(--a, 0) + 0.5) / 7 * 100% - 4px);
+  width: 7px;
+  height: 7px;
+  background: var(--signal);
+  opacity: 0;
+  transition: left 0.45s ease-out, opacity 0.25s ease-out;
+  z-index: 1;
+}
+.pb.has-active .pb-frame::before {
+  opacity: 1;
+}
+.pb-note {
+  min-height: 2.8em;
+  margin: 34px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.pb-out {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  /* Same top offset as the frame and the same inner padding as a step, so the drawings share one baseline. */
+  margin-top: 40px;
+  padding: 29px 0 15px;
+}
+.pb-out .iso-line {
+  --iso-fill: var(--bg);
+  z-index: 1;
+}
+/* The line from the outside world into the frame runs behind the opaque drawing. */
+.pb-link {
+  position: absolute;
+  top: calc(29px + var(--ih) / 2);
+  height: 1px;
+  background: var(--line-strong);
+}
+.pb-out-l .pb-link {
+  left: 50%;
+  right: 0;
+}
+.pb-out-r .pb-link {
+  left: 0;
+  right: 50%;
+}
+.pb-link::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  background: var(--signal);
+  animation: pb-go 2.6s linear infinite;
+}
+.pb-out-r .pb-link::after {
+  animation-direction: reverse;
+}
+@keyframes pb-go {
+  from {
+    left: 0;
+  }
+  to {
+    left: calc(100% - 5px);
+  }
+}
+@media (max-width: 880px) {
+  .sec-band {
+    padding-bottom: 56px;
+  }
+  .pb {
+    --ih: 60px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pb-out,
+  .pb-frame::before {
+    display: none;
+  }
+  .pb-main {
+    margin-top: 0;
+  }
+  .pb-frame {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pb-step + .pb-step {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .pb-btn {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+    grid-template-areas: "i l" "i c";
+    align-items: center;
+    gap: 1px 18px;
+    padding: 12px 16px;
+    text-align: left;
+  }
+  .pb-btn .iso-line {
+    grid-area: i;
+    justify-self: center;
+  }
+  .pb-label {
+    position: static;
+    grid-area: l;
+    align-self: end;
+    text-align: left;
+    font-size: 13px;
+  }
+  .pb-cap {
+    grid-area: c;
+    align-self: start;
+    text-align: left;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pb-link::after {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

@@ -219,7 +219,7 @@ if (typesEl) {
 const sceneIo = new IntersectionObserver((entries) => {
   for (const e of entries) (e.target as HTMLElement).toggleAttribute("data-paused", !e.isIntersecting);
 });
-document.querySelectorAll(".iso, .runtime-figure").forEach((el) => sceneIo.observe(el));
+document.querySelectorAll(".iso, .runtime-figure, .pb").forEach((el) => sceneIo.observe(el));
 
 if (!reduced) {
   root.classList.add("motion");
@@ -236,6 +236,41 @@ if (!reduced) {
       reveal.observe(el);
     });
   }
+}
+
+// ---- process band ------------------------------------------------------------------
+// The marker walks through the steps while the band is on screen; hovering or focusing a step pins it.
+const band = document.querySelector<HTMLElement>("[data-band]");
+if (band) {
+  const steps = [...band.querySelectorAll<HTMLElement>(".pb-step")];
+  const note = band.querySelector<HTMLElement>("[data-pb-note]")!;
+  const idleNote = note.textContent ?? "";
+  let pinned = false;
+  const show = (i: number) => {
+    band.style.setProperty("--a", String(i));
+    band.classList.toggle("has-active", i >= 0);
+    steps.forEach((s, k) => s.classList.toggle("is-on", k === i));
+    note.textContent = i >= 0 ? steps[i].dataset.note! : idleNote;
+  };
+  steps.forEach((s, i) => {
+    const pin = () => {
+      pinned = true;
+      show(i);
+    };
+    s.addEventListener("mouseenter", pin);
+    s.addEventListener("focusin", pin);
+  });
+  band.addEventListener("mouseleave", () => (pinned = false));
+  band.addEventListener("focusout", (e) => {
+    if (!band.contains(e.relatedTarget as Node | null)) pinned = false;
+  });
+  if (!reduced)
+    onVisible(band, async () => {
+      for (let i = 0; ; i = (i + 1) % steps.length) {
+        if (!pinned) show(i);
+        await wait(2600);
+      }
+    });
 }
 
 // ---- plugin search demo -----------------------------------------------------------

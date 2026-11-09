@@ -1,0 +1,50 @@
+---
+import Iso from "./Iso.astro";
+import { processScenes } from "../lib/scenes";
+
+// Seven real steps, from the install command to a panel update. The frame is the system boundary:
+// the browser you manage it from and the players who join are outside, everything else runs on your hardware.
+// Captions are values CraftPanel actually shows; notes repeat what the sections below explain.
+const steps = [
+  { key: "install", label: "Install", cap: "sha256 ✓", note: "One command. The release is verified against its SHA-256 before anything is installed." },
+  { key: "java", label: "Java", cap: "Java 21", note: "The Java your Minecraft version needs is downloaded per server. Nothing to install yourself." },
+  { key: "pick", label: "Pick", cap: "Paper 1.21.4", note: "Choose the software, the version and the memory: Paper, Purpur, Fabric, NeoForge, Vanilla or Velocity." },
+  { key: "create", label: "Create", cap: ":25565", note: "The server comes from its official source, is checked and starts on its own port." },
+  { key: "join", label: "Join", cap: "4 online", note: "Players connect straight to your machine. Console and player list update live." },
+  { key: "backup", label: "Backup", cap: "04:00 nightly", note: "Scheduled, verified archives. Restoring saves the current state first." },
+  { key: "update", label: "Update", cap: "v1.0.1", note: "Update the panel from the dashboard. Minecraft keeps running, and a failed update rolls back." },
+] as const;
+const idle = "From one command to a running server. Every step happens on your own machine.";
+---
+
+<div class="pb" data-band style="--a: 0">
+  <div class="pb-out pb-out-l">
+    <span class="pb-link" aria-hidden="true"></span>
+    <Iso boxes={processScenes.browser()} label="A laptop showing the dashboard" class="iso-line" outline pad={2} />
+    <span class="pb-cap mono">your browser</span>
+  </div>
+
+  <div class="pb-main">
+    <ol class="pb-frame dl-marks">
+      {
+        steps.map((s, i) => (
+          <li class="pb-step" data-note={s.note}>
+            <button type="button" class="pb-btn">
+              <span class="pb-label mono"><span class="pb-n">{String(i + 1).padStart(2, "0")}</span>{s.label}</span>
+              <Iso boxes={processScenes[s.key]()} label={`${s.label} illustration`} class="iso-line" outline pad={2} />
+              <span class="pb-cap mono">{s.cap}</span>
+            </button>
+          </li>
+        ))
+      }
+      <li class="dl-tab mono" aria-hidden="true">runs on your hardware</li>
+    </ol>
+    <p class="pb-note mono" data-pb-note>{idle}</p>
+  </div>
+
+  <div class="pb-out pb-out-r">
+    <span class="pb-link" aria-hidden="true"></span>
+    <Iso boxes={processScenes.players()} label="Two players" class="iso-line" outline pad={2} />
+    <span class="pb-cap mono">your players</span>
+  </div>
+</div>

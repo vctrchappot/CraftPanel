@@ -6,6 +6,7 @@ import Pixel, { type PixelName } from "../components/Pixel.astro";
 import Iso from "../components/Iso.astro";
 import Terminal from "../components/Terminal.astro";
 import RuntimeDiagram from "../components/RuntimeDiagram.astro";
+import ProcessBand from "../components/ProcessBand.astro";
 import Shot from "../components/Shot.astro";
 import { heroScene, pcScene, piScene, vpsScene } from "../lib/scenes";
 import { repoFacts } from "../lib/github";
@@ -376,6 +377,14 @@ const backups = [
             </div>
             <p class="hero-host mono" aria-hidden="true">raspberrypi.local · 4 GB</p>
           </div>
+        </div>
+      </section>
+
+      <!-- From install to update -->
+      <section class="sec-band" aria-labelledby="band-title">
+        <div class="wrap">
+          <h2 id="band-title" class="sr-only">From install to update</h2>
+          <ProcessBand />
         </div>
       </section>
 
