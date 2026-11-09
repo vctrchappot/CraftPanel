@@ -21,7 +21,7 @@ const releaseDate = release.date ? new Date(release.date).toLocaleDateString("en
 const github = "https://github.com/vctrchappot/CraftPanel";
 const title = "CraftPanel – Your Minecraft server, on your hardware";
 const description =
-  "Self-hosted panel for Minecraft Java servers on a PC, a Raspberry Pi or a VPS. One command to install. Paper, Purpur, Fabric, NeoForge, Vanilla and Velocity. No rent, no telemetry.";
+  "Self-hosted panel for Minecraft Java servers on a PC, a Raspberry Pi or a VPS. Paper, Purpur, Fabric, NeoForge, Vanilla and Velocity. No panel fee, no telemetry.";
 
 const types: { key: string; name: string; icon: PixelName; color: string; note: string; server: string; meta: string; addons: string; tab: string | null; players: string; tps: string; mem: string }[] = [
   { key: "paper", name: "Paper", icon: "paper", color: "#e8e2d4", note: "Plugins, fast and Vanilla-like.", server: "survival", meta: "Paper 1.21.4 · build 232 · Java 21", addons: "Plugins from Modrinth & Hangar", tab: "Plugins", players: "6 / 20", tps: "20.0", mem: "1.4 / 2.0 GB" },
@@ -87,31 +87,30 @@ const looks = [
 ] as const;
 
 const devices = [
-  { name: "The PC under your desk", os: "Windows · Linux · macOS", scene: pcScene(), ram: "4–8 GB", players: "10–30", note: "Runs as a Windows service or a systemd unit. Your gaming PC works too: Minecraft servers don't use the GPU." },
+  { name: "The PC under your desk", os: "Windows · Linux · macOS", scene: pcScene(), ram: "4–8 GB", players: "10–30", note: "Automatic services on Windows and Linux; manual setup on macOS. Your gaming PC works too: Minecraft servers don't use the GPU." },
   { name: "Raspberry Pi 4 / 5", os: "64-bit Raspberry Pi OS", scene: piScene(), ram: "2–3 GB", players: "2–8", note: "Draws a few watts. Pick the Pi preset, pre-generate the world, keep worlds on an SSD." },
-  { name: "A small VPS", os: "Any Linux with systemd", scene: vpsScene(), ram: "4–8 GB", players: "10–20", note: "Public IP, so no port forwarding and no CGNAT. Keep the dashboard behind a VPN or SSH tunnel." },
+  { name: "A small VPS", os: "Linux with systemd", scene: vpsScene(), ram: "4–8 GB", players: "10–20", note: "Choose a plan with a public IP and allow the Minecraft port in its firewall. Keep the dashboard behind a VPN, SSH tunnel or HTTPS reverse proxy." },
 ];
 
 const compare = {
-  cols: ["CraftPanel", "Pterodactyl", "Crafty Controller", "Rented server"],
+  cols: ["CraftPanel", "Managed Minecraft hosting"],
   rows: [
-    ["Made for", "Minecraft Java on one machine", "Many games on many machines", "Minecraft Java and Bedrock", "Whatever the host offers"],
-    ["Setup", "One command", "Panel, database, web server, Wings daemon", "Install script or Docker", "Sign up, pick a plan"],
-    ["Docker", "Not needed", "Required (Wings)", "Optional", "Not your problem"],
-    ["Raspberry Pi / ARM64", "Yes, with installer", "ARM64 supported", "Yes", "n/a"],
-    ["Several machines", "Not yet (planned)", "Yes", "No", "n/a"],
-    ["Cost", "Free · FSL, Apache-2.0 after 2 years", "Free · MIT", "Free · GPL-3.0", "Monthly, grows with RAM"],
-    ["Where your worlds live", "Your machine", "Your machine", "Your machine", "Their machine"],
+    ["Where it runs", "A PC, Pi or VPS you control", "Infrastructure operated by your provider"],
+    ["Getting started", "Linux/Windows installer; manual macOS setup", "Create an account and choose a plan"],
+    ["Software", "Paper, Purpur, Fabric, NeoForge, Vanilla or Velocity", "Software and versions offered by the provider"],
+    ["Worlds & files", "On your host, with direct file access", "On the provider's host; access depends on the plan"],
+    ["Maintenance", "You manage the machine, network and backups", "Responsibilities depend on the provider and plan"],
+    ["Costs", "Free panel; hardware, power and any VPS/network costs are yours", "Recurring hosting charge; pricing depends on the plan"],
   ],
 };
 
 const faqs = [
-  { q: "What does it cost?", a: "Nothing. CraftPanel is source-available under the Functional Source License (FSL-1.1-ALv2): use, change and share it for anything except a competing commercial product. Every version becomes Apache-2.0 two years after its release." },
+  { q: "What does it cost?", a: "The CraftPanel software is free. You pay for hardware, electricity and any VPS or connectivity you use. It is source-available under FSL-1.1-ALv2, which restricts competing commercial uses. Each version becomes Apache-2.0 after two years." },
   { q: "What hardware do I need?", a: "Anything that runs Node.js 22.13 or newer: a Windows or Linux PC, a Mac, a Raspberry Pi 4/5 with a 64-bit OS, or a small VPS. Minecraft needs most of the memory: about 2 GB for a small Paper server, 4 GB or more for modpacks." },
   { q: "Bedrock?", a: "Not yet. CraftPanel runs Minecraft Java Edition servers. A Bedrock adapter is on the roadmap." },
   { q: "Can I bring my existing world?", a: "Yes. Create a server with the same software and version, then import the world as a zip in the Worlds tab, or upload files in the file manager." },
   { q: "Should I open the dashboard to the internet?", a: "No. Only the Minecraft port should be public. Reach the dashboard through a VPN like Tailscale, an SSH tunnel or an HTTPS reverse proxy. By default CraftPanel only lets in private networks and refuses public clients without HTTPS." },
-  { q: "Does it phone home?", a: "No telemetry, no account, no cloud. CraftPanel goes online for official downloads, Modrinth and Hangar when you browse add-ons, and an optional update check against GitHub." },
+  { q: "Does it phone home?", a: "No telemetry and no CraftPanel cloud account. You create local users on your installation. CraftPanel goes online for official downloads, Modrinth and Hangar when you browse add-ons, and an optional update check against GitHub." },
 ];
 
 const backups = [
@@ -180,11 +179,15 @@ const backups = [
         <div class="wrap hero-grid">
           <div class="hero-copy">
             <p class="hero-kicker mono"><span class="px-dot" aria-hidden="true"></span><a href={release.url}>{release.tag}</a> · self-hosted Minecraft panel</p>
-            <h1 id="hero-title" class="display">Your server.<br />Your hardware.<br /><span class="mark">No rent.</span></h1>
+            <h1 id="hero-title" class="display">Your server.<br />Your hardware.<br /><span class="mark">No panel fee.</span></h1>
             <p class="hero-lead">
-              CraftPanel turns a spare PC, a Raspberry Pi or a cheap VPS into a Minecraft host you run from the browser. One command to install. Paper, Fabric or a whole modpack a few clicks later.
+              Run Minecraft Java servers on your PC, Raspberry Pi or VPS. Manage them from your browser.
             </p>
             <Terminal version={version} id="hero-term" />
+            <div class="install-help">
+              <a href="/docs/getting-started/installation/">Installation guide <span aria-hidden="true">↗</span></a>
+              <a href="/docs/getting-started/installation/#macos">macOS: manual setup <span aria-hidden="true">↗</span></a>
+            </div>
             <ul class="hero-facts mono" aria-label="Supported platforms">
               <li>Windows · Linux · macOS</li>
               <li>x64 · ARM64 · Raspberry Pi</li>
@@ -307,25 +310,12 @@ const backups = [
 
             <article class="tile tile-update">
               <div class="tile-copy">
-                <p class="tile-label mono"><Pixel name="update" size={14} />updates without downtime</p>
-                <h3>Update the panel. Players stay online.</h3>
-                <p>Minecraft runs in its own service. The dashboard can update, restart or crash, and your games keep going. If a release doesn't start, the installer puts the old one back.</p>
+                <p class="tile-label mono"><Pixel name="update" size={14} />independent runtime</p>
+                <h3>Update the panel. Keep playing.</h3>
+                <p>Minecraft runs in its own service. Watch the dashboard update and reconnect while your worlds keep ticking.</p>
               </div>
-              <div class="demo-update" data-update>
-                <ol class="du-steps mono">
-                  <li data-step="0"><span>Download v1.0.1</span><i class="du-state"></i></li>
-                  <li data-step="1"><span>Verify SHA-256</span><i class="du-state"></i></li>
-                  <li data-step="2"><span>Snapshot database</span><i class="du-state"></i></li>
-                  <li data-step="3"><span>Start new dashboard</span><i class="du-state"></i></li>
-                  <li data-step="4" class="du-rollback"><span>Roll back to v1.0.0</span><i class="du-state"></i></li>
-                </ol>
-                <p class="du-players mono"><span class="dot-run"></span><span><b>6 players online</b> the whole time</span></p>
-                <p class="du-result mono" data-result aria-live="polite"></p>
-                <div class="du-actions">
-                  <button type="button" class="btn btn-small" data-run="ok">Run update</button>
-                  <button type="button" class="btn btn-small btn-quiet" data-run="fail">Try a broken release</button>
-                </div>
-              </div>
+              <RuntimeDiagram />
+              <p class="runtime-caveat">Updating the runtime itself needs a planned server stop. CraftPanel tells you before it happens.</p>
             </article>
 
             <article class="tile tile-backup">
@@ -371,16 +361,6 @@ const backups = [
               </div>
             </article>
 
-            <article class="tile tile-runtime runtime-story">
-              <div class="runtime-story-copy">
-                <p class="tile-label mono"><Pixel name="signal" size={14} />Built to keep playing</p>
-                <h3 class="display">Two processes.<br />One less interruption.</h3>
-                <p>The dashboard is the control room. A separate runtime service owns the Minecraft processes. Close the panel, restart it or update it: your worlds keep ticking.</p>
-                <p class="runtime-caveat">An update to the runtime itself still needs a planned server stop. CraftPanel tells you before it happens.</p>
-              </div>
-              <RuntimeDiagram />
-            </article>
-
             <article class="tile tile-list">
               <ul class="minor">
                 {
@@ -403,7 +383,7 @@ const backups = [
           <header class="sec-head sec-head-row">
             <div>
               <p class="sec-no mono"><span>03</span>Inside the dashboard</p>
-              <h2 id="look-title" class="display">Every screen, explained.</h2>
+              <h2 id="look-title" class="display">Inside CraftPanel.</h2>
             </div>
             <div class="look-tabs" role="tablist" aria-label="Dashboard screens" data-look-tabs>
               {
@@ -458,7 +438,7 @@ const backups = [
           <header class="sec-head">
             <p class="sec-no mono"><span>04</span>Hardware</p>
             <h2 id="hw-title" class="display">Runs on what you have.</h2>
-            <p class="sec-lead">Rough numbers for a Paper server with a pre-generated world. Mods, mob farms and a view distance of 32 change everything.</p>
+            <p class="sec-lead">Planning estimates for Paper with a pre-generated world, not measured hardware benchmarks. Mods, mob farms and view distance change the load.</p>
           </header>
           <div class="devices">
             {
@@ -471,7 +451,7 @@ const backups = [
                   <p class="device-os mono">{d.os}</p>
                   <dl class="device-stats">
                     <div><dt class="mono">RAM for Minecraft</dt><dd class="display">{d.ram}</dd></div>
-                    <div><dt class="mono">Players, realistic</dt><dd class="display">{d.players}</dd></div>
+                    <div><dt class="mono">Players, estimate</dt><dd class="display">{d.players}</dd></div>
                   </dl>
                   <p class="device-note">{d.note}</p>
                 </article>
@@ -485,11 +465,11 @@ const backups = [
       <section class="sec" id="compare" aria-labelledby="compare-title">
         <div class="wrap wrap-mid">
           <header class="sec-head">
-            <p class="sec-no mono"><span>05</span>Alternatives</p>
-            <h2 id="compare-title" class="display">Honest comparison.</h2>
-            <p class="sec-lead">CraftPanel isn't the only way to run a server. Pterodactyl is great when you host many games on many machines. Crafty is a mature Minecraft panel. Renting is fine if you never want to think about hardware. CraftPanel is for one machine you own, set up in minutes.</p>
+            <p class="sec-no mono"><span>05</span>Hosting choices</p>
+            <h2 id="compare-title" class="display">Run it yourself, or rent a managed server?</h2>
+            <p class="sec-lead">CraftPanel manages Minecraft on one host you control. A managed host takes on some of that work. Choose based on who should look after the machine, not just the price of the panel.</p>
           </header>
-          <div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table, scrolls sideways">
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Self-hosting and managed Minecraft hosting comparison">
             <table class="compare">
               <thead>
                 <tr><th scope="col"><span class="sr-only">Aspect</span></th>{compare.cols.map((c, i) => <th scope="col" class={i === 0 ? "is-us" : undefined}>{c}</th>)}</tr>
@@ -504,23 +484,22 @@ const backups = [
               </tbody>
             </table>
           </div>
-          <p class="fineprint mono">As of November 2026, from each project's own documentation. Spotted a mistake? <a href={`${github}/issues`}>Open an issue</a>.</p>
+          <p class="comparison-note">CraftPanel is free. Hardware, electricity and any VPS or connectivity costs are yours. Managed hosting varies by provider and plan.</p>
+          <p class="fineprint">Looking at other self-hosted panels? Pterodactyl and Crafty Controller are alternatives. CraftPanel currently manages one host; multiple hosts are planned.</p>
         </div>
       </section>
 
       <!-- 06 Trust -->
       <section class="sec sec-trust" aria-labelledby="trust-title">
         <div class="wrap trust">
-          <div class="trust-quote">
-            <p class="sec-no mono"><span>06</span>Who's behind it</p>
-            <h2 id="trust-title" class="sr-only">Who's behind it</h2>
-            <blockquote>
-              <p class="display">“I wanted our server on hardware we already own, without learning Docker first. CraftPanel is the panel I wished existed.”</p>
-              <footer>
+          <div class="trust-project">
+            <p class="sec-no mono"><span>06</span>Project & source</p>
+            <h2 id="trust-title" class="display">Built by Victor.</h2>
+            <p>CraftPanel is built for people running their own Minecraft server. The source, issues, release notes and implementation evidence are public.</p>
+              <div class="project-author">
                 <Image src={avatar} alt="" width={48} height={48} class="avatar" />
                 <span><b>Victor</b><br /><a class="mono" href="https://github.com/vctrchappot">@vctrchappot</a> · builds CraftPanel</span>
-              </footer>
-            </blockquote>
+              </div>
           </div>
           <dl class="trust-facts">
             <div><dt class="mono">latest release</dt><dd><a href={release.url}>{release.tag}</a>{releaseDate && <span class="muted"> · {releaseDate}</span>}</dd></div>
@@ -557,14 +536,14 @@ const backups = [
       <section class="cta" aria-labelledby="cta-title">
         <div class="wrap cta-in">
           <div>
-            <h2 id="cta-title" class="display">Ten minutes from now, your friends could be online.</h2>
-            <p>Install, open the dashboard, pick Paper, press Start.</p>
+            <h2 id="cta-title" class="display">Install CraftPanel.</h2>
+            <p>Install → open the dashboard → create your first server.</p>
           </div>
           <div class="cta-side">
             <Terminal version={version} id="cta-term" compact />
             <div class="cta-links">
               <a class="btn btn-dark" href="/docs/getting-started/installation/">Installation guide <Pixel name="arrow" size={12} /></a>
-              <a class="btn btn-ghost-dark" href="/docs/"><Pixel name="book" size={14} /> Docs</a>
+              <a class="btn btn-ghost-dark" href={github}><Pixel name="github" size={14} /> View on GitHub</a>
             </div>
           </div>
         </div>

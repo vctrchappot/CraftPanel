@@ -45,7 +45,7 @@ const tabs = [
 ] as const;
 ---
 
-<div class:list={["term", { "term-compact": compact }]} data-term={compact ? "compact" : "full"}>
+<div class:list={["term", { "term-compact": compact, "term-full": !compact }]} data-term={compact ? "compact" : "full"}>
   <div class="term-bar">
     <span class="term-dots" aria-hidden="true"><i></i><i></i><i></i></span>
     <div class="term-tabs" role="tablist" aria-label="Operating system">
@@ -68,12 +68,22 @@ const tabs = [
             <span class="term-ghost" aria-hidden="true">{t.command}</span>
             <code class="term-typed" data-command={t.command}>{t.command}</code>
           </span>
-          <button class="term-copy" type="button" data-copy={t.command} aria-label={`Copy the ${t.label} install command`}>
+          {compact && <button class="term-copy" type="button" data-copy={t.command} aria-label={`Copy the ${t.label} install command`}>
             <Pixel name="copy" size={14} class="i-copy" />
             <Pixel name="check" size={14} class="i-done" />
             <span class="term-copy-label">Copy</span>
-          </button>
+          </button>}
         </div>
+        {!compact && (
+          <div class="term-actions">
+            <button class="term-copy" type="button" data-copy={t.command} aria-label={`Copy the ${t.label} install command`}>
+              <Pixel name="copy" size={14} class="i-copy" />
+              <Pixel name="check" size={14} class="i-done" />
+              <span class="term-copy-label" aria-live="polite">Copy install command</span>
+            </button>
+            <span class="term-requirement">{t.os === "windows" ? "PowerShell as administrator" : "Linux with systemd"}</span>
+          </div>
+        )}
         {!compact && (
           <div class="term-out" aria-live="off">
             {t.output.map(([kind, text]) => (

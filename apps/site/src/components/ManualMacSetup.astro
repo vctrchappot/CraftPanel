@@ -1,0 +1,15 @@
+<p id="macos">There is no installer for macOS yet. Run the release archive with Node.js:</p>
+
+<script>
+  // Reveal the landing page's deep link even if the visitor previously selected another OS.
+  async function revealInstallationSection() {
+    if (location.hash !== "#macos") return;
+    await customElements.whenDefined("starlight-tabs");
+    const macTab = [...document.querySelectorAll<HTMLAnchorElement>('starlight-tabs [role="tab"]')]
+      .find((tab) => tab.textContent?.trim() === "macOS");
+    macTab?.click();
+    document.getElementById("macos")?.scrollIntoView({ block: "start" });
+  }
+  void revealInstallationSection();
+  window.addEventListener("hashchange", () => void revealInstallationSection());
+</script>

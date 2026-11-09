@@ -6,6 +6,7 @@ sidebar:
 ---
 
 import { Tabs, TabItem, Steps, Aside } from "@astrojs/starlight/components";
+import ManualMacSetup from "../../../../components/ManualMacSetup.astro";
 
 The one-line installers are the recommended way to install CraftPanel. They download the latest release from GitHub, verify its checksum and set CraftPanel up to run in the background. Nothing is built on your machine.
 
@@ -65,7 +66,7 @@ Administrator rights are only needed to register the runtime service. Later upda
 </TabItem>
 <TabItem label="macOS">
 
-There is no installer for macOS yet. Run the release archive with Node.js:
+<ManualMacSetup />
 
 <Steps>
 

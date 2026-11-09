@@ -95,14 +95,16 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
   } else if (preferred) select(preferred);
 
   for (const btn of term.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
+    const label = btn.querySelector<HTMLElement>(".term-copy-label")!;
+    const idleLabel = label.textContent;
     btn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(btn.dataset.copy ?? "");
         btn.classList.add("is-copied");
-        btn.querySelector(".term-copy-label")!.textContent = "Copied";
+        label.textContent = "Copied";
         setTimeout(() => {
           btn.classList.remove("is-copied");
-          btn.querySelector(".term-copy-label")!.textContent = "Copy";
+          label.textContent = idleLabel;
         }, 1600);
       } catch {}
     });
@@ -167,55 +169,45 @@ if (updateEl) {
   const steps = [...updateEl.querySelectorAll<HTMLElement>("[data-step]")];
   const result = updateEl.querySelector<HTMLElement>("[data-result]")!;
   const buttons = [...updateEl.querySelectorAll<HTMLButtonElement>("[data-run]")];
+  const panelStatus = updateEl.querySelector<HTMLElement>("[data-panel-status]")!;
+  const panelVersion = updateEl.querySelector<HTMLElement>("[data-panel-version]")!;
   let running = false;
   async function run(fail: boolean) {
     if (running) return;
     running = true;
     buttons.forEach((b) => (b.disabled = true));
     updateEl!.classList.toggle("is-fail", fail);
+    updateEl!.dataset.panelState = "updating";
+    panelStatus.textContent = "Updating";
+    panelVersion.textContent = "v1.0.0";
     steps.forEach((s) => (s.dataset.state = ""));
-    result.textContent = "";
+    result.textContent = "Dashboard updating. Minecraft stays online.";
     for (const s of steps.slice(0, 4)) {
       s.dataset.state = "run";
       await wait(650);
       s.dataset.state = fail && s.dataset.step === "3" ? "fail" : "ok";
+      if (s.dataset.step === "3") {
+        updateEl!.dataset.panelState = fail ? "failed" : "updating";
+        panelStatus.textContent = fail ? "Start failed" : "Reconnecting";
+        if (!fail) await wait(450);
+      }
     }
     if (fail) {
       const rb = steps[4];
       rb.dataset.state = "run";
       await wait(800);
       rb.dataset.state = "ok";
-      result.textContent = "v1.0.1 didn't start. v1.0.0 and its database are back. Nobody noticed.";
-    } else result.textContent = "Updated to v1.0.1. Nobody got kicked.";
+      result.textContent = "v1.0.1 did not start. v1.0.0 and its database are restored. All 6 players stayed online.";
+    } else {
+      panelVersion.textContent = "v1.0.1";
+      result.textContent = "Connected to v1.0.1. All 6 players stayed online.";
+    }
+    updateEl!.dataset.panelState = "connected";
+    panelStatus.textContent = "Connected";
     buttons.forEach((b) => (b.disabled = false));
     running = false;
   }
   buttons.forEach((b) => b.addEventListener("click", () => void run(b.dataset.run === "fail")));
-  onVisible(updateEl, () => void run(false));
-}
-
-// ---- independent runtime illustration ------------------------------------------
-const runtimeFigure = document.querySelector<HTMLElement>("[data-runtime-figure]");
-if (runtimeFigure) {
-  const button = runtimeFigure.querySelector<HTMLButtonElement>("[data-runtime-restart]")!;
-  const status = runtimeFigure.querySelector<HTMLElement>("[data-runtime-status]")!;
-  const note = runtimeFigure.querySelector<HTMLElement>("[data-runtime-note]")!;
-  const caption = runtimeFigure.querySelector<HTMLElement>("[data-runtime-caption]")!;
-  caption.setAttribute("aria-live", "polite");
-  button.addEventListener("click", async () => {
-    button.disabled = true;
-    runtimeFigure.classList.add("is-restarting");
-    status.textContent = "Reconnecting…";
-    note.textContent = "Dashboard restarting.";
-    caption.textContent = "Dashboard offline. Minecraft is still running.";
-    await wait(1800);
-    runtimeFigure.classList.remove("is-restarting");
-    status.textContent = "Connected";
-    note.textContent = "Controls, console, settings.";
-    caption.textContent = "Reconnected. No game process restarted.";
-    button.disabled = false;
-    button.innerHTML = 'Restart again <span aria-hidden="true">↻</span>';
-  });
 }
 
 // ---- backup demo ---------------------------------------------------------------
