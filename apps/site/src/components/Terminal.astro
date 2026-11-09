@@ -1,7 +1,7 @@
 ---
 // The install command as a terminal window. The full variant types itself once and prints the installer's real
 // output; the compact variant is just the command with tabs and a copy button.
-import Pixel from "./Pixel.astro";
+import UiIcon from "./UiIcon.astro";
 
 interface Props {
   version: string;
@@ -69,16 +69,16 @@ const tabs = [
             <code class="term-typed" data-command={t.command}>{t.command}</code>
           </span>
           {compact && <button class="term-copy" type="button" data-copy={t.command} aria-label={`Copy the ${t.label} install command`}>
-            <Pixel name="copy" size={14} class="i-copy" />
-            <Pixel name="check" size={14} class="i-done" />
+            <UiIcon name="copy" size={12} class="i-copy" />
+            <UiIcon name="check" size={12} class="i-done" />
             <span class="term-copy-label">Copy</span>
           </button>}
         </div>
         {!compact && (
           <div class="term-actions">
             <button class="term-copy" type="button" data-copy={t.command} aria-label={`Copy the ${t.label} install command`}>
-              <Pixel name="copy" size={14} class="i-copy" />
-              <Pixel name="check" size={14} class="i-done" />
+              <UiIcon name="copy" size={12} class="i-copy" />
+              <UiIcon name="check" size={12} class="i-done" />
               <span class="term-copy-label" aria-live="polite">Copy install command</span>
             </button>
             <span class="term-requirement">{t.os === "windows" ? "PowerShell as administrator" : "Linux with systemd"}</span>

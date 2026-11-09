@@ -165,12 +165,18 @@ p {
 .px-a {
   fill: var(--px-a, currentColor);
 }
+/* Software icons: o = outline (fixed ink, so it reads on any surface), a/b = fills, h = highlight. */
+.px-o {
+  fill: #1c1b18;
+}
 .px-b {
   fill: var(--px-b, var(--grass));
 }
-.px-c {
-  fill: var(--px-b, currentColor);
-  opacity: 0.55;
+.px-h {
+  fill: var(--px-h, var(--px-a, currentColor));
+}
+.px-i-vanilla {
+  --px-b: #8d5b3d;
 }
 
 /* stepped "pixel" corners for small solid elements */
@@ -988,7 +994,8 @@ p {
   flex: none;
   background: var(--surface-2);
   --px-a: var(--type);
-  --px-b: color-mix(in srgb, var(--type) 55%, #3a3631);
+  --px-b: color-mix(in srgb, var(--type) 62%, #1c1b18);
+  --px-h: color-mix(in srgb, var(--type) 55%, #fff);
 }
 .type-text {
   display: grid;
@@ -1293,6 +1300,8 @@ p {
 .pv-source-icon {
   display: inline-flex;
   flex: none;
+  /* 24 px icon in a pill sized for 18 */
+  margin: -3px 0;
 }
 .is-swap {
   animation: swap 0.28s ease-out;
@@ -1348,9 +1357,9 @@ p {
   font-weight: 500;
 }
 .wz-sw-icon {
-  width: 34px;
-  height: 34px;
-  padding: 5px;
+  width: 40px;
+  height: 40px;
+  padding: 4px;
 }
 .wz-select {
   position: relative;

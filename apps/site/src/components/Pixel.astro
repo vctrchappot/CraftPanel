@@ -1,40 +1,8 @@
 ---
-// Hand-drawn pixel icons. "a" uses --px-a (default currentColor), "b" uses --px-b, "c" is "a" at reduced opacity.
-const icons = {
-  paper: ["..aaaaaaa...", "..a.....aa..", "..a.....aba.", "..a.....aaaa", "..a........a", "..a.bbbbb..a", "..a........a", "..a.bbbbbb.a", "..a........a", "..a.bbbb...a", "..a........a", "..aaaaaaaaaa"],
-  purpur: ["aaaaaaaaaaaa", "a..........a", "a.bbbbbbbb.a", "a.b......b.a", "a.b.aaaa.b.a", "a.b.a..a.b.a", "a.b.a..a.b.a", "a.b.aaaa.b.a", "a.b......b.a", "a.bbbbbbbb.a", "a..........a", "aaaaaaaaaaaa"],
-  fabric: ["..aaaaaaaa..", "...aaaaaa...", "....bbbb....", "....bbbb....", "....bbbb....", "....bbbb....", "....bbbb....", "....bbbb..b.", "...aaaaaa.b.", "..aaaaaaaab.", "..........b.", "........bb.."],
-  neoforge: ["........b.b.", ".........b..", "aaaaaaaaaaa.", ".aaaaaaaaaaa", "...aaaaaaa..", ".....aaa....", ".....aaa....", "....aaaaa...", "..aaaaaaaaa.", "..aaaaaaaaa.", "............", "............"],
-  vanilla: ["aaaaaaaaaaaa", "aaaaaaaaaaaa", "aaaaaaaaaaaa", "baabaaabaaba", "bbbabbbbabbb", "bbbbbbbbbbbb", "bcbbbbbcbbbb", "bbbbbbbbbbbb", "bbbbbcbbbbcb", "bbbbbbbbbbbb", "bbcbbbbbbbbb", "bbbbbbbbbbbb"],
-  velocity: ["............", "aa....bb....", ".aa....bb...", "..aa....bb..", "...aa....bb.", "....aa....bb", "....aa....bb", "...aa....bb.", "..aa....bb..", ".aa....bb...", "aa....bb....", "............"],
-  terminal: ["aaaaaaaaaaaa", "a..........a", "a.b........a", "a..b.......a", "a...b......a", "a..b.......a", "a.b..bbbb..a", "a..........a", "aaaaaaaaaaaa"],
-  chest: ["aaaaaaaaaaaa", "a..........a", "a..........a", "aaaaabbaaaaa", "a....bb....a", "a..........a", "a..........a", "aaaaaaaaaaaa"],
-  update: [".....aa.....", "....aaaa....", "...aaaaaa...", "..aa.aa.aa..", ".....aa.....", ".....aa.....", ".....aa.....", "............", "bbbbbbbbbbbb", "b.b........b", "bbbbbbbbbbbb"],
-  puzzle: ["....aa......", "...aaaa.....", "aaaaaaaaaa..", "aaaaaaaaaa..", "aaaaaaaaaaa.", "aaaaaaaaaaaa", "aaaaaaaaaaaa", "aaaaaaaaaaa.", "aaaaaaaaaa..", "aaaaaaaaaa.."],
-  people: ["..aa....bb..", ".aaaa..bbbb.", ".aaaa..bbbb.", "..aa....bb..", "............", ".aaaa..bbbb.", "aaaaaabbbbbb", "aaaaaabbbbbb", "aaaaaabbbbbb"],
-  cup: ["..b..b......", "...b..b.....", "..b..b......", "............", "aaaaaaaaa...", "a.......aaa.", "a.......a.a.", "a.......aaa.", ".a.....a....", "..aaaaa.....", "bbbbbbbbbb.."],
-  clock: ["...aaaaaa...", "..a......a..", ".a...b....a.", "a....b.....a", "a....b.....a", "a....bbbb..a", "a..........a", ".a........a.", "..a......a..", "...aaaaaa..."],
-  bell: [".....aa.....", "....aaaa....", "...aaaaaa...", "...aaaaaa...", "...aaaaaa...", "..aaaaaaaa..", ".aaaaaaaaaa.", "aaaaaaaaaaaa", "............", ".....bb....."],
-  signal: ["..........aa", "..........aa", ".......aa.aa", ".......aa.aa", "....aa.aa.aa", "....aa.aa.aa", ".aa.aa.aa.aa", ".aa.aa.aa.aa", "bbbbbbbbbbbb"],
-  check: ["......a", ".....aa", "a...aa.", "aa.aa..", ".aaa...", "..a...."],
-  cross: ["a...a", ".a.a.", "..a..", ".a.a.", "a...a"],
-  star: ["....a....", "....a....", "...aaa...", "aaaaaaaaa", ".aaaaaaa.", "..aaaaa..", "..aa.aa..", ".aa...aa."],
-  sun: ["....a....", ".a.....a.", "...aaa...", "..aaaaa..", "a.aaaaa.a", "..aaaaa..", "...aaa...", ".a.....a.", "....a...."],
-  moon: ["...aaa...", ".aaa.....", ".aa......", "aa.......", "aa.......", "aa......a", ".aa....aa", ".aaaaaaa.", "...aaa..."],
-  copy: ["..aaaaaaa", "..a.....a", "aaaaaaa.a", "a.....a.a", "a.....a.a", "a.....aaa", "a.....a..", "aaaaaaa.."],
-  arrow: ["....a...", "....aa..", "aaaaaaa.", "aaaaaaaa", "aaaaaaa.", "....aa..", "....a..."],
-  github: ["...aaaa...", ".aaaaaaaa.", "aa.aaaa.aa", "aaaaaaaaaa", "aa.aaaa.aa", "aaa....aaa", ".aaa..aaa.", "..aa..aa..", "aa.a..a...", ".aaa..a..."],
-  folder: ["aaaaa.......", "a....aaaaaaa", "a..........a", "abbbbbbbbbba", "a..........a", "a..........a", "a..........a", "aaaaaaaaaaaa"],
-  search: [".aaaa.....", "a....a....", "a....a....", "a....a....", ".aaaa.....", ".....bb...", "......bb..", ".......bb."],
-  book: ["aaaa..aaaa", "a..aaaa..a", "a.b.aa.b.a", "a..b.ab..a", "a.b.aa.b.a", "a...aa...a", "aaaaaaaaaa"],
-  shield: ["aaaaaaaaaaaa", "a..........a", "a.......b..a", "a..b...b...a", "a...b.b....a", "a....b.....a", ".a........a.", ".a........a.", "..a......a..", "...a....a...", "....aaaa...."],
-  hash: ["...a....a...", "...a....a...", "...a....a...", "aaaaaaaaaaaa", "...a....a...", "...a....a...", "...a....a...", "aaaaaaaaaaaa", "...a....a...", "...a....a...", "...a....a..."],
-  plug: [".a..a...", ".a..a...", "aaaaaa..", "abbbba..", "abbbba..", ".aaaa...", "..aa....", "..aa...."],
-  mod: [".aa..aa.", ".aa..aa.", "aaaaaaaa", "abbbbbba", "abbbbbba", "abbbbbba", "abbbbbba", "aaaaaaaa"],
-  cube: ["..aaaa..", ".abbbba.", "abbbbbba", "abbbbbba", "abbbbbba", "abbbbbba", ".abbbba.", "..aaaa.."],
-} as const;
-
-export type PixelName = keyof typeof icons;
+// Software icons: hand-drawn on a 16x16 grid with a 1 px outline, used at integer scales (32 px = 2x, 48 px = 3x).
+// o = outline (fixed dark ink), a/b = the two fills, h = highlight. Colours come from --px-a/--px-b/--px-h, which
+// the cards derive from the software colour. UI icons live in UiIcon.astro.
+import { pixelIcons, type PixelName } from "../lib/pixel-icons";
 
 interface Props {
   name: PixelName;
@@ -43,10 +11,8 @@ interface Props {
   label?: string;
 }
 
-const { name, size = 24, class: className, label } = Astro.props;
-const rows = icons[name];
-const h = rows.length;
-const w = Math.max(...rows.map((r) => r.length));
+const { name, size = 32, class: className, label } = Astro.props;
+const rows = pixelIcons[name];
 // Merge horizontal runs of the same colour into one rect.
 const rects: { x: number; y: number; w: number; k: string }[] = [];
 rows.forEach((row, y) => {
@@ -63,14 +29,13 @@ rows.forEach((row, y) => {
     x = end;
   }
 });
-const scale = size / Math.max(w, h);
 ---
 
 <svg
-  class:list={["px-icon", className]}
-  width={Math.round(w * scale)}
-  height={Math.round(h * scale)}
-  viewBox={`0 0 ${w} ${h}`}
+  class:list={["px-icon", `px-i-${name}`, className]}
+  width={size}
+  height={size}
+  viewBox="0 0 16 16"
   shape-rendering="crispEdges"
   aria-hidden={label ? undefined : "true"}
   role={label ? "img" : undefined}
