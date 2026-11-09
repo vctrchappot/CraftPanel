@@ -239,36 +239,52 @@ if (!reduced) {
 }
 
 // ---- process band ------------------------------------------------------------------
-// The marker walks through the steps while the band is on screen; hovering or focusing a step pins it.
+// The story plays once through while the band is on screen: the line fills and each step turns "done" in
+// turn, rests, then starts over. Hovering or focusing a step shows the state right after that step.
 const band = document.querySelector<HTMLElement>("[data-band]");
 if (band) {
   const steps = [...band.querySelectorAll<HTMLElement>(".pb-step")];
   const note = band.querySelector<HTMLElement>("[data-pb-note]")!;
   const idleNote = note.textContent ?? "";
   let pinned = false;
-  const show = (i: number) => {
-    band.style.setProperty("--a", String(i));
-    band.classList.toggle("has-active", i >= 0);
-    steps.forEach((s, k) => s.classList.toggle("is-on", k === i));
-    note.textContent = i >= 0 ? steps[i].dataset.note! : idleNote;
+  /** `on` is the current step (or -1), `done` how many steps before it are finished. */
+  const paint = (on: number, done: number) => {
+    steps.forEach((s, k) => {
+      s.classList.toggle("is-on", k === on);
+      s.classList.toggle("is-done", k < done);
+    });
+    band.classList.toggle("is-start", on >= 0 || done > 0);
+    band.classList.toggle("is-end", done === steps.length);
+    note.textContent = on >= 0 ? steps[on].dataset.note! : idleNote;
   };
   steps.forEach((s, i) => {
     const pin = () => {
       pinned = true;
-      show(i);
+      paint(i, i);
     };
     s.addEventListener("mouseenter", pin);
     s.addEventListener("focusin", pin);
   });
-  band.addEventListener("mouseleave", () => (pinned = false));
+  const release = () => {
+    pinned = false;
+    if (reduced) paint(-1, steps.length);
+  };
+  band.addEventListener("mouseleave", release);
   band.addEventListener("focusout", (e) => {
-    if (!band.contains(e.relatedTarget as Node | null)) pinned = false;
+    if (!band.contains(e.relatedTarget as Node | null)) release();
   });
-  if (!reduced)
+  if (reduced) paint(-1, steps.length);
+  else
     onVisible(band, async () => {
-      for (let i = 0; ; i = (i + 1) % steps.length) {
-        if (!pinned) show(i);
-        await wait(2600);
+      for (;;) {
+        for (let i = 0; i < steps.length; i++) {
+          if (!pinned) paint(i, i);
+          await wait(1800);
+        }
+        if (!pinned) paint(-1, steps.length);
+        await wait(3200);
+        if (!pinned) paint(-1, 0);
+        await wait(700);
       }
     });
 }

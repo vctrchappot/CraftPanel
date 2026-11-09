@@ -208,7 +208,7 @@ export function vpsScene(): Box[] {
 // ---- process band ----------------------------------------------------------------------------
 // Outline icons: every one stands on the same 5×5 plate and carries a tall invisible "ghost" box, so
 // all of them render at one scale and share a baseline. Boxes marked "hl" are what the step is about.
-const plate = (): Box[] => [box(0, 0, 0, 5, 5, 0.25, C.case), box(0, 0, 0, 0.01, 0.01, 4, C.case, "ghost")];
+const plate = (): Box[] => [box(0, 0, 0, 5, 5, 0.25, C.case), box(0, 0, 0, 0.01, 0.01, 3.4, C.case, "ghost")];
 const hl = (x: number, y: number, z: number, w: number, d: number, h: number): Box => box(x, y, z, w, d, h, C.case, "hl");
 const part = (x: number, y: number, z: number, w: number, d: number, h: number): Box => box(x, y, z, w, d, h, C.case);
 const figure = (x: number, y: number, mark = true): Box[] => [part(x, y, 0.25, 0.6, 0.4, 1), part(x, y, 1.25, 0.6, 0.4, 1), mark ? hl(x - 0.05, y - 0.05, 2.25, 0.7, 0.5, 0.65) : part(x - 0.05, y - 0.05, 2.25, 0.7, 0.5, 0.65)];
