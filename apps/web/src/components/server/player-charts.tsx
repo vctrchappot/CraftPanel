@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Panel, Tooltip, cn } from "@craftpanel/ui";
 import { APP_LOCALE, prettyId, type ItemStack } from "@craftpanel/shared";
+import { API_BASE } from "@/lib/api";
 import { formatPlaytime } from "@/lib/format";
 import { WEEKDAYS } from "@/lib/player-insights";
 
@@ -107,7 +108,7 @@ export function Heatmap({ heat }: { heat: number[][] }) {
 }
 
 /** A ranked list with a bar behind each value, scaled to the first entry. */
-export function BarList({ items, empty = "Nothing recorded yet.", tone = "bg-foreground" }: { items: { label: string; value: number; display?: string }[]; empty?: string; tone?: string }) {
+export function BarList({ items, empty = "Nothing recorded yet.", tone = "bg-foreground" }: { items: { label: string; value: number; display?: string; icon?: string }[]; empty?: string; tone?: string }) {
   if (!items.length) return <p className="text-[13px] text-muted-foreground">{empty}</p>;
   const max = Math.max(1, ...items.map((i) => i.value));
   return (
@@ -115,7 +116,14 @@ export function BarList({ items, empty = "Nothing recorded yet.", tone = "bg-for
       {items.map((i) => (
         <li key={i.label} className="space-y-1">
           <div className="flex items-baseline justify-between gap-3 text-[13px]">
-            <span className="min-w-0 truncate">{i.label}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              {i.icon && (
+                <span className="size-5 shrink-0">
+                  <ItemFace id={i.icon} className="rounded-[2px] text-[8px]" />
+                </span>
+              )}
+              <span className="truncate">{i.label}</span>
+            </span>
             <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{i.display ?? i.value.toLocaleString(APP_LOCALE)}</span>
           </div>
           <div className="h-1 overflow-hidden rounded-full bg-muted">
@@ -170,6 +178,10 @@ export function Pips({ value, max = 20, className }: { value: number; max?: numb
 
 // ---- items ----------------------------------------------------------------------------------------
 
+/** The server whose item textures the slots below load; set once around a profile. */
+const ItemIconsContext = React.createContext<string | null>(null);
+export const ItemIconsProvider = ItemIconsContext.Provider;
+
 function itemHue(id: string): number {
   let h = 7;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
@@ -185,13 +197,54 @@ function monogram(id: string): string {
   return words.length > 1 ? words[0][0] + words[words.length - 1][0] : words[0].slice(0, 2);
 }
 
+/** Grey textures that the game colours by biome; a plains-like green stands in for the biome. */
+function tintOf(name: string): string | null {
+  if (name === "spruce_leaves") return "#619961";
+  if (name === "birch_leaves") return "#80a755";
+  if (/^(oak|jungle|acacia|dark_oak|mangrove)_leaves$/.test(name) || ["grass_block", "short_grass", "tall_grass", "fern", "large_fern", "vine"].includes(name)) return "#78b050";
+  return null;
+}
+
+const pixelated = { imageRendering: "pixelated" } as const;
+
 /**
- * One inventory slot. The game's item textures belong to Mojang and aren't shipped, so an item is a coloured tile
- * (the colour follows its id) with a monogram; the tooltip has the real name, enchantments and wear.
+ * An item's picture, filling its parent: Mojang's texture when this server's version has one (loaded from the
+ * dashboard's own API, which fetched it from Mojang), otherwise a coloured tile with a monogram. Animated textures
+ * are strips of frames; the first frame is shown.
  */
-export function ItemSlot({ item, selected, label }: { item: ItemStack | null; selected?: boolean; label?: string }) {
+export function ItemFace({ id, className }: { id: string; className?: string }) {
+  const serverId = React.useContext(ItemIconsContext);
+  const [failed, setFailed] = React.useState(false);
+  const name = id.startsWith("minecraft:") ? id.slice(10) : null;
+  if (!serverId || !name || failed)
+    return (
+      <span className={cn("grid size-full place-items-center rounded-[3px] font-mono text-[11px] font-medium uppercase text-white/90", className)} style={{ background: `hsl(${itemHue(id)} 36% 38%)` }}>
+        {monogram(id)}
+      </span>
+    );
+  const src = `${API_BASE}/api/servers/${serverId}/item-icons/${name}`;
+  const tint = tintOf(name);
+  return (
+    <span className={cn("relative block size-full", className)}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" draggable={false} onError={() => setFailed(true)} className="size-full object-cover object-top" style={pixelated} />
+      {tint && <span className="absolute inset-0" style={{ background: tint, mixBlendMode: "multiply", WebkitMaskImage: `url(${src})`, maskImage: `url(${src})`, maskSize: "cover", maskPosition: "top", ...pixelated }} />}
+    </span>
+  );
+}
+
+/**
+ * One inventory slot; the tooltip has the real name, enchantments and wear. `ghost` names an empty slot that has a
+ * fixed purpose (armor, offhand).
+ */
+export function ItemSlot({ item, selected, label, ghost }: { item: ItemStack | null; selected?: boolean; label?: string; ghost?: string }) {
   const frame = cn("relative aspect-square min-w-0 rounded-md border bg-muted/40", selected ? "border-foreground ring-1 ring-foreground" : "border-border");
-  if (!item) return <div className={frame} aria-label={label ? `${label}: empty` : "Empty slot"} title={label} />;
+  if (!item)
+    return (
+      <div className={frame} aria-label={label ? `${label}: empty` : "Empty slot"} title={label}>
+        {ghost && <span className="absolute inset-0 grid place-items-center text-[9px] font-medium uppercase tracking-wide text-muted-foreground/60">{ghost}</span>}
+      </div>
+    );
   const name = item.name ?? prettyId(item.id);
   return (
     <Tooltip
@@ -210,9 +263,7 @@ export function ItemSlot({ item, selected, label }: { item: ItemStack | null; se
       }
     >
       <div className={cn(frame, "p-[3px]")} aria-label={`${label ? `${label}: ` : ""}${item.count > 1 ? `${item.count} × ` : ""}${name}`} tabIndex={0}>
-        <div className="grid size-full place-items-center rounded-[3px] font-mono text-[11px] font-medium uppercase text-white/90" style={{ background: `hsl(${itemHue(item.id)} 36% 38%)` }}>
-          {monogram(item.id)}
-        </div>
+        <ItemFace id={item.id} />
         {item.count > 1 && <span className="absolute bottom-0.5 right-1 font-mono text-[10px] font-medium tabular-nums text-white [text-shadow:0_0_2px_#000,0_0_2px_#000]">{item.count}</span>}
         {item.enchantments?.length ? <span className="absolute right-1 top-1 size-1.5 rounded-full bg-brand ring-1 ring-black/40" /> : null}
       </div>

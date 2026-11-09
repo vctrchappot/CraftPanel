@@ -11,8 +11,11 @@ export interface PlayerInsight {
 export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const DAY_MS = 86_400_000;
 
-/** Ways of getting around; the distance fallen is damage, not travel. */
-export const travelDistances = (s: PlayerStats) => s.distances.filter((d) => d.id !== "fall");
+/** Ways of getting around, without the distance fallen and without the metre or two that rounds to nothing. */
+export const travelDistances = (s: PlayerStats) => s.distances.filter((d) => d.id !== "fall" && d.cm >= 100);
+
+/** The mob behind at least half of the deaths; Minecraft only attributes deaths to mobs, so fall, fire and the rest are not in the list. */
+export const mainKiller = (s: PlayerStats) => (s.killedBy[0] && s.killedBy[0].count * 2 >= s.deaths ? s.killedBy[0] : null);
 
 /** Advancement ids end in a name that is only unique within its tab ("story/root"); a root is named after the tab. */
 export function advancementName(id: string): string {
@@ -42,9 +45,14 @@ export function playerInsights(p: PlayerProfile, now = Date.now()): PlayerInsigh
   if (s) {
     if (s.totals.mined >= 50 && s.mined[0]) out.push({ id: "mined", tone: "info", text: `Mines mostly ${prettyId(s.mined[0].id)}: ${pct(s.mined[0].count, s.totals.mined)}% of ${formatNumber(s.totals.mined)} blocks.` });
 
-    if (s.deaths >= 3 && s.killedBy[0]) {
-      const top = s.killedBy[0];
-      out.push({ id: "deaths", tone: "info", text: `Has died ${s.deaths} times, most often to ${prettyId(top.id)} (${top.count}).` });
+    if (s.deaths >= 3) {
+      const top = mainKiller(s);
+      const first = s.killedBy[0];
+      out.push({
+        id: "deaths",
+        tone: "info",
+        text: top ? `Has died ${s.deaths} times, most often to ${prettyId(top.id)} (${top.count}).` : `Has died ${s.deaths} times${first ? `, ${first.count} of them to ${prettyId(first.id)}` : ""}.`,
+      });
     } else if (s.deaths > 0 && s.playTicks && s.playTicks >= 72_000) {
       out.push({ id: "deaths", tone: "info", text: `${s.deaths === 1 ? "One death" : `${s.deaths} deaths`} in ${formatPlaytime((s.playTicks / 20) * 1000)} of play.` });
     }
@@ -65,7 +73,7 @@ export function playerInsights(p: PlayerProfile, now = Date.now()): PlayerInsigh
   }
 
   const adv = p.advancements;
-  if (adv && adv.done > 0) out.push({ id: "advancements", tone: "info", text: `${adv.done} advancements completed${adv.categories[0] ? `, most in ${prettyId(adv.categories[0].id)}` : ""}.` });
+  if (adv && adv.done > 0) out.push({ id: "advancements", tone: "info", text: `${adv.done} ${adv.done === 1 ? "advancement" : "advancements"} completed${adv.categories[0] ? `, most in ${prettyId(adv.categories[0].id)}` : ""}.` });
 
   return out;
 }

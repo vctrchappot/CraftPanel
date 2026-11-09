@@ -2,13 +2,15 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
+import zlib from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { createZip } from "@craftpanel/backup";
-import { servers } from "@craftpanel/database";
+import { playerSessions, servers } from "@craftpanel/database";
 import { dataLayout } from "@craftpanel/server-runtime";
 import { createContext } from "../src/bootstrap";
 import { buildApp, nextSegmentPath } from "../src/app";
+import { offlineUuid } from "../src/services/game";
 import type { AppContext } from "../src/context";
 import type { AppConfig } from "../src/config";
 
@@ -347,3 +349,108 @@ describe("duplicate plugin prevention", () => {
   });
 });
 
+describe("player profiles", () => {
+  const nbtStr = (s: string) => {
+    const b = Buffer.from(s, "utf8");
+    const len = Buffer.alloc(2);
+    len.writeUInt16BE(b.length);
+    return Buffer.concat([len, b]);
+  };
+  const i32 = (n: number) => {
+    const b = Buffer.alloc(4);
+    b.writeInt32BE(n);
+    return b;
+  };
+  const tag = (type: number, name: string, payload: Buffer) => Buffer.concat([Buffer.from([type]), nbtStr(name), payload]);
+  const compound = (name: string, ...kids: Buffer[]) => tag(10, name, Buffer.concat([...kids, Buffer.from([0])]));
+  const playerDat = zlib.gzipSync(
+    compound(
+      "",
+      tag(5, "Health", Buffer.from([0x41, 0x90, 0x00, 0x00])), // 18
+      tag(3, "XpLevel", i32(7)),
+      tag(
+        9,
+        "Inventory",
+        Buffer.concat([Buffer.from([10]), i32(1), tag(1, "Slot", Buffer.from([2])), tag(8, "id", nbtStr("minecraft:apple")), tag(3, "count", i32(5)), Buffer.from([0])]),
+      ),
+    ),
+  );
+
+  const alex = "Alex";
+  const steve = "Steve";
+  let viewer: Session;
+  let alexUuid: string;
+  const steveUuid = "11111111-2222-3333-8444-555555555555";
+
+  beforeAll(async () => {
+    // The shared viewer is disabled by an earlier test; this suite uses its own read-only account.
+    expect((await call(owner, "POST", "/api/users", { username: "profile-viewer", password: "profile-viewer-1", role: "viewer" })).statusCode).toBe(200);
+    viewer = await login("profile-viewer", "profile-viewer-1");
+    const dir = path.join(root, "servers", "test");
+    await fs.writeFile(path.join(dir, "server.properties"), "motd=Test\nmax-players=20\nonline-mode=false\n");
+    alexUuid = offlineUuid(alex);
+    const now = Date.now();
+    await ctx.database.db.insert(playerSessions).values([
+      { serverId, name: alex, uuid: alexUuid, ip: "10.0.0.2", joinedAt: now - 7_200_000, leftAt: now - 3_600_000 },
+      { serverId, name: alex, uuid: alexUuid, ip: "10.0.0.2", joinedAt: now - 1_800_000, leftAt: now - 900_000 },
+      { serverId, name: steve, uuid: steveUuid, ip: null, joinedAt: now - 60_000, leftAt: now - 30_000 },
+    ]);
+    // The classic layout for Alex, the layout of newer versions (players/…) for Steve.
+    for (const sub of ["stats", "advancements", "playerdata"]) await fs.mkdir(path.join(dir, "world", sub), { recursive: true });
+    await fs.writeFile(path.join(dir, "world", "stats", `${alexUuid}.json`), JSON.stringify({ stats: { "minecraft:custom": { "minecraft:deaths": 2, "minecraft:walk_one_cm": 250_000 }, "minecraft:mined": { "minecraft:stone": 10 } } }));
+    await fs.writeFile(path.join(dir, "world", "advancements", `${alexUuid}.json`), JSON.stringify({ "minecraft:story/root": { done: true, criteria: { x: "2024-05-01 10:00:00 +0200" } } }));
+    await fs.writeFile(path.join(dir, "world", "playerdata", `${alexUuid}.dat`), playerDat);
+    for (const sub of ["stats", "data"]) await fs.mkdir(path.join(dir, "world", "players", sub), { recursive: true });
+    await fs.writeFile(path.join(dir, "world", "players", "stats", `${steveUuid}.json`), JSON.stringify({ stats: { "minecraft:custom": { "minecraft:deaths": 9 } } }));
+    await fs.writeFile(path.join(dir, "world", "players", "data", `${steveUuid}.dat`), playerDat);
+  });
+
+  const profile = (s: Session | null, name: string, qs = "") => call(s, "GET", `/api/servers/${serverId}/players/${name}/profile${qs}`);
+
+  it("assembles sessions, statistics, advancements and the inventory", async () => {
+    const r = await profile(viewer, alex);
+    expect(r.statusCode).toBe(200);
+    const p = r.json();
+    expect(p).toMatchObject({ name: alex, uuid: alexUuid, online: false, world: "world" });
+    expect(p.activity).toMatchObject({ sessions: 2 });
+    expect(p.activity.playtimeMs).toBeGreaterThan(1_700_000);
+    expect(p.stats).toMatchObject({ deaths: 2, mined: [{ id: "minecraft:stone", count: 10 }] });
+    expect(p.stats.distances).toEqual([{ id: "walk", cm: 250_000 }]);
+    expect(p.advancements.done).toBe(1);
+    expect(p.state).toMatchObject({ health: 18, xpLevel: 7, inventory: [{ slot: 2, id: "minecraft:apple", count: 5 }] });
+    expect(p.savedAt).toBeGreaterThan(0);
+  });
+
+  it("finds the files of newer Minecraft versions under players/", async () => {
+    const p = (await profile(viewer, steve)).json();
+    expect(p.stats.deaths).toBe(9);
+    expect(p.state.inventory[0].id).toBe("minecraft:apple");
+    expect(p.advancements).toBeNull();
+  });
+
+  it("buckets by the time zone the browser sends and ignores nonsense", async () => {
+    const utc = (await profile(viewer, alex, "?tz=0")).json();
+    const east = (await profile(viewer, alex, "?tz=-600")).json();
+    expect(utc.activity.heat.flat().reduce((a: number, b: number) => a + b, 0)).toBe(east.activity.heat.flat().reduce((a: number, b: number) => a + b, 0));
+    expect((await profile(viewer, alex, "?tz=banana")).statusCode).toBe(200);
+  });
+
+  it("lists everyone in the players overview, newest first", async () => {
+    const r = (await call(viewer, "GET", `/api/servers/${serverId}/players`)).json();
+    expect(r.roster.map((x: { name: string }) => x.name)).toEqual([steve, alex]);
+    expect(r.roster[1]).toMatchObject({ sessions: 2, banned: false, online: false });
+  });
+
+  it("answers 404 for unknown players, 400 for invalid names, 401 without a session", async () => {
+    expect((await profile(viewer, "Nobody")).statusCode).toBe(404);
+    expect((await profile(viewer, "bad%20name")).statusCode).toBe(400);
+    expect((await profile(viewer, "..%2F..%2Fetc")).statusCode).toBeGreaterThanOrEqual(400);
+    expect((await profile(null, alex)).statusCode).toBe(401);
+  });
+
+  it("never asks about a skin for an offline-mode or malformed UUID", async () => {
+    expect((await call(viewer, "GET", `/api/skins/${alexUuid}`)).statusCode).toBe(404);
+    expect((await call(viewer, "GET", "/api/skins/not-a-uuid")).statusCode).toBe(404);
+    expect((await call(null, "GET", `/api/skins/${alexUuid}`)).statusCode).toBe(401);
+  });
+});

@@ -220,6 +220,8 @@ export interface ExtractOptions {
   destination: string;
   /** Only extract entries under this prefix (the prefix is stripped). */
   stripPrefix?: string;
+  /** Only extract entries this accepts (given the full entry name); the size limits still count the whole archive. */
+  filter?: (name: string) => boolean;
   limits?: Partial<ExtractLimits>;
   onProgress?: (p: ZipProgress) => void;
 }
@@ -242,6 +244,7 @@ export async function extractZip(opts: ExtractOptions): Promise<{ files: number;
   const prefix = opts.stripPrefix ? opts.stripPrefix.replace(/\/+$/, "") + "/" : "";
 
   await forEachEntry(opts.file, async (entry, zip) => {
+    if (opts.filter && !opts.filter(entry.fileName)) return;
     checkEntryName(entry.fileName);
     if (isSymlinkEntry(entry)) throw new PathError(`Archive contains a symbolic link (${entry.fileName}); refusing to extract`);
     let name = entry.fileName;

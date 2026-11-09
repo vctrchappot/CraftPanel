@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { timeAgo, formatDateTime, formatDistance, formatPlaytime } from "../src/lib/format";
 import { eventStyle } from "../src/lib/activity";
 import { connectEntries } from "../src/lib/network";
-import { playerInsights } from "../src/lib/player-insights";
+import { playerInsights, travelDistances } from "../src/lib/player-insights";
 
 describe("dashboard presentation", () => {
   it("formats relative times in the English UI locale regardless of the host locale", () => {
@@ -82,7 +82,7 @@ describe("player presentation", () => {
       damageTaken: 0,
       jumps: 0,
       distances: [{ id: "walk", cm: 700_000 }, { id: "boat", cm: 300_000 }, { id: "fall", cm: 900_000 }],
-      totals: { mined: 1000, crafted: 0, used: 0, broken: 0, pickedUp: 0, dropped: 0 },
+      totals: { mined: 1000, crafted: 0, used: 0, broken: 0, pickedUp: 0, dropped: 0, killed: 0, killedBy: 4 },
       mined: [{ id: "minecraft:stone", count: 900 }],
       crafted: [],
       used: [],
@@ -96,6 +96,13 @@ describe("player presentation", () => {
     expect(withStats).toContain("Mines mostly Stone: 90% of 1,000 blocks.");
     expect(withStats).toContain("Has died 7 times, most often to Creeper (4).");
     expect(withStats).toContain("Has travelled 10.0 km, 70% on foot, 30% by boat.");
+
+    // A mob behind only some of the deaths isn't "most often"; other causes aren't in Minecraft's list.
+    const few = playerInsights({ ...base, lastSeen: now, stats: { ...stats, killedBy: [{ id: "minecraft:creeper", count: 1 }] } }, now).map((i) => i.text);
+    expect(few).toContain("Has died 7 times, 1 of them to Creeper.");
+    expect(playerInsights({ ...base, lastSeen: now, stats: { ...stats, killedBy: [] } }, now).map((i) => i.text)).toContain("Has died 7 times.");
+    // Fall damage and a few centimetres of water-walking are not travel.
+    expect(travelDistances({ ...stats, distances: [{ id: "fall", cm: 900_000 }, { id: "walk_on_water", cm: 40 }, { id: "walk", cm: 500 }] })).toEqual([{ id: "walk", cm: 500 }]);
   });
 });
 

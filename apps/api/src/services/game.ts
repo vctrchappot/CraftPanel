@@ -11,6 +11,8 @@ import {
   checkModrinthUpdates,
   compatibleModrinthVersions,
   detectGamerules,
+  ensureTextures,
+  findItemTexture,
   DuplicateAddonError,
   findDuplicateAddon,
   HANGAR_SLUG,
@@ -30,6 +32,7 @@ import {
 import type { AppConfig } from "../config";
 import type { ActivityService, Actor } from "./activity";
 import { INFO_PLUGIN_FILE, isInfoPlugin } from "./info-pack";
+import { cachedSkin } from "./skins";
 import { MAX_SESSION_MS, normalizeAdvancements, normalizeStats, readPlayerState, summarizeActivity } from "./player-profile";
 import type { ServerRow, ServerService } from "./servers";
 
@@ -304,6 +307,17 @@ export class GameService {
       world: level,
       savedAt: Math.max(statsFile?.mtime ?? 0, advFile?.mtime ?? 0, dataFile?.mtime ?? 0) || null,
     };
+  }
+
+  /** The texture file for an item of this server's Minecraft version, or null; the first call downloads the textures. */
+  async itemTexture(row: ServerRow, name: string): Promise<string | null> {
+    this.requireGameServer(row);
+    const dir = await ensureTextures({ mcVersion: row.mcVersion, cacheDir: this.config.layout.cache });
+    return findItemTexture(dir, name);
+  }
+
+  skin(uuid: string) {
+    return cachedSkin(this.config.layout.cache, uuid);
   }
 
   private async resolveUuid(row: ServerRow, name: string): Promise<{ uuid: string; name: string }> {

@@ -150,7 +150,7 @@ export function normalizeStats(json: unknown): PlayerStats | null {
     damageTaken: c("damage_taken") / 10,
     jumps: c("jump"),
     distances,
-    totals: { mined: sum(mined), crafted: sum(crafted), used: sum(used), broken: sum(broken), pickedUp: sum(pickedUp), dropped: sum(dropped) },
+    totals: { mined: sum(mined), crafted: sum(crafted), used: sum(used), broken: sum(broken), pickedUp: sum(pickedUp), dropped: sum(dropped), killed: sum(killed), killedBy: sum(killedBy) },
     mined: top(mined),
     crafted: top(crafted),
     used: top(used),

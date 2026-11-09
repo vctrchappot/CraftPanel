@@ -91,6 +91,27 @@ try {
   ok(after.events.some((e) => e.kind === "player.kick"), `the kick shows in the player's activity: ${after.events[0]?.message}`);
   ok(!!after.state && after.state.inventory.some((i) => i.id === "minecraft:apple"), "player data is still readable after the player left");
 
+  // Item pictures: Mojang's client for this version is downloaded to the cache, only item/block PNGs are kept.
+  const raw = async (url) => {
+    const { cookie } = c.session();
+    const r = await fetch(base + url, { headers: { cookie } });
+    return { status: r.status, type: r.headers.get("content-type"), cache: r.headers.get("cache-control"), body: Buffer.from(await r.arrayBuffer()) };
+  };
+  const isPng = (b) => b.length > 67 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  const sword = await raw(`/api/servers/${s.id}/item-icons/diamond_sword`);
+  ok(sword.status === 200 && sword.type === "image/png" && isPng(sword.body), `diamond_sword texture served from the client jar (${sword.body.length} bytes)`);
+  for (const [name, why] of [["sand", "a block"], ["apple", "an item"], ["crafting_table", "a block seen from its front"], ["iron_helmet", "armor"], ["grass_block", "a tinted block"]]) {
+    const r = await raw(`/api/servers/${s.id}/item-icons/${name}`);
+    ok(r.status === 200 && isPng(r.body), `${name} (${why}) has a texture`);
+  }
+  ok((await raw(`/api/servers/${s.id}/item-icons/not_an_item`)).status === 404, "an unknown item is a 404 (the dashboard shows a monogram instead)");
+  ok((await raw(`/api/servers/${s.id}/item-icons/..%2F..%2Fserver`)).status >= 400, "a path-like item name is refused");
+
+  // A real skin: Dinnerbone's account (a Mojang-issued UUID) through the dashboard's API; an offline UUID has none.
+  const skin = await raw("/api/skins/61699b2e-d327-4a01-9f1e-0ea8c3f06bc6");
+  ok(skin.status === 200 && isPng(skin.body) && skin.body.readUInt32BE(16) === 64, `a real skin PNG comes back through CraftPanel (${skin.body.length} bytes, ${skin.body.readUInt32BE(16)}x${skin.body.readUInt32BE(20)})`);
+  ok((await raw(`/api/skins/${live.uuid}`)).status === 404, "the bot's offline-mode UUID has no skin (and Mojang was not asked)");
+
   // Case-insensitive lookup, unknown names and path-like names.
   ok((await profile(NAME.toLowerCase())).name === NAME, "lookup is case-insensitive");
   ok((await profile("Nobody_here").catch((e) => e.status)) === 404, "an unknown player is a 404");

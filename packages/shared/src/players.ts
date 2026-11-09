@@ -65,7 +65,7 @@ export interface PlayerStats {
   jumps: number;
   /** Centimetres by way of travel. */
   distances: { id: string; cm: number }[];
-  totals: { mined: number; crafted: number; used: number; broken: number; pickedUp: number; dropped: number };
+  totals: { mined: number; crafted: number; used: number; broken: number; pickedUp: number; dropped: number; killed: number; killedBy: number };
   mined: CountEntry[];
   crafted: CountEntry[];
   used: CountEntry[];

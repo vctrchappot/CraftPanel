@@ -28,10 +28,10 @@ import { api, ApiError } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useRealtimeEvent } from "@/lib/realtime";
 import { formatDate, formatDateTime, formatDistance, formatNumber, formatPlaytime, timeAgo } from "@/lib/format";
-import { advancementName, playerInsights, travelDistances } from "@/lib/player-insights";
+import { advancementName, mainKiller, playerInsights, travelDistances } from "@/lib/player-insights";
 import { eventStyle } from "@/lib/activity";
 import { CopyButton } from "./workspace";
-import { BarList, Card, DailyBars, Heatmap, Hearts, ItemSlot, KpiGrid, Pips, SlotGrid } from "./player-charts";
+import { BarList, Card, DailyBars, Heatmap, Hearts, ItemIconsProvider, ItemSlot, KpiGrid, Pips, SlotGrid } from "./player-charts";
 import { PlayerAvatar, ReasonDialog, usePlayerActions } from "./player-parts";
 
 const DIMENSIONS: Record<string, string> = { "minecraft:overworld": "Overworld", "minecraft:the_nether": "Nether", "minecraft:the_end": "The End" };
@@ -80,6 +80,7 @@ export function PlayerProfileView({ server: s, name }: { server: ServerDetail; n
   const live = s.status === "running";
 
   return (
+    <ItemIconsProvider value={s.id}>
     <div className="space-y-6">
       {back}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -188,6 +189,7 @@ export function PlayerProfileView({ server: s, name }: { server: ServerDetail; n
         onConfirm={() => act.mutateAsync({ action: "op", name: p.name })}
       />
     </div>
+    </ItemIconsProvider>
   );
 }
 
@@ -219,7 +221,7 @@ function Overview({ p }: { p: PlayerProfile }) {
         items={[
           { label: "Playtime", value: formatPlaytime(p.activity.playtimeMs), sub: gameTicks !== null ? `Minecraft counts ${formatPlaytime((gameTicks / 20) * 1000)}` : `${p.activity.sessions} ${p.activity.sessions === 1 ? "session" : "sessions"}` },
           { label: "Sessions", value: formatNumber(p.activity.sessions), sub: p.activity.sessions ? `avg ${formatPlaytime(p.activity.averageMs)}` : undefined },
-          { label: "Deaths", value: s ? formatNumber(s.deaths) : "—", sub: s?.killedBy[0] ? `mostly ${prettyId(s.killedBy[0].id)}` : undefined },
+          { label: "Deaths", value: s ? formatNumber(s.deaths) : "—", sub: s && mainKiller(s) ? `mostly ${prettyId(mainKiller(s)!.id)}` : undefined },
           { label: "Mob kills", value: s ? formatNumber(s.mobKills) : "—", sub: s ? `${s.playerKills} player ${s.playerKills === 1 ? "kill" : "kills"}` : undefined },
           { label: "Distance", value: distance !== null ? formatDistance(distance) : "—", sub: travel[0] ? `mostly ${travel[0].id.replaceAll("_", " ")}` : undefined },
           { label: "Advancements", value: p.advancements ? formatNumber(p.advancements.done) : "—", sub: p.advancements?.recent[0] ? `latest ${advancementName(p.advancements.recent[0].id)}` : undefined },
@@ -360,6 +362,7 @@ function Inventory({ p, live }: { p: PlayerProfile; live: boolean }) {
   for (const i of [...st.inventory, ...st.enderChest]) held.set(i.id, (held.get(i.id) ?? 0) + i.count);
   const enchanted = all.filter((i) => i.enchantments?.length);
   const ARMOR = ["Boots", "Leggings", "Chestplate", "Helmet"];
+  const ARMOR_GHOST = ["Feet", "Legs", "Chest", "Head"];
 
   return (
     <div className="space-y-6">
@@ -370,10 +373,10 @@ function Inventory({ p, live }: { p: PlayerProfile; live: boolean }) {
             <div className="flex gap-4">
               <div className="w-[calc((100%-1rem)/10)] min-w-10 shrink-0 space-y-1.5">
                 {[3, 2, 1, 0].map((i) => (
-                  <ItemSlot key={i} item={st.armor[i] ?? null} label={ARMOR[i]} />
+                  <ItemSlot key={i} item={st.armor[i] ?? null} label={ARMOR[i]} ghost={ARMOR_GHOST[i]} />
                 ))}
                 <div className="pt-1.5">
-                  <ItemSlot item={st.offhand} label="Offhand" />
+                  <ItemSlot item={st.offhand} label="Offhand" ghost="Off" />
                 </div>
               </div>
               <div className="min-w-0 flex-1 space-y-3">
@@ -390,7 +393,7 @@ function Inventory({ p, live }: { p: PlayerProfile; live: boolean }) {
         </div>
         <div className="space-y-6">
           <Card title="Most held" hint="Backpack, hotbar and ender chest together.">
-            <BarList items={[...held].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([id, value]) => ({ label: prettyId(id), value }))} empty="The inventory is empty." />
+            <BarList items={[...held].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([id, value]) => ({ label: prettyId(id), value, icon: id }))} empty="The inventory is empty." />
           </Card>
           <Card title="Enchanted gear" aside={enchanted.length ? String(enchanted.length) : undefined}>
             {enchanted.length ? (
@@ -414,7 +417,8 @@ function Inventory({ p, live }: { p: PlayerProfile; live: boolean }) {
 
 // ---- statistics -----------------------------------------------------------------------------------
 
-const ranked = (rows: { id: string; count: number }[]) => rows.map((r) => ({ label: prettyId(r.id), value: r.count }));
+/** Items and blocks get their picture; mobs (`icons` off) have none. */
+const ranked = (rows: { id: string; count: number }[], icons = true) => rows.map((r) => ({ label: prettyId(r.id), value: r.count, icon: icons ? r.id : undefined }));
 
 const HIGHLIGHT_LABEL: Record<string, string> = {
   fish_caught: "Fish caught",
@@ -468,6 +472,7 @@ function StatsBody({ s }: { s: PlayerStats }) {
   const travel = travelDistances(s);
   const distance = sum(travel);
   const ratio = s.damageTaken && s.damageDealt ? s.damageDealt / s.damageTaken : null;
+  const otherDeaths = Math.max(0, s.deaths - s.totals.killedBy);
   return (
     <>
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -478,7 +483,7 @@ function StatsBody({ s }: { s: PlayerStats }) {
             <Row label="Deaths">{formatNumber(s.deaths)}</Row>
             <Row label="Damage dealt">{formatNumber(s.damageDealt)}</Row>
             <Row label="Damage taken">{formatNumber(s.damageTaken)}</Row>
-            {ratio !== null && <Row label="Dealt per taken">{ratio.toFixed(1)}×</Row>}
+            {ratio !== null && <Row label="Dealt per taken">{ratio < 0.01 ? "<0.01" : ratio < 1 ? ratio.toFixed(2) : ratio.toFixed(1)}×</Row>}
             {s.sinceDeathTicks !== null && <Row label="Alive for">{formatPlaytime((s.sinceDeathTicks / 20) * 1000)}</Row>}
           </dl>
         </Card>
@@ -511,10 +516,10 @@ function StatsBody({ s }: { s: PlayerStats }) {
           <BarList items={ranked(s.used)} />
         </Card>
         <Card title="Mobs killed" aside={formatNumber(s.mobKills)}>
-          <BarList items={ranked(s.killed)} tone="bg-success" />
+          <BarList items={ranked(s.killed, false)} tone="bg-success" />
         </Card>
-        <Card title="Killed by" aside={formatNumber(s.deaths)}>
-          <BarList items={ranked(s.killedBy)} tone="bg-destructive" empty="Never killed." />
+        <Card title="Killed by mobs" aside={formatNumber(s.totals.killedBy)} hint={otherDeaths ? `${otherDeaths} of ${s.deaths} deaths had other causes (falling, fire, drowning, …); Minecraft doesn't break those down.` : undefined}>
+          <BarList items={ranked(s.killedBy, false)} tone="bg-destructive" empty="No death caused by a mob." />
         </Card>
         <Card title="Tools broken" aside={formatNumber(s.totals.broken)}>
           <BarList items={ranked(s.broken)} tone="bg-warning" />

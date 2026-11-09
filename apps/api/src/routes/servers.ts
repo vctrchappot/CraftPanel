@@ -346,6 +346,23 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     const tz = Number(req.query.tz);
     return game.playerProfile(await row(req.params.id), req.params.name, Number.isFinite(tz) && Math.abs(tz) <= 14 * 60 ? Math.round(tz) : 0);
   });
+  // Item and block art for the inventory view: Mojang's textures, downloaded to this machine on first use.
+  app.get<{ Params: { id: string; item: string } }>("/api/servers/:id/item-icons/:item", async (req, reply) => {
+    requirePermission(req, "server.view");
+    const file = await game.itemTexture(await row(req.params.id), req.params.item).catch(() => null);
+    if (!file) {
+      reply.header("cache-control", "no-store");
+      throw new AppError(404, "not_found", "No texture for this item");
+    }
+    return reply.header("content-type", "image/png").header("cache-control", "private, max-age=86400").send(fs.createReadStream(file));
+  });
+  // A Mojang account's skin, fetched by this server so browsers never contact Mojang themselves.
+  app.get<{ Params: { uuid: string } }>("/api/skins/:uuid", async (req, reply) => {
+    requirePermission(req, "server.view");
+    const skin = await game.skin(req.params.uuid);
+    if (!skin) throw new AppError(404, "not_found", "No skin for this player");
+    return reply.header("content-type", "image/png").header("cache-control", "private, max-age=3600").send(skin);
+  });
   app.post<IdParams & { Params: { action: string } }>("/api/servers/:id/players/:action", async (req, reply) => {
     requirePermission(req, "players.manage");
     const action = req.params.action;

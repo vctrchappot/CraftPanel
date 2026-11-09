@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, Field, Input } from "@craftpanel/ui";
-import { api } from "@/lib/api";
+import { api, API_BASE } from "@/lib/api";
 import { useAction } from "@/lib/queries";
 
 /** Everything the player views can do to a player; one place so the list and the profile stay in step. */
@@ -39,11 +39,56 @@ const SKIN = ["#f1c9a5", "#e0ac69", "#d9a066", "#b87b4b", "#8d5524", "#ffdbac"];
 const HAIR = ["#2b1d0e", "#5a3825", "#a0682e", "#d9b44a", "#1b1b1b", "#7a3b1f", "#b8b8b8", "#3a6b35", "#3b5bdb"];
 const IRIS = ["#3a5a9b", "#2f6b4f", "#5b3a1e", "#1b1b1b", "#6b4aa0"];
 
-/**
- * A pixel face drawn from the player's UUID (or name). Skins live on Mojang's servers and the dashboard makes no
- * third-party requests, so this is a stand-in that is stable per player, not their actual skin.
- */
+/** Skins by UUID; a lookup that found nothing (offline-mode players, no skin) is remembered for the page's lifetime. */
+const skins = new Map<string, Promise<HTMLImageElement | null>>();
+const MOJANG_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function loadSkin(uuid: string): Promise<HTMLImageElement | null> {
+  let p = skins.get(uuid);
+  if (!p) {
+    // CraftPanel's own API serves it (it asked Mojang), so the browser never contacts a third party.
+    p = new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = `${API_BASE}/api/skins/${uuid}`;
+    });
+    skins.set(uuid, p);
+  }
+  return p;
+}
+
+/** The face of a skin: the 8×8 head plus its hat layer, scaled up without smoothing. */
+function SkinFace({ skin, name, size, className }: { skin: HTMLImageElement; name: string; size: number; className?: string }) {
+  const ref = React.useRef<HTMLCanvasElement>(null);
+  React.useEffect(() => {
+    const ctx = ref.current?.getContext("2d");
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, 8, 8);
+    ctx.drawImage(skin, 8, 8, 8, 8, 0, 0, 8, 8);
+    ctx.drawImage(skin, 40, 8, 8, 8, 0, 0, 8, 8);
+  }, [skin]);
+  return <canvas ref={ref} width={8} height={8} role="img" aria-label={`${name}'s skin`} className={className} style={{ width: size, height: size, imageRendering: "pixelated" }} />;
+}
+
+/** The player's real skin when Mojang has one for them, otherwise a face drawn from their UUID. */
 export function PlayerAvatar({ name, uuid, size = 32, className }: { name: string; uuid?: string | null; size?: number; className?: string }) {
+  const [skin, setSkin] = React.useState<HTMLImageElement | null>(null);
+  React.useEffect(() => {
+    setSkin(null);
+    if (!uuid || !MOJANG_UUID.test(uuid)) return;
+    let live = true;
+    void loadSkin(uuid.toLowerCase()).then((img) => live && setSkin(img));
+    return () => {
+      live = false;
+    };
+  }, [uuid]);
+  return skin ? <SkinFace skin={skin} name={name} size={size} className={className} /> : <GeneratedFace name={name} uuid={uuid} size={size} className={className} />;
+}
+
+/** A pixel face drawn from the player's UUID (or name): stable per player, used where there is no skin to show. */
+function GeneratedFace({ name, uuid, size = 32, className }: { name: string; uuid?: string | null; size?: number; className?: string }) {
   const cells = React.useMemo(() => {
     const rnd = hash((uuid ?? name).toLowerCase());
     const pick = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];

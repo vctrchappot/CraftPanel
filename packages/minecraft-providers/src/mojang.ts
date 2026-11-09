@@ -12,6 +12,8 @@ export interface VersionDetail {
   id: string;
   javaMajor: number;
   server: { url: string; sha1: string; size: number } | null;
+  /** The game client; CraftPanel only reads item and block textures from it, to show them in the dashboard. */
+  client: { url: string; sha1: string; size: number } | null;
 }
 
 const manifestCache = new TtlCache<Manifest>(10 * 60 * 1000);
@@ -36,12 +38,13 @@ export function getVersionDetail(id: string): Promise<VersionDetail> {
     const m = await getManifest();
     const v = m.versions.find((x) => x.id === id);
     if (!v) throw new Error(`Unknown Minecraft version ${id}`);
-    const d = await fetchJson<{ javaVersion?: { majorVersion: number }; downloads?: { server?: { url: string; sha1: string; size: number } } }>(v.url);
+    const d = await fetchJson<{ javaVersion?: { majorVersion: number }; downloads?: { server?: { url: string; sha1: string; size: number }; client?: { url: string; sha1: string; size: number } } }>(v.url);
     return {
       id,
       // Versions predating the javaVersion field run on Java 8.
       javaMajor: d.javaVersion?.majorVersion ?? 8,
       server: d.downloads?.server ?? null,
+      client: d.downloads?.client ?? null,
     };
   });
 }
