@@ -7,6 +7,7 @@ import { Badge, Button, Callout, Dialog, DialogContent, DialogFooter, DialogHead
 import { buildFieldLabel, buildName, SOFTWARE_INFO, softwareLabel, type ServerDetail, type ServerSoftware } from "@craftpanel/shared";
 import { api, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
+import { formatDate } from "@/lib/format";
 import { useAction } from "@/lib/queries";
 import { Choice, SOFTWARE_CHOICES, type VersionInfo, type VersionOption } from "../wizard";
 
@@ -112,7 +113,7 @@ export function SoftwareSettings({ server: s }: { server: ServerDetail }) {
               {info.data?.builds.map((b) => (
                 <option key={b.id} value={b.id}>
                   {buildName(software, b.id)} · {b.channel.toLowerCase()}
-                  {b.time ? ` · ${new Date(b.time).toLocaleDateString()}` : ""}
+                  {b.time ? ` · ${formatDate(b.time)}` : ""}
                   {b.id === s.build && s.software === software && s.mcVersion === version ? " (current)" : ""}
                 </option>
               ))}

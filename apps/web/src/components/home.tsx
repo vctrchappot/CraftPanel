@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Boxes, Cpu, HardDrive, MemoryStick, Plus } from "lucide-react";
 import { Button, EmptyState, PageHeader, Panel, Progress, Section, Skeleton, Stat } from "@craftpanel/ui";
-import { softwareLabel, type ActivityEvent } from "@craftpanel/shared";
+import { softwareLabel, type ActivityEvent, type ConnectAddress, type NetworkAddressKind } from "@craftpanel/shared";
 import { api } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useServers } from "@/lib/queries";
@@ -35,10 +35,12 @@ export interface SystemInfo {
     publicUrl: string | null;
     trustedProxies: string[];
     transportSecure: boolean;
-    urls: { url: string; kind: "local" | "lan" | "vpn" | "virtual"; interface?: string }[];
+    urls: { url: string; kind: NetworkAddressKind; label?: string; interface?: string }[];
     clientIp: string;
   };
   lan: string[];
+  /** Labelled LAN, VPN and virtual adapter addresses, real LAN first (newer APIs). */
+  lanAddresses?: ConnectAddress[];
   servers: { total: number; running: number };
 }
 

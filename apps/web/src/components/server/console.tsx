@@ -12,9 +12,9 @@ import { StatusBadge } from "../status";
 import type { Stream } from "./workspace";
 
 const LEVEL_CLASS: Record<string, string> = {
-  ERROR: "text-red-400",
-  FATAL: "text-red-400",
-  WARN: "text-amber-300",
+  ERROR: "text-status-crashed",
+  FATAL: "text-status-crashed",
+  WARN: "text-status-starting",
   DEBUG: "text-neutral-500",
 };
 
@@ -90,7 +90,7 @@ export function ConsoleLines({
         }}
         onKeyDown={(e) => ["ArrowUp", "PageUp", "Home"].includes(e.key) && pause()}
         tabIndex={0}
-        className="scrollbar-thin h-full overflow-y-auto px-4 py-3 font-mono text-[12px] leading-[1.6] text-console-foreground outline-none"
+        className="scrollbar-thin h-full overflow-y-auto px-4 py-4 font-mono text-[12px] leading-[1.6] text-console-foreground outline-none"
         role="log"
         aria-live="off"
       >
@@ -232,7 +232,7 @@ export function ConsoleTab({ server: s, stream }: { server: ServerDetail; stream
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-2 text-xs text-neutral-400">
           <StatusBadge status={s.status} />
           <span className="flex items-center gap-1.5">
-            <span className={cn("size-1.5 rounded-full", conn === "open" ? "bg-emerald-400" : conn === "connecting" ? "bg-amber-300 animate-pulse" : "bg-red-400")} />
+            <span className={cn("size-1.5 rounded-full", conn === "open" ? "bg-status-running" : conn === "connecting" ? "bg-status-starting animate-pulse" : "bg-status-crashed")} />
             {conn === "open" ? "Live" : conn === "connecting" ? "Connecting…" : "Disconnected — reconnecting"}
           </span>
           <span className="ml-auto tabular-nums">{filtered.length} lines</span>

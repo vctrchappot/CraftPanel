@@ -2,7 +2,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { backups, desc, eq, servers, type Database } from "@craftpanel/database";
-import { conflict, notFound, SOFTWARE_INFO, type BackupInfo } from "@craftpanel/shared";
+import { APP_LOCALE, conflict, notFound, SOFTWARE_INFO, type BackupInfo } from "@craftpanel/shared";
 import { createZip, extractZip, LocalBackupStorage, verifyZip } from "@craftpanel/backup";
 import { freeDiskSpace } from "@craftpanel/server-runtime";
 import type { Hub } from "../hub";
@@ -184,7 +184,7 @@ export class BackupService {
       // Ports and bind address are owned by CraftPanel; re-apply them.
       await this.servers.syncManagedProperties(await this.servers.row(server.id));
       emit("restored", 100, "Restore complete");
-      await this.activity.event(server.id, "backup.restored", `Restored backup from ${new Date(row.createdAt).toLocaleString()}`, { actor, level: "warn" });
+      await this.activity.event(server.id, "backup.restored", `Restored backup from ${new Date(row.createdAt).toLocaleString(APP_LOCALE, { dateStyle: "medium", timeStyle: "short" })}`, { actor, level: "warn" });
       await this.activity.audit(actor, "backup.restore", id, { serverId: server.id });
     });
   }

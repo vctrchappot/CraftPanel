@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
-import { Panel, Progress, Section, Skeleton, Stat } from "@craftpanel/ui";
+import { Panel, Progress, Section, Skeleton, Stat, cn } from "@craftpanel/ui";
 import { SOFTWARE_INFO, softwareLabel, type ActivityEvent, type BackupInfo, type ServerDetail, type ServerMetrics } from "@craftpanel/shared";
 import { api } from "@/lib/api";
 import { formatBytes, formatDuration, timeAgo } from "@/lib/format";
+import { connectEntries, type ConnectionAddresses } from "@/lib/network";
 import { EventList } from "../activity";
 import { Unavailable } from "../status";
 import { CopyButton, type Stream } from "./workspace";
@@ -18,7 +19,7 @@ interface Overview {
   disk: { free: number; total: number } | null;
   latestBackup: BackupInfo | null;
   events: ActivityEvent[];
-  addresses: { local: string; lan: string[] };
+  addresses: ConnectionAddresses;
 }
 
 export function OverviewTab({ server: s, stream }: { server: ServerDetail; stream: Stream }) {
@@ -70,13 +71,13 @@ export function OverviewTab({ server: s, stream }: { server: ServerDetail; strea
         <div className="space-y-10">
           <Section title="Connect">
             <Panel className="divide-y divide-border text-[13px]">
-              {ov.data?.addresses.lan.map((a) => (
-                <div key={a} className="flex items-center justify-between gap-2 px-4 py-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Local network</p>
-                    <p className="font-mono">{a}</p>
+              {ov.data && connectEntries(ov.data.addresses).map((a) => (
+                <div key={a.address} className="flex items-center justify-between gap-2 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground" title={a.interface}>{a.label}</p>
+                    <p className={cn("font-mono", a.kind !== "lan" && "text-muted-foreground")}>{a.address}</p>
                   </div>
-                  <CopyButton value={a} />
+                  <CopyButton value={a.address} />
                 </div>
               ))}
               {ov.data && (

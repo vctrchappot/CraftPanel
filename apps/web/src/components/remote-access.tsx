@@ -70,7 +70,7 @@ export function RemoteAccess() {
                 <span className="min-w-0 flex-1 truncate font-mono text-xs" title={u.interface}>
                   {u.url}
                 </span>
-                <Badge variant={u.kind === "vpn" ? "info" : undefined}>{KIND_LABEL[u.kind]}</Badge>
+                <Badge variant={u.kind === "vpn" ? "info" : undefined}>{u.label ?? KIND_LABEL[u.kind]}</Badge>
                 <CopyButton value={u.url} />
               </li>
             ))}

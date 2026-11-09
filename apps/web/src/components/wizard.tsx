@@ -9,7 +9,7 @@ import { Badge, Button, Callout, Field, Input, NativeSelect, PageHeader, Panel, 
 import { buildFieldLabel, buildName, PERFORMANCE_PRESETS, PRESET_INFO, recommendPreset, SOFTWARE_INFO, softwareLabel, type CreateServerInput, type ServerSoftware } from "@craftpanel/shared";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { useServers } from "@/lib/queries";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatDate } from "@/lib/format";
 import { useSystem } from "./home";
 import { ModpackPicker, type PreparedModpack } from "./modpack-picker";
 
@@ -318,7 +318,7 @@ export function CreateServerWizard() {
                           {versionInfo.data?.builds.map((b) => (
                             <option key={b.id} value={b.id}>
                               {buildName(f.software, b.id)} · {b.channel.toLowerCase()}
-                              {b.time ? ` · ${new Date(b.time).toLocaleDateString()}` : ""}
+                              {b.time ? ` · ${formatDate(b.time)}` : ""}
                             </option>
                           ))}
                         </NativeSelect>
@@ -491,9 +491,9 @@ export function CreateServerWizard() {
                   <Field label="Bind address" htmlFor="bind" help="All interfaces is simplest.">
                     <NativeSelect id="bind" value={f.bindAddress} onChange={(e) => set("bindAddress", e.target.value)}>
                       <option value="">All interfaces</option>
-                      {system.data?.lan.map((ip) => (
-                        <option key={ip} value={ip}>
-                          {ip}
+                      {(system.data?.lanAddresses ?? system.data?.lan.map((address) => ({ address, kind: "lan", label: "Local network" })) ?? []).map((a) => (
+                        <option key={a.address} value={a.address}>
+                          {a.address} ({a.label})
                         </option>
                       ))}
                     </NativeSelect>

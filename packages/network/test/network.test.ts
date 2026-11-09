@@ -1,6 +1,34 @@
 import net from "node:net";
 import { describe, expect, it } from "vitest";
-import { formatAddress, isCgnatIPv4, isPortAvailable, isPrivateIPv4, probeTcp, parseNetwork, ipMatches, isPrivateAddress, isPrivateNetwork, isClientAllowed } from "../src";
+import { classifyAdapter, sortByKind, formatAddress, isCgnatIPv4, isPortAvailable, isPrivateIPv4, probeTcp, parseNetwork, ipMatches, isPrivateAddress, isPrivateNetwork, isClientAllowed } from "../src";
+
+describe("adapter labels and ordering", () => {
+  it.each([
+    ["Ethernet", "192.168.1.10", "lan", "Local network"],
+    ["Wi-Fi", "192.168.56.10", "lan", "Local network"],
+    ["Ethernet", "100.80.1.2", "lan", "Local network"],
+    ["vEthernet (WSL (Hyper-V firewall))", "172.20.0.1", "virtual", "Virtual adapter (WSL)"],
+    ["vEthernet (Default Switch)", "172.24.0.1", "virtual", "Virtual adapter (Hyper-V)"],
+    ["VirtualBox Host-Only Network", "192.168.56.1", "virtual", "Virtual adapter (VirtualBox)"],
+    ["docker0", "172.17.0.1", "virtual", "Virtual adapter (Docker)"],
+    ["Tailscale", "100.80.1.2", "vpn", "VPN (Tailscale)"],
+    ["wg0", "10.20.0.1", "vpn", "VPN (WireGuard)"],
+    ["utun3", "10.20.0.1", "vpn", "VPN"],
+  ])("labels %s", (name, address, kind, label) => {
+    expect(classifyAdapter(name, address)).toEqual({ kind, label });
+  });
+
+  it("puts real LAN first without changing the order of equal kinds or mutating the input", () => {
+    const list = [
+      { id: "wsl", kind: "virtual" as const },
+      { id: "vpn", kind: "vpn" as const },
+      { id: "wifi", kind: "lan" as const },
+      { id: "ethernet", kind: "lan" as const },
+    ];
+    expect(sortByKind(list).map((a) => a.id)).toEqual(["wifi", "ethernet", "vpn", "wsl"]);
+    expect(list[0].id).toBe("wsl");
+  });
+});
 
 describe("network helpers", () => {
   it("classifies addresses", () => {

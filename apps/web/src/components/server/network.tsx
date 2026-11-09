@@ -4,9 +4,10 @@ import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Globe, Home, Info, Radar, ShieldCheck, XCircle } from "lucide-react";
 import { Button, Callout, Field, Input, NativeSelect, Panel, Section, Skeleton, cn } from "@craftpanel/ui";
-import type { ServerDetail } from "@craftpanel/shared";
+import type { NetworkAddressKind, ServerDetail } from "@craftpanel/shared";
 import { api } from "@/lib/api";
 import { useCan } from "@/lib/auth";
+import { connectEntries, type ConnectionAddresses } from "@/lib/network";
 import { useAction } from "@/lib/queries";
 import { CopyButton } from "./workspace";
 
@@ -14,8 +15,8 @@ interface NetworkInfo {
   mode: "lan" | "wan";
   port: number;
   bindAddress: string;
-  lan: { interface: string; address: string }[];
-  addresses: { local: string; lan: string[] };
+  lan: { interface: string; address: string; kind: NetworkAddressKind; label: string }[];
+  addresses: ConnectionAddresses;
   publicIp: string | null;
   ddnsDomain: string | null;
   running: boolean;
@@ -41,14 +42,16 @@ export function NetworkTab({ server: s }: { server: ServerDetail }) {
   if (!q.data || !form) return <Skeleton className="h-96 rounded-xl" />;
   const n = q.data;
   const portSuffix = n.port === 25565 ? "" : `:${n.port}`;
+  // The router forwards to the real LAN address, never to a WSL, Docker or VPN adapter.
+  const forwardTarget = n.lan.find((a) => a.kind === "lan")?.address;
 
   return (
     <div className="grid gap-10 lg:grid-cols-2">
       <div className="space-y-10">
         <Section title="How players connect">
           <Panel className="divide-y divide-border text-[13px]">
-            {n.addresses.lan.map((a) => (
-              <AddressRow key={a} label="Same network (LAN)" value={a} />
+            {connectEntries(n.addresses).map((a) => (
+              <AddressRow key={a.address} label={a.label} value={a.address} />
             ))}
             <AddressRow label="This computer" value={n.addresses.local} />
             {n.mode === "wan" && n.publicIp && <AddressRow label="Internet (public IP)" value={`${n.publicIp}${portSuffix}`} />}
@@ -81,7 +84,7 @@ export function NetworkTab({ server: s }: { server: ServerDetail }) {
                   <option value="127.0.0.1">127.0.0.1 (this computer only)</option>
                   {n.lan.map((a) => (
                     <option key={a.address} value={a.address}>
-                      {a.address} ({a.interface})
+                      {a.address} ({a.kind === "lan" ? a.interface : `${a.label}, ${a.interface}`})
                     </option>
                   ))}
                 </NativeSelect>
@@ -108,9 +111,9 @@ export function NetworkTab({ server: s }: { server: ServerDetail }) {
         ) : (
           <Section title="Internet access guide">
             <ol className="list-decimal space-y-2 pl-5 text-[13px] text-muted-foreground">
-              <li>Give this computer a fixed LAN address ({n.lan[0]?.address ?? "see above"}) in your router&apos;s DHCP settings.</li>
+              <li>Give this computer a fixed LAN address ({forwardTarget ?? "see above"}) in your router&apos;s DHCP settings.</li>
               <li>
-                Create a port forwarding rule: external TCP port {n.port} → {n.lan[0]?.address ?? "this computer"}:{n.port}. CraftPanel does not change router settings automatically.
+                Create a port forwarding rule: external TCP port {n.port} → {forwardTarget ?? "this computer"}:{n.port}. CraftPanel does not change router settings automatically.
               </li>
               <li>Allow TCP port {n.port} in this computer&apos;s firewall.</li>
               <li>Share your public address (or a DDNS name, configurable in Settings) with players.</li>

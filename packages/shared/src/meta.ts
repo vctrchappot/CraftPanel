@@ -13,3 +13,9 @@ export const CRAFTPANEL_AUTHOR = {
   github: "https://github.com/vctrchappot",
   website: "https://www.vctr.site",
 } as const;
+
+/**
+ * Locale of the user interface. The dashboard is English-only, so dates and relative times are formatted in this
+ * locale instead of the browser's, which would mix languages ("vor 5 Minuten" next to English labels).
+ */
+export const APP_LOCALE = "en";

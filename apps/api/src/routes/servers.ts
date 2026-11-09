@@ -28,10 +28,11 @@ import {
   SOFTWARE_INFO,
   updateServerSchema,
   worldCreateSchema,
+  type ConnectAddress,
 } from "@craftpanel/shared";
 import { eq, servers as serversTable } from "@craftpanel/database";
 import { directorySize, freeDiskSpace } from "@craftpanel/server-runtime";
-import { diagnoseWan, formatAddress, lanAddresses, fetchPublicIp, isPrivateIPv4 } from "@craftpanel/network";
+import { classifyAdapter, diagnoseWan, formatAddress, lanAddresses, fetchPublicIp, isCgnatIPv4, isPrivateIPv4 } from "@craftpanel/network";
 import { getProvider, listModpackVersions, searchModpacks } from "@craftpanel/minecraft-providers";
 import { actorOf, canSee, noContent, requirePermission, type AppContext } from "../context";
 import { parse } from "../validate";
@@ -553,13 +554,17 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
   });
 }
 
-function connectionAddresses(port: number, bind: string) {
+/**
+ * Addresses players can connect to. `lan` stays a plain list for older clients; `network` labels each one
+ * (real LAN first, then VPN and virtual adapters such as WSL, Hyper-V, Docker or VirtualBox).
+ */
+function connectionAddresses(port: number, bind: string): { local: string; lan: string[]; network: ConnectAddress[] } {
   const lan = lanAddresses();
-  const hosts = bind && bind !== "0.0.0.0" ? [bind] : lan.map((a) => a.address);
-  return {
-    local: formatAddress("localhost", port),
-    lan: hosts.filter((h) => isPrivateIPv4(h) || h.startsWith("100.")).map((h) => formatAddress(h, port)),
-  };
+  const bound = bind && bind !== "0.0.0.0" ? [lan.find((a) => a.address === bind) ?? { address: bind, interface: "", ...classifyAdapter("", bind) }] : lan;
+  const network = bound
+    .filter((a) => isPrivateIPv4(a.address) || isCgnatIPv4(a.address))
+    .map((a): ConnectAddress => ({ address: formatAddress(a.address, port), kind: a.kind, label: a.label, ...(a.interface ? { interface: a.interface } : {}) }));
+  return { local: formatAddress("localhost", port), lan: network.map((a) => a.address), network };
 }
 
 function redactProperties(text: string) {

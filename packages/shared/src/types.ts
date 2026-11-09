@@ -279,3 +279,15 @@ export type ScheduleAction = "start" | "restart" | "stop" | "backup" | "announce
 /** What can trigger a notification (Discord / e-mail). */
 export const NOTIFICATION_CATEGORIES = ["server", "backup", "schedule", "update"] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+
+/** What kind of network adapter an address belongs to: this machine, the real LAN, a VPN overlay or a VM/container adapter. */
+export type NetworkAddressKind = "local" | "lan" | "vpn" | "virtual";
+
+/** An address players or users can connect to, with a label such as "Local network" or "Virtual adapter (WSL)". */
+export interface ConnectAddress {
+  /** Host or host:port, ready to copy. */
+  address: string;
+  kind: NetworkAddressKind;
+  label: string;
+  interface?: string;
+}

@@ -1,5 +1,6 @@
 import os from "node:os";
 import net from "node:net";
+import type { NetworkAddressKind } from "@craftpanel/shared";
 
 export interface LocalAddress {
   interface: string;
@@ -7,6 +8,10 @@ export interface LocalAddress {
   family: "IPv4" | "IPv6";
   private: boolean;
   internal: boolean;
+  /** Real LAN, VPN overlay or VM/container adapter (see classifyAdapter). */
+  kind: NetworkAddressKind;
+  /** "Local network", "VPN (Tailscale)", "Virtual adapter (WSL)", … */
+  label: string;
 }
 
 /** Parse dotted IPv4 into a 32-bit unsigned integer, or null. */
@@ -66,10 +71,62 @@ export function listLocalAddresses(): LocalAddress[] {
         family: a.family,
         internal: a.internal,
         private: a.family === "IPv4" ? isPrivateIPv4(a.address) : a.address.toLowerCase().startsWith("fd"),
+        ...(a.internal ? { kind: "local" as const, label: "This computer" } : classifyAdapter(name, a.address)),
       });
     }
   }
   return out;
+}
+
+// ---- adapter classification --------------------------------------------------
+
+export interface AdapterClass {
+  kind: NetworkAddressKind;
+  label: string;
+}
+
+const vpn = (product?: string): AdapterClass => ({ kind: "vpn", label: product ? `VPN (${product})` : "VPN" });
+const virtual = (product?: string): AdapterClass => ({ kind: "virtual", label: product ? `Virtual adapter (${product})` : "Virtual adapter" });
+
+/** Name patterns, checked in order; the first match wins. Names come from Windows (adapter aliases), Linux and macOS. */
+const ADAPTER_RULES: [RegExp, AdapterClass][] = [
+  // VPN overlays
+  [/tailscale/i, vpn("Tailscale")],
+  [/zerotier|^zt[0-9a-z]/i, vpn("ZeroTier")],
+  [/wireguard|^wg\d/i, vpn("WireGuard")],
+  [/openvpn|tap-windows/i, vpn("OpenVPN")],
+  [/^(tun|tap|utun|ppp|ipsec)\d*$/i, vpn()],
+  // VM and container adapters
+  [/vEthernet \(WSL/i, virtual("WSL")],
+  [/docker|^br-[0-9a-f]{6,}$|^veth[0-9a-f]+(?:@.*)?$/i, virtual("Docker")],
+  [/vEthernet \(Default Switch\)|Hyper-V/i, virtual("Hyper-V")],
+  [/virtualbox|^vboxnet/i, virtual("VirtualBox")],
+  [/vmware|^vmnet\d/i, virtual("VMware")],
+  [/parallels|^vnic\d/i, virtual("Parallels")],
+  [/^virbr/i, virtual("libvirt")],
+  [/^(lxcbr|lxdbr|incusbr)/i, virtual("LXC")],
+  [/^(cni|flannel|cali|podman)/i, virtual("Containers")],
+];
+
+/**
+ * Classify a network adapter by its name and address, so the dashboard can tell the address players on the
+ * home network should use apart from WSL, Hyper-V, Docker, VirtualBox and VPN adapters. Pure, for testing.
+ */
+export function classifyAdapter(name: string, address: string): AdapterClass {
+  if (isLoopback(address)) return { kind: "local", label: "This computer" };
+  for (const [pattern, cls] of ADAPTER_RULES) if (pattern.test(name)) return cls;
+  // Other Hyper-V switches: an internal switch uses a private 172.16/12 network, while an external switch
+  // bridges the physical adapter and carries the machine's real LAN address.
+  if (/^vEthernet/i.test(name)) return inRange(address, "172.16.0.0/12") ? virtual("Hyper-V") : { kind: "lan", label: "Local network" };
+  // Address ranges alone do not identify an adapter: a physical LAN can use 192.168.56/24,
+  // and 100.64/10 can be an ISP's CGNAT connection rather than Tailscale.
+  return { kind: "lan", label: "Local network" };
+}
+
+const KIND_ORDER: Record<NetworkAddressKind, number> = { lan: 0, vpn: 1, virtual: 2, local: 3 };
+/** Real LAN addresses first, then VPNs, then VM/container adapters; stable within a kind. */
+export function sortByKind<T extends { kind: NetworkAddressKind }>(list: T[]): T[] {
+  return [...list].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind]);
 }
 
 // ---- dashboard access control ------------------------------------------------
@@ -160,31 +217,34 @@ export function isClientAllowed(ip: string, policy: AccessPolicy, extraNetworks:
 export interface DashboardUrl {
   url: string;
   /** local = this machine, lan = home/office network, vpn = Tailscale/WireGuard/ZeroTier, virtual = VM/container adapters. */
-  kind: "local" | "lan" | "vpn" | "virtual";
+  kind: NetworkAddressKind;
+  /** "This computer", "Local network", "VPN (Tailscale)", "Virtual adapter (WSL)", … */
+  label: string;
   interface?: string;
 }
 
-const VPN_ADAPTER = /tailscale|wireguard|^wg\d|^zt|zerotier|^utun/i;
-const VIRTUAL_ADAPTER = /vEthernet|Hyper-V|VirtualBox|VMware|docker|^br-|^veth|^virbr|^vboxnet|^lxc|^cni/i;
-
-/** Every address the dashboard can be opened at, given the address it listens on. */
+/** Every address the dashboard can be opened at, given the address it listens on. Real LAN addresses come first. */
 export function dashboardUrls(host: string, port: number, https = false): DashboardUrl[] {
   const scheme = https ? "https" : "http";
   const fmt = (h: string) => `${scheme}://${h.includes(":") ? `[${h}]` : h}:${port}`;
   const wildcard = host === "0.0.0.0" || host === "::";
-  if (!wildcard) return [{ url: fmt(isLoopback(host) ? "localhost" : host), kind: isLoopback(host) ? "local" : isCgnatIPv4(host) ? "vpn" : "lan" }];
-  const out: DashboardUrl[] = [{ url: fmt("localhost"), kind: "local" }];
+  if (!wildcard) {
+    if (isLoopback(host)) return [{ url: fmt("localhost"), kind: "local", label: "This computer" }];
+    const own = listLocalAddresses().find((a) => a.address === host);
+    const cls = own ?? classifyAdapter("", host);
+    return [{ url: fmt(host), kind: cls.kind, label: cls.label, ...(own ? { interface: own.interface } : {}) }];
+  }
+  const out: DashboardUrl[] = [];
   for (const a of listLocalAddresses()) {
     if (a.internal || a.family !== "IPv4" || isLinkLocal(a.address)) continue;
-    const kind = VPN_ADAPTER.test(a.interface) || isCgnatIPv4(a.address) ? "vpn" : VIRTUAL_ADAPTER.test(a.interface) ? "virtual" : "lan";
-    out.push({ url: fmt(a.address), kind, interface: a.interface });
+    out.push({ url: fmt(a.address), kind: a.kind, label: a.label, interface: a.interface });
   }
-  return out;
+  return [{ url: fmt("localhost"), kind: "local", label: "This computer" }, ...sortByKind(out)];
 }
 
-/** Private, non-loopback IPv4 addresses players on the LAN can use. */
+/** Private, non-loopback IPv4 addresses players can use: real LAN addresses first, then VPN and virtual adapters. */
 export function lanAddresses(): LocalAddress[] {
-  return listLocalAddresses().filter((a) => a.family === "IPv4" && !a.internal && !isLinkLocal(a.address) && (a.private || isCgnatIPv4(a.address)));
+  return sortByKind(listLocalAddresses().filter((a) => a.family === "IPv4" && !a.internal && !isLinkLocal(a.address) && (a.private || isCgnatIPv4(a.address))));
 }
 
 /** True when a TCP port can be bound on the given host. */
@@ -241,15 +301,18 @@ export async function diagnoseWan(opts: { port: number; running: boolean; public
   const lan = lanAddresses();
   const findings: WanDiagnosis["findings"] = [];
   const portBound = opts.running ? await probeTcp("127.0.0.1", opts.port) : false;
-  const cgnatInterface = lan.some((a) => isCgnatIPv4(a.address));
+  // A 100.64/10 address on a named VPN adapter (Tailscale) is the overlay, not the ISP's carrier-grade NAT.
+  const cgnatInterface = lan.some((a) => isCgnatIPv4(a.address) && classifyAdapter(a.interface, "0.0.0.0").kind !== "vpn");
   const cgnatPublic = opts.publicIp ? isCgnatIPv4(opts.publicIp) : false;
-  const natLikely = lan.some((a) => a.private);
+  // VM, container and VPN adapters carry private addresses too; only a real LAN address means a router in between.
+  const realLan = lan.filter((a) => a.kind === "lan" && a.private);
+  const natLikely = realLan.length > 0;
 
   if (!opts.running) findings.push({ level: "info", message: "Start the server to test whether the game port is listening." });
   else if (portBound) findings.push({ level: "ok", message: `Minecraft is listening on port ${opts.port}.` });
   else findings.push({ level: "error", message: `Nothing is accepting connections on port ${opts.port} locally.` });
 
-  if (natLikely) findings.push({ level: "info", message: "This machine is behind a router (private address). Forward TCP port " + opts.port + " on the router to " + (lan.find((a) => a.private)?.address ?? "this machine") + "." });
+  if (natLikely) findings.push({ level: "info", message: "This machine is behind a router (private address). Forward TCP port " + opts.port + " on the router to " + (realLan[0]?.address ?? "this machine") + "." });
   if (cgnatInterface || cgnatPublic)
     findings.push({ level: "warn", message: "Carrier-grade NAT (100.64.0.0/10) detected. Port forwarding will likely not work; ask your ISP for a public IPv4 address or use a tunnel provider." });
   if (opts.publicIp && !cgnatPublic)

@@ -1,3 +1,5 @@
+import { APP_LOCALE } from "@craftpanel/shared";
+
 export function formatBytes(bytes: number | null | undefined, digits = 1): string {
   if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return "—";
   if (bytes < 1024) return `${bytes} B`;
@@ -23,24 +25,30 @@ export function formatDuration(ms: number | null | undefined): string {
   return `${s}s`;
 }
 
-const rtf = typeof Intl !== "undefined" ? new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }) : null;
-export function timeAgo(ts: number | null | undefined): string {
+const rtf = new Intl.RelativeTimeFormat(APP_LOCALE, { numeric: "auto" });
+
+/** "just now", "5 minutes ago", "yesterday"; older than a month falls back to the date. `now` is injectable for tests. */
+export function timeAgo(ts: number | null | undefined, now = Date.now()): string {
   if (!ts) return "never";
-  const diff = (ts - Date.now()) / 1000;
+  const diff = (ts - now) / 1000;
   const abs = Math.abs(diff);
-  if (!rtf) return new Date(ts).toLocaleString();
   if (abs < 45) return "just now";
   if (abs < 3600) return rtf.format(Math.round(diff / 60), "minute");
   if (abs < 86400) return rtf.format(Math.round(diff / 3600), "hour");
   if (abs < 86400 * 30) return rtf.format(Math.round(diff / 86400), "day");
-  return new Date(ts).toLocaleDateString();
+  return formatDate(ts);
+}
+
+export function formatDate(ts: number | string | null | undefined): string {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleDateString(APP_LOCALE, { dateStyle: "medium" });
 }
 
 export function formatDateTime(ts: number | null | undefined): string {
   if (!ts) return "—";
-  return new Date(ts).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return new Date(ts).toLocaleString(APP_LOCALE, { dateStyle: "medium", timeStyle: "short" });
 }
 
 export function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString(undefined, { hour12: false });
+  return new Date(ts).toLocaleTimeString(APP_LOCALE, { hour12: false });
 }

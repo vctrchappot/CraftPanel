@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { appSettingsSchema, backupCreateSchema, badRequest, CRAFTPANEL_VERSION, scheduleSchema, SOFTWARE_INFO } from "@craftpanel/shared";
+import { appSettingsSchema, backupCreateSchema, badRequest, CRAFTPANEL_VERSION, scheduleSchema, SOFTWARE_INFO, type ConnectAddress } from "@craftpanel/shared";
 import { nextRuns, validateCron } from "@craftpanel/scheduler";
 import { getProvider, log4shellMitigation, PROVIDERS } from "@craftpanel/minecraft-providers";
 import { SETTING_GROUPS, SETTINGS } from "@craftpanel/config";
@@ -153,6 +153,7 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
     const disk = await freeDiskSpace(ctx.config.layout.root);
     const rows = (await ctx.servers.rows()).filter((r) => canSee(me, r.id));
     const running = rows.filter((r) => ctx.agent.isRunning(r.id));
+    const addresses = lanAddresses();
     return {
       version: CRAFTPANEL_VERSION,
       platform: process.platform,
@@ -180,7 +181,8 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
         urls: dashboardUrls(ctx.config.host, ctx.config.port, !!ctx.config.tls),
         clientIp: req.ip,
       },
-      lan: lanAddresses().map((a) => a.address),
+      lan: addresses.map((a) => a.address),
+      lanAddresses: addresses.map((a): ConnectAddress => ({ address: a.address, kind: a.kind, label: a.label, interface: a.interface })),
       servers: { total: rows.length, running: running.length },
     };
   });
