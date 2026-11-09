@@ -56,7 +56,7 @@ try {
   $before = (Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw | ConvertFrom-Json).pid
   Install-Fixture "98.0.0" $false
   $after = (Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw | ConvertFrom-Json).pid
-  if ($before -ne $after) { throw "Unsupported archive stopped the existing process" }
+  if ($before -ne $after) { throw "Unsupported archive changed the dashboard process (control.json pid $before -> $after)" }
   foreach ($version in @("99.0.1", "99.0.2", "99.0.3")) {
     Install-Fixture $version $false
     Assert-Ready
@@ -97,6 +97,21 @@ try {
   if ($points.Count -ne 2) { throw "Successful recovery retention is not bounded" }
   $passed = $true
   Write-Output "PASS: unsupported archive, failed migration, hanging startup, subsequent updates and recovery retention."
+} catch {
+  # CI runners discard retained artifacts, so print what is needed before cleanup removes it.
+  Write-Output "FAILURE: $($_.Exception.Message)"
+  Write-Output "before pid: $before, after pid: $after"
+  try {
+    $control = Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw -ErrorAction Stop | ConvertFrom-Json
+    Write-Output "control.json pid: $($control.pid), alive: $([bool](Get-Process -Id $control.pid -ErrorAction SilentlyContinue))"
+  } catch { Write-Output "control.json unreadable: $($_.Exception.Message)" }
+  $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
+  if ($info) { Write-Output "task last run: $($info.LastRunTime), last result: $($info.LastTaskResult)" }
+  foreach ($log in @("craftpanel.log", "craftpanel.err.log", "craftpanel.previous.log", "craftpanel.err.previous.log", "runtime.err.log", "runtime-host.err.log")) {
+    $file = Join-Path $dataRoot "logs\$log"
+    if (Test-Path -LiteralPath $file) { Write-Output "--- $log (tail)"; Get-Content -LiteralPath $file -Tail 25 }
+  }
+  throw
 } finally {
   $updater = Join-Path $installRoot "update.ps1"
   if (Test-Path -LiteralPath $updater) {
