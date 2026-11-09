@@ -2,22 +2,22 @@
 import Iso from "./Iso.astro";
 import { processScenes } from "../lib/scenes";
 
-// Seven real steps, from the install command to a panel update. The frame is the system boundary:
-// the browser you manage it from and the players who join are outside, everything else runs on your hardware.
+// Seven real steps, from the install command to a panel update, threaded on one line from your browser to
+// your players. "who" says who does the step: three are yours, the rest CraftPanel (or the players) does.
 // Captions are values CraftPanel actually shows; notes repeat what the sections below explain.
 const steps = [
-  { key: "install", label: "Install", cap: "sha256 ✓", note: "One command. The release is verified against its SHA-256 before anything is installed." },
-  { key: "java", label: "Java", cap: "Java 21", note: "The Java your Minecraft version needs is downloaded per server. Nothing to install yourself." },
-  { key: "pick", label: "Pick", cap: "Paper 1.21.4", note: "Choose the software, the version and the memory: Paper, Purpur, Fabric, NeoForge, Vanilla or Velocity." },
-  { key: "create", label: "Create", cap: ":25565", note: "The server comes from its official source, is checked and starts on its own port." },
-  { key: "join", label: "Join", cap: "4 online", note: "Players connect straight to your machine. Console and player list update live." },
-  { key: "backup", label: "Backup", cap: "04:00 nightly", note: "Scheduled, verified archives. Restoring saves the current state first." },
-  { key: "update", label: "Update", cap: "v1.0.1", note: "Update the panel from the dashboard. Minecraft keeps running, and a failed update rolls back." },
+  { key: "install", who: "you", label: "Install", cap: "sha256 ✓", note: "You: one command. CraftPanel verifies the release against its SHA-256 before anything is installed." },
+  { key: "java", who: "CraftPanel", label: "Java", cap: "Java 21", note: "CraftPanel: downloads the Java your Minecraft version needs, per server. Nothing to install yourself." },
+  { key: "pick", who: "you", label: "Pick", cap: "Paper 1.21.4", note: "You: choose the software, the version and the memory. Paper, Purpur, Fabric, NeoForge, Vanilla or Velocity." },
+  { key: "create", who: "CraftPanel", label: "Create", cap: ":25565", note: "CraftPanel: gets the server from its official source, checks it and starts it on its own port." },
+  { key: "join", who: "players", label: "Join", cap: "4 online", note: "Players: connect straight to your machine. Console and player list update live." },
+  { key: "backup", who: "CraftPanel", label: "Backup", cap: "04:00 nightly", note: "CraftPanel: scheduled, verified archives. Restoring saves the current state first." },
+  { key: "update", who: "you", label: "Update", cap: "v1.0.1", note: "You: press update. Minecraft keeps running, and a failed update rolls back by itself." },
 ] as const;
-const idle = "From one command to a running server. Every step happens on your own machine.";
+const idle = "Three things are yours: the install command, the software you pick and when you update. CraftPanel does the rest, on your own machine.";
 ---
 
-<div class="pb" data-band style="--a: 0">
+<div class="pb" data-band>
   <div class="pb-out pb-out-l">
     <span class="pb-link" aria-hidden="true"></span>
     <Iso boxes={processScenes.browser()} label="A laptop showing the dashboard" class="iso-line" outline pad={2} />
@@ -31,7 +31,10 @@ const idle = "From one command to a running server. Every step happens on your o
           <li class="pb-step" data-note={s.note}>
             <button type="button" class="pb-btn">
               <span class="pb-label mono"><span class="pb-n">{String(i + 1).padStart(2, "0")}</span>{s.label}</span>
-              <Iso boxes={processScenes[s.key]()} label={`${s.label} illustration`} class="iso-line" outline pad={2} />
+              <span class="pb-who mono" data-who={s.who}>{s.who}</span>
+              <span class="pb-art">
+                <Iso boxes={processScenes[s.key]()} label={`${s.label} illustration`} class="iso-line" outline pad={2} />
+              </span>
               <span class="pb-cap mono">{s.cap}</span>
             </button>
           </li>
