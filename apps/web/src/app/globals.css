@@ -8,8 +8,8 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* The dashboard's names for the shared tokens. The dashboard stays calm: brand green only for brand
-   moments, gold for interaction, the status colours only for status. */
+/* The dashboard's names for the shared tokens. The dashboard stays calm: Signal green only for brand
+   moments and "running", a neutral accent for interaction, the status colours only for state. */
 :root {
   /* Lets native controls (select popups, scrollbars, date pickers) follow the theme. */
   color-scheme: light;
@@ -30,6 +30,10 @@
   --destructive: var(--cp-danger);
   --console: var(--cp-console);
   --console-foreground: var(--cp-console-fg);
+  --status-running: var(--cp-status-running);
+  --status-starting: var(--cp-status-starting);
+  --status-stopped: var(--cp-status-stopped);
+  --status-crashed: var(--cp-status-crashed);
 }
 
 .dark {
@@ -54,6 +58,10 @@
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-text: var(--brand-text);
+  --color-status-running: var(--status-running);
+  --color-status-starting: var(--status-starting);
+  --color-status-stopped: var(--status-stopped);
+  --color-status-crashed: var(--status-crashed);
   --font-sans: var(--font-geist-sans), var(--cp-font-sans);
   --font-mono: var(--font-geist-mono), var(--cp-font-mono);
   --font-serif: var(--font-geist-serif), var(--cp-font-serif);

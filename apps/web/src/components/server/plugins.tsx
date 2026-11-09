@@ -335,7 +335,7 @@ function Updates({ server: s }: { server: ServerDetail }) {
           <ul className="divide-y divide-border">
             {q.data.map((u) => (
               <li key={u.file} className="flex items-center gap-4 px-4 py-3 text-[13px]">
-                <ArrowUpCircle className="size-4 text-accent" />
+                <ArrowUpCircle className="size-4 text-brand-text" />
                 <div className="flex-1">
                   <p className="font-medium">{u.name ?? u.file}</p>
                   <p className="text-xs text-muted-foreground">

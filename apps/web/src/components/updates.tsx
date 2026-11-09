@@ -141,7 +141,7 @@ export function UpdateDialog({ status: initial, open, onOpenChange }: { status: 
           </div>
         ) : (
           s.releaseUrl && (
-            <a href={s.releaseUrl} target="_blank" rel="noreferrer" className="text-[13px] text-accent hover:underline">
+            <a href={s.releaseUrl} target="_blank" rel="noreferrer" className="text-[13px] underline decoration-border underline-offset-2 hover:decoration-foreground">
               Read the release notes on GitHub
             </a>
           )
@@ -369,7 +369,7 @@ function inline(text: string): React.ReactNode[] {
     else {
       const [, label, href] = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(t)!;
       out.push(
-        <a key={m.index} href={href} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+        <a key={m.index} href={href} target="_blank" rel="noreferrer" className="underline decoration-border underline-offset-2 hover:decoration-foreground">
           {label}
         </a>,
       );
@@ -475,7 +475,7 @@ export function UpdateSection() {
           )}
           <p className="text-xs text-muted-foreground">
             {s.releaseUrl && (
-              <a href={s.releaseUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+              <a href={s.releaseUrl} target="_blank" rel="noreferrer" className="underline decoration-border underline-offset-2 hover:decoration-foreground">
                 {s.available ? "What's new" : "Releases"}
               </a>
             )}

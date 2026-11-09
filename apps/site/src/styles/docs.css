@@ -6,7 +6,7 @@
   --sl-content-width: 48rem;
 
   --sl-color-accent-low: #1f3319;
-  --sl-color-accent: var(--cp-grass-500);
+  --sl-color-accent: var(--cp-signal);
   --sl-color-accent-high: #b9e6ae;
   --sl-color-white: var(--cp-sandstone-50);
   --sl-color-gray-1: #ece8df;
@@ -20,7 +20,7 @@
 
 :root[data-theme="light"] {
   --sl-color-accent-low: #ddf0d6;
-  --sl-color-accent: var(--cp-grass-800);
+  --sl-color-accent: var(--cp-signal-deep);
   --sl-color-accent-high: #22501b;
   --sl-color-white: #1c1b18;
   --sl-color-gray-1: #2a2824;

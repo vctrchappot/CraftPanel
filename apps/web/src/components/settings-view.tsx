@@ -340,17 +340,17 @@ function About() {
             <dt className="text-muted-foreground">Created by</dt>
             <dd>
               {CRAFTPANEL_AUTHOR.name} (
-              <a href={CRAFTPANEL_AUTHOR.github} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+              <a href={CRAFTPANEL_AUTHOR.github} target="_blank" rel="noreferrer" className="underline decoration-border underline-offset-2 hover:decoration-foreground">
                 @{CRAFTPANEL_AUTHOR.handle}
               </a>
               ) ·{" "}
-              <a href={CRAFTPANEL_AUTHOR.website} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+              <a href={CRAFTPANEL_AUTHOR.website} target="_blank" rel="noreferrer" className="underline decoration-border underline-offset-2 hover:decoration-foreground">
                 {CRAFTPANEL_AUTHOR.website.replace(/^https:\/\//, "")}
               </a>
             </dd>
             <dt className="text-muted-foreground">Project</dt>
             <dd>
-              <a href={CRAFTPANEL_REPO_URL} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+              <a href={CRAFTPANEL_REPO_URL} target="_blank" rel="noreferrer" className="underline decoration-border underline-offset-2 hover:decoration-foreground">
                 {CRAFTPANEL_REPO_URL.replace(/^https:\/\//, "")}
               </a>{" "}
               · issues and ideas welcome

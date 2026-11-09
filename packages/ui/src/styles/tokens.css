@@ -24,19 +24,18 @@
   --cp-sandstone-700: #5f5a52;
   --cp-sandstone-900: #1c1b18;
 
-  --cp-grass-500: #5bbf4a; /* the logo's Signal green */
-  --cp-grass-400: #7ccf6a;
-  --cp-grass-700: #2f6b25;
-  --cp-grass-800: #2a5f21;
-  --cp-grass-950: #10200a;
-  --cp-gold-400: #e8b03a;
-  --cp-gold-700: #8a5a00;
-  --cp-emerald-400: #4cc38a;
-  --cp-emerald-700: #177245;
-  --cp-copper-400: #f0883e;
-  --cp-copper-700: #a8480c;
-  --cp-redstone-400: #ef5a48;
-  --cp-redstone-700: #b8321f;
+  /* The logo's colours. Signal is the only green; Amber, Ember and Ash are the other server states.
+     The -ink steps are the same hues dark enough for text on light surfaces (AA). */
+  --cp-signal: #5bbf4a;
+  --cp-signal-ink: #2f6b25;
+  --cp-signal-deep: #2a5f21;
+  --cp-signal-night: #10200a;
+  --cp-amber: #e8b04a;
+  --cp-amber-ink: #8a5a00;
+  --cp-ember: #ef5a4f;
+  --cp-ember-ink: #b8321f;
+  --cp-ash: #9aa1a8;
+  --cp-ash-ink: #5c636a;
 
   /* ---- type ---- */
   --cp-font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
@@ -59,21 +58,28 @@
   --cp-fg: var(--cp-sandstone-900);
   --cp-fg-muted: var(--cp-sandstone-700);
 
-  /* brand: logo moments, setup, empty states, "update available" */
-  --cp-brand: var(--cp-grass-500);
-  --cp-brand-ink: var(--cp-grass-950);
-  --cp-brand-text: var(--cp-grass-700);
-  --cp-brand-button: var(--cp-grass-800);
+  /* brand: Signal green for "update available", setup and calls to action */
+  --cp-brand: var(--cp-signal);
+  --cp-brand-ink: var(--cp-signal-night);
+  --cp-brand-text: var(--cp-signal-ink);
+  --cp-brand-button: var(--cp-signal-deep);
   --cp-brand-button-fg: #ffffff;
 
-  /* accent: focus, links, selection, info */
-  --cp-accent: var(--cp-gold-700);
-  --cp-accent-fg: #ffffff;
+  /* accent: focus rings, links, selection. Neutral on purpose, so it never reads as a state. */
+  --cp-accent: var(--cp-sandstone-900);
+  --cp-accent-fg: var(--cp-sandstone-50);
 
-  /* status: never use these for decoration */
-  --cp-success: var(--cp-emerald-700);
-  --cp-warning: var(--cp-copper-700);
-  --cp-danger: var(--cp-redstone-700);
+  /* server states, theme-independent: dots, bars, marks */
+  --cp-status-running: var(--cp-signal);
+  --cp-status-starting: var(--cp-amber);
+  --cp-status-crashed: var(--cp-ember);
+  --cp-status-stopped: var(--cp-ash);
+
+  /* status text and tints: never use these for decoration */
+  --cp-success: var(--cp-signal-ink);
+  --cp-warning: var(--cp-amber-ink);
+  --cp-danger: var(--cp-ember-ink);
+  --cp-neutral: var(--cp-ash-ink);
 
   --cp-console: #1a1917;
   --cp-console-fg: var(--cp-deepslate-100);
@@ -92,18 +98,17 @@
   --cp-fg: var(--cp-deepslate-100);
   --cp-fg-muted: var(--cp-deepslate-300);
 
-  --cp-brand: var(--cp-grass-500);
-  --cp-brand-ink: var(--cp-grass-950);
-  --cp-brand-text: var(--cp-grass-400);
-  --cp-brand-button: var(--cp-grass-500);
-  --cp-brand-button-fg: var(--cp-grass-950);
+  --cp-brand-text: var(--cp-signal);
+  --cp-brand-button: var(--cp-signal);
+  --cp-brand-button-fg: var(--cp-signal-night);
 
-  --cp-accent: var(--cp-gold-400);
-  --cp-accent-fg: #1c1508;
+  --cp-accent: var(--cp-deepslate-100);
+  --cp-accent-fg: var(--cp-deepslate-900);
 
-  --cp-success: var(--cp-emerald-400);
-  --cp-warning: var(--cp-copper-400);
-  --cp-danger: var(--cp-redstone-400);
+  --cp-success: var(--cp-signal);
+  --cp-warning: var(--cp-amber);
+  --cp-danger: var(--cp-ember);
+  --cp-neutral: var(--cp-ash);
 
   --cp-console: var(--cp-deepslate-950);
   --cp-console-fg: #e4e0d7;

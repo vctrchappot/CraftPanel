@@ -2,15 +2,15 @@ import { Badge, cn } from "@craftpanel/ui";
 import type { ServerStatus } from "@craftpanel/shared";
 
 const META: Record<ServerStatus, { label: string; dot: string; variant: "success" | "warning" | "danger" | "default" | "info" }> = {
-  unknown: { label: "Connection lost", dot: "bg-muted-foreground/50", variant: "warning" },
-  running: { label: "Running", dot: "bg-success", variant: "success" },
-  starting: { label: "Starting", dot: "bg-warning animate-pulse", variant: "warning" },
-  stopping: { label: "Stopping", dot: "bg-warning animate-pulse", variant: "warning" },
-  stopped: { label: "Stopped", dot: "bg-muted-foreground/50", variant: "default" },
-  crashed: { label: "Crashed", dot: "bg-destructive", variant: "danger" },
-  error: { label: "Error", dot: "bg-destructive", variant: "danger" },
-  installing: { label: "Installing", dot: "bg-accent animate-pulse", variant: "info" },
-  orphaned: { label: "Detached", dot: "bg-warning", variant: "warning" },
+  unknown: { label: "Connection lost", dot: "bg-status-stopped", variant: "warning" },
+  running: { label: "Running", dot: "bg-status-running", variant: "success" },
+  starting: { label: "Starting", dot: "bg-status-starting animate-pulse", variant: "warning" },
+  stopping: { label: "Stopping", dot: "bg-status-starting animate-pulse", variant: "warning" },
+  stopped: { label: "Stopped", dot: "bg-status-stopped", variant: "default" },
+  crashed: { label: "Crashed", dot: "bg-status-crashed", variant: "danger" },
+  error: { label: "Error", dot: "bg-status-crashed", variant: "danger" },
+  installing: { label: "Installing", dot: "bg-status-starting animate-pulse", variant: "info" },
+  orphaned: { label: "Detached", dot: "bg-status-starting", variant: "warning" },
 };
 
 export function StatusDot({ status, className }: { status: ServerStatus; className?: string }) {

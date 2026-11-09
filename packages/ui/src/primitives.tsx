@@ -115,14 +115,14 @@ export const Switch = React.forwardRef<React.ElementRef<typeof SwitchPrimitive.R
 ));
 Switch.displayName = "Switch";
 
-const badgeVariants = cva("inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap [&_svg]:size-3", {
+const badgeVariants = cva("inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-0.5 text-xs font-medium whitespace-nowrap [&_svg]:size-3", {
   variants: {
     variant: {
       default: "border-border bg-muted text-muted-foreground",
       success: "border-success/20 bg-success/10 text-success",
       warning: "border-warning/25 bg-warning/10 text-warning",
       danger: "border-destructive/20 bg-destructive/10 text-destructive",
-      info: "border-accent/20 bg-accent/10 text-accent",
+      info: "border-border bg-muted text-foreground",
       outline: "border-border text-foreground",
     },
   },
