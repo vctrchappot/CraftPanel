@@ -105,7 +105,7 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 ### 5. Comfort and optimisation (Phase 4)
 - [x] Measure first: `scripts/measure.mjs` (startup, idle CPU/RAM, API latency, bundle sizes); first fixes from it: minified API bundle, precompressed dashboard with long-lived caching, cached host info in `/api/system` (numbers in STATUS.md).
 - [ ] Run `scripts/measure.mjs` on a Pi and a small VPS; add backup duration and database growth over weeks of activity.
-- [x] Performance presets for Pi and small VPS (JVM flags, view/simulation distance) with a recommendation per machine, and chunk pre-generation with Chunky.
+- [x] Performance presets for Pi and small VPS (JVM flags, view/simulation distance) with a recommendation per machine, and chunk pre-generation with Chunky. A Performance tab per server with insights, live charts and all tuning in one place (history in memory; persistent monitoring stays under "Professional deployments").
 - [ ] Incremental/deduplicated backups and destinations such as USB drives or S3-compatible storage.
 - [ ] German UI (i18n) and a checked mobile layout.
 - [ ] Test on a physical Raspberry Pi 4/5.

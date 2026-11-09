@@ -1,11 +1,21 @@
 ---
 title: Performance
-description: Performance presets, memory sizing and world pre-generation with Chunky.
+description: The Performance tab: live charts, insights, presets, memory sizing and world pre-generation with Chunky.
 sidebar:
   order: 5
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+## The Performance tab
+
+Everything about how a server runs lives in one tab, **Performance**, next to Console and Settings:
+
+- **Insights**: a short, ranked list of what the live numbers and your settings say, with a one-click fix where there is one (for example a view distance that suits the machine, tuned garbage-collector flags, or a memory size the machine can spare). It says "Running smoothly" when there is nothing to flag.
+- **Live**: TPS, tick time, CPU, memory and players, as current values with average and peak, and as charts over the last 5 minutes, 15 minutes or hour. Hover or touch a chart for the exact value and time. Tick time has its 50 ms budget marked; CPU shows 100 % as one core; memory shows the heap size.
+- **Tuning**: presets, the performance settings from `server.properties` (view and simulation distance, watchdog, entity broadcast range, chunk saving), memory and JVM arguments, and world pre-generation.
+
+CraftPanel samples a server only while a dashboard has it open, and keeps about an hour of samples in memory since the last start. A gap in a chart means nobody was watching; a restart of CraftPanel clears the history. Memory is what the Java process uses in total, which is a little more than the heap you allocate. Tick times need Paper, Purpur, Fabric or NeoForge; Vanilla reports them from 1.20.3, and a Velocity proxy shows CPU, memory and players only.
 
 ## Presets
 
@@ -17,13 +27,13 @@ A preset sets Aikar's garbage-collector flags sized to the server's memory, plus
 | **Balanced** | A typical desktop or mid-size VPS | Medium |
 | **Powerful machine** | Many cores, plenty of memory | Long |
 
-The wizard preselects the preset recommended for this machine. Change it later under the server's **Settings → Performance**; your own JVM arguments are kept.
+The wizard preselects the preset recommended for this machine. Change it later in the server's **Performance** tab; your own JVM arguments are kept.
 
 ## Does it fit this machine?
 
-CraftPanel looks at the machine it runs on (cores, memory, a Raspberry Pi or other board model, and a container's memory limit) and at your plan: the software, the player slots, the view distance, a modpack and the servers that already run. In the wizard's **Resources** step and under **Settings → Performance** one card says whether the plan fits, is tight or is too much, and suggests a memory size. Nothing extra is asked, and the memory slider follows the plan until you move it yourself.
+CraftPanel looks at the machine it runs on (cores, memory, a Raspberry Pi or other board model, and a container's memory limit) and at your plan: the software, the player slots, the view distance, a modpack and the servers that already run. In the wizard's **Resources** step one card says whether the plan fits, is tight or is too much, and suggests a memory size; the Performance tab raises the same finding in its insights and shows the suggestion next to the memory slider. Nothing extra is asked, and the memory slider follows the plan until you move it yourself.
 
-The numbers are rules of thumb for Paper-class servers, not a guarantee: about 60 % of the player slots are assumed to be online at once, and the CPU estimate only separates small boards from desktops and large hosts. The overview shows real heap use once the server runs.
+The numbers are rules of thumb for Paper-class servers, not a guarantee: about 60 % of the player slots are assumed to be online at once, and the CPU estimate only separates small boards from desktops and large hosts. The Performance tab shows what the server really uses once it runs.
 
 ## Memory
 
@@ -36,11 +46,11 @@ Give the server what it needs, not everything the machine has. The operating sys
 | Fabric with performance mods | 2–4 GB |
 | NeoForge or a modpack | 4–8 GB |
 
-The overview shows the actual heap use, so you can see whether a server is short on memory.
+The memory chart in the Performance tab shows what the server really uses, so you can see whether it is short on memory.
 
 ## Pre-generating the world
 
-Generating new chunks while players explore is the most expensive thing a server does. **Settings → Performance → Pre-generate the world** installs [Chunky](https://modrinth.com/plugin/chunky) with one click (Paper, Purpur, Fabric and NeoForge) and generates a radius around spawn ahead of time. You can follow the progress, pause, continue or cancel.
+Generating new chunks while players explore is the most expensive thing a server does. **Performance → Pre-generate the world** installs [Chunky](https://modrinth.com/plugin/chunky) with one click (Paper, Purpur, Fabric and NeoForge) and generates a radius around spawn ahead of time. You can follow the progress, pause, continue or cancel.
 
 <Aside type="tip">
 On a Raspberry Pi, pre-generate a modest radius (for example 1,000 blocks) overnight before inviting players.

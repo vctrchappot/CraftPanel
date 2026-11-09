@@ -35,6 +35,7 @@ import { AutomationTab } from "./automation";
 import { SettingsTab } from "./settings";
 import { NetworkTab } from "./network";
 import { ProxyTab } from "./proxy";
+import { PerformanceTab } from "./performance";
 
 const TABS = [
   ["overview", "Overview"],
@@ -45,6 +46,7 @@ const TABS = [
   ["files", "Files"],
   ["backups", "Backups"],
   ["automation", "Automation"],
+  ["performance", "Performance"],
   ["settings", "Settings"],
   ["network", "Network"],
   ["proxy", "Proxy"],
@@ -101,6 +103,7 @@ export function ServerWorkspace() {
           {tab === "files" && <FilesTab server={s} />}
           {tab === "backups" && <ServerBackupsTab server={s} />}
           {tab === "automation" && <AutomationTab server={s} />}
+          {tab === "performance" && <PerformanceTab server={s} stream={stream} />}
           {tab === "settings" && <SettingsTab server={s} />}
           {tab === "network" && <NetworkTab server={s} />}
           {tab === "proxy" && <ProxyTab server={s} />}

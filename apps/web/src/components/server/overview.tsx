@@ -31,31 +31,36 @@ export function OverviewTab({ server: s, stream }: { server: ServerDetail; strea
 
   return (
     <div className="space-y-10">
-      <Panel className="grid grid-cols-2 gap-px overflow-hidden bg-border sm:grid-cols-3 lg:grid-cols-6 [&>*]:bg-surface">
-        <div className="p-5">
-          <Stat label="Players" value={running ? `${players.length} / ${s.maxPlayers}` : <Unavailable reason="Server is not running" />} />
-        </div>
-        <div className="p-5">
-          <Stat label="CPU" value={running && m?.cpuPercent != null ? `${m.cpuPercent.toFixed(0)}%` : <Unavailable reason={running ? "Sampling…" : "Server is not running"} />} sub="100% = one core" />
-        </div>
-        <div className="p-5">
-          <Stat label="Memory" value={running && m?.memoryBytes != null ? formatBytes(m.memoryBytes) : <Unavailable />} sub={`of ${(s.memoryMb / 1024).toFixed(1)} GB heap`} />
-          {running && memPct !== null && <Progress value={Math.min(100, memPct)} className="mt-2" />}
-        </div>
-        <div className="p-5">
-          <Stat
-            label="TPS"
-            value={running && m?.tps != null ? m.tps.toFixed(1) : <Unavailable reason={SOFTWARE_INFO[s.software].paperCommands ? "Waiting for the next sample" : `${softwareLabel(s.software)} reports MSPT via /tick query (1.20.3+); TPS is derived from it`} />}
-            sub={running && m?.mspt != null ? `${m.mspt.toFixed(1)} ms/tick` : "ms/tick unavailable"}
-          />
-        </div>
-        <div className="p-5">
-          <Stat label="Uptime" value={running && s.startedAt ? formatDuration(Date.now() - s.startedAt) : <Unavailable />} />
-        </div>
-        <div className="p-5">
-          <Stat label="Storage" value={ov.data ? formatBytes(ov.data.storageBytes) : <Skeleton className="h-7 w-16" />} sub={ov.data?.disk ? `${formatBytes(ov.data.disk.free)} free on disk` : undefined} />
-        </div>
-      </Panel>
+      <div className="space-y-3">
+        <Panel className="grid grid-cols-2 gap-px overflow-hidden bg-border sm:grid-cols-3 lg:grid-cols-6 [&>*]:bg-surface">
+          <div className="p-5">
+            <Stat label="Players" value={running ? `${players.length} / ${s.maxPlayers}` : <Unavailable reason="Server is not running" />} />
+          </div>
+          <div className="p-5">
+            <Stat label="CPU" value={running && m?.cpuPercent != null ? `${m.cpuPercent.toFixed(0)}%` : <Unavailable reason={running ? "Sampling…" : "Server is not running"} />} sub="100% = one core" />
+          </div>
+          <div className="p-5">
+            <Stat label="Memory" value={running && m?.memoryBytes != null ? formatBytes(m.memoryBytes) : <Unavailable />} sub={`of ${(s.memoryMb / 1024).toFixed(1)} GB heap`} />
+            {running && memPct !== null && <Progress value={Math.min(100, memPct)} className="mt-2" />}
+          </div>
+          <div className="p-5">
+            <Stat
+              label="TPS"
+              value={running && m?.tps != null ? m.tps.toFixed(1) : <Unavailable reason={SOFTWARE_INFO[s.software].paperCommands ? "Waiting for the next sample" : `${softwareLabel(s.software)} reports MSPT via /tick query (1.20.3+); TPS is derived from it`} />}
+              sub={running && m?.mspt != null ? `${m.mspt.toFixed(1)} ms/tick` : "ms/tick unavailable"}
+            />
+          </div>
+          <div className="p-5">
+            <Stat label="Uptime" value={running && s.startedAt ? formatDuration(Date.now() - s.startedAt) : <Unavailable />} />
+          </div>
+          <div className="p-5">
+            <Stat label="Storage" value={ov.data ? formatBytes(ov.data.storageBytes) : <Skeleton className="h-7 w-16" />} sub={ov.data?.disk ? `${formatBytes(ov.data.disk.free)} free on disk` : undefined} />
+          </div>
+        </Panel>
+        <Link href={`/server/?id=${s.id}&tab=performance`} className="inline-block text-[13px] text-muted-foreground hover:text-foreground">
+          Charts, insights and tuning →
+        </Link>
+      </div>
 
       <div className="grid gap-10 lg:grid-cols-3">
         <div className="grid min-h-0 gap-10 lg:col-span-2 lg:grid-rows-[auto_minmax(0,1fr)]">

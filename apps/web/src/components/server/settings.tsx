@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Download, RotateCw, Save, Search, ShieldCheck, Upload } from "lucide-react";
@@ -12,9 +13,8 @@ import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
 import { ToggleRow } from "../wizard";
 import { SoftwareSettings } from "./software";
-import { PerformanceSettings } from "./performance";
 
-interface SettingDef {
+export interface SettingDef {
   key: string;
   label: string;
   group: string;
@@ -36,7 +36,6 @@ export function SettingsTab({ server: s }: { server: ServerDetail }) {
         {game && <TabsTrigger value="gamerules">Game rules</TabsTrigger>}
         <TabsTrigger value="runtime">Runtime</TabsTrigger>
         <TabsTrigger value="software">{game ? "Software & version" : "Velocity version"}</TabsTrigger>
-        {game && <TabsTrigger value="performance">Performance</TabsTrigger>}
         {game && <TabsTrigger value="raw">Raw file</TabsTrigger>}
         <TabsTrigger value="danger">Danger zone</TabsTrigger>
       </TabsList>
@@ -52,9 +51,6 @@ export function SettingsTab({ server: s }: { server: ServerDetail }) {
       <TabsContent value="software">
         <SoftwareSettings server={s} />
       </TabsContent>
-      <TabsContent value="performance">
-        <PerformanceSettings server={s} />
-      </TabsContent>
       <TabsContent value="raw">
         <RawEditor server={s} />
       </TabsContent>
@@ -65,7 +61,7 @@ export function SettingsTab({ server: s }: { server: ServerDetail }) {
   );
 }
 
-function useProperties(id: string) {
+export function useProperties(id: string) {
   return useQuery({ queryKey: ["properties", id], queryFn: () => api.get<{ raw: string; values: Record<string, string>; catalog: SettingDef[]; restartRequired: boolean; running: boolean }>(`/api/servers/${id}/properties`) });
 }
 
@@ -110,15 +106,21 @@ function PropertiesEditor({ server: s }: { server: ServerDetail }) {
           <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search…" className="h-8 pl-8 text-[13px]" aria-label="Search settings" />
         </div>
         <nav className="flex gap-1 overflow-x-auto lg:flex-col">
-          {catalog.data.groups.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => (setGroup(g.id), setFilter(""))}
-              className={cn("whitespace-nowrap rounded-md px-2.5 py-1.5 text-left text-[13px] transition-colors", !filter && group === g.id ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground")}
-            >
-              {g.label}
-            </button>
-          ))}
+          {/* View distance and the other performance settings live on the Performance tab, next to what they affect. */}
+          {catalog.data.groups
+            .filter((g) => g.id !== "performance")
+            .map((g) => (
+              <button
+                key={g.id}
+                onClick={() => (setGroup(g.id), setFilter(""))}
+                className={cn("whitespace-nowrap rounded-md px-2.5 py-1.5 text-left text-[13px] transition-colors", !filter && group === g.id ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground")}
+              >
+                {g.label}
+              </button>
+            ))}
+          <Link href={`/server/?id=${s.id}&tab=performance`} className="whitespace-nowrap rounded-md px-2.5 py-1.5 text-left text-[13px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground">
+            Performance →
+          </Link>
         </nav>
       </div>
       <div className="space-y-6">
@@ -155,7 +157,7 @@ function PropertiesEditor({ server: s }: { server: ServerDetail }) {
   );
 }
 
-function SettingRow({ def, value, present, error, disabled, onChange }: { def: SettingDef; value: string; present: boolean; error?: string; disabled: boolean; onChange: (v: string) => void }) {
+export function SettingRow({ def, value, present, error, disabled, onChange }: { def: SettingDef; value: string; present: boolean; error?: string; disabled: boolean; onChange: (v: string) => void }) {
   const id = `prop-${def.key}`;
   const t = def.type;
   return (
@@ -272,7 +274,8 @@ function GameRuleRow({ rule, disabled, onSave }: { rule: GameRuleInfo; disabled:
 function RuntimeSettings({ server: s }: { server: ServerDetail }) {
   const canEdit = useCan("server.configure");
   const java = useQuery({ queryKey: ["java"], queryFn: () => api.get<{ path: string; major: number; version: string; vendor: string | null; managed: boolean }[]>("/api/java") });
-  const [f, setF] = React.useState({ name: s.name, description: s.description, memoryMb: s.memoryMb, jvmArgs: s.jvmArgs, javaPath: s.javaPath ?? "", autoStart: s.autoStart, infoCommand: s.infoCommand });
+  // Memory and JVM arguments are edited on the Performance tab; leaving them out of this form keeps this save from overwriting them.
+  const [f, setF] = React.useState({ name: s.name, description: s.description, javaPath: s.javaPath ?? "", autoStart: s.autoStart, infoCommand: s.infoCommand });
   const save = useAction(() => api.patch(`/api/servers/${s.id}`, { ...f, javaPath: f.javaPath || null }), { success: "Saved", invalidate: [["server", s.id], ["servers"]] });
   return (
     <div className="max-w-2xl space-y-6">
@@ -304,11 +307,20 @@ function RuntimeSettings({ server: s }: { server: ServerDetail }) {
           </Field>
         )}
       </Section>
-      <Section title="Java & memory" description="Changes apply on the next start.">
-        <Field label="Memory" htmlFor="rmem" aside={<span className="text-[13px] font-medium tabular-nums">{(f.memoryMb / 1024).toFixed(1)} GB</span>}>
-          <input id="rmem" type="range" min={512} max={32768} step={512} value={f.memoryMb} onChange={(e) => setF({ ...f, memoryMb: Number(e.target.value) })} disabled={!canEdit} className="w-full accent-[var(--foreground)]" />
-        </Field>
-        <Field label="Java runtime" htmlFor="rjava" help={`${SOFTWARE_INFO[s.software].proxy ? "Velocity" : "Minecraft"} ${s.mcVersion} requires Java ${s.javaMajor}. Automatic picks a compatible runtime and downloads one if needed.`}>
+      <Section title="Java" description="Changes apply on the next start.">
+        <Field
+          label="Java runtime"
+          htmlFor="rjava"
+          help={
+            <>
+              {SOFTWARE_INFO[s.software].proxy ? "Velocity" : "Minecraft"} {s.mcVersion} requires Java {s.javaMajor}. Automatic picks a compatible runtime and downloads one if needed. Memory and JVM arguments are on the{" "}
+              <Link href={`/server/?id=${s.id}&tab=performance`} className="underline underline-offset-2">
+                Performance
+              </Link>{" "}
+              tab.
+            </>
+          }
+        >
           <NativeSelect id="rjava" value={f.javaPath} onChange={(e) => setF({ ...f, javaPath: e.target.value })} disabled={!canEdit}>
             <option value="">Automatic</option>
             {java.data?.map((j) => (
@@ -317,9 +329,6 @@ function RuntimeSettings({ server: s }: { server: ServerDetail }) {
               </option>
             ))}
           </NativeSelect>
-        </Field>
-        <Field label="JVM arguments" htmlFor="rjvm" help="Each argument must start with '-'. Memory flags are managed above.">
-          <Textarea id="rjvm" rows={3} value={f.jvmArgs} onChange={(e) => setF({ ...f, jvmArgs: e.target.value })} disabled={!canEdit} className="font-mono text-xs" />
         </Field>
         {s.log4shell && (
           <Callout icon={<ShieldCheck />} title="Log4Shell protection active">

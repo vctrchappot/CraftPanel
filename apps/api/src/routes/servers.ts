@@ -214,7 +214,14 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     await game.updateProperties(await row(req.params.id), body.values, actorOf(req));
     return noContent(reply);
   });
-  // ---- performance presets ---------------------------------------------------------------
+  // ---- performance ---------------------------------------------------------------
+
+  // Metrics sampled since the last start. Sampling runs while a dashboard has the server open.
+  app.get<IdParams>("/api/servers/:id/metrics", async (req) => {
+    requirePermission(req, "server.view");
+    const r = await row(req.params.id);
+    return { samples: servers.metricsHistory(r.id) };
+  });
 
   app.get<IdParams>("/api/servers/:id/performance", async (req) => {
     requirePermission(req, "server.view");

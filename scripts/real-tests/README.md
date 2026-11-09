@@ -15,6 +15,7 @@ scripts/real-tests/run.sh <api-port> <data-dir> <scenario.mjs> [args…]
 | `info-card.mjs` | `<phase> <state-file> <tools-dir> [mcVersion] [mcPort]` | `/craftpanel` card with a real player (mineflayer): current version and software, read from the running game; two phases around a dashboard-only restart. |
 | `host-fit.mjs` | `[mcVersion] [mcPort]` | Host detection (board, usable memory, cores) in `/api/system` and the hardware fit of a server plan against this machine. |
 | `performance.mjs` | `[software] [mcVersion] [mcPort]` | Wizard preset applied (JVM flags, distances), preset switch, Chunky install and pre-generation with pause/continue/cancel. |
+| `performance-tab.mjs` | `[mcVersion] [mcPort]` | The Performance tab's data: metric history from live sampling (equal to the stream), a fresh series after restart, memory/JVM and performance properties saved, bad distance refused. `KEEP_RUNNING=1` leaves the server up for a browser check. |
 | `neoforge.mjs` | `<mcVersion> <mcPort>` | NeoForge catalogue, install, start, Chunky as a NeoForge mod, mod list from `neoforge.mods.toml`, pre-generation, switch preview. |
 | `neoforge-update.mjs` | `[mcVersion] [mcPort]` | In-place NeoForge update from the second-newest to the newest build: old version folder removed, shared libraries kept, server starts. |
 | `modpack.mjs` | `search <query>` or `run <modrinthProjectId> <mcPort> [versionId]` | Modrinth modpack search; prepare, create, install, start, mods loaded. |

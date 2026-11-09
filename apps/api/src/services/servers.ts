@@ -12,6 +12,7 @@ import {
   SOFTWARE_INFO,
   type InstallProgress,
   type ServerDetail,
+  type ServerMetrics,
   type ServerSoftware,
   type ServerStatus,
   type ServerSummary,
@@ -32,12 +33,16 @@ import type { SettingsService } from "./settings";
 
 export type ServerRow = typeof servers.$inferSelect;
 const MARKER = ".craftpanel";
+/** Samples kept per server for the Performance page: roughly an hour (one every 5 s, one more per tick query). */
+const METRICS_HISTORY = 1000;
 
 export class ServerService {
   /** Servers whose configuration changed while running. */
   readonly restartRequired = new Set<string>();
   private locks = new Map<string, string>();
   private installs = new Map<string, AbortController>();
+  /** Sampled metrics of the current or last run; sampling only happens while a dashboard is open, so this can have gaps. */
+  private metricSeries = new Map<string, ServerMetrics[]>();
   readonly modpacks: ModpackStaging;
   /** Extension points (the proxy service writes Velocity and backend configuration here). */
   readonly hooks = {
@@ -611,6 +616,11 @@ export class ServerService {
     if (oldNeoForge && after.jarFile !== row.jarFile && oldNeoForge !== ".." && oldNeoForge !== ".") await fsp.rm(path.join(row.directory, "libraries", "net", "neoforged", "neoforge", oldNeoForge), { recursive: true, force: true });
   }
 
+  /** Metrics sampled since the server last started, oldest first. */
+  metricsHistory(id: string): ServerMetrics[] {
+    return this.metricSeries.get(id) ?? [];
+  }
+
   // ---- agent events & recovery ---------------------------------------------
 
   private wireAgent() {
@@ -630,6 +640,7 @@ export class ServerService {
       })().catch(() => undefined);
     });
     this.agent.on("status", async (id, status, detail) => {
+      if (status === "starting") this.metricSeries.delete(id);
       const info = this.agent.info(id);
       this.hub.broadcast({ type: "status", serverId: id, status, detail });
       try {
@@ -646,7 +657,13 @@ export class ServerService {
       }
     });
     this.agent.on("lines", (id, lines) => this.hub.toSubscribers(id, { type: "console", serverId: id, lines }));
-    this.agent.on("metrics", (id, metrics) => this.hub.toSubscribers(id, { type: "metrics", serverId: id, metrics }));
+    this.agent.on("metrics", (id, metrics) => {
+      const series = this.metricSeries.get(id) ?? [];
+      series.push(metrics);
+      if (series.length > METRICS_HISTORY) series.splice(0, series.length - METRICS_HISTORY);
+      this.metricSeries.set(id, series);
+      this.hub.toSubscribers(id, { type: "metrics", serverId: id, metrics });
+    });
     this.agent.on("players", (id, players) => this.hub.broadcast({ type: "players", serverId: id, players }));
     this.agent.on("signal", async (id, sig) => {
       try {
