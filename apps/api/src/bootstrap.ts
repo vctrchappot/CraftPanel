@@ -18,6 +18,7 @@ import { UpdateService } from "./services/updates";
 import { PregenService } from "./services/pregen";
 import { ProxyService } from "./services/proxy";
 import { NotificationService } from "./services/notifications";
+import { runtimeAccess } from "./services/runtime-access";
 
 /** Wire up persistence, runtime and services. Does not start listening. */
 export async function createContext(config: AppConfig, opts: { migrationsFolder?: string; installRoot?: string; agent?: RuntimeAgent } = {}): Promise<AppContext> {
@@ -35,9 +36,12 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const java = new JavaManager(L.java, L.tmp);
   const activity = new ActivityService(db, hub);
   const settings = new SettingsService(db);
-  const updates = new UpdateService(settings, opts.installRoot ?? null);
+  const updates = new UpdateService(settings, opts.installRoot ?? null, undefined, undefined, undefined, opts.agent ? {
+    build: () => agent.connected ? agent.identity?.build ?? null : null,
+    approvalFile: path.join(L.root, "runtime", "update-approval.json"),
+  } : undefined);
   const sessions = new SessionStore(db, config.sessionTtlMs, async () => (await settings.get()).twoFactorRoles);
-  const servers = new ServerService(db, agent, hub, activity, java, config, settings);
+  const servers = new ServerService(db, agent, hub, activity, java, config, settings, runtimeAccess(opts.installRoot, agent));
   const backups = new BackupService(db, servers, hub, activity, settings, config);
   const schedules = new ScheduleService(db, servers, backups, activity, settings);
   const game = new GameService(db, servers, activity, config);

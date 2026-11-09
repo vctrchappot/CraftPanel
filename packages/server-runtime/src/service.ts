@@ -4,7 +4,8 @@ import net, { type Socket } from "node:net";
 import { SOFTWARE_INFO, type ServerSoftware } from "@craftpanel/shared";
 import { LocalAgent, type AgentEvents } from "./agent";
 import type { LaunchSpec } from "./managed-server";
-import { channel, COMMAND_TTL_MS, RUNTIME_PROTOCOL, runtimePaths, type RuntimeSnapshot } from "./protocol";
+import { runtimeReporter, type RuntimeDiagnosticSink } from "./diagnostics";
+import { channel, COMMAND_TTL_MS, RUNTIME_PROTOCOL, runtimePaths, prepareRuntimeEndpoint, type RuntimeSnapshot } from "./protocol";
 
 const EVENTS = ["status", "lines", "players", "metrics", "signal", "exit"] as const;
 type Spec = LaunchSpec & { software: ServerSoftware; autoStart?: boolean };
@@ -23,13 +24,19 @@ export class RuntimeService {
   private initialized = false;
   private writes: Promise<void> = Promise.resolve();
   private broadcasts = new Set<(event: keyof AgentEvents, args: unknown[]) => void>();
+  private report: ReturnType<typeof runtimeReporter>;
+  private closePromise: Promise<void> | null = null;
 
-  constructor(dataDir: string) {
+  constructor(private dataDir: string, private build = "development", diagnostics?: RuntimeDiagnosticSink) {
     this.paths = runtimePaths(dataDir);
+    this.report = runtimeReporter("service", diagnostics);
     // Subscribe before serving; state is sent along with every event, before its consumers run.
     for (const event of EVENTS) this.agent.on(event, (...args: unknown[]) => {
       for (const broadcast of this.broadcasts) broadcast(event, args);
-      if (this.initialized && (event === "status" || event === "exit")) void this.persist().catch(() => this.close().catch(() => undefined));
+      if (this.initialized && !this.closing && (event === "status" || event === "exit")) void this.persist().catch((error) => {
+        this.report("registry-write-failed", error);
+        void this.close().catch((shutdownError) => this.report("shutdown-failed", shutdownError));
+      });
     });
   }
 
@@ -52,6 +59,7 @@ export class RuntimeService {
   async listen() {
     await fs.mkdir(this.paths.directory, { recursive: true, mode: 0o700 });
     if (process.platform !== "win32") await fs.chmod(this.paths.directory, 0o700);
+    this.paths = await prepareRuntimeEndpoint(this.dataDir);
     try {
       this.token = (await fs.readFile(this.paths.token, "utf8")).trim();
       if (!/^[a-f0-9]{64}$/.test(this.token)) throw new Error("Invalid runtime token; restore runtime/token before starting");
@@ -72,7 +80,9 @@ export class RuntimeService {
     }
     await new Promise<void>((resolve, reject) => {
       this.server.once("error", reject);
-      this.server.listen(this.paths.endpoint, () => { this.server.off("error", reject); resolve(); });
+      // Windows dashboard and runtime use different accounts. Pipe access is authenticated
+      // by the private token; do not rely on the creator account's default pipe DACL.
+      this.server.listen({ path: this.paths.endpoint, readableAll: process.platform === "win32", writableAll: process.platform === "win32" }, () => { this.server.off("error", reject); resolve(); });
     });
     if (process.platform !== "win32") await fs.chmod(this.paths.endpoint, 0o600);
     try {
@@ -80,6 +90,7 @@ export class RuntimeService {
       if (saved.protocol !== RUNTIME_PROTOCOL || !saved.servers) throw new Error("Incompatible runtime registry; refusing to start servers");
       this.records = Object.assign(Object.create(null), saved.servers);
       for (const [id, entry] of Object.entries(this.records)) {
+        validateSpec(entry.spec);
         // A runtime crash cannot reattach stdin. Never duplicate a possibly live process.
         if (entry.pid && await this.agent.probeOrphan(entry.pid)) {
           this.agent.setStatus(id, "orphaned", `Runtime lost ownership of PID ${entry.pid}; stop the process before starting again`);
@@ -96,30 +107,30 @@ export class RuntimeService {
 
   private accept(socket: Socket) {
     this.peers.add(socket);
-    socket.on("error", () => undefined);
+    socket.on("error", (error) => this.report("peer-socket-error", error));
     let authenticated = false;
     let session = "";
     let sequence = 0;
     const watches = new Map<string, () => void>();
     const pausedSaves = new Set<string>();
-    const deadline = setTimeout(() => socket.destroy(), 3000);
+    const deadline = setTimeout(() => { this.report("peer-handshake-timeout"); socket.destroy(); }, 3000);
     const broadcast = (event: keyof AgentEvents, args: unknown[]) => {
       send({ type: "event", event, args, snapshot: this.snapshot(String(args[0])) });
     };
     const send = channel(socket, (m) => {
       if (!authenticated) {
         if (!this.initialized || m.type !== "hello" || m.protocol !== RUNTIME_PROTOCOL || typeof m.token !== "string" || Buffer.byteLength(m.token) !== Buffer.byteLength(this.token) ||
-            !crypto.timingSafeEqual(Buffer.from(m.token), Buffer.from(this.token))) { socket.destroy(); return; }
+            !crypto.timingSafeEqual(Buffer.from(m.token), Buffer.from(this.token))) { this.report("peer-handshake-rejected"); socket.destroy(); return; }
         authenticated = true;
         clearTimeout(deadline);
         session = crypto.randomUUID();
         for (const id of Object.keys(this.records)) send({ type: "snapshot", snapshot: this.snapshot(id, true) });
         this.broadcasts.add(broadcast);
-        send({ type: "ready", protocol: RUNTIME_PROTOCOL, epoch: this.epoch, session });
+        send({ type: "ready", protocol: RUNTIME_PROTOCOL, epoch: this.epoch, session, build: this.build });
         return;
       }
       // No replay window: a command belongs to exactly this connection and runtime generation.
-      if (this.closing || m.type !== "call" || m.epoch !== this.epoch || m.session !== session || !Number.isSafeInteger(m.seq) || (m.seq as number) !== sequence + 1) { socket.destroy(); return; }
+      if (this.closing || m.type !== "call" || m.epoch !== this.epoch || m.session !== session || !Number.isSafeInteger(m.seq) || (m.seq as number) !== sequence + 1) { this.report("peer-command-envelope-rejected"); socket.destroy(); return; }
       sequence = m.seq as number;
       const seq = sequence;
       if (typeof m.deadline !== "number" || m.deadline < Date.now() || m.deadline > Date.now() + COMMAND_TTL_MS + 1000) {
@@ -129,10 +140,23 @@ export class RuntimeService {
       void (async () => {
         try {
           let result: unknown = null;
-          if (!id && !["ping", "stopAll"].includes(String(m.method))) throw new Error("Invalid server id");
+          if (!id && !["ping", "stopAll", "shutdownRuntime", "checkPaths"].includes(String(m.method))) throw new Error("Invalid server id");
           const entry = this.records[id];
           switch (m.method) {
             case "ping": break;
+            case "checkPaths":
+              if (typeof m.directory !== "string" || typeof m.javaPath !== "string" || m.directory.length > 4096 || m.javaPath.length > 4096) throw new Error("Invalid runtime paths");
+              result = await this.agent.checkPaths(m.directory, m.javaPath);
+              break;
+            case "configure": {
+              const spec = validateSpec(m.spec);
+              this.records[id] = { spec, pid: entry?.pid ?? null };
+              await this.persist();
+              break;
+            }
+            case "shutdownRuntime":
+              setTimeout(() => void this.close().catch((err) => { console.error(err); process.exitCode = 1; }), 50);
+              break;
             case "start": {
               const spec = validateSpec(m.spec);
               if (entry?.pid && !this.agent.isRunning(id) && await this.agent.probeOrphan(entry.pid)) throw new Error("A previous runtime process is still running");
@@ -177,7 +201,7 @@ export class RuntimeService {
           send({ type: "reply", seq, error: (err as Error).message });
         }
       })();
-    });
+    }, this.report);
     socket.once("close", () => {
       clearTimeout(deadline);
       this.broadcasts.delete(broadcast);
@@ -188,14 +212,25 @@ export class RuntimeService {
     });
   }
 
-  async close(timeoutMs = 90_000) {
-    if (this.closing) return;
+  close(timeoutMs = 90_000): Promise<void> {
+    return this.closePromise ??= this.shutdown(timeoutMs);
+  }
+
+  private async shutdown(timeoutMs: number) {
     this.closing = true;
     for (const peer of this.peers) peer.destroy();
     const closed = this.server.listening ? new Promise<void>((resolve) => this.server.close(() => resolve())) : Promise.resolve();
-    await this.agent.shutdown(timeoutMs);
-    if (this.initialized) await this.persist();
-    await closed;
+    try {
+      await this.agent.shutdown(timeoutMs);
+      if (this.initialized) await this.persist();
+    } finally {
+      await closed;
+      if (this.paths.socketAlias) {
+        const alias = this.paths.socketAlias;
+        const stat = await fs.lstat(alias).catch((error) => { if (error.code !== "ENOENT") throw error; return null; });
+        if (stat?.isSymbolicLink() && stat.uid === process.getuid!() && await fs.readlink(alias) === this.paths.directory) await fs.unlink(alias);
+      }
+    }
   }
 }
 

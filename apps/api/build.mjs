@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
+import crypto from "node:crypto";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(here, "dist");
@@ -36,6 +37,7 @@ await build({
   target: "node22",
   minify: true,
   keepNames: true,
+  banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
   logLevel: "info",
 });
 
@@ -54,6 +56,14 @@ await build({
 fs.cpSync(path.resolve(here, "../../packages/database/drizzle"), path.join(dist, "drizzle"), { recursive: true });
 fs.cpSync(path.join(here, "assets"), path.join(dist, "assets"), { recursive: true });
 fs.copyFileSync(path.resolve(here, "../../deploy/windows-job.ps1"), path.join(dist, "windows-job.ps1"));
+fs.copyFileSync(path.resolve(here, "../../deploy/windows-runtime-service.cs"), path.join(dist, "windows-runtime-service.cs"));
+const runtimeBundle = fs.readFileSync(path.join(dist, "runtime.js"));
+const runtimeHash = crypto.createHash("sha256").update(runtimeBundle)
+  .update(fs.readFileSync(path.join(dist, "windows-job.ps1")))
+  .update(fs.readFileSync(path.join(dist, "windows-runtime-service.cs")))
+  .update(fs.readFileSync(path.resolve(here, "../../deploy/craftpanel-runtime.service"))).digest("hex");
+fs.writeFileSync(path.join(dist, "runtime-manifest.json"), JSON.stringify({ protocol: 1, sha256: runtimeHash,
+  bundleSha256: crypto.createHash("sha256").update(runtimeBundle).digest("hex") }) + "\n");
 const web = path.resolve(here, "../web/out");
 if (fs.existsSync(path.join(web, "index.html"))) {
   fs.cpSync(web, path.join(dist, "web"), { recursive: true });

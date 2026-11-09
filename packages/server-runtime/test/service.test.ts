@@ -3,8 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import net from "node:net";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
-import { RuntimeClient, RuntimeService, runtimePaths, RUNTIME_PROTOCOL, channel } from "../src/index";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { runtimeReporter } from "../src/diagnostics";
+import { RuntimeClient, RuntimeService, runtimePaths, prepareRuntimeEndpoint, RUNTIME_PROTOCOL, channel } from "../src/index";
 
 const fake = path.join(path.dirname(fileURLToPath(import.meta.url)), "fake-minecraft.mjs");
 const spec = { javaPath: "unused", directory: os.tmpdir(), jarFile: "unused", memoryMb: 512, jvmArgs: [], software: "vanilla" as const,
@@ -24,12 +25,118 @@ async function fixture() {
   return { dir, runtime, client };
 }
 afterEach(async () => {
+  vi.restoreAllMocks();
   for (const c of clients.splice(0)) await c.disconnect();
   for (const s of services.splice(0)) await s.close(2000);
   for (const r of roots.splice(0)) await fs.rm(r, { recursive: true, force: true });
 });
 
 describe("independent runtime transport", () => {
+  it("connects safely when the data directory exceeds Unix socket path limits", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cp-ipc-long-"));
+    roots.push(root);
+    const dir = path.join(root, "nested-" + "x".repeat(100));
+    const runtime = new RuntimeService(dir);
+    services.push(runtime);
+    await runtime.listen();
+    const client = new RuntimeClient(dir);
+    clients.push(client);
+    await client.connect();
+    await client.configure("test", spec);
+    expect(client.owns("test")).toBe(true);
+    const paths = runtimePaths(dir);
+    if (paths.socketAlias) {
+      expect(Buffer.byteLength(paths.endpoint)).toBeLessThan(104);
+      expect(await fs.readlink(paths.socketAlias)).toBe(paths.directory);
+      expect((await fs.stat(paths.directory)).mode & 0o777).toBe(0o700);
+    }
+    await client.disconnect();
+    await runtime.close();
+    if (paths.socketAlias) await expect(fs.lstat(paths.socketAlias)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it.skipIf(process.platform === "win32")("refuses an existing socket alias pointing outside the runtime directory", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cp-ipc-alias-"));
+    roots.push(root);
+    const dir = path.join(root, "nested-" + "x".repeat(100));
+    const paths = runtimePaths(dir);
+    expect(paths.socketAlias).not.toBeNull();
+    await fs.symlink(root, paths.socketAlias!);
+    try { await expect(prepareRuntimeEndpoint(dir)).rejects.toThrow(/points elsewhere/); }
+    finally { await fs.unlink(paths.socketAlias!); }
+  });
+
+  it("bounds diagnostic output and never includes error messages or credentials", () => {
+    const sink = vi.fn();
+    const report = runtimeReporter("service", sink);
+    for (let i = 0; i < 25; i++) report("registry-write-failed", Object.assign(new Error("secret-token-and-command"), { code: "EACCES" }));
+    expect(sink).toHaveBeenCalledTimes(10);
+    expect(sink.mock.calls[0][0]).toEqual({ component: "service", reason: "registry-write-failed", code: "EACCES" });
+    expect(JSON.stringify(sink.mock.calls)).not.toContain("secret-token");
+  });
+
+  it("reports registry persistence failure and lets every close caller await cleanup", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "cp-ipc-"));
+    roots.push(dir);
+    const diagnostics = vi.fn();
+    const runtime = new RuntimeService(dir, "test", diagnostics);
+    await runtime.listen();
+    const rename = vi.spyOn(fs, "rename").mockRejectedValueOnce(Object.assign(new Error("private-path"), { code: "EACCES" }));
+    runtime.agent.setStatus("test", "error");
+    await expect.poll(() => diagnostics.mock.calls.some(([entry]) => entry.reason === "registry-write-failed")).toBe(true);
+    const closing = runtime.close(2000);
+    expect(runtime.close(2000)).toBe(closing);
+    await expect(closing).rejects.toMatchObject({ code: "EACCES" });
+    expect(diagnostics.mock.calls).toContainEqual([{ component: "service", reason: "registry-write-failed", code: "EACCES" }]);
+    expect(rename).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an in-flight query on IPC loss and reconnects without replaying it", async () => {
+    const { dir, runtime } = await fixture();
+    // A real local relay makes transport loss independent of dashboard or service shutdown.
+    const relayDir = await fs.mkdtemp(path.join(os.tmpdir(), "cp-ipc-relay-"));
+    roots.push(relayDir);
+    const relayPaths = runtimePaths(relayDir);
+    await fs.mkdir(relayPaths.directory);
+    await prepareRuntimeEndpoint(relayDir);
+    await fs.copyFile(runtimePaths(dir).token, relayPaths.token);
+    const sockets = new Set<net.Socket>();
+    const relay = net.createServer((downstream) => {
+      const upstream = net.connect(runtimePaths(dir).endpoint);
+      for (const socket of [downstream, upstream]) {
+        sockets.add(socket);
+        socket.on("error", () => undefined);
+        socket.once("close", () => { sockets.delete(socket); downstream.destroy(); upstream.destroy(); });
+      }
+      downstream.pipe(upstream).pipe(downstream);
+    });
+    await new Promise<void>((resolve, reject) => { relay.once("error", reject); relay.listen(relayPaths.endpoint, resolve); });
+    const next = new RuntimeClient(relayDir, () => undefined);
+    clients.push(next);
+    try {
+      await next.connect();
+      await next.start("test", spec);
+      await expect.poll(() => next.status("test")).toBe("running");
+      const pid = next.info("test").pid;
+      const query = vi.spyOn(runtime.agent, "query");
+      const pending = next.query("test", "unanswered-command", /no-such-response/, { timeoutMs: 1500 });
+      const rejected = expect(pending).rejects.toThrow(/unavailable/);
+      await expect.poll(() => query.mock.calls.length).toBe(1);
+      for (const socket of sockets) socket.destroy();
+      await rejected;
+      expect(next.status("test")).toBe("unknown");
+      await expect.poll(() => next.connected, { timeout: 5000 }).toBe(true);
+      expect(next.info("test").pid).toBe(pid);
+      await next.query("test", "save-all flush", /^Saved the (game|world)/);
+      expect(query.mock.calls.filter(([, command]) => command === "unanswered-command")).toHaveLength(1);
+      expect(await next.stop("test", 2000)).toBe(true);
+    } finally {
+      await next.disconnect();
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => relay.close(() => resolve()));
+    }
+  });
+
   it("keeps the same process and full control after the dashboard disconnects", async () => {
     const { dir, runtime, client } = await fixture();
     await client.start("test", spec);
@@ -65,6 +172,17 @@ describe("independent runtime transport", () => {
     expect(client.status("test")).toBe("unknown");
     expect(() => client.isRunning("test")).toThrow(/unavailable/);
     await expect(client.send("test", "stop")).rejects.toThrow(/unavailable/);
+  });
+
+  it("restores autosave when the dashboard disappears during a live backup", async () => {
+    const { runtime, client } = await fixture();
+    await client.start("test", spec);
+    await expect.poll(() => client.status("test")).toBe("running");
+    const send = vi.spyOn(runtime.agent, "send");
+    await client.send("test", "save-off");
+    await client.disconnect();
+    await expect.poll(() => send.mock.calls.some(([id, command]) => id === "test" && command === "save-on")).toBe(true);
+    expect(runtime.agent.isRunning("test")).toBe(true);
   });
 
   it("refuses wrong credentials and incompatible protocol versions", async () => {
@@ -121,5 +239,18 @@ describe("independent runtime transport", () => {
     await next.listen();
     await expect.poll(() => next.agent.status("test")).toBe("running");
     expect(next.agent.info("test").pid).not.toBe(pid);
+  });
+
+  it("persists updated boot policy without starting a server", async () => {
+    const { dir, runtime, client } = await fixture();
+    await client.configure("test", { ...spec, autoStart: true });
+    expect(client.owns("test")).toBe(true);
+    expect(client.isRunning("test")).toBe(false);
+    await client.disconnect();
+    await runtime.close(2000);
+    const next = new RuntimeService(dir);
+    services.push(next);
+    await next.listen();
+    await expect.poll(() => next.agent.status("test")).toBe("running");
   });
 });

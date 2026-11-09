@@ -20,6 +20,9 @@ export interface UpdateResult {
 }
 
 export interface UpdateStatus {
+  runtime?: { protocol: number; sha256: string } | null;
+  interruption?: "none" | "required" | "unknown";
+  affectedServers?: { id: string; name: string; autoStart: boolean }[];
   enabled: boolean;
   current: string;
   latest: string | null;
@@ -101,16 +104,19 @@ export function UpdateNotice() {
 }
 
 const MANUAL_HINT: Record<UpdateStatus["install"]["method"], string> = {
-  "linux-service": "Run this on the machine where CraftPanel is installed. Running servers are stopped gracefully and CraftPanel restarts with the new version.",
-  windows: "Run this in PowerShell on the computer where CraftPanel is installed. Running servers are stopped gracefully and CraftPanel restarts with the new version.",
+  "linux-service": "Run this on the CraftPanel machine. Dashboard-only updates keep Minecraft running. A runtime change requires an explicit maintenance restart (--allow-runtime-restart).",
+  windows: "Run this in PowerShell on the CraftPanel computer. Dashboard-only updates keep Minecraft running. A runtime change requires explicit maintenance approval (CRAFTPANEL_ALLOW_RUNTIME_RESTART=1).",
   git: "Run this in the CraftPanel folder, then restart CraftPanel.",
   manual: "Download the new release and replace the app folder, or reinstall with the one-line installer from the README. Your servers and settings live in the data directory and are kept.",
 };
 
-export function UpdateDialog({ status: s, open, onOpenChange }: { status: UpdateStatus; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function UpdateDialog({ status: initial, open, onOpenChange }: { status: UpdateStatus; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const preview = useQuery({ queryKey: ["update-preview"], queryFn: () => api.get<UpdateStatus>("/api/updates?refresh=1"), enabled: open, staleTime: 0 });
+  const s = preview.data ?? initial;
   const servers = useServers();
-  const running = (servers.data ?? []).filter((x) => ["running", "starting"].includes(x.status));
-  const start = useAction(() => api.post<UpdateProgress>("/api/updates/install"), {
+  const running = s.affectedServers ?? (servers.data ?? []).filter((x) => ["running", "starting", "stopping", "orphaned"].includes(x.status));
+  const interrupts = s.interruption !== "none";
+  const start = useAction(() => api.post<UpdateProgress>("/api/updates/install", { approvedRuntime: interrupts ? s.runtime?.sha256 : undefined }), {
     onSuccess: (p) => {
       onOpenChange(false);
       setFlow({ from: s.current, target: p.target ?? s.latest ?? "", startedAt: p.startedAt ?? Date.now(), phase: "installing", steps: p.steps, log: p.log, sawRestart: false, result: null });
@@ -140,9 +146,11 @@ export function UpdateDialog({ status: s, open, onOpenChange }: { status: Update
             </a>
           )
         )}
-        {running.length > 0 && (
+        {s.interruption === "none" && <Callout variant="info" title="Dashboard update">Minecraft servers and connected players keep running while the dashboard restarts.</Callout>}
+        {s.interruption === "unknown" && <Callout variant="warning" title="Interruption could not be determined">Reconnect the runtime or use the manual installer to review this release. No automatic update is started.</Callout>}
+        {interrupts && running.length > 0 && (
           <Callout variant="warning" icon={<AlertTriangle />} title={`${running.length} server${running.length === 1 ? " is" : "s are"} running`}>
-            <p>They save and stop while CraftPanel restarts (usually under a minute).</p>
+            <p>This release changes the Minecraft runtime. These servers must save and stop; players will be disconnected. Startup time depends on their worlds and software.</p>
             <ul className="mt-1 space-y-0.5">
               {running.map((x) => (
                 <li key={x.id}>
@@ -163,8 +171,8 @@ export function UpdateDialog({ status: s, open, onOpenChange }: { status: Update
             Later
           </Button>
           {s.canInstall && (
-            <Button onClick={() => start.mutate()} loading={start.isPending}>
-              <ArrowUpCircle /> Update now
+            <Button onClick={() => start.mutate()} loading={start.isPending} disabled={preview.isFetching || !!preview.error || s.interruption === "unknown"}>
+              <ArrowUpCircle /> {interrupts ? "Stop affected servers and update" : "Update dashboard"}
             </Button>
           )}
         </DialogFooter>
@@ -186,7 +194,7 @@ function CommandBox({ command }: { command: string }) {
 
 const PHASES = [
   { id: "download", label: "Download and verify the release" },
-  { id: "install", label: "Save and stop servers, install" },
+  { id: "install", label: "Install the reviewed update" },
   { id: "restart", label: "Start the new version" },
   { id: "done", label: "Done" },
 ] as const;
@@ -477,6 +485,34 @@ export function UpdateSection() {
         </div>
       )}
       {s.available && <UpdateDialog status={s} open={open} onOpenChange={setOpen} />}
+      <RuntimeMaintenance />
     </div>
+  );
+}
+
+function RuntimeMaintenance() {
+  const [open, setOpen] = React.useState(false);
+  const servers = useServers();
+  const active = (servers.data ?? []).filter((s) => ["running", "starting", "stopping"].includes(s.status));
+  const unknown = (servers.data ?? []).some((s) => s.status === "unknown");
+  const stop = useAction(async () => {
+    const response = await api.post<{ results: { id: string; stopped: boolean }[] }>("/api/system/stop-all");
+    if (response.results.some((r) => !r.stopped)) throw new Error("Some servers did not stop in time. Check their consoles before maintenance.");
+    return response;
+  }, { success: "All Minecraft servers stopped", invalidate: [["servers"], ["server"]], onSuccess: () => setOpen(false) });
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpen(true)} disabled={unknown || !active.length}>Stop all servers for maintenance</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader title="Stop all Minecraft servers?" description="The runtime saves and stops each server. Connected players will be disconnected. Auto-start settings remain in effect for the next host boot." />
+          <ul>{active.map((s) => <li key={s.id}>{s.name}</li>)}</ul>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={() => stop.mutate()} loading={stop.isPending} disabled={unknown}>Save and stop all servers</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

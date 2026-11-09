@@ -5,11 +5,14 @@ import { AppError, type ConsoleLine, type ServerSoftware, type ServerStatus } fr
 import type { AgentEvents, RuntimeAgent } from "./agent";
 import type { LaunchSpec } from "./managed-server";
 import { isJavaProcess, isPidAlive } from "./process-info";
-import { channel, COMMAND_TTL_MS, emptyRuntimeInfo, RUNTIME_PROTOCOL, runtimePaths, type RuntimeSnapshot } from "./protocol";
+import { runtimeReporter, type RuntimeDiagnosticSink } from "./diagnostics";
+import type { RuntimePathAccess } from "./access";
+import { channel, COMMAND_TTL_MS, emptyRuntimeInfo, RUNTIME_PROTOCOL, prepareRuntimeEndpoint, type RuntimeSnapshot } from "./protocol";
 
 /** A dashboard connection, never an owner of Minecraft processes. No command retries. */
 export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeAgent {
   connected = false;
+  identity: { protocol: number; build: string } | null = null;
   private socket: Socket | null = null;
   private sendFrame: ((m: object) => boolean) | null = null;
   private epoch = "";
@@ -22,8 +25,9 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
   private heartbeat: NodeJS.Timeout | null = null;
   private closed = false;
   private connecting: Promise<void> | null = null;
+  private report: ReturnType<typeof runtimeReporter>;
 
-  constructor(private dataDir: string) { super(); }
+  constructor(private dataDir: string, diagnostics?: RuntimeDiagnosticSink) { super(); this.report = runtimeReporter("client", diagnostics); }
 
   connect(): Promise<void> {
     if (this.connected) return Promise.resolve();
@@ -34,20 +38,21 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
 
   private async open() {
     try {
-      const paths = runtimePaths(this.dataDir);
+      const paths = await prepareRuntimeEndpoint(this.dataDir);
       const token = (await fs.readFile(paths.token, "utf8")).trim();
       if (this.closed) throw this.unavailable();
       await new Promise<void>((resolve, reject) => {
         const socket = net.connect(paths.endpoint);
         this.socket = socket;
-        const timeout = setTimeout(() => { reject(this.unavailable()); socket.destroy(); }, 3000);
+        const timeout = setTimeout(() => { this.report("handshake-timeout"); reject(this.unavailable()); socket.destroy(); }, 3000);
         this.sendFrame = channel(socket, (m) => {
           if (m.type === "snapshot") {
             const s = m.snapshot as RuntimeSnapshot;
             this.snapshots.set(s.id, { ...s, lines: s.lines ?? this.snapshots.get(s.id)?.lines ?? [] });
           } else if (m.type === "ready") {
-            if (m.protocol !== RUNTIME_PROTOCOL || typeof m.epoch !== "string" || typeof m.session !== "string") { socket.destroy(); return; }
+            if (m.protocol !== RUNTIME_PROTOCOL || typeof m.epoch !== "string" || typeof m.session !== "string") { this.report("invalid-handshake"); socket.destroy(); return; }
             this.epoch = m.epoch;
+            this.identity = { protocol: RUNTIME_PROTOCOL, build: typeof m.build === "string" ? m.build : "unknown" };
             this.session = m.session;
             this.sequence = 0;
             this.connected = true;
@@ -73,19 +78,21 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
             if (typeof m.error === "string") p.reject(new AppError(409, "runtime_rejected", m.error));
             else p.resolve(m.result);
           }
-        });
+        }, this.report);
         socket.once("connect", () => {
           this.snapshots.clear();
           this.sendFrame?.({ type: "hello", protocol: RUNTIME_PROTOCOL, token });
         });
-        socket.on("error", () => undefined);
+        socket.on("error", (error) => this.report("socket-error", error));
         socket.once("close", () => {
           clearTimeout(timeout);
+          if (!this.closed) this.report("connection-closed");
           if (this.socket === socket) this.lost();
           reject(this.unavailable());
         });
       });
     } catch (err) {
+      if (!this.closed) this.report("connection-failed", err);
       this.scheduleReconnect();
       throw err;
     }
@@ -118,6 +125,7 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         // Disconnect cancels all outstanding requests. Never allow an uncertain late reply to continue a workflow.
+        this.report("command-reply-timeout");
         this.socket?.destroy();
         this.lost();
       }, waitMs);
@@ -127,6 +135,8 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
   }
 
   async start(id: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }) { await this.call("start", id, { spec }); }
+  async checkPaths(directory: string, javaPath: string) { return await this.call("checkPaths", "", { directory, javaPath }, 15_000) as RuntimePathAccess; }
+  async configure(id: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }) { await this.call("configure", id, { spec }); }
   async stop(id: string, timeoutMs = 90_000) { return await this.call("stop", id, { timeoutMs }, timeoutMs + 5000) as boolean; }
   async kill(id: string) { await this.call("kill", id); }
   async send(id: string, command: string) { await this.call("send", id, { command }); }
@@ -162,6 +172,7 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
   async forget(id: string) { await this.call("forget", id); this.snapshots.delete(id); }
   async configureAutoStart(id: string, value: boolean) { await this.call("autoStart", id, { value }); }
   async stopAll(timeoutMs = 90_000) { return await this.call("stopAll", "", { timeoutMs }, timeoutMs + 5000) as { id: string; stopped: boolean }[]; }
+  async requestServiceShutdown() { await this.call("shutdownRuntime"); }
   /** Kept for embedded callers. Stopping all servers is always explicit. */
   async shutdown(timeoutMs?: number) { await this.stopAll(timeoutMs); }
   async disconnect() {

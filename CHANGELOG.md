@@ -6,6 +6,12 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 
 ## Unreleased
 
+### Added
+- Independent Minecraft runtime service with authenticated local IPC, console replay and dashboard reconnection. Dashboard-only updates preserve running servers; runtime changes require explicit maintenance approval. Windows service registration needs one elevated installation under the dashboard owner's account.
+
+### Fixed
+- Runtime-update rollback preserves registry ownership and boot policy. Dashboard rollback leaves an unchanged Windows runtime host untouched. Manual runtime/dashboard starts share the same default data directory, and server installation is not reported complete before runtime registration is acknowledged.
+
 ## 0.2.1 – 2026-11-09
 
 ### Changed

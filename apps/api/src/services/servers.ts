@@ -54,6 +54,7 @@ export class ServerService {
     readonly java: JavaManager,
     private config: AppConfig,
     private settings: SettingsService,
+    private prepareRuntimeAccess: (directory: string, javaPath: string) => Promise<void> = async () => undefined,
   ) {
     this.modpacks = new ModpackStaging(config.layout.tmp);
     this.wireAgent();
@@ -281,6 +282,9 @@ export class ServerService {
           await ensureLog4jConfig(row.directory, log4j.configFile, ac.signal);
         }
         await this.installPendingModpack(row, actor, ac.signal);
+        // Publish installation completion only after the process owner has accepted its boot policy.
+        // Otherwise the Start button can race the still-held install lock during Java inspection/IPC.
+        if (this.agent.connected) await this.registerRuntime({ ...row, installState: "installed", jarFile: result.jarFile, javaPath }, javaPath);
         await this.db
           .update(servers)
           .set({ installState: "installed", jarFile: result.jarFile, jarSha: result.sha, build: result.build, javaPath, installError: null, lastStatus: "stopped", updatedAt: Date.now() })
@@ -366,6 +370,18 @@ export class ServerService {
 
   // ---- lifecycle ----------------------------------------------------------
 
+  /** Persist next-boot policy even for a server that has never been started. */
+  private async registerRuntime(row: ServerRow, resolvedJava?: string) {
+    if (row.installState !== "installed" || !row.eulaAccepted) return;
+    if (!this.agent.connected) throw new AppError(503, "runtime_disconnected", "Reconnect the Minecraft runtime before changing its configuration");
+    if (!this.agent.identity) return; // Embedded test agent has no boot policy to persist.
+    const javaPath = resolvedJava ?? await this.ensureJava(row.javaMajor, row.javaPath);
+    await this.prepareRuntimeAccess(row.directory, javaPath);
+    const log4j = this.log4shell(row);
+    await this.agent.configure(row.id, { javaPath, directory: row.directory, jarFile: row.jarFile ?? "server.jar", memoryMb: row.memoryMb,
+      jvmArgs: [...(log4j?.jvmArgs ?? []), ...splitArgs(row.jvmArgs)], software: row.software, autoStart: row.autoStart });
+  }
+
   async start(id: string, actor: Actor): Promise<void> {
     await this.withLock(id, "start", async () => {
       const row = await this.row(id);
@@ -393,6 +409,7 @@ export class ServerService {
       }
       for (const hook of this.hooks.beforeStart) await hook(row);
       const javaPath = await this.ensureJava(row.javaMajor, row.javaPath);
+      await this.prepareRuntimeAccess(row.directory, javaPath);
       if (javaPath !== row.javaPath) await this.db.update(servers).set({ javaPath }).where(eq(servers.id, id));
       const log4j = this.log4shell(row);
       if (log4j?.configFile) {
@@ -508,7 +525,6 @@ export class ServerService {
 
   async update(id: string, patch: Partial<Pick<ServerRow, "name" | "description" | "memoryMb" | "jvmArgs" | "javaPath" | "autoStart" | "networkMode" | "bindAddress" | "port" | "infoCommand">>, actor: Actor) {
     const row = await this.row(id);
-    if (patch.autoStart !== undefined) await this.agent.configureAutoStart(id, patch.autoStart);
     if (patch.port !== undefined && patch.port !== row.port) {
       const others = (await this.rows()).filter((s) => s.id !== id);
       if (others.some((s) => s.port === patch.port)) throw conflict(`Port ${patch.port} is used by another CraftPanel server`);
@@ -523,6 +539,7 @@ export class ServerService {
       if (!info) throw badRequest("That path is not a working Java executable");
       if (!isJavaCompatible(row.javaMajor, info.major)) throw badRequest(`Java ${info.major} is not compatible; Minecraft ${row.mcVersion} needs Java ${row.javaMajor}`);
     }
+    await this.registerRuntime({ ...row, ...patch });
     await this.db.update(servers).set({ ...patch, updatedAt: Date.now() }).where(eq(servers.id, id));
     const runtimeKeys: (keyof typeof patch)[] = ["memoryMb", "jvmArgs", "javaPath", "port", "bindAddress"];
     if (this.agent.isRunning(id) && runtimeKeys.some((k) => patch[k] !== undefined && patch[k] !== row[k])) this.restartRequired.add(id);
@@ -641,6 +658,7 @@ export class ServerService {
     if (!this.agent.connected) return;
     for (const row of await this.rows()) {
       if (row.installState === "installing" || row.installState === "pending") {
+        if (this.installs.has(row.id)) continue; // A transport reconnect did not interrupt this dashboard's installation.
         await this.db.update(servers).set({ installState: "failed", installError: "Installation was interrupted. Retry the installation." }).where(eq(servers.id, row.id));
         continue;
       }
@@ -668,6 +686,8 @@ export class ServerService {
     for (const row of await this.rows()) {
       if (row.autoStart && row.installState === "installed" && row.eulaAccepted && !this.agent.owns(row.id) && !this.agent.isRunning(row.id) && row.lastStatus !== "orphaned") {
         this.start(row.id, SYSTEM_ACTOR).catch((err) => this.activity.event(row.id, "server.autostart_failed", `Automatic start failed: ${(err as Error).message}`, { level: "error" }));
+      } else if (row.installState === "installed" && row.lastStatus !== "orphaned" && !this.agent.owns(row.id)) {
+        await this.registerRuntime(row).catch((err) => this.activity.event(row.id, "runtime.registration_failed", `Runtime registration failed: ${(err as Error).message}`, { level: "error" }));
       }
     }
   }

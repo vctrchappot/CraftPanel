@@ -3,7 +3,7 @@
 ```bash
 corepack enable            # Node 25+: npm install -g pnpm
 pnpm install
-pnpm dev            # API :8080 (tsx watch) + Next.js :3000; data in ./.data
+pnpm dev            # runtime + API :8080 (tsx watch) + Next.js :3000; data in ./.data
 ```
 
 In development the dashboard calls the API cross-origin (`NEXT_PUBLIC_API_URL`), and the API allows that origin via `CRAFTPANEL_CORS_ORIGINS` (set by `scripts/dev.mjs`). In production both are served from the same origin.
@@ -14,7 +14,8 @@ In development the dashboard calls the API cross-origin (`NEXT_PUBLIC_API_URL`),
 | --- | --- |
 | `pnpm dev` | API + dashboard with reload |
 | `pnpm build` | Static export of the dashboard, then the bundled API in `apps/api/dist` |
-| `pnpm start` | Run the production build |
+| `pnpm start:runtime` | Start the independent production Minecraft runtime |
+| `pnpm start` | Start the production dashboard/API in another terminal, using the same data directory |
 | `pnpm test` | Vitest: unit + integration tests (no network required) |
 | `pnpm test:e2e` | Playwright: full user flow against the production build with a real Minecraft server (needs internet, ~1 min after the first download). Run `npx playwright install chromium` once. |
 | `pnpm typecheck` | `tsc` for every package |

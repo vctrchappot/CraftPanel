@@ -3,8 +3,8 @@
 # Change settings in /etc/craftpanel/craftpanel.env instead: it overrides the defaults below and is kept.
 [Unit]
 Description=CraftPanel Minecraft server manager
-After=network-online.target
-Wants=network-online.target
+After=network-online.target craftpanel-runtime.service
+Wants=network-online.target craftpanel-runtime.service
 
 [Service]
 Type=simple
@@ -19,10 +19,10 @@ Environment=CRAFTPANEL_DATA_DIR=/var/lib/craftpanel
 Environment=CRAFTPANEL_PROFILE=lan
 Environment=CRAFTPANEL_PORT=8080
 EnvironmentFile=-/etc/craftpanel/craftpanel.env
-# CraftPanel stops Minecraft servers gracefully on SIGTERM (up to 60 s each).
+# Only the dashboard stops here. The runtime owns Minecraft in a separate cgroup.
 KillSignal=SIGTERM
 TimeoutStopSec=120
-# Only the main process gets SIGTERM; CraftPanel then sends "stop" to each server.
+# Never add PartOf= or BindsTo= between dashboard and runtime.
 KillMode=mixed
 Restart=on-failure
 RestartSec=5

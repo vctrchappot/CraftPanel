@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { snapshotState, restoreState } from "../src/state-snapshot";
+import { snapshotState, restoreState, snapshotRuntime, restoreRuntime } from "../src/state-snapshot";
 
 const roots: string[] = [];
 async function fixture() {
@@ -26,6 +26,48 @@ afterEach(async () => {
 });
 
 describe("update database recovery", () => {
+  it("restores runtime registry content and original ownership without rolling back its token", async () => {
+    const { data, snapshot } = await fixture();
+    const directory = path.join(data, "runtime");
+    await fs.mkdir(directory);
+    const registry = path.join(directory, "servers.json");
+    await fs.writeFile(registry, '{"servers":{"test":{"autoStart":true}}}', { mode: 0o600 });
+    const before = await fs.stat(registry);
+    await fs.writeFile(path.join(directory, "token"), "unchanged-token");
+    await snapshotState(data, snapshot);
+    await snapshotRuntime(data, snapshot);
+    await fs.writeFile(registry, "new-runtime-state");
+    await restoreRuntime(data, snapshot);
+    expect(await fs.readFile(registry, "utf8")).toBe('{"servers":{"test":{"autoStart":true}}}');
+    const after = await fs.stat(registry);
+    expect([after.uid, after.gid, after.mode & 0o700]).toEqual([before.uid, before.gid, before.mode & 0o700]);
+    expect(await fs.readFile(path.join(directory, "token"), "utf8")).toBe("unchanged-token");
+    await fs.writeFile(path.join(snapshot, "runtime-servers.json"), "tampered");
+    await expect(restoreRuntime(data, snapshot)).rejects.toThrow(/checksum mismatch/);
+    expect(await fs.readFile(registry, "utf8")).toContain("autoStart");
+  });
+
+  it.skipIf(process.platform === "win32")("refuses registry source links and replaces destination links without following them", async () => {
+    const { root, data, snapshot } = await fixture();
+    const directory = path.join(data, "runtime");
+    await fs.mkdir(directory);
+    const registry = path.join(directory, "servers.json");
+    const outside = path.join(root, "outside");
+    await fs.writeFile(outside, "must-not-change");
+    await fs.symlink(outside, registry);
+    await snapshotState(data, snapshot);
+    await expect(snapshotRuntime(data, snapshot)).rejects.toThrow(/regular file/);
+    await fs.unlink(registry);
+    await fs.writeFile(registry, "original-registry");
+    await snapshotRuntime(data, snapshot);
+    await fs.unlink(registry);
+    await fs.symlink(outside, registry);
+    await restoreRuntime(data, snapshot);
+    expect(await fs.readFile(outside, "utf8")).toBe("must-not-change");
+    expect(await fs.readFile(registry, "utf8")).toBe("original-registry");
+    expect((await fs.lstat(registry)).isSymbolicLink()).toBe(false);
+  });
+
   it("refuses to change state while the recorded application process is alive", async () => {
     const { data, snapshot } = await fixture();
     await fs.writeFile(path.join(data, "control.json"), JSON.stringify({ pid: process.pid }));
