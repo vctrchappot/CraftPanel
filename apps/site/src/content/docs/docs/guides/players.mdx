@@ -1,0 +1,42 @@
+---
+title: Players and profiles
+description: Who is online, who has been here, and a profile for every player with statistics, inventory, activity and moderation.
+sidebar:
+  order: 4
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+## The Players tab
+
+**Players** lists who is online, with a button to kick or ban each of them, and below it:
+
+- **Everyone**: every player CraftPanel has seen join, plus anyone on the whitelist, the operator list or the ban list, newest first, with playtime and badges for Online, OP, Banned and Whitelisted. Search by name.
+- **Whitelist**, **Operators** and **Bans** (including IP bans), and the **History** of the last 200 sessions.
+
+Click a name anywhere on the page to open that player's profile. The address is shareable (`…&tab=players&player=Name`), and the browser's back button returns to the list.
+
+<Aside>
+  Operators are in-game permissions, not dashboard accounts. Dashboard access is managed under Settings → Users.
+</Aside>
+
+## A player's profile
+
+The header shows who they are (online or last seen, first seen, operator level, whitelist and ban state) and has the moderation actions: kick, ban or unban, whitelist, make or revoke operator. Four views sit below it.
+
+**Overview** has six key figures (playtime, sessions, deaths, mob kills, distance travelled, advancements), playtime per day for the last 30 days, a few plain-language observations ("Most active on Fridays around 20:00", "Dies most often to Creeper", "Mines mostly Stone"), the player's state when last saved (health, hunger, experience level) and details such as UUID, position, spawn point and where they last died.
+
+**Inventory** shows the hotbar, backpack, armor, offhand and ender chest as slots, which stack the player has selected, what they hold most of, and their enchanted gear. Hover or focus a slot for the item's name, enchantments and wear.
+
+**Statistics** shows combat figures, distance by way of travel (on foot, sprinting, swimming, by boat, elytra and so on), everyday counters (jumps, fish caught, villager trades) and rankings of blocks mined, items crafted and used, mobs killed, what killed them and tools broken, plus completed advancements by category and the latest ones.
+
+**Activity** shows when the player is online as a heatmap of weekday and hour of day (in your browser's time zone), session length, the latest sessions, the addresses they connected from, and every kick, ban or list change made to them through CraftPanel.
+
+## Where the numbers come from
+
+Sessions, addresses and moderation come from CraftPanel's own log, so they only cover the time CraftPanel managed the server. Statistics, advancements, inventory and position come from the files Minecraft keeps for each player in the world folder (`stats`, `advancements` and `playerdata`, or under `players/` in newer versions), read-only and through the same file sandbox as the Files tab.
+
+- **They are as fresh as the last save.** Minecraft writes them when the world saves (about every five minutes) and when a player leaves. A player who is online right now shows the state of the last save, and the profile says how long ago that was. Run `save-all` in the console to refresh it.
+- **A world has its own set.** After switching worlds, a player shows the statistics of the world that is active now. Playtime from CraftPanel's sessions and the playtime Minecraft counts can differ for that reason.
+- **Missing data is not an error.** A player who never saved on this world, or a file from a Minecraft version CraftPanel doesn't read yet, leaves that view empty with a note instead of failing the page.
+- **Avatars are drawn, not downloaded.** A pixel face is generated from the player's UUID. Skins live on Mojang's servers and the dashboard makes no third-party requests. Item icons are coloured tiles with a monogram for the same reason: the game's textures are not shipped.

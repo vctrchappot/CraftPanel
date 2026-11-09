@@ -52,3 +52,26 @@ export function formatDateTime(ts: number | null | undefined): string {
 export function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString(APP_LOCALE, { hour12: false });
 }
+
+const nf = new Intl.NumberFormat(APP_LOCALE);
+export const formatNumber = (n: number | null | undefined): string => (n === null || n === undefined || !Number.isFinite(n) ? "—" : nf.format(Math.round(n)));
+
+/** Centimetres as Minecraft counts distance → "850 m", "12.4 km". */
+export function formatDistance(cm: number | null | undefined): string {
+  if (cm === null || cm === undefined || !Number.isFinite(cm)) return "—";
+  const m = cm / 100;
+  if (m < 1000) return `${Math.round(m)} m`;
+  const km = m / 1000;
+  return `${km.toFixed(km >= 100 ? 0 : 1)} km`;
+}
+
+/** Playtime in the unit that reads best: minutes under an hour, otherwise hours (with minutes under 10 h), days beyond 48 h. */
+export function formatPlaytime(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms)) return "—";
+  const min = Math.round(ms / 60_000);
+  if (min < 60) return `${min} min`;
+  const h = ms / 3_600_000;
+  if (h < 10) return `${Math.floor(h)} h ${min % 60} min`;
+  if (h < 48) return `${Math.round(h)} h`;
+  return `${Math.floor(h / 24)} d ${Math.round(h % 24)} h`;
+}

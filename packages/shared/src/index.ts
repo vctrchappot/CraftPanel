@@ -7,3 +7,4 @@ export * from "./software";
 export * from "./performance";
 export * from "./hardware";
 export * from "./insights";
+export * from "./players";

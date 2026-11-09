@@ -1,15 +1,18 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Ban, Crown, LogOut, ShieldOff, UserMinus, UserPlus } from "lucide-react";
-import { Button, Callout, ConfirmDialog, Dialog, DialogContent, DialogFooter, DialogHeader, Field, Input, Panel, Section, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@craftpanel/ui";
-import type { OnlinePlayer, ServerDetail } from "@craftpanel/shared";
+import { Ban, Crown, LogOut, Search, ShieldOff, UserMinus, UserPlus } from "lucide-react";
+import { Badge, Button, Callout, ConfirmDialog, Input, Panel, Section, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@craftpanel/ui";
+import type { OnlinePlayer, PlayerRosterEntry, ServerDetail } from "@craftpanel/shared";
 import { api } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { useAction } from "@/lib/queries";
 import { useRealtimeEvent } from "@/lib/realtime";
-import { formatDateTime, timeAgo } from "@/lib/format";
+import { formatDateTime, formatPlaytime, timeAgo } from "@/lib/format";
+import { PlayerProfileView } from "./player-profile";
+import { PlayerAvatar, ReasonDialog, playerHref, usePlayerActions } from "./player-parts";
 
 interface PlayersData {
   online: OnlinePlayer[];
@@ -20,20 +23,24 @@ interface PlayersData {
   whitelistEnabled: boolean;
   onlineMode: boolean;
   history: { id: number; name: string; uuid: string | null; ip: string | null; joinedAt: number; leftAt: number | null }[];
+  roster: PlayerRosterEntry[];
   live: boolean;
 }
 
+/** A player's name in `?player=` opens their profile instead of the lists. */
 export function PlayersTab({ server: s }: { server: ServerDetail }) {
+  const player = useSearchParams().get("player");
+  return player ? <PlayerProfileView key={player} server={s} name={player} /> : <PlayersList server={s} />;
+}
+
+function PlayersList({ server: s }: { server: ServerDetail }) {
   const key = ["players", s.id];
   const q = useQuery({ queryKey: key, queryFn: () => api.get<PlayersData>(`/api/servers/${s.id}/players`) });
   const canManage = useCan("players.manage");
   const canOp = useCan("server.configure");
   useRealtimeEvent((m) => m.type === "players" && m.serverId === s.id && void q.refetch());
 
-  const act = useAction((v: { action: string; name?: string; reason?: string; ip?: string; enabled?: boolean }) => api.post(`/api/servers/${s.id}/players/${v.action}`, { name: v.name, reason: v.reason, ip: v.ip, enabled: v.enabled }), {
-    success: "Done",
-    invalidate: [key],
-  });
+  const act = usePlayerActions(s.id);
   const [dialog, setDialog] = React.useState<{ action: "kick" | "ban"; name: string } | null>(null);
   const [confirmOp, setConfirmOp] = React.useState<string | null>(null);
 
@@ -49,9 +56,11 @@ export function PlayersTab({ server: s }: { server: ServerDetail }) {
             <ul className="divide-y divide-border">
               {d.online.map((p) => (
                 <li key={p.name} className="flex flex-wrap items-center gap-3 px-4 py-3 text-[13px]">
-                  <span className="flex size-6 items-center justify-center rounded bg-muted text-[11px] font-semibold uppercase">{p.name.slice(0, 1)}</span>
+                  <PlayerAvatar name={p.name} uuid={p.uuid} size={28} className="shrink-0 rounded" />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium">{p.name}</p>
+                    <Link href={playerHref(s.id, p.name)} scroll={false} className="font-medium hover:underline">
+                      {p.name}
+                    </Link>
                     <p className="text-xs text-muted-foreground">
                       joined {timeAgo(p.joinedAt)}
                       {p.uuid ? ` · ${p.uuid}` : ""}
@@ -76,13 +85,18 @@ export function PlayersTab({ server: s }: { server: ServerDetail }) {
         </Panel>
       </Section>
 
-      <Tabs defaultValue="whitelist" className="space-y-4">
+      <Tabs defaultValue="everyone" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="everyone">Everyone ({d.roster.length})</TabsTrigger>
           <TabsTrigger value="whitelist">Whitelist ({d.whitelist.length})</TabsTrigger>
           <TabsTrigger value="ops">Operators ({d.ops.length})</TabsTrigger>
           <TabsTrigger value="bans">Bans ({d.bans.length + d.ipBans.length})</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="everyone">
+          <Roster serverId={s.id} roster={d.roster} />
+        </TabsContent>
 
         <TabsContent value="whitelist" className="space-y-4">
           <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3">
@@ -96,6 +110,7 @@ export function PlayersTab({ server: s }: { server: ServerDetail }) {
           <NameList
             items={d.whitelist.map((w) => ({ name: w.name, sub: w.uuid }))}
             empty="The whitelist is empty."
+            link={(name) => playerHref(s.id, name)}
             action={canManage ? { label: "Remove", icon: <UserMinus />, run: (name) => act.mutate({ action: "whitelist-remove", name }) } : undefined}
           />
         </TabsContent>
@@ -108,6 +123,7 @@ export function PlayersTab({ server: s }: { server: ServerDetail }) {
           <NameList
             items={d.ops.map((o) => ({ name: o.name, sub: `level ${o.level} · ${o.uuid}` }))}
             empty="No operators."
+            link={(name) => playerHref(s.id, name)}
             action={canOp ? { label: "Revoke", icon: <ShieldOff />, run: (name) => act.mutate({ action: "deop", name }) } : undefined}
           />
         </TabsContent>
@@ -117,6 +133,7 @@ export function PlayersTab({ server: s }: { server: ServerDetail }) {
           <NameList
             items={d.bans.map((b) => ({ name: b.name ?? b.uuid ?? "?", sub: `${b.reason ?? "No reason"}${b.created ? ` · ${b.created}` : ""}${b.source ? ` · by ${b.source}` : ""}` }))}
             empty="No banned players."
+            link={(name) => playerHref(s.id, name)}
             action={canManage ? { label: "Unban", icon: <UserPlus />, run: (name) => act.mutate({ action: "pardon", name }) } : undefined}
           />
           <IpBans data={d.ipBans} canManage={canManage} onBan={(ip, reason) => act.mutateAsync({ action: "ip-ban", ip, reason })} onPardon={(ip) => act.mutate({ action: "ip-pardon", ip })} />
@@ -137,7 +154,11 @@ export function PlayersTab({ server: s }: { server: ServerDetail }) {
                 <tbody className="divide-y divide-border">
                   {d.history.map((h) => (
                     <tr key={h.id}>
-                      <td className="px-4 py-2 font-medium">{h.name}</td>
+                      <td className="px-4 py-2 font-medium">
+                        <Link href={playerHref(s.id, h.name)} scroll={false} className="hover:underline">
+                          {h.name}
+                        </Link>
+                      </td>
                       <td className="px-4 py-2 text-muted-foreground">{formatDateTime(h.joinedAt)}</td>
                       <td className="px-4 py-2 text-muted-foreground">{h.leftAt ? formatDateTime(h.leftAt) : "online"}</td>
                       <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{h.ip ?? "—"}</td>
@@ -198,7 +219,7 @@ function AddPlayer({ label, onAdd }: { label: string; onAdd: (name: string) => P
   );
 }
 
-function NameList({ items, empty, action }: { items: { name: string; sub?: string }[]; empty: string; action?: { label: string; icon: React.ReactNode; run: (name: string) => void } }) {
+function NameList({ items, empty, action, link }: { items: { name: string; sub?: string }[]; empty: string; action?: { label: string; icon: React.ReactNode; run: (name: string) => void }; link?: (name: string) => string }) {
   return (
     <Panel>
       {items.length ? (
@@ -206,7 +227,13 @@ function NameList({ items, empty, action }: { items: { name: string; sub?: strin
           {items.map((i) => (
             <li key={i.name} className="flex items-center gap-3 px-4 py-2.5 text-[13px]">
               <div className="min-w-0 flex-1">
-                <p className="font-medium">{i.name}</p>
+                {link ? (
+                  <Link href={link(i.name)} scroll={false} className="font-medium hover:underline">
+                    {i.name}
+                  </Link>
+                ) : (
+                  <p className="font-medium">{i.name}</p>
+                )}
                 {i.sub && <p className="truncate text-xs text-muted-foreground">{i.sub}</p>}
               </div>
               {action && (
@@ -248,38 +275,58 @@ function IpBans({ data, canManage, onBan, onPardon }: { data: { ip?: string; rea
   );
 }
 
-function ReasonDialog({ state, onClose, onSubmit }: { state: { action: "kick" | "ban"; name: string } | null; onClose: () => void; onSubmit: (reason: string) => Promise<void> }) {
-  const [reason, setReason] = React.useState("");
-  const [busy, setBusy] = React.useState(false);
-  React.useEffect(() => setReason(""), [state]);
+function Roster({ serverId, roster }: { serverId: string; roster: PlayerRosterEntry[] }) {
+  const [filter, setFilter] = React.useState("");
+  const [all, setAll] = React.useState(false);
+  const shown = roster.filter((r) => r.name.toLowerCase().includes(filter.trim().toLowerCase()));
+  const rows = all ? shown : shown.slice(0, 50);
+  if (!roster.length)
+    return (
+      <Panel>
+        <p className="p-4 text-[13px] text-muted-foreground">Nobody has joined yet. Players appear here once they connect, or when they are on the whitelist, an operator or banned.</p>
+      </Panel>
+    );
   return (
-    <Dialog open={!!state} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader title={state?.action === "ban" ? `Ban ${state.name}` : `Kick ${state?.name}`} description={state?.action === "ban" ? "The player is disconnected and cannot rejoin until unbanned." : "The player is disconnected but may rejoin."} />
-        <Field label="Reason" htmlFor="reason" help="Optional. Shown to the player.">
-          <Input id="reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} autoFocus />
-        </Field>
-        <DialogFooter>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant={state?.action === "ban" ? "destructive" : "default"}
-            loading={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await onSubmit(reason.trim());
-                onClose();
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {state?.action === "ban" ? "Ban player" : "Kick player"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <div className="space-y-4">
+      <div className="relative max-w-xs">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a player" aria-label="Find a player" className="pl-8" />
+      </div>
+      <Panel>
+        {rows.length ? (
+          <ul className="divide-y divide-border">
+            {rows.map((r) => (
+              <li key={r.name.toLowerCase()}>
+                <Link href={playerHref(serverId, r.name)} scroll={false} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-[13px] transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                  <PlayerAvatar name={r.name} uuid={r.uuid} size={28} className="shrink-0 rounded" />
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 font-medium">
+                      {r.name}
+                      {r.online && <Badge variant="success">Online</Badge>}
+                      {r.opLevel !== null && (
+                        <Badge variant="warning">
+                          <Crown /> OP
+                        </Badge>
+                      )}
+                      {r.banned && <Badge variant="danger">Banned</Badge>}
+                      {r.whitelisted && <Badge variant="outline">Whitelisted</Badge>}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{r.sessions ? `${r.sessions} ${r.sessions === 1 ? "session" : "sessions"} · ${formatPlaytime(r.playtimeMs)} played` : "Never joined"}</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{r.online ? "now" : r.lastSeen ? `last seen ${timeAgo(r.lastSeen)}` : ""}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="p-4 text-[13px] text-muted-foreground">No player matches “{filter}”.</p>
+        )}
+      </Panel>
+      {!all && shown.length > rows.length && (
+        <Button variant="ghost" size="sm" onClick={() => setAll(true)}>
+          Show all {shown.length}
+        </Button>
+      )}
+    </div>
   );
 }

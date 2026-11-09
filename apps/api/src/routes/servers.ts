@@ -341,6 +341,11 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     requirePermission(req, "server.view");
     return game.players(await row(req.params.id));
   });
+  app.get<{ Params: { id: string; name: string }; Querystring: { tz?: string } }>("/api/servers/:id/players/:name/profile", async (req) => {
+    requirePermission(req, "server.view");
+    const tz = Number(req.query.tz);
+    return game.playerProfile(await row(req.params.id), req.params.name, Number.isFinite(tz) && Math.abs(tz) <= 14 * 60 ? Math.round(tz) : 0);
+  });
   app.post<IdParams & { Params: { action: string } }>("/api/servers/:id/players/:action", async (req, reply) => {
     requirePermission(req, "players.manage");
     const action = req.params.action;

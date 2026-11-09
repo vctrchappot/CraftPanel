@@ -31,6 +31,7 @@ export default defineConfig({
             { slug: "docs/guides/server-software" },
             { slug: "docs/guides/plugins-and-mods" },
             { slug: "docs/guides/worlds-and-backups" },
+            { slug: "docs/guides/players" },
             { slug: "docs/guides/automation-and-notifications" },
             { slug: "docs/guides/performance" },
             { slug: "docs/guides/velocity" },

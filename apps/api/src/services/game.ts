@@ -1,9 +1,9 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import { badRequest, conflict, findInstalledAddon, notFound, SOFTWARE_INFO, softwareLabel, type AddonKind, type GameRuleInfo, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
-import { PropertiesDocument, SETTINGS, SETTINGS_BY_KEY, parseJsonList, validateSetting, type BanEntry, type OpEntry, type WhitelistEntry } from "@craftpanel/config";
-import { desc, eq, playerSessions, servers as serversTable, type Database } from "@craftpanel/database";
+import { badRequest, conflict, findInstalledAddon, notFound, SOFTWARE_INFO, softwareLabel, type AddonKind, type GameRuleInfo, type PlayerProfile, type PlayerRosterEntry, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
+import { PropertiesDocument, SETTINGS, SETTINGS_BY_KEY, parseJsonList, parseNbtFile, validateSetting, type BanEntry, type OpEntry, type WhitelistEntry } from "@craftpanel/config";
+import { and, desc, asc, eq, events, playerSessions, servers as serversTable, sql, type Database } from "@craftpanel/database";
 import { createZip, extractZip, listZip, readZipEntry } from "@craftpanel/backup";
 import { directorySize } from "@craftpanel/server-runtime";
 import {
@@ -30,6 +30,7 @@ import {
 import type { AppConfig } from "../config";
 import type { ActivityService, Actor } from "./activity";
 import { INFO_PLUGIN_FILE, isInfoPlugin } from "./info-pack";
+import { MAX_SESSION_MS, normalizeAdvancements, normalizeStats, readPlayerState, summarizeActivity } from "./player-profile";
 import type { ServerRow, ServerService } from "./servers";
 
 /** UUID Minecraft assigns to players in offline mode (name-based v3). */
@@ -46,6 +47,9 @@ const HANGAR_INDEX = ".craftpanel-hangar.json";
 /** Which jars in plugins/ or mods/ came from Modrinth (project + version), for duplicate detection. */
 const MODRINTH_INDEX = ".craftpanel-modrinth.json";
 const MODRINTH_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Player files (statistics, advancements, NBT) are a few hundred KB at most; anything bigger isn't one. */
+const PLAYER_FILE_LIMIT = 8 * 1024 * 1024;
 
 const MANAGED_KEYS = new Set(SETTINGS.filter((s) => s.managed).map((s) => s.key));
 
@@ -163,8 +167,9 @@ export class GameService {
       sb.readTextIfExists("server.properties").then((t) => PropertiesDocument.parse(t ?? "")),
     ]);
     const history = await this.db.select().from(playerSessions).where(eq(playerSessions.serverId, row.id)).orderBy(desc(playerSessions.joinedAt)).limit(200);
+    const online = this.servers.agent.info(row.id).players;
     return {
-      online: this.servers.agent.info(row.id).players,
+      online,
       whitelist,
       ops,
       bans,
@@ -172,7 +177,132 @@ export class GameService {
       whitelistEnabled: props.get("white-list") === "true",
       onlineMode: props.get("online-mode") !== "false",
       history,
+      roster: await this.roster(row, { whitelist, ops, bans }, online.map((p) => p.name)),
       live: this.running(row),
+    };
+  }
+
+  /** Everyone this server has seen or listed: players from the session log plus whitelist, operator and ban entries. */
+  private async roster(row: ServerRow, lists: { whitelist: WhitelistEntry[]; ops: OpEntry[]; bans: BanEntry[] }, onlineNames: string[]): Promise<PlayerRosterEntry[]> {
+    const now = Date.now();
+    const seen = await this.db
+      .select({
+        name: sql<string>`min(${playerSessions.name})`,
+        uuid: sql<string | null>`max(${playerSessions.uuid})`,
+        firstSeen: sql<number>`min(${playerSessions.joinedAt})`,
+        lastSeen: sql<number>`max(${playerSessions.joinedAt})`,
+        sessions: sql<number>`count(*)`,
+        playtimeMs: sql<number>`sum(min(coalesce(${playerSessions.leftAt}, ${now}), ${playerSessions.joinedAt} + ${MAX_SESSION_MS}) - ${playerSessions.joinedAt})`,
+      })
+      .from(playerSessions)
+      .where(eq(playerSessions.serverId, row.id))
+      .groupBy(sql`lower(${playerSessions.name})`);
+    const byName = new Map<string, PlayerRosterEntry>();
+    const entry = (name: string, uuid: string | null): PlayerRosterEntry => {
+      const key = name.toLowerCase();
+      let e = byName.get(key);
+      if (!e) byName.set(key, (e = { name, uuid, online: false, firstSeen: null, lastSeen: null, sessions: 0, playtimeMs: 0, whitelisted: false, opLevel: null, banned: false }));
+      e.uuid ??= uuid;
+      return e;
+    };
+    for (const s of seen) Object.assign(entry(s.name, s.uuid), { firstSeen: s.firstSeen, lastSeen: s.lastSeen, sessions: s.sessions, playtimeMs: s.playtimeMs ?? 0 });
+    for (const w of lists.whitelist) entry(w.name, w.uuid).whitelisted = true;
+    for (const o of lists.ops) entry(o.name, o.uuid).opLevel = o.level;
+    for (const b of lists.bans) if (b.name) entry(b.name, b.uuid ?? null).banned = true;
+    for (const n of onlineNames) entry(n, null).online = true;
+    return [...byName.values()].sort((a, b) => Number(b.online) - Number(a.online) || (b.lastSeen ?? 0) - (a.lastSeen ?? 0) || a.name.localeCompare(b.name));
+  }
+
+  /**
+   * One player's profile. Sessions and moderation state come from CraftPanel; statistics, advancements and the
+   * inventory come from the files Minecraft keeps in the world folder (readable while the server runs, as of its
+   * last save).
+   */
+  async playerProfile(row: ServerRow, name: string, tzOffsetMin: number): Promise<PlayerProfile> {
+    this.requireGameServer(row);
+    if (!/^[A-Za-z0-9_]{1,16}$/.test(name)) throw badRequest("Not a valid Minecraft username");
+    const sb = this.servers.sandbox(row);
+    const lower = name.toLowerCase();
+    const same = (e: { name?: string }) => e.name?.toLowerCase() === lower;
+    const [whitelist, ops, bans, props, sessions, level] = await Promise.all([
+      sb.readTextIfExists("whitelist.json").then((t) => parseJsonList<WhitelistEntry>(t)),
+      sb.readTextIfExists("ops.json").then((t) => parseJsonList<OpEntry>(t)),
+      sb.readTextIfExists("banned-players.json").then((t) => parseJsonList<BanEntry>(t)),
+      sb.readTextIfExists("server.properties").then((t) => PropertiesDocument.parse(t ?? "")),
+      this.db.select().from(playerSessions).where(and(eq(playerSessions.serverId, row.id), sql`lower(${playerSessions.name}) = ${lower}`)).orderBy(asc(playerSessions.joinedAt)),
+      this.levelName(row),
+    ]);
+    const wl = whitelist.find(same);
+    const op = ops.find(same);
+    const ban = bans.find(same);
+    if (!sessions.length && !wl && !op && !ban) throw notFound("Player");
+
+    const live = this.servers.agent.info(row.id).players.find((p) => p.name.toLowerCase() === lower);
+    const uuid = [...sessions].reverse().find((s) => s.uuid)?.uuid ?? wl?.uuid ?? op?.uuid ?? ban?.uuid ?? (props.get("online-mode") === "false" ? offlineUuid(name) : null) ?? live?.uuid ?? null;
+    const safeUuid = uuid && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(uuid) ? uuid.toLowerCase() : null;
+
+    // Where Minecraft keeps per-player files: next to level.dat up to 1.21.x, under players/ in newer versions.
+    const find = async (rels: string[]) => {
+      for (const rel of rels) {
+        try {
+          const abs = await sb.resolve(rel);
+          const st = await fsp.stat(abs);
+          if (st.isFile() && st.size <= PLAYER_FILE_LIMIT) return { abs, mtime: st.mtimeMs };
+        } catch {
+          /* not there */
+        }
+      }
+      return null;
+    };
+    const at = (dir: string, ext: string) => (safeUuid ? [`${level}/${dir}/${safeUuid}.${ext}`] : []);
+    const [statsFile, advFile, dataFile] = await Promise.all([
+      find([...at("stats", "json"), ...at("players/stats", "json")]),
+      find([...at("advancements", "json"), ...at("players/advancements", "json")]),
+      find([...at("playerdata", "dat"), ...at("players/data", "dat")]),
+    ]);
+    const json = async (f: { abs: string } | null) => {
+      if (!f) return null;
+      try {
+        return JSON.parse(await fsp.readFile(f.abs, "utf8")) as unknown;
+      } catch {
+        return null;
+      }
+    };
+    let state: PlayerProfile["state"] = null;
+    if (dataFile) {
+      try {
+        state = readPlayerState(parseNbtFile(await fsp.readFile(dataFile.abs)));
+      } catch {
+        /* a file written mid-save or in a format we don't know: show the rest */
+      }
+    }
+
+    const mention = new RegExp(`(^|[^A-Za-z0-9_])${lower}($|[^A-Za-z0-9_])`, "i");
+    const recent = await this.db
+      .select()
+      .from(events)
+      .where(and(eq(events.serverId, row.id), sql`${events.kind} like 'player.%'`))
+      .orderBy(desc(events.createdAt))
+      .limit(400);
+
+    const now = Date.now();
+    return {
+      name: sessions[sessions.length - 1]?.name ?? wl?.name ?? op?.name ?? ban?.name ?? name,
+      uuid: safeUuid ?? uuid,
+      online: !!live && this.running(row),
+      onlineSince: live && this.running(row) ? live.joinedAt : null,
+      whitelisted: !!wl,
+      opLevel: op?.level ?? null,
+      ban: ban ? { reason: ban.reason ?? null, created: ban.created ?? null, source: ban.source ?? null } : null,
+      firstSeen: sessions[0]?.joinedAt ?? null,
+      lastSeen: live ? now : (sessions[sessions.length - 1]?.leftAt ?? sessions[sessions.length - 1]?.joinedAt ?? null),
+      activity: summarizeActivity(sessions, now, tzOffsetMin),
+      stats: normalizeStats(await json(statsFile)),
+      advancements: normalizeAdvancements(await json(advFile)),
+      state,
+      events: recent.filter((e) => mention.test(e.message)).slice(0, 40),
+      world: level,
+      savedAt: Math.max(statsFile?.mtime ?? 0, advFile?.mtime ?? 0, dataFile?.mtime ?? 0) || null,
     };
   }
 
