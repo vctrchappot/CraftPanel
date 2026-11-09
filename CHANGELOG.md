@@ -37,7 +37,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Notifications via Discord webhook and e-mail (SMTP) when a server crashes or fails to start, a backup or scheduled task fails, or a CraftPanel update is available; with a test button.
 
 ### Changed
-- License: CraftPanel is now under the PolyForm Strict License 1.0.0 (free for personal and noncommercial use; no selling, changes or redistribution) instead of AGPL-3.0-or-later.
+- License: CraftPanel is now under the Functional Source License 1.1 with Apache 2.0 future license (FSL-1.1-ALv2) instead of AGPL-3.0-or-later. Use, changes and redistribution are allowed for any purpose except a competing commercial product or service, and each version becomes Apache-2.0 two years after its release. (An interim switch to PolyForm Strict 1.0.0 was never released.)
 - The version lives only in `package.json`.
 - Faster and smaller: the dashboard is sent brotli/gzip-compressed (about 1.2 MB of JavaScript → 0.3 MB) and cached by the browser; the panel starts about 15% faster and uses less memory; the release archive no longer ships the 8 MB source map.
 - The system view answers in about 2 ms instead of 9 ms on Windows.

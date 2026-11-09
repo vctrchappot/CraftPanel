@@ -153,4 +153,4 @@ Issues and ideas are welcome on [GitHub](https://github.com/vctrchappot/CraftPan
 
 ## License
 
-Copyright © 2026 Victor ([@vctrchappot](https://github.com/vctrchappot)). Licensed under the [PolyForm Strict License 1.0.0](LICENSE): free to use for personal and other noncommercial purposes; not to be sold, changed or redistributed. For anything else (commercial use, contributions, building on it), open an issue and ask. See [docs/development](docs/development/README.md#license) for details and dependency license notes.
+Copyright © 2026 Victor ([@vctrchappot](https://github.com/vctrchappot)). Licensed under the [Functional Source License 1.1, ALv2 Future License (FSL-1.1-ALv2)](LICENSE). You may use, change and share CraftPanel for any purpose except offering it, or something substantially similar, as a commercial product or service that competes with it. Running it for yourself, your community or your own company is allowed. Each version becomes available under the Apache License 2.0 two years after its release. See [docs/development](docs/development/README.md#license) for details and dependency license notes.

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Self-hosted Minecraft server manager",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "FSL-1.1-ALv2",
   "author": "Victor (@vctrchappot) (https://www.vctr.site)",
   "homepage": "https://github.com/vctrchappot/CraftPanel",
   "repository": { "type": "git", "url": "https://github.com/vctrchappot/CraftPanel.git" },
