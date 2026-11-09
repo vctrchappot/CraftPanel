@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const [outputArg, instance = "craftpanel"] = process.argv.slice(2);
+const [outputArg, instance = "craftpanel", legacySourceArg] = process.argv.slice(2);
 if (!outputArg || !/^(craftpanel|craftpanel-ops-[a-z0-9-]+)$/.test(instance)) throw new Error("Usage: installer-fixtures.mjs OUTPUT [craftpanel-ops-NAME]");
 const output = path.resolve(outputArg);
 await fs.mkdir(path.dirname(output), { recursive: true });
@@ -61,5 +61,24 @@ setInterval(() => {}, 1000);` : "process.exit(1);"}
   archives[kind] = archive;
   await fs.rm(stage, { recursive: true }); // Only the staging directory just created above.
 }
-await fs.writeFile(path.join(output, "fixtures.json"), JSON.stringify({ instance, archives }, null, 2));
+let legacy;
+if (legacySourceArg) {
+  const source = path.resolve(legacySourceArg);
+  const name = `${instance}-v97.0.0`;
+  const stage = path.join(output, name);
+  await fs.mkdir(path.join(stage, "apps", "api"), { recursive: true });
+  await fs.cp(path.join(source, "apps", "api", "dist"), path.join(stage, "apps", "api", "dist"), { recursive: true, filter: (p) => !p.endsWith(".js.map") });
+  await fs.mkdir(path.join(stage, "deploy"));
+  for (const file of ["README.md", "LICENSE", "CHANGELOG.md"]) await fs.copyFile(path.join(source, file), path.join(stage, file));
+  for (const file of ["install.sh", "craftpanel.service"])
+    await fs.writeFile(path.join(stage, "deploy", rewrite(file)), rewrite(await fs.readFile(path.join(source, "deploy", file), "utf8")));
+  const installer = path.join(output, "legacy-install.sh");
+  await fs.writeFile(installer, rewrite(await fs.readFile(path.join(source, "deploy", "install.sh"), "utf8")));
+  await fs.writeFile(path.join(stage, "release.json"), JSON.stringify({ version: "97.0.0", recoveryProtocol: 1, fixture: "legacy" }));
+  const archive = path.join(output, name + ".tar.gz");
+  execFileSync("tar", ["-czf", archive, name], { cwd: output, windowsHide: true });
+  await fs.rm(stage, { recursive: true });
+  legacy = { archive, installer };
+}
+await fs.writeFile(path.join(output, "fixtures.json"), JSON.stringify({ instance, archives, ...(legacy ? { legacy } : {}) }, null, 2));
 console.log(output);

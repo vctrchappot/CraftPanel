@@ -19,6 +19,8 @@ const dist = path.resolve(distOption >= 0 ? args[distOption + 1] : path.join(rep
 const entry = path.join(dist, "index.js");
 await fs.access(entry);
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "craftpanel-deployment-"));
+const dataRoot = args.includes("--deep-data") ? path.join(root, "nested-" + "x".repeat(100)) : root;
+await fs.mkdir(dataRoot, { recursive: true });
 const processes = [];
 const servers = [];
 const sockets = new Set();
@@ -68,7 +70,7 @@ async function freePort() {
 }
 
 async function start(name, env, useDefaultData = false) {
-  const dataBase = path.join(root, name);
+  const dataBase = path.join(dataRoot, name);
   const data = useDefaultData ? process.platform === "darwin" ? path.join(dataBase, "Library", "Application Support", "CraftPanel")
     : path.join(dataBase, process.platform === "win32" ? "CraftPanel" : "craftpanel") : dataBase;
   const port = await freePort();

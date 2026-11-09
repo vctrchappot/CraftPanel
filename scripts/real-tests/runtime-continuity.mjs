@@ -15,7 +15,9 @@ const [fixturesArg, instance, portArg, toolsDir, javaPath] = process.argv.slice(
 if (process.platform !== "linux" || process.getuid() !== 0 || !/^craftpanel-ops-[a-z0-9-]+$/.test(instance ?? "") || !toolsDir)
   throw new Error("Use Linux/root: runtime-continuity.mjs FIXTURES craftpanel-ops-NAME PORT TOOLS_DIR [JAVA_PATH]");
 const fixtures = path.resolve(fixturesArg);
-await fs.access(path.join(fixtures, "fixtures.json"));
+const fixtureManifest = JSON.parse(await fs.readFile(path.join(fixtures, "fixtures.json"), "utf8"));
+// Fixtures generated on Windows are consumed by this Linux harness; derive paths locally.
+const legacy = fixtureManifest.legacy ? { installer: path.join(fixtures, "legacy-install.sh"), archive: path.join(fixtures, `${instance}-v97.0.0.tar.gz`) } : null;
 const port = Number(portArg);
 assert(Number.isInteger(port) && port >= 1024 && port <= 65535);
 const data = `/var/lib/${instance}`;
@@ -40,7 +42,7 @@ const wait = async (fn, timeout = 90_000) => {
   throw last ?? new Error("Acceptance condition timed out");
 };
 const ready = () => wait(async () => (await fetch(`http://127.0.0.1:${port}/api/ready`)).ok);
-const install = async (version, succeeds = true, flags = [], expectedFailure) => {
+const install = async (version, succeeds = true, flags = [], expectedFailure, legacyInstall = false) => {
   const env = { ...process.env };
   if (flags.includes("--from-dashboard")) {
     // Dashboard updates intentionally ignore archive arguments. Offer exactly one checked local release.
@@ -53,7 +55,7 @@ const install = async (version, succeeds = true, flags = [], expectedFailure) =>
     env.CRAFTPANEL_RELEASE_DIR = releaseDir;
   }
   try {
-    const result = await run("bash", [installer, "--archive", archive(version), "--port", String(port), ...flags], { env, timeout: 180_000, maxBuffer: 2 * 1024 * 1024 });
+    const result = await run("bash", [legacyInstall ? legacy.installer : installer, "--archive", legacyInstall ? legacy.archive : archive(version), "--port", String(port), ...flags], { env, timeout: 180_000, maxBuffer: 2 * 1024 * 1024 });
     await fs.writeFile(path.join(fixtures, `continuity-${version}.log`), result.stdout + result.stderr);
     assert(succeeds, `Broken ${version} unexpectedly installed`);
   } catch (error) {
@@ -71,7 +73,7 @@ try {
   await new Promise((resolve, reject) => { listener.once("error", reject); listener.listen(0, "127.0.0.1", resolve); });
   playerPort = listener.address().port;
   await new Promise((resolve) => listener.close(resolve));
-  await install("99.0.0");
+  await install(legacy ? "97.0.0" : "99.0.0", true, [], undefined, !!legacy);
   await ready();
   let isolatedJava;
   if (javaPath) {
@@ -96,16 +98,65 @@ try {
   await c.waitInstalled(id);
   await c.call("PUT", `/api/servers/${id}/properties`, { values: { "view-distance": "3", "simulation-distance": "3", "spawn-protection": "0" } });
   await c.start(id);
-  const javaPid = (await c.server(id)).pid;
-  const runtimePid = (await run("systemctl", ["show", `${instance}-runtime`, "-p", "MainPID", "--value"])).stdout.trim();
+  let javaPid = (await c.server(id)).pid;
+  let runtimePid = legacy ? null : (await run("systemctl", ["show", `${instance}-runtime`, "-p", "MainPID", "--value"])).stdout.trim();
   const mineflayer = createRequire(path.join(path.resolve(toolsDir), "package.json"))("mineflayer");
-  bot = mineflayer.createBot({ host: "127.0.0.1", port: playerPort, username: "RuntimeBot", auth: "offline", version: "1.21.4" });
-  bot.on("end", (reason) => { disconnected ??= String(reason); });
-  bot.on("error", (error) => { disconnected ??= error.message; });
-  bot.on("kicked", (reason) => { disconnected ??= JSON.stringify(reason); });
-  await wait(() => bot.entity && bot.health !== undefined, 90_000);
-  await wait(async () => (await c.server(id)).players.some((player) => player.name === "RuntimeBot"));
+  const connectPlayer = async () => {
+    disconnected = null;
+    const active = mineflayer.createBot({ host: "127.0.0.1", port: playerPort, username: "RuntimeBot", auth: "offline", version: "1.21.4" });
+    bot = active;
+    active.on("end", (reason) => { if (bot === active) disconnected ??= String(reason); });
+    active.on("error", (error) => { if (bot === active) disconnected ??= error.message; });
+    active.on("kicked", (reason) => { if (bot === active) disconnected ??= JSON.stringify(reason); });
+    await wait(() => active.entity && active.health !== undefined, 90_000);
+    await wait(async () => (await c.server(id)).players.some((player) => player.name === "RuntimeBot"));
+  };
+  await connectPlayer();
   record("real-player-connected", { javaPid, runtimePid, playerPort });
+
+  const sentinel = "runtime-world-preserved";
+  const verifyWorld = async () => {
+    await c.waitStatus(id, "running");
+    await c.command(id, `execute if block 0 100 0 minecraft:gold_block run say ${sentinel}`);
+    await wait(async () => (await c.log(id)).some((line) => line.stream !== "command" && line.text.includes(sentinel)), 10_000);
+  };
+
+  if (legacy) {
+    await install("99.0.0", false, [], /changes the Minecraft runtime/);
+    assert.equal((await c.server(id)).pid, javaPid);
+    assert.equal(disconnected, null);
+    record("legacy-migration-refused-without-maintenance-approval");
+    const directory = (await c.server(id)).directory;
+    const custom = path.join(directory, "acceptance-config.yml");
+    await fs.writeFile(custom, "preserve: legacy configuration\n");
+    const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
+    const customHash = hash(await fs.readFile(custom));
+    const propertiesHash = async () => hash((await fs.readFile(path.join(directory, "server.properties"), "utf8")).split(/\r?\n/).filter((line) => line && !line.startsWith("#")).sort().join("\n"));
+    const propertiesBefore = await propertiesHash();
+    await c.command(id, "forceload add 0 0");
+    await c.sleep(500);
+    await c.command(id, "setblock 0 100 0 minecraft:gold_block");
+    await c.command(id, "save-all flush");
+    bot.end(); bot = null;
+    await install("99.0.1", false, ["--allow-runtime-restart"]);
+    await ready();
+    await verifyWorld();
+    await absent(`/etc/systemd/system/${instance}-runtime.service`);
+    assert.equal(hash(await fs.readFile(custom)), customHash);
+    assert.equal(await propertiesHash(), propertiesBefore);
+    record("failed-legacy-migration-restores-embedded-runtime-and-world", { customHash, propertiesHash: propertiesBefore });
+    await install("99.0.0", true, ["--allow-runtime-restart"]);
+    await ready();
+    await verifyWorld();
+    assert.equal(hash(await fs.readFile(custom)), customHash);
+    assert.equal(await propertiesHash(), propertiesBefore);
+    const migrated = await c.server(id);
+    assert.notEqual(migrated.pid, javaPid);
+    javaPid = migrated.pid;
+    runtimePid = (await run("systemctl", ["show", `${instance}-runtime`, "-p", "MainPID", "--value"])).stdout.trim();
+    await connectPlayer();
+    record("legacy-migration-preserves-world-and-configuration", { javaPid, runtimePid, customHash, propertiesHash: propertiesBefore });
+  }
 
   let marker = 0;
   const continuity = async (scenario) => {
@@ -157,17 +208,13 @@ try {
   await fs.rm(approvalFile, { force: true });
 
   // A world sentinel must survive a failed changed-runtime update and subsequent valid update.
-  const sentinel = "runtime-world-preserved";
+  await c.command(id, "forceload add 0 0");
+  await c.sleep(500);
   await c.command(id, "setblock 0 100 0 minecraft:gold_block");
   await c.command(id, "save-all flush");
   await wait(async () => (await c.log(id)).some((line) => /Saved the (game|world)/.test(line.text)), 30_000);
   bot.end();
   bot = null;
-  const verifyWorld = async () => {
-    await c.waitStatus(id, "running");
-    await c.command(id, `execute if block 0 100 0 minecraft:gold_block run say ${sentinel}`);
-    await wait(async () => (await c.log(id)).some((line) => line.stream !== "command" && line.text.includes(sentinel)), 10_000);
-  };
   await install("99.0.5", false, ["--allow-runtime-restart"]);
   await ready();
   await verifyWorld();

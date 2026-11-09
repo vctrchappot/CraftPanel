@@ -54,7 +54,18 @@ node scripts/real-tests/installer-fixtures.mjs test-results/installer-recovery
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/real-tests/installer-windows.ps1 -Fixtures test-results/installer-recovery
 ```
 
-Use a new fixture directory per run. Existing normal CraftPanel instances are not changed. Tests cover unsupported archives, failed migrations, hanging startup and descendants, subsequent updates and snapshot retention. Linux also checks a specific-interface proxy listener and an invalid unit; Windows checks an invalid launcher. Failed Windows test artifacts are retained for diagnosis.
+Use a new fixture directory per run. Existing normal CraftPanel instances are not changed. Windows service tests require an elevated shell under the dashboard owner's account. Tests cover unsupported archives, failed migrations, hanging startup and descendants, subsequent updates and snapshot retention. Linux also checks a specific-interface proxy listener and an invalid unit. Windows checks an invalid dashboard entry point, SCM identity/recovery and changed-runtime rollback. Failed Windows test artifacts are retained for diagnosis.
+
+## Installed runtime/player continuity (Linux)
+
+Generate fixtures with a fresh isolated name, then run as root on a disposable systemd test host with mineflayer already installed in a separate tools directory:
+
+```bash
+node scripts/real-tests/installer-fixtures.mjs test-results/runtime-acceptance craftpanel-ops-runtime-test
+sudo node scripts/real-tests/runtime-continuity.mjs test-results/runtime-acceptance craftpanel-ops-runtime-test 19689 /path/to/test-tools [/path/to/java]
+```
+
+The optional Java executable is copied into this instance's data directory; the original installation is read-only. The harness installs real Paper 1.21.4, holds a real offline player through dashboard restart/crash, successful dashboard update and migration/unit rollback, and checks unchanged PIDs, player connection, console replay and working commands. It also checks missing/expired/mismatched runtime approvals, changed-runtime rollback and successful maintenance update using a gold block in the real world, and graceful runtime-service restart with auto-start. That final scenario is not an actual host reboot. JSON evidence and installer logs remain in the fixture directory. Services are uninstalled even on failure; data is retained for diagnosis. Fixture names and ports must be unused. Playwright output is confined to `test-results/playwright` so it cannot delete these archives.
 
 ## Conventions
 
