@@ -4,9 +4,9 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 **Goal:** clone or download CraftPanel, run it on a second PC, a Raspberry Pi or a VPS, and create and manage Minecraft servers across platforms and versions from a browser, without needing to know Docker, Java or networking.
 
-## Current state (handoff, 2026-11-08)
+## Current state (2026-11-09)
 
-The active phase is **Minecraft-Laufzeit vom Dashboard trennen**, saved on `wip/runtime-separation` at the user's request to stop for the day. Start with [RUNTIME-HANDOFF.md](RUNTIME-HANDOFF.md): it records implemented work, exact verification limits, an intermittent runtime-test disconnect and the next steps. The phase is not complete; do not merge/deploy this WIP. Main remains at the pre-phase baseline.
+The active phase is **Minecraft-Laufzeit vom Dashboard trennen** on `wip/runtime-separation`. Real Linux player continuity, dashboard update rollback, changed-runtime approval/world recovery and browser maintenance/preview checks now pass. [RUNTIME-HANDOFF.md](RUNTIME-HANDOFF.md) records exact evidence and outstanding Windows, host-reboot and legacy-migration work. The earlier intermittent disconnect remains unreproduced rather than explained. The phase is incomplete; do not merge/release this WIP. Main remains at the pre-phase baseline.
 
 - **Velocity proxy** is done and verified (STATUS.md); remaining points are listed under step 4.
 - **Suggested next, in order:** finish the professional-deployment verification below, publish the first release and run the real installer paths (step 1), then separate runtime ownership from the dashboard before adding remote hosts. Bedrock and Pi/VPS measurements remain planned.
@@ -41,8 +41,8 @@ afterwards its actual state, console and controls are available again.
 - [x] Dashboard reconnect reconciles actual runtime snapshots, rejects controls while disconnected, and never retries expired or uncertain commands (automated integration tests).
 - [ ] Ubuntu/systemd installer migration and independent dashboard/runtime update transactions.
 - [ ] Windows installer parity, including graceful host shutdown.
-- [ ] Explicit maintenance action and runtime-update interruption preview in the dashboard.
-- [ ] Prove a real player remains connected during dashboard restart/update and abrupt crash.
+- [x] Explicit maintenance action and runtime-update interruption preview in the dashboard (real-server stop-all and controlled release-preview browser checks).
+- [x] Prove a real player remains connected during dashboard restart/update and abrupt crash (isolated Ubuntu/systemd, Paper 1.21.4 + mineflayer; Windows parity remains open).
 - [ ] Prove disconnect/replay handling, graceful host reboot/autostart, preserved worlds/configuration and recoverable update failure on installed services.
 
 Commit order: interface → service → reconnect → installers → failure/acceptance tests.

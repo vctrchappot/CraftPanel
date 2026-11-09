@@ -1,14 +1,15 @@
 # Implementation status
 
-## Runtime separation WIP (2026-11-08)
+## Runtime separation WIP (2026-11-09)
 
 Resume on `wip/runtime-separation`; read [RUNTIME-HANDOFF.md](RUNTIME-HANDOFF.md) before changing or deploying it. **Phase incomplete.**
 
-- 🧪 Runtime contract, authenticated IPC, child-process continuity/reconnection, exact-runtime update approval and stored boot policy are implemented and tested.
-- ✅ Isolated Ubuntu/WSL systemd installer regression passed: initial install, unsupported archive, migration/unit/hanging-start rollback, subsequent updates and recovery retention. This used an earlier build and no Minecraft player.
-- 🧪 Production HTTP/TLS/WebSocket deployment smoke passed with a separate runtime. Windows SCM host compiled, but service installation is untested.
-- 🟡 Final typecheck passed. Full suite previously passed 253 tests (2 skipped); the last suite run alongside typecheck had one intermittent runtime disconnect, then all 7 isolated runtime tests passed. Investigate before merge. Final source needs a fresh build.
-- 🟡 Real-player continuity, final-build installer tests, Windows service/reboot parity, legacy world migration and changed-runtime rollback remain open.
+- 🧪 Authenticated IPC now has bounded, credential-free diagnostics. Real transport-loss tests reject in-flight queries without replay, preserve the process through reconnect and restore autosave after a dashboard disconnect. Reconnect leaves active installations intact; installation completion waits for runtime registration.
+- ✅ Isolated Ubuntu/WSL systemd acceptance with real Paper 1.21.4 and a mineflayer player: dashboard restart, SIGKILL/recovery, successful dashboard update, failed migration and invalid-unit rollback preserve the same Java/runtime PIDs and player connection, with commands and console replay working afterwards.
+- ✅ Missing, expired and wrong-runtime approvals are refused without interrupting the player. Failed changed-runtime migration rolls back and preserves a gold-block world sentinel; an approved runtime update and graceful runtime-service restart preserve the world and restore auto-start. Testing found and fixed root-owned registry restoration; the recovery helper now preserves ownership/checksums and replaces files atomically without following links.
+- ✅ Production deployment smoke covers shared default data paths, HTTPS proxy/rewritten Host, auth/WebSocket, direct TLS, readiness and doctor. Windows Chromium E2E passed a real Vanilla server lifecycle, the maintenance stop-all action and interruption preview states (controlled release metadata; no real UI-triggered update).
+- 🧪 Windows typecheck and full suite: 261 passed, 4 Unix-specific skips. CI also found and fixed Unix socket-length failures for deep data paths; owned/validated short aliases keep the actual socket inside the protected runtime directory. macOS CI now passes typecheck, tests, build and production deployment smoke. The earlier intermittent disconnect did not reproduce in twelve complete suite runs; its original cause remains unproven.
+- 🟡 Windows SCM installer/rollback/recovery checks configure parent traversal and Node execution access for the virtual service account; this local shell has no administrator token and elevated checks run in CI. Ubuntu legacy migration with real Paper world/configuration preservation, approval refusal and rollbacks is verified (test-results/runtime-legacy-20261109). Actual host reboot and Windows real-player continuity remain open. A runtime-service restart is not host-reboot evidence. Phase incomplete; do not merge or release.
 
 
 Legend: ✅ verified against real Minecraft servers / real services · 🧪 covered by automated tests (unit/integration, fake process) · 🟡 implemented, not yet verified end-to-end · ⏳ planned.

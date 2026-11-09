@@ -1,9 +1,9 @@
 # Architecture
 
-CraftPanel is a TypeScript monorepo (pnpm workspaces). In production it is **one Node.js process on one port**: the Fastify Control API serves the statically exported Next.js dashboard, the REST API and a WebSocket, and owns the Minecraft child processes through an in-process runtime agent.
+CraftPanel is a TypeScript monorepo (pnpm workspaces). Production uses **two independent Node.js processes**: the Fastify Control API serves the statically exported Next.js dashboard, REST API and WebSocket on one port; the runtime service owns Minecraft children and has no TCP listener. The dashboard connects through authenticated local IPC. See [runtime.md](runtime.md) for the protocol and recovery boundary.
 
 ```
-Browser ──HTTP/WS──▶ Control API (Fastify) ──▶ RuntimeAgent (LocalAgent) ──spawn──▶ java -jar server.jar nogui
+Browser ──HTTP/WS──▶ Control API ──▶ RuntimeClient ──local IPC──▶ RuntimeService ──▶ LocalAgent ──▶ Java
    ▲                      │        │                    │
    │ static export        │        └─ SQLite (node:sqlite + Drizzle)
    └──────────────────────┘        └─ Providers: Mojang · PaperMC · Adoptium · Modrinth
@@ -27,7 +27,7 @@ Browser ──HTTP/WS──▶ Control API (Fastify) ──▶ RuntimeAgent (Loc
 
 ## Key design decisions
 
-**Process ownership and recovery.** Servers are spawned directly (`spawn(file, argv, { shell: false })`), never through a shell. Lifecycle states: `installing → stopped → starting → running → stopping → stopped`, with `crashed` (unexpected exit), `error` (spawn failure) and `orphaned`. On startup CraftPanel reconciles the database with reality: a stored PID is probed and its executable name checked. A live Java process becomes `orphaned` (stoppable, but without console), and a dead one is marked `crashed` if it was meant to be running. On SIGINT/SIGTERM CraftPanel sends `stop` to every server and waits.
+**Process ownership and recovery.** The runtime spawns servers directly (`spawn(file, argv, { shell: false })`). Lifecycle states include `starting`, `running`, `stopping`, `stopped`, `crashed`, `error` and `orphaned`; a disconnected dashboard reports `unknown`. Dashboard startup/reconnection reconciles database observations with authoritative runtime snapshots, including live players and console replay. Dashboard shutdown disconnects without stopping games. Runtime shutdown sends `stop` and waits for saves; runtime startup reads its own launch/auto-start registry independently of SQLite. A live Java PID left by a runtime crash is held orphaned, since stdin cannot be reattached. Mutations acknowledge asynchronously and are never replayed after transport loss.
 
 **Internal queries.** Metrics and game rules use the server's own console (`tps`, `mspt`, `tick query`, `gamerule <name>`, `save-all flush`). `ManagedServer.query()` sends the command and consumes the matching response line, so internal traffic doesn't clutter the user's console. Metrics are sampled only while someone is watching the server, so there is no idle polling.
 
@@ -37,7 +37,7 @@ Browser ──HTTP/WS──▶ Control API (Fastify) ──▶ RuntimeAgent (Loc
 
 **Velocity proxy.** A Velocity server is a server with `SOFTWARE_INFO.proxy`: no world, players, game rules or `server.properties`, so those services answer 409 and the dashboard hides the tabs. `ProxyService` keeps the backend list in `.craftpanel-proxy.json` and the forwarding secret in `forwarding.secret` in the proxy's directory. It plugs into `ServerService.hooks`: `created` writes the initial files, `beforeStart` rewrites `velocity.toml` before a proxy starts and, before a backend starts, sets `online-mode=false` plus Paper's `proxies.velocity` (or FabricProxy-Lite's config) with the secret. Saving the list on a running proxy sends `velocity reload`; backends pick up changes on their next start. The TOML/YAML edits are small line-based editors (`packages/config/src/proxy.ts`) that keep everything they don't own.
 
-**Remote agents (future).** `RuntimeAgent` is the seam between orchestration and process control. A remote agent would implement the same interface over an authenticated channel (e.g. mTLS WebSocket) so one dashboard can manage several hosts. Container isolation would be another agent implementation.
+**Remote agents (future).** `RuntimeAgent` separates orchestration from process control. `RuntimeClient` implements local IPC and `LocalAgent` is the process owner (also injectable for embedded tests). Remote hosts would need authenticated remote transport plus filesystem, installation and resource operations that still belong to the local API today. Container isolation is a later phase.
 
 **Other server software (future).** `ServerProvider` covers versions, builds, Java requirement and installation. Fabric/NeoForge fit this interface directly (plus a mods directory and Modrinth `loaders` filter). Bedrock Dedicated Server needs `LaunchSpec.command` (native binary, no JVM), UDP port 19132 and its own properties/permissions model.
 
@@ -46,6 +46,7 @@ Browser ──HTTP/WS──▶ Control API (Fastify) ──▶ RuntimeAgent (Loc
 ```
 <data dir>/
   craftpanel.db          SQLite (WAL)
+  runtime/              private IPC token, endpoint and launch/auto-start registry
   servers/<slug-id>/     one directory per server (marker file .craftpanel)
   backups/<server-id>/   zip archives (or a configured destination)
   runtimes/java/         Temurin runtimes downloaded by CraftPanel

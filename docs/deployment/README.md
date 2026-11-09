@@ -16,9 +16,9 @@ The download commands below require a published release. If GitHub has no releas
 curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash
 ```
 
-- App in `/opt/craftpanel`, data in `/var/lib/craftpanel`, service `craftpanel` running as the unprivileged `craftpanel` user (hardened unit, see below).
+- App in `/opt/craftpanel`, data in `/var/lib/craftpanel`, separate `craftpanel` dashboard and `craftpanel-runtime` services running as the unprivileged `craftpanel` user (hardened units, see below).
 - Uses the system Node.js if it is 22.13 or newer and installed system-wide; otherwise downloads the current Node.js LTS from nodejs.org (checksum-verified) into `/opt/craftpanel/node`. Your system Node.js is not changed.
-- Settings: `/etc/craftpanel/craftpanel.env` (port, profile, HTTPS, …). It is created once and kept on updates; apply changes with `sudo systemctl restart craftpanel`. If you move the data directory, also add it to `ReadWritePaths` with `sudo systemctl edit craftpanel`.
+- Settings: `/etc/craftpanel/craftpanel.env` (port, profile, HTTPS, …). It is created once and kept on updates. Dashboard changes need `sudo systemctl restart craftpanel`; runtime environment changes need a maintenance restart of `craftpanel-runtime` too. If you move the data directory, add it to `ReadWritePaths` in both units and configure the same path for both.
 - Update: run the command again or `sudo /opt/craftpanel/update.sh`. Options: `--version 0.2.0` (a specific release, also to go back), `--archive file.tar.gz` (offline; verified if `SHA256SUMS` is next to it), `--port 8090`, `--uninstall` (keeps data and settings). Pass them as `curl … | sudo bash -s -- --port 8090`.
 
 **Windows 10/11** (x64, ARM64):
@@ -27,13 +27,13 @@ curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/in
 irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex
 ```
 
-- App in `%LOCALAPPDATA%\Programs\CraftPanel`, data in `%LOCALAPPDATA%\CraftPanel`, no administrator rights needed. A scheduled task named `CraftPanel` starts it hidden when you sign in; a Start-menu entry opens the dashboard. Logs: `%LOCALAPPDATA%\CraftPanel\logs\craftpanel.log`.
+- The first installation needs an elevated PowerShell under the same Windows account that will own the dashboard. App: `%LOCALAPPDATA%\Programs\CraftPanel`; data/logs: `%LOCALAPPDATA%\CraftPanel`. The `CraftPanel Runtime` SCM service uses a virtual account; the separate `CraftPanel` dashboard task starts at sign-in. A Start-menu entry opens the dashboard.
 - Uses an installed Node.js 22.13+ or downloads one into the install folder.
 - Settings: `config.env` in the install folder. Options are environment variables set before running the command: `$env:CRAFTPANEL_PORT = "8090"`, `CRAFTPANEL_PROFILE` (`lan` or `local`), `CRAFTPANEL_INSTALL_VERSION`, `CRAFTPANEL_ARCHIVE`, `CRAFTPANEL_UNINSTALL = "1"` (keeps data).
 - Update: run the command again, or `update.ps1` in the install folder (the dashboard shows the exact command).
-- CraftPanel runs only while you are signed in. For a dedicated machine, prefer the Linux systemd installation or run `start.ps1` through a Windows service manager configured with a dedicated account.
+- Minecraft starts independently at host boot according to each server's auto-start policy. The dashboard starts at sign-in. The installing user can start/stop the runtime service and run updates; registering/removing a service requires administrator access.
 
-**Updates in both installers:** installers reject concurrent runs and unsupported recovery protocols before stopping the existing installation. CraftPanel then stops gracefully (running Minecraft servers save and stop), a consistent database recovery point is created, and the new application must pass its readiness check. Post-swap failures trigger restoration of the previous database, application and saved startup artifacts before the old version is restarted. If recovery fails, CraftPanel stays stopped. Servers with "Start with CraftPanel" come back automatically. See [update recovery](#update-recovery).
+**Updates in both installers:** installers reject concurrent runs and unsupported recovery protocols before stopping anything. Dashboard-only updates snapshot SQLite and replace the API while Minecraft keeps running. A changed runtime or legacy migration requires explicit maintenance approval (`--allow-runtime-restart` on Linux; `CRAFTPANEL_ALLOW_RUNTIME_RESTART=1` on Windows), saves/stops games and snapshots the runtime registry separately. Dashboard approval is bound to the exact runtime hash and expires after ten minutes. Failed updates restore the previous database, application and startup artifacts; changed-runtime rollback also restores registry ownership and boot policy. If recovery fails, the affected components stay stopped. Runtime startup starts only games with auto-start enabled. See [update recovery](#update-recovery).
 
 ## Build it yourself
 
@@ -41,8 +41,10 @@ irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.p
 corepack enable            # Node 25+: npm install -g pnpm
 pnpm install
 pnpm build            # → apps/api/dist
-node apps/api/dist/index.js
+node apps/api/dist/runtime.js
 ```
+
+Keep the runtime running. Start `node apps/api/dist/index.js` in another terminal. Both use the platform data directory by default; apply the same `CRAFTPANEL_DATA_DIR` override to both.
 
 ## Start profiles
 
@@ -97,8 +99,8 @@ The installer builds and packages the checkout, then uses the release installer'
 
 1. Install Node.js 24 LTS from nodejs.org, and Git.
 2. In PowerShell: `corepack enable` (on Node 25+ use `npm install -g pnpm` instead), then `pnpm install; pnpm build`.
-3. Run `node apps\api\dist\index.js`. Windows Defender Firewall asks to allow Java the first time a server starts. Allow **private networks** only.
-4. To run at logon, create a Task Scheduler task ("At log on", action `node.exe` with argument `C:\path\to\craftpanel\apps\api\dist\index.js`, "Start in" the repository folder). For a background service, wrap it with a service manager such as NSSM or WinSW. Make sure it stops with Ctrl+C/SIGINT semantics so servers shut down gracefully.
+3. Run `node apps\api\dist\runtime.js`, then `node apps\api\dist\index.js` in another terminal, with the same data-directory settings. Windows Defender Firewall asks to allow Java the first time a server starts. Allow **private networks** only.
+4. For installed boot/sign-in integration, package the checkout (`node scripts/release.mjs pack`) and use `deploy\install.ps1` with `CRAFTPANEL_ARCHIVE` pointing to that archive. The installer provides the SCM process owner and dashboard task. Stopping a manual terminal runtime stops its games.
 
 Data lives in `%LOCALAPPDATA%\CraftPanel` by default.
 
@@ -107,10 +109,10 @@ Data lives in `%LOCALAPPDATA%\CraftPanel` by default.
 ```bash
 brew install node git
 npm install -g pnpm && pnpm install && pnpm build
-node apps/api/dist/index.js
+node apps/api/dist/runtime.js
 ```
 
-Data lives in `~/Library/Application Support/CraftPanel`. To start at login, create a LaunchAgent plist that runs `node /path/to/apps/api/dist/index.js`.
+In another terminal run `node apps/api/dist/index.js`. Data lives in `~/Library/Application Support/CraftPanel`. Login automation needs separate LaunchAgents for runtime and dashboard; automated macOS service installation is not provided.
 
 ## VPS
 
@@ -223,7 +225,7 @@ The script (`scripts/update.mjs`) fetches the newest version, stashes local edit
 
 Manual equivalent: `git pull && pnpm install && pnpm build`, then restart (service installs: `git pull && sudo ./deploy/install-linux.sh`).
 
-Database migrations run automatically on start. Running Minecraft servers are stopped gracefully during the restart. Enable "Start with CraftPanel" on servers that should come back automatically.
+Database migrations run automatically on dashboard start. Dashboard restarts preserve running games. Runtime updates save/stop games after explicit approval; auto-start controls which games return when the runtime starts.
 
 ### Update recovery
 
@@ -247,6 +249,6 @@ Database recovery points belong to the original absolute data-directory path. Th
 
 ## Backups of CraftPanel itself
 
-Back up the whole data directory while CraftPanel is stopped, or at least `craftpanel.db` plus the `servers/` and `backups/` folders.
+Back up the whole data directory while both dashboard and runtime are stopped, including the database, server files, backups and runtime registry. Stopping only the dashboard leaves Minecraft writing world data.
 
 Also preserve service configuration, certificates and keys separately. A copy of only the main database file while CraftPanel is running can omit committed data in SQLite's WAL; use the recovery helper for a consistent database snapshot or stop CraftPanel before copying the complete data directory. Test restoration to a separate location before relying on a backup. Complete application backup/restore and a host-migration assistant are planned.

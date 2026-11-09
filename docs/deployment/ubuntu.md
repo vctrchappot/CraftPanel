@@ -28,7 +28,7 @@ cd craftpanel
 sudo bash deploy/install-linux.sh
 ```
 
-The installer installs build dependencies, builds and packages CraftPanel, and starts its systemd service. This can take several minutes. It also enables startup after an Ubuntu reboot, so you can close the terminal afterwards.
+The installer installs build dependencies, builds and packages CraftPanel, and starts separate systemd services for the dashboard and Minecraft runtime. This can take several minutes. Both are enabled after an Ubuntu reboot, so you can close the terminal afterwards.
 
 At the end, keep the printed **dashboard address** and **setup token** handy. The token is used once to create the owner account.
 
@@ -101,7 +101,7 @@ Enable **Start with CraftPanel** on servers that should start after an Ubuntu re
 - Disable automatic suspend/standby while hosting.
 - Give Ubuntu a fixed DHCP reservation in your router so its address stays the same.
 - CraftPanel starts automatically after boot. Each Minecraft server needs its own **Start with CraftPanel** setting.
-- A normal CraftPanel restart or update currently saves and stops the Minecraft servers; servers with automatic startup enabled come back afterwards.
+- Dashboard restarts and dashboard-only updates keep Minecraft running. A runtime change or migration from the older combined process requires explicit maintenance approval and saves/stops games; servers with auto-start enabled return when the runtime starts.
 - This home-network setup uses HTTP. Keep it on a trusted LAN or encrypted VPN. Do not forward dashboard port **8080** through your router. For access from outside your home, follow the [VPN and HTTPS deployment guidance](README.md#remote-access-for-teams).
 
 ## Where files live and how to update
@@ -121,3 +121,5 @@ cd ~/craftpanel
 ```
 
 Keep the checkout for this update command. Configuration, HTTPS, recovery and other operating systems are covered in the [deployment reference](README.md).
+
+If an update reports that the Minecraft runtime changes, choose a maintenance window and run `sudo bash deploy/install-linux.sh --allow-runtime-restart` from the checkout. The dashboard's update preview also identifies updates that will interrupt games. Runtime logs are available with `sudo journalctl -u craftpanel-runtime -f`.

@@ -30,15 +30,15 @@ The release installer keeps CraftPanel running in the background. Nothing is bui
 curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash
 ```
 
-**Windows 10/11** (PowerShell, no administrator rights needed; starts when you sign in):
+**Windows 10/11** (PowerShell as administrator for the first install, using your normal Windows account):
 
 ```powershell
 irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex
 ```
 
-The installer prints the dashboard address and a one-time **setup token** for creating the owner account. Run the same command again to update; a failed update rolls back automatically. The dashboard shows a notice when a new release is out (Settings → Security & about). Options, uninstalling and what goes where: [docs/deployment](docs/deployment/README.md#one-line-install-recommended).
+The installer prints the dashboard address and a one-time **setup token** for creating the owner account. Minecraft runs in an independent background service; on Windows the dashboard starts when you sign in. Dashboard-only updates preserve running games. Updates that change the runtime require explicit maintenance approval and save/stop affected servers. Failed updates restore the previous application and database. Options and recovery limits: [docs/deployment](docs/deployment/README.md#one-line-install-recommended).
 
-Every release also has a plain `craftpanel-vX.Y.Z.tar.gz` that runs anywhere with Node.js 22.13+: unpack it and run `node apps/api/dist/index.js --profile lan`.
+Every release also has a plain `craftpanel-vX.Y.Z.tar.gz` for Node.js 22.13+: unpack it, start `node apps/api/dist/runtime.js` in one terminal, then `node apps/api/dist/index.js --profile lan` in another. Both processes must use the same data directory.
 
 ## Run from source
 
@@ -50,8 +50,10 @@ cd craftpanel
 corepack enable            # Node 25+: npm install -g pnpm
 pnpm install
 pnpm build
-pnpm start
+pnpm start:runtime
 ```
+
+Keep the runtime running. In another terminal in the same folder, run `pnpm start` for the dashboard. Both use the same platform data directory by default; set `CRAFTPANEL_DATA_DIR` identically for both when overriding it. `pnpm dev` starts runtime, API and dashboard together for development.
 
 Open **http://127.0.0.1:8080**, create the owner account, and follow the wizard to create your first server.
 
