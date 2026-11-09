@@ -11,12 +11,14 @@ if (!outputArg || !/^(craftpanel|craftpanel-ops-[a-z0-9-]+)$/.test(instance)) th
 const output = path.resolve(outputArg);
 await fs.mkdir(path.dirname(output), { recursive: true });
 await fs.mkdir(output); // Refuse to overwrite an existing fixture set.
-const rewrite = (text) => instance === "craftpanel" ? text : text.replace(/\bcraftpanel\b/g, () => instance).replaceAll(`${instance}-recovery-v1`, "craftpanel-recovery-v1").replaceAll(`${instance}-runtime-v1`, "craftpanel-runtime-v1");
+// Isolate service, user and path names, but keep release archives named craftpanel-vX.Y.Z like real
+// releases: the dashboard reads craftpanel-vX.Y.Z/release.json from them.
+const rewrite = (text) => instance === "craftpanel" ? text : text.replace(/\bcraftpanel\b(?!-v)/g, () => instance).replaceAll(`${instance}-recovery-v1`, "craftpanel-recovery-v1").replaceAll(`${instance}-runtime-v1`, "craftpanel-runtime-v1");
 await fs.writeFile(path.join(output, "install.sh"), rewrite(await fs.readFile(path.join(root, "deploy/install.sh"), "utf8")));
 await fs.copyFile(path.join(root, "deploy/install.ps1"), path.join(output, "install.ps1"));
 const archives = {};
 for (const [kind, version] of [["good", "99.0.0"], ["unsupported", "98.0.0"], ["migration", "99.0.1"], ["unit", "99.0.2"], ["hang", "99.0.3"], ["runtime", "99.0.4"], ["runtime-migration", "99.0.5"]]) {
-  const name = `${instance}-v${version}`;
+  const name = `craftpanel-v${version}`;
   const stage = path.join(output, name);
   const dist = path.join(stage, "apps/api/dist");
   await fs.mkdir(path.dirname(dist), { recursive: true });
@@ -64,7 +66,7 @@ setInterval(() => {}, 1000);` : "process.exit(1);"}
 let legacy;
 if (legacySourceArg) {
   const source = path.resolve(legacySourceArg);
-  const name = `${instance}-v97.0.0`;
+  const name = "craftpanel-v97.0.0";
   const stage = path.join(output, name);
   await fs.mkdir(path.join(stage, "apps", "api"), { recursive: true });
   await fs.cp(path.join(source, "apps", "api", "dist"), path.join(stage, "apps", "api", "dist"), { recursive: true, filter: (p) => !p.endsWith(".js.map") });

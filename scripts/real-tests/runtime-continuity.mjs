@@ -17,13 +17,13 @@ if (process.platform !== "linux" || process.getuid() !== 0 || !/^craftpanel-ops-
 const fixtures = path.resolve(fixturesArg);
 const fixtureManifest = JSON.parse(await fs.readFile(path.join(fixtures, "fixtures.json"), "utf8"));
 // Fixtures generated on Windows are consumed by this Linux harness; derive paths locally.
-const legacy = fixtureManifest.legacy ? { installer: path.join(fixtures, "legacy-install.sh"), archive: path.join(fixtures, `${instance}-v97.0.0.tar.gz`) } : null;
+const legacy = fixtureManifest.legacy ? { installer: path.join(fixtures, "legacy-install.sh"), archive: path.join(fixtures, "craftpanel-v97.0.0.tar.gz") } : null;
 const port = Number(portArg);
 assert(Number.isInteger(port) && port >= 1024 && port <= 65535);
 const data = `/var/lib/${instance}`;
 const app = `/opt/${instance}`;
 const installer = path.join(fixtures, "install.sh");
-const archive = (version) => path.join(fixtures, `${instance}-v${version}.tar.gz`);
+const archive = (version) => path.join(fixtures, `craftpanel-v${version}.tar.gz`);
 const c = client(`http://127.0.0.1:${port}`);
 const original = (await run("systemctl", ["show", "craftpanel", "-p", "MainPID", "--value"])).stdout.trim();
 const absent = async (file) => { await assert.rejects(fs.access(file), { code: "ENOENT" }); };
@@ -196,7 +196,7 @@ try {
   // Approval is bound to a runtime fingerprint and a short expiry, before stopping anything.
   await install("99.0.4", false, [], /changes the Minecraft runtime/);
   await continuity("changed-runtime-refused-without-approval");
-  const manifestIn = async (version) => JSON.parse((await run("tar", ["-xOf", archive(version), `${instance}-v${version}/release.json`])).stdout);
+  const manifestIn = async (version) => JSON.parse((await run("tar", ["-xOf", archive(version), `craftpanel-v${version}/release.json`])).stdout);
   const targetRuntime = (await manifestIn("99.0.4")).runtime.sha256;
   const approvalFile = path.join(data, "runtime", "update-approval.json");
   await fs.writeFile(approvalFile, JSON.stringify({ sha256: targetRuntime, expiresAt: Date.now() - 1 }), { mode: 0o600 });

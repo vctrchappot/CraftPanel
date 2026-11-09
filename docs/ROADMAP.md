@@ -6,10 +6,10 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 ## Current state (2026-11-09)
 
-The active phase is **Minecraft-Laufzeit vom Dashboard trennen** on `wip/runtime-separation`. Real Linux player continuity, legacy migration, dashboard update rollback, changed-runtime approval/world recovery, browser maintenance/preview checks and the elevated Windows SCM scenarios in CI pass. [RUNTIME-HANDOFF.md](RUNTIME-HANDOFF.md) records exact evidence and the remaining acceptance: Windows host shutdown/boot on a real or virtual machine, dashboard-triggered rollback and concurrent installers. The earlier intermittent disconnect remains unreproduced rather than explained. The phase is incomplete; do not merge/release this WIP. Main remains at the pre-phase baseline.
+**Minecraft-Laufzeit vom Dashboard trennen** is done and merged: games run in their own runtime service and survive dashboard restarts, crashes and updates (evidence in STATUS.md). One verification gap stays open: an actual Windows host shutdown on a disposable VM. Releases v0.1.0–v0.2.1 are published on GitHub; the runtime separation ships with the next release.
 
 - **Velocity proxy** is done and verified (STATUS.md); remaining points are listed under step 4.
-- **Suggested next, in order:** finish the runtime separation, then the remaining professional-deployment verification below, publish the first release and run the real installer paths (step 1). Bedrock and Pi/VPS measurements remain planned.
+- **Suggested next, in order:** release the runtime separation, run the real installer paths on a physical Pi and a small VPS and announce (step 1), then per-server isolation and resource limits. Bedrock and Pi/VPS measurements remain planned.
 - **Known small issues** (not yet tracked elsewhere):
   - Modrinth update checks also offer beta/alpha versions (`checkModrinthUpdates` doesn't filter by `version_type`).
   - Removing a plugin installed from Hangar leaves its entry in `plugins/.craftpanel-hangar.json` (harmless; only existing jars are checked).
@@ -31,7 +31,7 @@ The active phase is **Minecraft-Laufzeit vom Dashboard trennen** on `wip/runtime
 
 ## Next
 
-### Minecraft-Laufzeit vom Dashboard trennen
+### Minecraft-Laufzeit vom Dashboard trennen (done, one gap)
 
 User outcome: the dashboard can close, restart or update while Minecraft continues;
 afterwards its actual state, console and controls are available again.
@@ -40,10 +40,11 @@ afterwards its actual state, console and controls are available again.
 - [x] Separate process owner, authenticated Unix socket / Windows named pipe, bounded history and protocol handshake (automated child-process tests).
 - [x] Dashboard reconnect reconciles actual runtime snapshots, rejects controls while disconnected, and never retries expired or uncertain commands (automated integration tests).
 - [x] Ubuntu/systemd installer migration and independent dashboard/runtime update transactions (isolated Ubuntu/systemd with real Paper worlds, legacy migration and rollbacks).
-- [ ] Windows installer parity, including graceful host shutdown (SCM service, updates, rollback, crash recovery and real-player continuity pass in CI; an actual host shutdown is open).
+- [x] Windows installer parity: SCM service under a virtual account, updates, rollback, crash recovery and real-player continuity (CI on a hosted runner).
+- [ ] Verify an actual Windows host shutdown and boot on a disposable VM (the shared stop path is verified; Windows does not let applications send preshutdown).
 - [x] Explicit maintenance action and runtime-update interruption preview in the dashboard (real-server stop-all and controlled release-preview browser checks).
 - [x] Prove a real player remains connected during dashboard restart/update and abrupt crash (isolated Ubuntu/systemd and Windows SCM in CI, Paper 1.21.4 + mineflayer).
-- [ ] Prove disconnect/replay handling, graceful host reboot/autostart, preserved worlds/configuration and recoverable update failure on installed services (verified on Ubuntu/systemd, including graceful shutdown/boot of a disposable WSL host; Windows host shutdown is open).
+- [x] Prove disconnect/replay handling, graceful host reboot/autostart, preserved worlds/configuration and recoverable update failure on installed services (Ubuntu/systemd including shutdown/boot of a disposable WSL host; Windows except an actual host shutdown).
 
 Commit order: interface → service → reconnect → installers → failure/acceptance tests.
 Do not mark this phase complete from mocked or child-process-only evidence.
@@ -55,8 +56,9 @@ Following phases: per-server isolation/resources → complete backups and host m
 - [x] Deployment diagnostics in Remote access and the read-only `doctor --json` command; separate liveness and readiness endpoints.
 - [x] Standalone recovery protocol, consistent database snapshots and startup-artifact rollback verified through isolated Linux/Windows package installs, including failed migrations, unsupported targets and hanging startup. Linux also covers an invalid systemd unit. Source installs share the release installer transaction.
 - [x] Real HTTPS reverse-proxy, built-in TLS and WebSocket package tests on Windows and Ubuntu/WSL2, plus the Remote access UI in Chromium.
-- [ ] Extend verification to dashboard-triggered rollback, concurrent installers and a physical separate-host HTTPS proxy; keep STATUS.md evidence specific to each environment.
-- [ ] Separate the runtime service from the API so panel updates do not stop game servers and reconnect restores control (in progress, see "Minecraft-Laufzeit vom Dashboard trennen" above).
+- [x] Dashboard-triggered update with rollback and runtime approval, and concurrent installers (Ubuntu/systemd, `dashboard-update.mjs`).
+- [ ] The same on Windows, and a physical separate-host HTTPS proxy; keep STATUS.md evidence specific to each environment.
+- [x] Separate the runtime service from the API so panel updates do not stop game servers and reconnect restores control.
 - [ ] Add per-server OS isolation and resource limits.
 - [ ] Add complete application backup/restore and host migration, including configuration and secrets outside the panel database.
 - [ ] Add persistent monitoring and recoverable background jobs, then authenticated remote agents and multiple hosts.
@@ -71,7 +73,8 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 - [x] Update notice in the dashboard (GitHub latest release, opt-out; shows the update command for the install method).
 - [x] One-click update from the dashboard (systemd path unit / scheduled task run the installer; progress, reload, "What's new", rollback reported), local release folder for offline installs.
 - [x] Version bump process: `package.json` is the single source, `node scripts/release.mjs bump X.Y.Z` dates the changelog, commits and tags.
-- [ ] Publish the first release and run the real `curl | sudo bash` / `irm | iex` path against it (also on a physical Pi).
+- [x] Publish releases (v0.1.0–v0.2.1); a v0.1.0 → v0.2.0 Windows package update was verified in an isolated install.
+- [ ] Run the real `curl | sudo bash` / `irm | iex` path against a release on a physical Pi and a small VPS.
 - [ ] macOS: a LaunchAgent installer (today: run the release archive with Node.js by hand).
 - [ ] Optional: multi-arch Docker image (amd64/arm64) with a data volume.
 

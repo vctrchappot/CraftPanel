@@ -67,6 +67,20 @@ sudo node scripts/real-tests/runtime-continuity.mjs test-results/runtime-accepta
 
 The optional Java executable is copied into this instance's data directory; the original installation is read-only. The harness installs real Paper 1.21.4, holds a real offline player through dashboard restart/crash, successful dashboard update and migration/unit rollback, and checks unchanged PIDs, player connection, console replay and working commands. It also checks missing/expired/mismatched runtime approvals, changed-runtime rollback and successful maintenance update using a gold block in the real world, and graceful runtime-service restart with auto-start. That final scenario is not an actual host reboot. JSON evidence and installer logs remain in the fixture directory. Services are uninstalled even on failure; data is retained for diagnosis. Fixture names and ports must be unused. Playwright output is confined to `test-results/playwright` so it cannot delete these archives.
 
+## Dashboard-triggered updates and concurrent installers (Linux)
+
+```bash
+node scripts/real-tests/installer-fixtures.mjs test-results/dashboard-update craftpanel-ops-dash-test
+sudo node scripts/real-tests/dashboard-update.mjs test-results/dashboard-update craftpanel-ops-dash-test 19697
+```
+
+The scenario installs an isolated instance and points its settings file at a local release folder (`CRAFTPANEL_RELEASE_DIR`). It then updates through the dashboard API as "Update now" does, and the systemd path unit runs the installer. Checks:
+- A release with a failing migration rolls back. The dashboard shows the result and log after its restart, and the runtime is not restarted.
+- A runtime-changing release is refused without approval and installs with the exact approval.
+- Of two installers started at the same time, one is refused by the install lock.
+
+The instance is uninstalled afterwards. Fixture archives keep the real `craftpanel-vX.Y.Z` names, because the dashboard reads `craftpanel-vX.Y.Z/release.json` from them. Only service, user and path names are isolated.
+
 ## Installed runtime/player continuity (Windows)
 
 Run in an elevated shell under the account that will own the dashboard, on a disposable machine (CI uses the hosted Windows runner):

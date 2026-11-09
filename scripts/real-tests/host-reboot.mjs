@@ -63,7 +63,7 @@ if (phase === "prepare") {
     await new Promise((resolve) => listener.close(resolve));
     return value;
   };
-  const result = await run("bash", [installer, "--archive", path.join(fixtures, `${instance}-v99.0.0.tar.gz`), "--port", String(port)], { timeout: 180_000, maxBuffer: 2 * 1024 * 1024 });
+  const result = await run("bash", [installer, "--archive", path.join(fixtures, "craftpanel-v99.0.0.tar.gz"), "--port", String(port)], { timeout: 180_000, maxBuffer: 2 * 1024 * 1024 });
   await fs.writeFile(path.join(fixtures, "host-reboot-install.log"), result.stdout + result.stderr);
   await ready();
   let isolatedJava;
