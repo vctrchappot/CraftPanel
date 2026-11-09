@@ -12,6 +12,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - More detailed original isometric hardware and block-world artwork, plus a unified interactive showcase of panel updates and rollbacks keeping the Minecraft runtime and connected players online.
 - Slightly tighter Sans letter spacing across the dashboard, website and docs; commands and console output retain their normal Mono spacing.
 - The website's isometric scenes and demos move: the Pi's world floats with data rising to it, drive lights blink, players walk and chimneys smoke during the panel-update demo, the dashboard link pulses until an update starts, feature tiles settle in on scroll and the plugin search types itself. Scenes pause off-screen and stand still with reduced motion.
+- Website server-software section: the panel mockup keeps its tab bar on one line (scrolling with a fade when narrow), scales the memory value to its tile so it never overflows, shows a block icon instead of the plug for Fabric and NeoForge, and the trust icons are outlined at one stroke width and centred on their titles. Card descriptions use balanced line breaks.
 - New type system: Inter for text, Mona Sans for headers, titles and the wordmark, Mona Sans Mono for the console, commands and technical labels. All self-hosted; Geist Serif stays for release notes.
 
 ### Fixed

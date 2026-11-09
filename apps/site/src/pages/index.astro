@@ -99,7 +99,7 @@ const software = {
     players: "4 / 20",
     middleStat: ["TPS", "20.0"],
     memRatio: 0.7,
-    sourceIcon: "plug" as const,
+    sourceIcon: "mod" as const,
     source: "Mods from Modrinth",
   },
   neoforge: {
@@ -125,7 +125,7 @@ const software = {
     players: "3 / 10",
     middleStat: ["TPS", "20.0"],
     memRatio: 0.7,
-    sourceIcon: "plug" as const,
+    sourceIcon: "mod" as const,
     source: "Mods and modpacks from Modrinth",
   },
   vanilla: {
@@ -195,7 +195,7 @@ const defaultSw = software.paper;
 const defaultVer = defaultSw.versions[0];
 const defaultMem = 2;
 const defaultMeta = [`${defaultSw.name} ${defaultVer[0]}`, defaultVer[1], defaultSw.java].filter(Boolean).join(" · ");
-const defaultMemText = `${(defaultMem * defaultSw.memRatio).toFixed(1)} / ${defaultMem.toFixed(1)} GB`;
+const defaultMemText = `${(defaultMem * defaultSw.memRatio).toFixed(1)} / ${defaultMem.toFixed(1)}`;
 
 const softwareTrust: { icon: PixelName; title: string; text: string }[] = [
   { icon: "shield", title: "Official source", text: "Every server comes straight from the project that makes it." },
@@ -464,10 +464,11 @@ const backups = [
                     <dl class="pv-stats" data-pv="stats">
                       <div><dt>Players</dt><dd class="mono" data-pv="players">{defaultSw.players}</dd></div>
                       <div><dt data-pv="mid-label">{defaultSw.middleStat[0]}</dt><dd class="mono" data-pv="mid-val">{defaultSw.middleStat[1]}</dd></div>
-                      <div><dt>Memory</dt><dd class="mono" data-pv="mem">{defaultMemText}</dd></div>
+                      <div><dt>Memory</dt><dd class="mono" data-pv="mem"><span>{defaultMemText}</span><small>GB</small></dd></div>
                     </dl>
                     <div class="pv-addons" data-pv="source-wrap">
                       <span class="pv-source-icon" data-source-icon="plug"><Pixel name="plug" size={18} /></span>
+                      <span class="pv-source-icon" data-source-icon="mod" hidden><Pixel name="mod" size={18} /></span>
                       <span class="pv-source-icon" data-source-icon="cube" hidden><Pixel name="cube" size={18} /></span>
                       <span data-pv="addons">{defaultSw.source}</span>
                     </div>

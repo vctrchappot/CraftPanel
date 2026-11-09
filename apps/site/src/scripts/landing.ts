@@ -125,7 +125,7 @@ interface SoftwareEntry {
   players: string;
   middleStat: [string, string];
   memRatio: number;
-  sourceIcon: "plug" | "cube";
+  sourceIcon: "plug" | "mod" | "cube";
   source: string;
 }
 
@@ -177,7 +177,7 @@ if (typesEl) {
     pv("players").textContent = s.players;
     pv("mid-label").textContent = s.middleStat[0];
     pv("mid-val").textContent = s.middleStat[1];
-    pv("mem").textContent = `${usedMem} / ${totalMem} GB`;
+    pv("mem").innerHTML = `<span>${usedMem} / ${totalMem}</span><small>GB</small>`;
 
     for (const icon of sourceIcons) icon.hidden = icon.dataset.sourceIcon !== s.sourceIcon;
     pv("addons").textContent = s.source;

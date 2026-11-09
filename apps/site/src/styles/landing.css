@@ -1016,6 +1016,7 @@ p {
   color: var(--surface);
 }
 .type-note {
+  text-wrap: balance;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -1187,14 +1188,23 @@ p {
 }
 .pv-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0 22px;
+  flex-wrap: nowrap;
+  gap: 0 14px;
   margin-top: 20px;
+  padding-bottom: 1px;
   border-bottom: 1px solid var(--line);
-  font-size: 14.5px;
+  font-size: 14px;
   color: var(--muted);
+  /* One line, always: a narrow mockup scrolls its tabs instead of wrapping them. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pv-tabs::-webkit-scrollbar {
+  display: none;
 }
 .pv-tab {
+  flex: none;
+  white-space: nowrap;
   padding: 0 0 9px;
   border-bottom: 3px solid transparent;
   margin-bottom: -1px;
@@ -1217,6 +1227,8 @@ p {
 .pv-stats div {
   padding: 13px 16px;
   min-width: 0;
+  /* The value scales with its own tile (cqw), so "5.6 / 8.0" always fits, at any width. */
+  container-type: inline-size;
 }
 .pv-stats div + div {
   border-left: 1px solid var(--line);
@@ -1226,10 +1238,45 @@ p {
   color: var(--muted);
 }
 .pv-stats dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 5px;
   margin: 2px 0 0;
-  font-size: 20px;
+  font-size: min(20px, 17cqw);
   font-weight: 500;
+}
+/* The number never breaks; if the tile is too narrow the unit drops below it instead of overflowing. */
+.pv-stats dd span {
   white-space: nowrap;
+}
+.pv-stats dd small {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+/* Where the tabs can outgrow the mockup they scroll; a fade on the right edge shows there is more. */
+@media (min-width: 981px) and (max-width: 1100px), (max-width: 620px) {
+  .pv-tabs {
+    padding-right: 24px;
+    mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+  }
+}
+/* Between the two-column and stacked layouts the mockup is narrowest: give the main column the room. */
+@media (min-width: 981px) and (max-width: 1100px) {
+  .pv-body {
+    grid-template-columns: 132px minmax(0, 1fr);
+  }
+  .pv-side {
+    padding: 16px 10px;
+  }
+  .pv-main {
+    padding: 20px 16px;
+  }
+  .pv-stats div {
+    padding: 12px 10px;
+  }
 }
 .pv-addons {
   display: inline-flex;
@@ -1450,7 +1497,9 @@ p {
 .sw-trust-icon {
   flex: none;
   display: inline-flex;
-  margin-top: 2px;
+  align-items: center;
+  /* Same height as the title line, so the icon sits centred on it. */
+  height: 28px;
   color: var(--fg);
   --px-a: var(--fg);
   --px-b: var(--muted);
@@ -1459,9 +1508,11 @@ p {
   display: block;
   font-size: 16.5px;
   font-weight: 500;
+  line-height: 28px;
 }
 .sw-trust-item p {
-  margin: 2px 0 0;
+  text-wrap: balance;
+  margin: 0;
   font-size: 15px;
   color: var(--muted);
   line-height: 1.4;
@@ -2490,7 +2541,7 @@ p {
     padding: 11px 10px;
   }
   .pv-stats dd {
-    font-size: 16px;
+    font-size: min(16px, 16cqw);
   }
   .wizard {
     grid-template-columns: minmax(0, 1fr);
