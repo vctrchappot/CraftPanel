@@ -123,6 +123,7 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
     if (code === "ENOENT") return reply.code(404).send({ error: { code: "not_found", message: "File or directory not found" } });
     if (code === "EEXIST") return reply.code(409).send({ error: { code: "conflict", message: "Already exists" } });
     if (code === "ENOSPC") return reply.code(507).send({ error: { code: "disk_full", message: "The disk is full", hint: "Free up space or move backups to another drive." } });
+    if (code === "EBUSY") return reply.code(409).send({ error: { code: "in_use", message: "The file is in use by another process", hint: "Stop the server that uses it, then try again." } });
     if (code === "EACCES" || code === "EPERM") return reply.code(500).send({ error: { code: "permission_denied", message: "CraftPanel lacks filesystem permission for this operation" } });
     const status = (err as { statusCode?: number }).statusCode;
     if (status && status < 500) return reply.code(status).send({ error: { code: (err as { code?: string }).code ?? "bad_request", message: err.message } });

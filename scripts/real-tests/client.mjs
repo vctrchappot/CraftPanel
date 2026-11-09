@@ -5,7 +5,8 @@ export function client(base) {
   let csrf = "";
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   async function call(method, url, body) {
-    const r = await fetch(base + url, { method, headers: { "content-type": "application/json", cookie, "x-csrf-token": csrf }, body: body !== undefined ? JSON.stringify(body) : method === "GET" || method === "DELETE" ? undefined : "{}" });
+    const payload = body !== undefined ? JSON.stringify(body) : method === "GET" || method === "DELETE" ? undefined : "{}";
+    const r = await fetch(base + url, { method, headers: { ...(payload !== undefined ? { "content-type": "application/json" } : {}), cookie, "x-csrf-token": csrf }, body: payload });
     const sc = r.headers.get("set-cookie");
     if (sc) cookie = sc.split(";")[0];
     const text = await r.text();

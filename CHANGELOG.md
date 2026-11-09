@@ -13,6 +13,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Slightly tighter Sans letter spacing across the dashboard, website and docs; commands and console output retain their normal Mono spacing.
 
 ### Fixed
+- On Windows, removing, disabling or updating a plugin or mod the running server has loaded now says to stop the server first (409) instead of failing with a filesystem error, and a refused update no longer leaves a second copy of the jar behind.
 - Dashboard dates and relative times use the English UI locale instead of mixing in the browser's language.
 - Connection addresses list real LAN adapters first and label known VPN, WSL, Hyper-V, Docker and VirtualBox adapters separately.
 - Activity events have icons and status colours by event kind; updates and installs stay neutral. Console output has more space above the first line and uses shared status colours.

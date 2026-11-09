@@ -431,18 +431,31 @@ export class GameService {
       const dup = findDuplicateAddon(candidate, existing.filter((p) => p.enabled), kind, loader, file);
       if (dup) throw conflict(`${dup.name ?? base} is already enabled (${dup.file})`, "Disable or remove the other copy first.");
     }
-    await fsp.rename(from, to);
+    await this.jarOp(row, file, () => fsp.rename(from, to));
     // Disabling/enabling CraftPanel's own info plugin is remembered, so it isn't reinstalled on the next start.
     if (base === INFO_PLUGIN_FILE) await this.servers.update(row.id, { infoCommand: enabled }, actor);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
     await this.activity.audit(actor, enabled ? "plugin.enable" : "plugin.disable", row.id, { file: base });
   }
 
+  /** Windows locks the jars a running server has loaded: report that instead of a raw EBUSY/EPERM. */
+  private async jarOp<T>(row: ServerRow, file: string, op: () => Promise<T>): Promise<T> {
+    try {
+      return await op();
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if ((code === "EBUSY" || code === "EPERM") && this.servers.agent.isRunning(row.id)) {
+        throw conflict(`${file} is in use by the running server`, "Stop the server, then try again. Windows locks the jars a running server has loaded.");
+      }
+      throw err;
+    }
+  }
+
   async removePlugin(row: ServerRow, file: string, actor: Actor) {
     this.requireAddons(row);
     this.safePluginFile(file);
     const isOwnInfoPlugin = baseAddonFile(file) === INFO_PLUGIN_FILE && (await isInfoPlugin(path.join(this.pluginsDir(row), file)));
-    await fsp.rm(path.join(this.pluginsDir(row), file));
+    await this.jarOp(row, file, () => fsp.rm(path.join(this.pluginsDir(row), file)));
     await Promise.all([this.forgetHangar(row, file), this.forgetModrinth(row, file)]);
     if (isOwnInfoPlugin) await this.servers.update(row.id, { infoCommand: false }, actor);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
@@ -685,38 +698,33 @@ export class GameService {
     const loader = this.loader(row);
     this.safePluginFile(file);
     const dir = this.pluginsDir(row);
+    const known = source === "hangar" ? (await this.hangarIndex(row))[baseAddonFile(file)] : undefined;
+    if (source === "hangar" && !known) throw badRequest(`${file} was not installed from Hangar`);
+    // Move the old jar aside first: if the running server has it locked, nothing is downloaded and
+    // no second copy is left behind; if the install fails, it is put back.
+    const current = path.join(dir, file);
+    const aside = path.join(dir, `.${file}.${crypto.randomUUID()}.replacing`);
+    await this.jarOp(row, file, () => fsp.rename(current, aside));
+    let res: { file: string; projectId?: string };
+    try {
+      res = source === "hangar" ? await installHangarVersion(versionId, dir, { replaceFile: file }) : await installModrinthVersion(versionId, dir, { kind, loader, replaceFile: file });
+    } catch (err) {
+      await fsp.rename(aside, current).catch(() => {});
+      if (err instanceof DuplicateAddonError) throw conflict(err.message);
+      if (source === "hangar") throw badRequest((err as Error).message);
+      throw err;
+    }
+    await fsp.rm(aside, { force: true });
     if (source === "hangar") {
-      const known = (await this.hangarIndex(row))[baseAddonFile(file)];
-      if (!known) throw badRequest(`${file} was not installed from Hangar`);
-      let res;
-      try {
-        res = await installHangarVersion(versionId, dir, { replaceFile: file });
-      } catch (err) {
-        if (err instanceof DuplicateAddonError) throw conflict(err.message);
-        throw badRequest((err as Error).message);
-      }
-      if (res.file !== file) {
-        await fsp.rm(path.join(dir, file), { force: true });
-        if (res.file !== baseAddonFile(file)) await this.forgetHangar(row, file);
-      }
-      await this.rememberHangar(row, res.file, known.project, versionId);
+      if (res.file !== baseAddonFile(file)) await this.forgetHangar(row, file);
+      await this.rememberHangar(row, res.file, known!.project, versionId);
       if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
       await this.activity.event(row.id, "plugin.updated", `${this.addonLabel(row)} ${file} updated to ${res.file}`, { actor });
       await this.activity.audit(actor, "plugin.update", row.id, { source: "hangar", file, versionId });
       return;
     }
-    let res;
-    try {
-      res = await installModrinthVersion(versionId, dir, { kind, loader, replaceFile: file });
-    } catch (err) {
-      if (err instanceof DuplicateAddonError) throw conflict(err.message);
-      throw err;
-    }
-    if (res.file !== file) {
-      await fsp.rm(path.join(dir, file), { force: true });
-      if (res.file !== baseAddonFile(file)) await this.forgetModrinth(row, file);
-    }
-    await this.rememberModrinth(row, res.file, res.projectId, versionId);
+    if (res.file !== baseAddonFile(file)) await this.forgetModrinth(row, file);
+    await this.rememberModrinth(row, res.file, res.projectId!, versionId);
     if (this.servers.agent.isRunning(row.id)) this.servers.restartRequired.add(row.id);
     await this.activity.event(row.id, "plugin.updated", `${this.addonLabel(row)} ${file} updated to ${res.file}`, { actor });
     await this.activity.audit(actor, "plugin.update", row.id, { file, versionId });
