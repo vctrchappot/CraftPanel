@@ -46,7 +46,8 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
 
   async function play(panel: HTMLElement) {
     const os = panel.dataset.panel!;
-    const typed = panel.querySelector<HTMLElement>(".term-typed")!;
+    const typed = panel.querySelector<HTMLElement>(".term-typed");
+    if (!typed) return; // the macOS tab has no command to type
     const lines = [...panel.querySelectorAll<HTMLElement>(".term-out .term-line")];
     if (!full || reduced || typedOnce.has(os)) {
       typed.textContent = typed.dataset.command!;
@@ -80,13 +81,20 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
       t.tabIndex = on ? 0 : -1;
       const panel = term.querySelector<HTMLElement>(`#${t.getAttribute("aria-controls")}`)!;
       panel.hidden = !on;
-      if (on) void play(panel);
+      if (on) {
+        void play(panel);
+        // Keep the chosen tab in view when the bar is narrower than its tabs.
+        const bar = t.parentElement!;
+        if (bar.scrollWidth > bar.clientWidth) bar.scrollLeft = Math.max(0, t.offsetLeft - 8);
+      }
     }
   };
   roving(tabs, select);
 
   // Start with the visitor's own system.
-  const preferred = /Windows/i.test(navigator.userAgent) ? tabs.find((t) => t.dataset.os === "windows") : undefined;
+  const ua = navigator.userAgent;
+  const preferredOs = /Windows/i.test(ua) ? "windows" : /Macintosh|Mac OS X/i.test(ua) ? "macos" : null;
+  const preferred = preferredOs ? tabs.find((t) => t.dataset.os === preferredOs) : undefined;
   const first = preferred ?? tabs[0];
   if (full) {
     // Blank the command first so the page doesn't flash the full text before typing.

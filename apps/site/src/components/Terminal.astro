@@ -45,6 +45,9 @@ const tabs = [
     ],
   },
 ] as const;
+// macOS has no one-line installer (install.sh is Linux-only); this tab says so and links the manual steps.
+const mac = { os: "macos", label: "macOS", guide: "/docs/getting-started/installation/#macos" } as const;
+const allTabs = [...tabs, mac];
 ---
 
 <div class:list={["term", { "term-compact": compact, "term-full": !compact }]} data-term={compact ? "compact" : "full"}>
@@ -52,7 +55,7 @@ const tabs = [
     <span class="term-dots" aria-hidden="true"><i></i><i></i><i></i></span>
     <div class="term-tabs" role="tablist" aria-label="Operating system">
       {
-        tabs.map((t, i) => (
+        allTabs.map((t, i) => (
           <button role="tab" type="button" data-os={t.os} id={`${id}-tab-${t.os}`} aria-controls={`${id}-${t.os}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
             {t.label}
           </button>
@@ -61,7 +64,17 @@ const tabs = [
     </div>
   </div>
   {
-    tabs.map((t, i) => (
+    allTabs.map((t, i) =>
+      "guide" in t ? (
+        <div class="term-body" role="tabpanel" id={`${id}-${t.os}`} aria-labelledby={`${id}-tab-${t.os}`} hidden data-panel={t.os}>
+          <p class="term-note">There is no one-line installer for macOS yet. Install from the release archive; it takes a few steps.</p>
+          <div class="term-actions">
+            <a class="term-copy term-guide" href={t.guide}>
+              macOS instructions
+            </a>
+          </div>
+        </div>
+      ) : (
       <div class="term-body" role="tabpanel" id={`${id}-${t.os}`} aria-labelledby={`${id}-tab-${t.os}`} hidden={i !== 0} data-panel={t.os}>
         <div class="term-line term-cmd">
           {!compact && <span class="term-prompt">{t.prompt}</span>}
