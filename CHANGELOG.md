@@ -6,6 +6,10 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 
 ## Unreleased
 
+### Fixed
+- Windows: running `update.ps1` of an installation by hand always acts on that installation. Before, an installation in a custom folder updated (or, with `CRAFTPANEL_UNINSTALL=1`, removed) the default installation unless the same `CRAFTPANEL_*` variables were set again; a conflicting `CRAFTPANEL_INSTALL_DIR` is now refused.
+- Windows: a first install with `CRAFTPANEL_PORT` no longer fails with "Another CraftPanel is running" when a different CraftPanel uses port 8080.
+
 ## 0.2.0 – 2026-11-09
 
 ### Added

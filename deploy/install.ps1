@@ -35,13 +35,19 @@ function Install-CraftPanel {
   $Root = if ($env:CRAFTPANEL_INSTALL_DIR) { $env:CRAFTPANEL_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "Programs\CraftPanel" }
   $DataDir = if ($env:CRAFTPANEL_DATA_DIR) { $env:CRAFTPANEL_DATA_DIR } else { Join-Path $env:LOCALAPPDATA "CraftPanel" }
   $TaskName = if ($env:CRAFTPANEL_TASK_NAME) { $env:CRAFTPANEL_TASK_NAME } else { "CraftPanel" }
-  if ($FromDashboard) {
-    # Started by the update task: this script is update.ps1 in the install folder; everything else comes from there.
+  # update.ps1 in an install folder always belongs to that install, also when run by hand. Falling
+  # back to the default location would update, or with CRAFTPANEL_UNINSTALL remove, another installation.
+  $ownInstall = if ($PSCommandPath -and (Split-Path -Leaf $PSCommandPath) -eq "update.ps1") { Join-Path $PSScriptRoot "install.json" }
+  if ($FromDashboard -or ($ownInstall -and (Test-Path -LiteralPath $ownInstall))) {
+    if (-not $FromDashboard -and $env:CRAFTPANEL_INSTALL_DIR -and [IO.Path]::GetFullPath($env:CRAFTPANEL_INSTALL_DIR).TrimEnd('\') -ne [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd('\')) {
+      throw "CRAFTPANEL_INSTALL_DIR ($env:CRAFTPANEL_INSTALL_DIR) is not this installation ($PSScriptRoot). Run the update.ps1 of that installation instead."
+    }
     $Root = $PSScriptRoot
     $installed = Get-Content (Join-Path $Root "install.json") -Raw | ConvertFrom-Json
     if ($installed.taskName) { $TaskName = $installed.taskName }
     if ($installed.dataDir) { $DataDir = $installed.dataDir }
-    foreach ($name in "CRAFTPANEL_INSTALL_VERSION", "CRAFTPANEL_ARCHIVE", "CRAFTPANEL_PORT", "CRAFTPANEL_PROFILE", "CRAFTPANEL_UNINSTALL") { Remove-Item "env:$name" -ErrorAction SilentlyContinue }
+    # Started by the update task: everything comes from the install folder.
+    if ($FromDashboard) { foreach ($name in "CRAFTPANEL_INSTALL_VERSION", "CRAFTPANEL_ARCHIVE", "CRAFTPANEL_PORT", "CRAFTPANEL_PROFILE", "CRAFTPANEL_UNINSTALL") { Remove-Item "env:$name" -ErrorAction SilentlyContinue } }
   }
   $ConfigFile = Join-Path $Root "config.env"
   # File locking works across dashboard updates and interactive installers, including different sessions.
@@ -72,7 +78,8 @@ function Install-CraftPanel {
     return $values
   }
 
-  function Get-Port { $c = Read-Config; if ($c["CRAFTPANEL_PORT"]) { [int]$c["CRAFTPANEL_PORT"] } else { 8080 } }
+  # Before the first install there is no config.env yet: the requested port applies.
+  function Get-Port { $c = Read-Config; if ($c["CRAFTPANEL_PORT"]) { [int]$c["CRAFTPANEL_PORT"] } elseif ($env:CRAFTPANEL_PORT) { [int]$env:CRAFTPANEL_PORT } else { 8080 } }
 
   function Get-LocalStatus($port, $path) {
     $config = Read-Config
