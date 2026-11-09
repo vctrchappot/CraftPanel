@@ -6,12 +6,12 @@ import { Boxes, Plus } from "lucide-react";
 import { Button, EmptyState, PageHeader, Panel, Skeleton } from "@craftpanel/ui";
 import { softwareLabel } from "@craftpanel/shared";
 import { useCan } from "@/lib/auth";
-import { useServers } from "@/lib/queries";
+import { useServersActiveFirst } from "@/lib/queries";
 import { formatDuration } from "@/lib/format";
 import { StatusBadge } from "./status";
 
 export function ServersView() {
-  const servers = useServers();
+  const servers = useServersActiveFirst();
   const router = useRouter();
   const canCreate = useCan("server.create");
   return (

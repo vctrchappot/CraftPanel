@@ -7,7 +7,7 @@ import { Button, EmptyState, PageHeader, Panel, Progress, Section, Skeleton, Sta
 import { softwareLabel, type ActivityEvent, type ConnectAddress, type NetworkAddressKind } from "@craftpanel/shared";
 import { api } from "@/lib/api";
 import { useCan } from "@/lib/auth";
-import { useServers } from "@/lib/queries";
+import { useServersActiveFirst } from "@/lib/queries";
 import { formatBytes } from "@/lib/format";
 import { StatusBadge } from "./status";
 import { EventList } from "./activity";
@@ -51,7 +51,7 @@ export function useSystem() {
 }
 
 export function HomeView() {
-  const servers = useServers();
+  const servers = useServersActiveFirst();
   const system = useSystem();
   const activity = useQuery({ queryKey: ["activity", "home"], queryFn: () => api.get<ActivityEvent[]>("/api/activity?limit=8") });
   const canCreate = useCan("server.create");

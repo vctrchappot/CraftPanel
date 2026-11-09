@@ -2,11 +2,24 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { ServerDetail, ServerSummary } from "@craftpanel/shared";
+import type { ServerDetail, ServerStatus, ServerSummary } from "@craftpanel/shared";
 import { api, errorMessage } from "./api";
 
 export function useServers() {
   return useQuery({ queryKey: ["servers"], queryFn: () => api.get<ServerSummary[]>("/api/servers") });
+}
+
+const ACTIVE_STATUSES: readonly ServerStatus[] = ["installing", "starting", "running", "stopping", "orphaned"];
+
+/** Servers with a live process or install first; the API order is kept within each group. */
+function activeFirst(servers: ServerSummary[]): ServerSummary[] {
+  const active = servers.filter((s) => ACTIVE_STATUSES.includes(s.status));
+  return [...active, ...servers.filter((s) => !ACTIVE_STATUSES.includes(s.status))];
+}
+
+/** `useServers` for lists the user scans (sidebar, overview, server table): running servers on top. */
+export function useServersActiveFirst() {
+  return useQuery({ queryKey: ["servers"], queryFn: () => api.get<ServerSummary[]>("/api/servers"), select: activeFirst });
 }
 
 export function useServer(id: string | null) {

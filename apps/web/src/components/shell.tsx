@@ -11,7 +11,7 @@ import { ROLE_LABELS } from "@craftpanel/shared";
 import { useAuth, useCan } from "@/lib/auth";
 import { api, setCsrfToken } from "@/lib/api";
 import { RealtimeProvider, useConnectionState } from "@/lib/realtime";
-import { useServers } from "@/lib/queries";
+import { useServers, useServersActiveFirst } from "@/lib/queries";
 import { StatusDot } from "./status";
 import { Logo } from "./logo";
 import { TwoFactorRequired } from "./auth-forms";
@@ -118,7 +118,7 @@ function Sidebar({ onSearch }: { onSearch: () => void }) {
   const pathname = usePathname();
   const params = useSearchParams();
   const activeServer = pathname.startsWith("/server") ? params.get("id") : null;
-  const servers = useServers();
+  const servers = useServersActiveFirst();
   const connection = useConnectionState();
   const canCreate = useCan("server.create");
 
