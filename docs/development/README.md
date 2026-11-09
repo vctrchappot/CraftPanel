@@ -15,7 +15,7 @@ In development the dashboard calls the API cross-origin (`NEXT_PUBLIC_API_URL`),
 | `pnpm dev` | API + dashboard with reload |
 | `pnpm build` | Static export of the dashboard, then the bundled API in `apps/api/dist` |
 | `pnpm start:runtime` | Start the independent production Minecraft runtime |
-| `pnpm start` | Start the production dashboard/API in another terminal, using the same data directory |
+| `pnpm start` | Start the production runtime (unless one is running for this data directory) and dashboard together (`scripts/start.mjs`) |
 | `pnpm test` | Vitest: unit + integration tests (no network required) |
 | `pnpm test:e2e` | Playwright: full user flow against the production build with a real Minecraft server (needs internet, ~1 min after the first download). Run `npx playwright install chromium` once. |
 | `pnpm typecheck` | `tsc` for every package |

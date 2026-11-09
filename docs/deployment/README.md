@@ -41,10 +41,10 @@ irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.p
 corepack enable            # Node 25+: npm install -g pnpm
 pnpm install
 pnpm build            # → apps/api/dist
-node apps/api/dist/runtime.js
+pnpm start            # runtime + dashboard; Ctrl+C saves and stops both
 ```
 
-Keep the runtime running. Start `node apps/api/dist/index.js` in another terminal. Both use the platform data directory by default; apply the same `CRAFTPANEL_DATA_DIR` override to both.
+`pnpm start` (`scripts/start.mjs`) starts the runtime unless one already runs for this data directory, then the dashboard. To keep games running while you restart the dashboard, run them separately instead: `pnpm start:runtime` in one terminal and `node apps/api/dist/index.js` in another. Both use the platform data directory by default; apply the same `CRAFTPANEL_DATA_DIR` override to both.
 
 ## Start profiles
 

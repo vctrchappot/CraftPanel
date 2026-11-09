@@ -6,8 +6,17 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 
 ## Unreleased
 
+### Upgrading from 0.2.x
+This release moves Minecraft into its own runtime service. The first update saves and stops running servers once (servers with auto-start come back) and needs your explicit approval, so it can't be started from the dashboard of 0.2.x:
+- **Linux / Raspberry Pi:** `curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash -s -- --allow-runtime-restart`
+- **Windows:** in PowerShell **as administrator** (once, to register the runtime service; same Windows account): `$env:CRAFTPANEL_ALLOW_RUNTIME_RESTART = "1"; irm https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.ps1 | iex`
+- **Checkout:** `update.cmd` / `./update.sh`, then `pnpm start` as before; it now starts the runtime too.
+
+Later dashboard-only updates keep your servers running.
+
 ### Added
 - Independent Minecraft runtime service with authenticated local IPC, console replay and dashboard reconnection. Dashboard-only updates preserve running servers; runtime changes require explicit maintenance approval. Windows service registration needs one elevated installation under the dashboard owner's account.
+- `pnpm start` in a checkout starts the runtime and the dashboard together, or reuses a runtime that already runs for the same data directory.
 
 ### Fixed
 - Runtime-update rollback preserves registry ownership and boot policy. Dashboard rollback leaves an unchanged Windows runtime host untouched. Manual runtime/dashboard starts share the same default data directory, and server installation is not reported complete before runtime registration is acknowledged.

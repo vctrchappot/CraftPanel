@@ -50,10 +50,10 @@ cd craftpanel
 corepack enable            # Node 25+: npm install -g pnpm
 pnpm install
 pnpm build
-pnpm start:runtime
+pnpm start
 ```
 
-Keep the runtime running. In another terminal in the same folder, run `pnpm start` for the dashboard. Both use the same platform data directory by default; set `CRAFTPANEL_DATA_DIR` identically for both when overriding it. `pnpm dev` starts runtime, API and dashboard together for development.
+`pnpm start` starts the Minecraft runtime and the dashboard together; Ctrl+C saves and stops your servers and closes both. If a runtime already runs for the same data directory (for example in another terminal via `pnpm start:runtime`), the dashboard uses it and leaves it running. `pnpm dev` starts runtime, API and dashboard together for development.
 
 Open **http://127.0.0.1:8080**, create the owner account, and follow the wizard to create your first server.
 
