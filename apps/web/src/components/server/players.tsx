@@ -271,7 +271,7 @@ function IpBans({ data, canManage, onBan, onPardon }: { data: { ip?: string; rea
           </Button>
         </form>
       )}
-      <NameList items={data.map((b) => ({ name: b.ip ?? "?", sub: b.reason }))} empty="No banned IP addresses." action={canManage ? { label: "Unban", icon: <UserPlus />, run: onPardon } : undefined} />
+      <NameList items={data.map((b) => ({ name: b.ip ?? "Hidden address", sub: b.reason }))} empty="No banned IP addresses." action={canManage ? { label: "Unban", icon: <UserPlus />, run: onPardon } : undefined} />
     </Section>
   );
 }

@@ -178,7 +178,7 @@ export function PlayerProfileView({ server: s, name }: { server: ServerDetail; n
           <Statistics p={p} live={live} serverId={s.id} />
         </TabsContent>
         <TabsContent value="activity">
-          <Activity p={p} />
+          <Activity p={p} canManage={canManage} />
         </TabsContent>
       </Tabs>
 
@@ -585,7 +585,7 @@ function StatsBody({ s }: { s: PlayerStats }) {
 
 // ---- activity -------------------------------------------------------------------------------------
 
-function Activity({ p }: { p: PlayerProfile }) {
+function Activity({ p, canManage }: { p: PlayerProfile; canManage: boolean }) {
   const a = p.activity;
   const longest = Math.max(1, ...a.recent.map((r) => (r.leftAt ?? Date.now()) - r.joinedAt));
   return (
@@ -599,7 +599,7 @@ function Activity({ p }: { p: PlayerProfile }) {
             <Row label="Total playtime">{formatPlaytime(a.playtimeMs)}</Row>
             <Row label="Average session">{formatPlaytime(a.averageMs)}</Row>
             <Row label="Longest session">{formatPlaytime(a.longestMs)}</Row>
-            <Row label="Addresses">{a.addresses.length}</Row>
+            {canManage && <Row label="Addresses">{a.addresses.length}</Row>}
           </dl>
         </Card>
       </div>
@@ -630,7 +630,9 @@ function Activity({ p }: { p: PlayerProfile }) {
 
         <div className="space-y-6">
           <Card title="Addresses" hint="Where this player connected from.">
-            {a.addresses.length ? (
+            {!canManage ? (
+              <p className="text-[13px] text-muted-foreground">IP addresses are only shown to users who can manage players.</p>
+            ) : a.addresses.length ? (
               <ul className="-my-2 divide-y divide-border">
                 {a.addresses.map((x) => (
                   <li key={x.ip} className="flex items-baseline justify-between gap-3 py-2 text-[13px]">

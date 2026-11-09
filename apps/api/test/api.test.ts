@@ -441,6 +441,17 @@ describe("player profiles", () => {
     expect(r.roster[1]).toMatchObject({ sessions: 2, banned: false, online: false });
   });
 
+  it("shows IP addresses only to users who can manage players", async () => {
+    const seen = (await profile(owner, alex)).json();
+    expect(seen.activity.addresses).toEqual([expect.objectContaining({ ip: "10.0.0.2", sessions: 2 })]);
+    expect(seen.activity.recent[0].ip).toBe("10.0.0.2");
+    const hidden = (await profile(viewer, alex)).json();
+    expect(hidden.activity.addresses).toEqual([]);
+    expect(hidden.activity.recent.every((r: { ip: string | null }) => r.ip === null)).toBe(true);
+    expect(JSON.stringify((await call(viewer, "GET", `/api/servers/${serverId}/players`)).json())).not.toContain("10.0.0.2");
+    expect(JSON.stringify((await call(owner, "GET", `/api/servers/${serverId}/players`)).json())).toContain("10.0.0.2");
+  });
+
   it("answers 404 for unknown players, 400 for invalid names, 401 without a session", async () => {
     expect((await profile(viewer, "Nobody")).statusCode).toBe(404);
     expect((await profile(viewer, "bad%20name")).statusCode).toBe(400);

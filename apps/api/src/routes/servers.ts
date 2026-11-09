@@ -10,6 +10,7 @@ import {
   applyPresetFlags,
   assessHost,
   badRequest,
+  canAccess,
   commandSchema,
   createServerSchema,
   detectPreset,
@@ -222,7 +223,6 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     const r = await row(req.params.id);
     return { samples: servers.metricsHistory(r.id) };
   });
-
   app.get<IdParams>("/api/servers/:id/performance", async (req) => {
     requirePermission(req, "server.view");
     const r = await row(req.params.id);
@@ -338,13 +338,19 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
   // ---- players --------------------------------------------------------------------------
 
   app.get<IdParams>("/api/servers/:id/players", async (req) => {
-    requirePermission(req, "server.view");
-    return game.players(await row(req.params.id));
+    const user = requirePermission(req, "server.view");
+    const players = await game.players(await row(req.params.id));
+    // IP addresses are personal data: only users who manage players see them.
+    if (canAccess(user, "players.manage", req.params.id)) return players;
+    return { ...players, ipBans: players.ipBans.map((b) => ({ ...b, ip: undefined })), history: players.history.map((h) => ({ ...h, ip: null })) };
   });
   app.get<{ Params: { id: string; name: string }; Querystring: { tz?: string } }>("/api/servers/:id/players/:name/profile", async (req) => {
-    requirePermission(req, "server.view");
+    const user = requirePermission(req, "server.view");
     const tz = Number(req.query.tz);
-    return game.playerProfile(await row(req.params.id), req.params.name, Number.isFinite(tz) && Math.abs(tz) <= 14 * 60 ? Math.round(tz) : 0);
+    const profile = await game.playerProfile(await row(req.params.id), req.params.name, Number.isFinite(tz) && Math.abs(tz) <= 14 * 60 ? Math.round(tz) : 0);
+    if (canAccess(user, "players.manage", req.params.id)) return profile;
+    const a = profile.activity;
+    return { ...profile, activity: { ...a, addresses: [], recent: a.recent.map((r) => ({ ...r, ip: null })) } };
   });
   // Item and block art for the inventory view: Mojang's textures, downloaded to this machine on first use.
   app.get<{ Params: { id: string; item: string } }>("/api/servers/:id/item-icons/:item", async (req, reply) => {
