@@ -38,20 +38,29 @@ export function SettingsView() {
   const params = useSearchParams();
   const canOwner = useCan("app.configure");
   const canAudit = useCan("audit.view");
+  const sections: [string, string][] = [
+    ["account", "Account"],
+    ...(canOwner ? ([["users", "Users"], ["backups", "Backups"], ["access", "Remote access"], ["network", "Dynamic DNS"], ["notifications", "Notifications"]] as [string, string][]) : []),
+    ["java", "Java"],
+    ...(canAudit ? ([["audit", "Audit log"]] as [string, string][]) : []),
+    ["about", "Security & about"],
+  ];
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Application-wide configuration. Per-server settings live in each server's Settings tab." />
-      <Tabs key={params.get("tab") ?? "account"} defaultValue={params.get("tab") ?? "account"} className="space-y-6">
-        <TabsList className="max-w-full overflow-x-auto">
-          <TabsTrigger value="account">Account</TabsTrigger>
-          {canOwner && <TabsTrigger value="users">Users</TabsTrigger>}
-          {canOwner && <TabsTrigger value="backups">Backups</TabsTrigger>}
-          {canOwner && <TabsTrigger value="access">Remote access</TabsTrigger>}
-          {canOwner && <TabsTrigger value="network">Dynamic DNS</TabsTrigger>}
-          {canOwner && <TabsTrigger value="notifications">Notifications</TabsTrigger>}
-          <TabsTrigger value="java">Java</TabsTrigger>
-          {canAudit && <TabsTrigger value="audit">Audit log</TabsTrigger>}
-          <TabsTrigger value="about">Security & about</TabsTrigger>
+      {/* Nine sections do not fit one row: a side list on wide screens (like a server's Settings tab),
+          a swipeable row without a scrollbar on narrow ones. Only the active section is mounted. */}
+      <Tabs key={params.get("tab") ?? "account"} defaultValue={params.get("tab") ?? "account"} className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-8">
+        <TabsList className="flex h-auto min-w-0 justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-0 [scrollbar-width:none] lg:sticky lg:top-6 lg:flex-col lg:items-stretch lg:self-start lg:overflow-visible [&::-webkit-scrollbar]:hidden">
+          {sections.map(([value, label]) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className="h-auto shrink-0 justify-start px-2.5 py-1.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-muted data-[state=active]:font-medium data-[state=active]:shadow-none"
+            >
+              {label}
+            </TabsTrigger>
+          ))}
         </TabsList>
         <TabsContent value="account">
           <Account />
