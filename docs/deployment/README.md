@@ -219,7 +219,7 @@ Git checkout, from the CraftPanel folder:
 ./update.sh       # Linux / macOS (update.cmd on Windows)
 ```
 
-The script (`scripts/update.mjs`) fetches the newest version, stashes local edits and keeps your own commits on a `backup/before-update-…` branch, also copes with rewritten published history, installs dependencies and rebuilds. On a service install (`deploy/install-linux.sh`) it re-runs the installer, which replaces `/opt/craftpanel` and restarts the service; otherwise it tells you whether a running CraftPanel needs a restart.
+The script (`scripts/update.mjs`) fetches the newest version, stashes local edits and keeps your own commits on a `backup/before-update-…` branch, also copes with rewritten published history, installs dependencies and rebuilds. Each step shows one line; the install and build output goes to `update.log` in the checkout and is shown only when a step fails (`update.cmd --verbose` / `./update.sh --verbose` shows it live). On a service install (`deploy/install-linux.sh`) it re-runs the installer, which replaces `/opt/craftpanel` and restarts the service; otherwise it tells you whether a running CraftPanel needs a restart.
 
 Manual equivalent: `git pull && pnpm install && pnpm build`, then restart (service installs: `git pull && sudo ./deploy/install-linux.sh`).
 

@@ -7,7 +7,9 @@
 //    Otherwise: tells you whether CraftPanel is running and needs a restart.
 // Your servers, worlds, backups and settings live in the data directory, outside this folder,
 // and are not touched. Database changes are applied automatically when CraftPanel starts.
-import { execFileSync, spawnSync } from "node:child_process";
+//
+// Install/build output goes to update.log and is shown only when a step fails; --verbose shows it live.
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,8 +23,10 @@ const green = c("32");
 const yellow = c("33");
 const red = c("31");
 
-const step = (msg) => console.log(`\n${bold("›")} ${msg}`);
-const info = (msg) => console.log(`  ${msg}`);
+const verbose = process.argv.includes("--verbose");
+const logFile = path.join(root, "update.log");
+const info = (msg) => console.log(`    ${msg}`);
+const done = (msg, detail = "") => console.log(`${green("✓")} ${msg}${detail ? `  ${dim(detail)}` : ""}`);
 const fail = (msg, hint) => {
   console.error(`\n${red("✖")} ${msg}`);
   if (hint) console.error(`  ${hint}`);
@@ -44,13 +48,49 @@ const version = () => {
     return "?";
   }
 };
-const run = (cmd, args, opts = {}) => {
-  // Windows: pnpm/npm are .cmd shims and need a shell; arguments here are fixed, never user input.
-  const r = spawnSync(cmd, args, { cwd: root, stdio: "inherit", shell: process.platform === "win32", ...opts });
-  return r.status === 0;
+const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: root, stdio: "inherit", ...opts }).status === 0;
+// Windows: pnpm is a .cmd shim that only starts through a shell. The arguments are fixed
+// literals (checked below), never user input, and are passed as one command line so Node
+// does not warn about concatenating separate arguments (DEP0190).
+const pnpm = (args, opts = {}) => {
+  if (process.platform !== "win32") return spawn("pnpm", args, { cwd: root, ...opts });
+  if (!args.every((a) => /^[\w@./:=-]+$/.test(a))) throw new Error(`Unsafe pnpm argument: ${args.join(" ")}`);
+  return spawn(["pnpm", ...args].join(" "), { cwd: root, shell: true, ...opts });
 };
+const elapsed = (start) => `${((Date.now() - start) / 1000).toFixed(1)}s`;
 
-console.log(`\n${bold("CraftPanel update")} ${dim(root)}`);
+/** Runs a pnpm step quietly with a spinner; the full output goes to update.log. */
+async function task(label, doneLabel, args, failure) {
+  const start = Date.now();
+  if (verbose) {
+    console.log(`\n${bold("›")} ${label}…`);
+    const code = await new Promise((resolve) => pnpm(args, { stdio: "inherit" }).on("close", resolve).on("error", () => resolve(1)));
+    if (code !== 0) fail(...failure(false));
+    return done(doneLabel, elapsed(start));
+  }
+  fs.appendFileSync(logFile, `\n=== ${new Date().toISOString()} pnpm ${args.join(" ")}\n`);
+  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  let frame = 0;
+  const spinner = tty ? setInterval(() => process.stdout.write(`\r${frames[frame++ % frames.length]} ${label}… ${dim(elapsed(start))}`), 100) : null;
+  if (!tty) console.log(`  ${label}…`);
+  const output = [];
+  const code = await new Promise((resolve) => {
+    const child = pnpm(args, { stdio: ["ignore", "pipe", "pipe"] });
+    const collect = (chunk) => { output.push(chunk); fs.appendFileSync(logFile, chunk); };
+    child.stdout.on("data", collect);
+    child.stderr.on("data", collect);
+    child.on("error", () => resolve(1));
+    child.on("close", resolve);
+  });
+  if (spinner) { clearInterval(spinner); process.stdout.write("\r\u001b[2K"); }
+  if (code === 0) return done(doneLabel, elapsed(start));
+  const tail = Buffer.concat(output).toString("utf8").trimEnd().split(/\r?\n/).slice(-30);
+  console.error(dim("  Last lines of the output:"));
+  for (const line of tail) console.error(dim(`  │ ${line}`));
+  fail(...failure(true));
+}
+
+console.log(`\n${bold("CraftPanel update")}  ${dim(root)}\n`);
 
 // ---- preconditions ---------------------------------------------------------------
 if (!gitOk("rev-parse", "--is-inside-work-tree")) fail("This folder is not a git checkout of CraftPanel.", "Download a fresh copy: git clone https://github.com/vctrchappot/CraftPanel.git");
@@ -58,18 +98,18 @@ const remote = "origin";
 if (!gitOk("remote", "get-url", remote)) fail('No "origin" remote is configured.', "Add it: git remote add origin https://github.com/vctrchappot/CraftPanel.git");
 const branch = git("rev-parse", "--abbrev-ref", "HEAD");
 if (branch !== "main") fail(`You are on branch "${branch}", not "main".`, "Switch with: git checkout main   (then run the update again)");
-if (!run("pnpm", ["--version"], { stdio: "ignore" }))
+const win = process.platform === "win32";
+if (spawnSync(win ? "pnpm --version" : "pnpm", win ? [] : ["--version"], { cwd: root, stdio: "ignore", shell: win }).status !== 0)
   fail("pnpm is not installed.", "Install it with: npm install -g pnpm   (or: corepack enable)");
 
 const before = git("rev-parse", "HEAD");
 const versionBefore = version();
 
 // ---- fetch ------------------------------------------------------------------------
-step("Checking for a newer version…");
 if (!gitOk("fetch", "--quiet", remote, "main")) fail("Could not reach GitHub.", "Check your internet connection and try again.");
 const target = git("rev-parse", `${remote}/main`);
 if (target === before) {
-  info(green(`Already up to date (v${versionBefore}).`));
+  done(`Already up to date`, `v${versionBefore}`);
   process.exit(0);
 }
 
@@ -114,20 +154,25 @@ if (gitOk("merge-base", "--is-ancestor", "HEAD", target)) {
 }
 
 const versionAfter = version();
-step(`Updated ${versionBefore === versionAfter ? `v${versionAfter}` : `v${versionBefore} → v${versionAfter}`}. What's new:`);
 const log = gitOk("merge-base", "--is-ancestor", before, target) ? git("log", "--format=%s", "--no-merges", `${before}..${target}`) : git("log", "--format=%s", "--no-merges", "-15", target);
-for (const line of log.split("\n").filter(Boolean).slice(0, 15)) info(`• ${line}`);
+const changes = log.split("\n").filter(Boolean);
+done(versionBefore === versionAfter ? `Updated to the newest v${versionAfter}` : `Updated v${versionBefore} → v${versionAfter}`,
+  `${changes.length} change${changes.length === 1 ? "" : "s"}`);
+for (const line of changes.slice(0, 15)) info(dim(`• ${line}`));
+if (changes.length > 15) info(dim(`  … and ${changes.length - 15} more`));
 
 // ---- rebuild ----------------------------------------------------------------------
-step("Installing dependencies…");
-if (!run("pnpm", ["install", "--frozen-lockfile"])) fail("Installing dependencies failed.", "Fix the error above and run the update again; your previous build is unchanged until the build step.");
-step("Building…");
-if (!run("pnpm", ["build"])) fail("The build failed.", `Report it at https://github.com/vctrchappot/CraftPanel/issues. To go back: git reset --hard ${before.slice(0, 12)} && pnpm install && pnpm build`);
+const seeLog = (quiet) => (quiet ? `\n  Full output: ${logFile}` : "");
+if (!verbose) fs.writeFileSync(logFile, `CraftPanel update ${new Date().toISOString()}: ${before.slice(0, 12)} → ${target.slice(0, 12)}\n`);
+await task("Installing dependencies", "Dependencies installed", ["install", "--frozen-lockfile"], (quiet) =>
+  ["Installing dependencies failed.", `Run the update again once the problem is fixed; your previous build is unchanged.${seeLog(quiet)}`]);
+await task("Building", "Built", ["build"], (quiet) =>
+  ["The build failed.", `Report it at https://github.com/vctrchappot/CraftPanel/issues. To go back: git reset --hard ${before.slice(0, 12)} && pnpm install && pnpm build${seeLog(quiet)}`]);
 
 // ---- apply ------------------------------------------------------------------------
 const serviceInstall = process.platform === "linux" && fs.existsSync("/etc/systemd/system/craftpanel.service") && fs.existsSync("/opt/craftpanel");
 if (serviceInstall) {
-  step("Updating the CraftPanel service (asks for your password)…");
+  console.log(`\n${bold("›")} Updating the CraftPanel service (asks for your password)…`);
   const asRoot = process.getuid?.() === 0;
   const ok = asRoot ? run("bash", ["deploy/install-linux.sh"]) : run("sudo", ["bash", "deploy/install-linux.sh"]);
   if (!ok) fail("Reinstalling the service failed.", "Run it yourself: sudo ./deploy/install-linux.sh");
@@ -137,7 +182,7 @@ if (serviceInstall) {
   const running = await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(1500) })
     .then((r) => r.ok)
     .catch(() => false);
-  console.log(`\n${green("✔")} CraftPanel v${versionAfter} is ready.`);
-  if (running) info(yellow(`CraftPanel is running on port ${port} with the old version. Restart it to switch: stop it with Ctrl+C (servers shut down cleanly), then start it again, e.g. pnpm start.`));
-  else info("Start it with: pnpm start   (or pnpm start:lan to reach the dashboard from other devices)");
+  console.log(`\n${green("✔")} ${bold(`CraftPanel v${versionAfter} is ready.`)}`);
+  if (running) console.log(`  ${yellow(`It is still running the old version on port ${port}. Restart it to switch: Ctrl+C (servers shut down cleanly), then pnpm start.`)}`);
+  else console.log(`  Start it with ${bold("pnpm start")}  ${dim("(pnpm start:lan to reach it from other devices)")}`);
 }
