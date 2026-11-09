@@ -1,12 +1,11 @@
-import path from "node:path";
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { RuntimeClient, RuntimeService, RUNTIME_PROTOCOL } from "@craftpanel/server-runtime";
+import { RuntimeClient, RuntimeService, RUNTIME_PROTOCOL, defaultDataDir } from "@craftpanel/server-runtime";
 
 if (process.argv.includes("--protocol")) {
   console.log(`craftpanel-runtime-v${RUNTIME_PROTOCOL}`);
 } else if (process.argv.includes("--status") || process.argv.includes("--shutdown") || process.argv.includes("--stop-all")) {
-  const client = new RuntimeClient(path.resolve(process.env.CRAFTPANEL_DATA_DIR ?? ".data"));
+  const client = new RuntimeClient(defaultDataDir());
   try {
     await client.connect();
     if (process.argv.includes("--shutdown")) await client.requestServiceShutdown();
@@ -17,7 +16,7 @@ if (process.argv.includes("--protocol")) {
     process.exitCode = 1;
   } finally { await client.disconnect(); }
 } else {
-  const root = path.resolve(process.env.CRAFTPANEL_DATA_DIR ?? ".data");
+  const root = defaultDataDir();
   const bundleHash = crypto.createHash("sha256").update(fs.readFileSync(new URL(import.meta.url))).digest("hex");
   let build = bundleHash;
   try {

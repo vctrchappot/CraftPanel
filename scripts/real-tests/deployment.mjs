@@ -67,13 +67,16 @@ async function freePort() {
   return port;
 }
 
-async function start(name, env) {
-  const data = path.join(root, name);
+async function start(name, env, useDefaultData = false) {
+  const dataBase = path.join(root, name);
+  const data = useDefaultData ? process.platform === "darwin" ? path.join(dataBase, "Library", "Application Support", "CraftPanel")
+    : path.join(dataBase, process.platform === "win32" ? "CraftPanel" : "craftpanel") : dataBase;
   const port = await freePort();
   const variables = {
     ...inheritedEnv, CRAFTPANEL_HOST: "127.0.0.1", CRAFTPANEL_PORT: String(port),
     CRAFTPANEL_DATA_DIR: data, CRAFTPANEL_UPDATE_CHECK: "false", CRAFTPANEL_LOG_LEVEL: "warn",
     CRAFTPANEL_LOG_FORMAT: "json", ...env,
+    ...(useDefaultData ? { CRAFTPANEL_DATA_DIR: undefined, LOCALAPPDATA: dataBase, XDG_DATA_HOME: dataBase, HOME: dataBase } : {}),
   };
   const runtime = spawn(process.execPath, [path.join(dist, "runtime.js")], { cwd: dist, env: variables, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   const runtimeClosed = new Promise((resolve) => runtime.once("close", resolve));
@@ -129,6 +132,10 @@ function proxy(api, certificates, secureEdge = true) {
 }
 
 try {
+  const defaults = await start("default-data-path", { CRAFTPANEL_PROFILE: "local" }, true);
+  await fs.access(path.join(defaults.data, "runtime", "token"));
+  await fs.access(path.join(defaults.data, "craftpanel.db"));
+  console.log("PASS dashboard and runtime share the platform default data directory");
   const openssl = process.env.OPENSSL ?? (process.platform === "win32" ? "C:/Program Files/Git/usr/bin/openssl.exe" : "openssl");
   const cert = path.join(root, "localhost.pem");
   const key = path.join(root, "localhost.key");

@@ -3,6 +3,7 @@ import { SOFTWARE_INFO, type ConsoleLine, type OnlinePlayer, type ServerMetrics,
 import { ManagedServer, type LaunchSpec } from "./managed-server";
 import { createProcessProbe, isJavaProcess, isPidAlive, type ProcessProbe } from "./process-info";
 import { parseMspt, parseTps, type LogSignal } from "./log-parser";
+import { checkRuntimePaths, type RuntimePathAccess } from "./access";
 
 export interface AgentEvents {
   connection: [connected: boolean];
@@ -23,6 +24,7 @@ export interface RuntimeAgent extends EventEmitter<AgentEvents> {
   readonly connected: boolean;
   readonly identity: { protocol: number; build: string } | null;
   owns(serverId: string): boolean;
+  checkPaths(directory: string, javaPath: string): Promise<RuntimePathAccess>;
   start(serverId: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }): Promise<void>;
   configure(serverId: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }): Promise<void>;
   stop(serverId: string, timeoutMs?: number): Promise<boolean>;
@@ -78,6 +80,7 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
   }
 
   owns(id: string) { return this.servers.has(id); }
+  checkPaths(directory: string, javaPath: string) { return checkRuntimePaths(directory, javaPath); }
 
   async start(id: string, spec: LaunchSpec & { software: ServerSoftware }) {
     this.software.set(id, spec.software);

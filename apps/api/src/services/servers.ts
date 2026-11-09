@@ -54,6 +54,7 @@ export class ServerService {
     readonly java: JavaManager,
     private config: AppConfig,
     private settings: SettingsService,
+    private prepareRuntimeAccess: (directory: string, javaPath: string) => Promise<void> = async () => undefined,
   ) {
     this.modpacks = new ModpackStaging(config.layout.tmp);
     this.wireAgent();
@@ -281,6 +282,9 @@ export class ServerService {
           await ensureLog4jConfig(row.directory, log4j.configFile, ac.signal);
         }
         await this.installPendingModpack(row, actor, ac.signal);
+        // Publish installation completion only after the process owner has accepted its boot policy.
+        // Otherwise the Start button can race the still-held install lock during Java inspection/IPC.
+        if (this.agent.connected) await this.registerRuntime({ ...row, installState: "installed", jarFile: result.jarFile, javaPath }, javaPath);
         await this.db
           .update(servers)
           .set({ installState: "installed", jarFile: result.jarFile, jarSha: result.sha, build: result.build, javaPath, installError: null, lastStatus: "stopped", updatedAt: Date.now() })
@@ -288,7 +292,6 @@ export class ServerService {
         this.progress({ serverId: id, stage: "Installed", message: "Installation complete", percent: 100, done: true });
         this.hub.broadcast({ type: "status", serverId: id, status: "stopped" });
         await this.activity.event(id, "server.installed", `Installed ${provider.label} ${row.mcVersion}${result.build ? ` build ${result.build}` : ""}`, { actor });
-        if (this.agent.connected) await this.registerRuntime(await this.row(id));
       });
     } catch (err) {
       const message = (err as Error).message;
@@ -368,11 +371,12 @@ export class ServerService {
   // ---- lifecycle ----------------------------------------------------------
 
   /** Persist next-boot policy even for a server that has never been started. */
-  private async registerRuntime(row: ServerRow) {
+  private async registerRuntime(row: ServerRow, resolvedJava?: string) {
     if (row.installState !== "installed" || !row.eulaAccepted) return;
     if (!this.agent.connected) throw new AppError(503, "runtime_disconnected", "Reconnect the Minecraft runtime before changing its configuration");
     if (!this.agent.identity) return; // Embedded test agent has no boot policy to persist.
-    const javaPath = await this.ensureJava(row.javaMajor, row.javaPath);
+    const javaPath = resolvedJava ?? await this.ensureJava(row.javaMajor, row.javaPath);
+    await this.prepareRuntimeAccess(row.directory, javaPath);
     const log4j = this.log4shell(row);
     await this.agent.configure(row.id, { javaPath, directory: row.directory, jarFile: row.jarFile ?? "server.jar", memoryMb: row.memoryMb,
       jvmArgs: [...(log4j?.jvmArgs ?? []), ...splitArgs(row.jvmArgs)], software: row.software, autoStart: row.autoStart });
@@ -405,6 +409,7 @@ export class ServerService {
       }
       for (const hook of this.hooks.beforeStart) await hook(row);
       const javaPath = await this.ensureJava(row.javaMajor, row.javaPath);
+      await this.prepareRuntimeAccess(row.directory, javaPath);
       if (javaPath !== row.javaPath) await this.db.update(servers).set({ javaPath }).where(eq(servers.id, id));
       const log4j = this.log4shell(row);
       if (log4j?.configFile) {
@@ -653,6 +658,7 @@ export class ServerService {
     if (!this.agent.connected) return;
     for (const row of await this.rows()) {
       if (row.installState === "installing" || row.installState === "pending") {
+        if (this.installs.has(row.id)) continue; // A transport reconnect did not interrupt this dashboard's installation.
         await this.db.update(servers).set({ installState: "failed", installError: "Installation was interrupted. Retry the installation." }).where(eq(servers.id, row.id));
         continue;
       }

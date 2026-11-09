@@ -4,6 +4,7 @@ import net, { type Socket } from "node:net";
 import { SOFTWARE_INFO, type ServerSoftware } from "@craftpanel/shared";
 import { LocalAgent, type AgentEvents } from "./agent";
 import type { LaunchSpec } from "./managed-server";
+import { runtimeReporter, type RuntimeDiagnosticSink } from "./diagnostics";
 import { channel, COMMAND_TTL_MS, RUNTIME_PROTOCOL, runtimePaths, type RuntimeSnapshot } from "./protocol";
 
 const EVENTS = ["status", "lines", "players", "metrics", "signal", "exit"] as const;
@@ -23,13 +24,19 @@ export class RuntimeService {
   private initialized = false;
   private writes: Promise<void> = Promise.resolve();
   private broadcasts = new Set<(event: keyof AgentEvents, args: unknown[]) => void>();
+  private report: ReturnType<typeof runtimeReporter>;
+  private closePromise: Promise<void> | null = null;
 
-  constructor(dataDir: string, private build = "development") {
+  constructor(dataDir: string, private build = "development", diagnostics?: RuntimeDiagnosticSink) {
     this.paths = runtimePaths(dataDir);
+    this.report = runtimeReporter("service", diagnostics);
     // Subscribe before serving; state is sent along with every event, before its consumers run.
     for (const event of EVENTS) this.agent.on(event, (...args: unknown[]) => {
       for (const broadcast of this.broadcasts) broadcast(event, args);
-      if (this.initialized && (event === "status" || event === "exit")) void this.persist().catch(() => this.close().catch(() => undefined));
+      if (this.initialized && !this.closing && (event === "status" || event === "exit")) void this.persist().catch((error) => {
+        this.report("registry-write-failed", error);
+        void this.close().catch((shutdownError) => this.report("shutdown-failed", shutdownError));
+      });
     });
   }
 
@@ -99,20 +106,20 @@ export class RuntimeService {
 
   private accept(socket: Socket) {
     this.peers.add(socket);
-    socket.on("error", () => undefined);
+    socket.on("error", (error) => this.report("peer-socket-error", error));
     let authenticated = false;
     let session = "";
     let sequence = 0;
     const watches = new Map<string, () => void>();
     const pausedSaves = new Set<string>();
-    const deadline = setTimeout(() => socket.destroy(), 3000);
+    const deadline = setTimeout(() => { this.report("peer-handshake-timeout"); socket.destroy(); }, 3000);
     const broadcast = (event: keyof AgentEvents, args: unknown[]) => {
       send({ type: "event", event, args, snapshot: this.snapshot(String(args[0])) });
     };
     const send = channel(socket, (m) => {
       if (!authenticated) {
         if (!this.initialized || m.type !== "hello" || m.protocol !== RUNTIME_PROTOCOL || typeof m.token !== "string" || Buffer.byteLength(m.token) !== Buffer.byteLength(this.token) ||
-            !crypto.timingSafeEqual(Buffer.from(m.token), Buffer.from(this.token))) { socket.destroy(); return; }
+            !crypto.timingSafeEqual(Buffer.from(m.token), Buffer.from(this.token))) { this.report("peer-handshake-rejected"); socket.destroy(); return; }
         authenticated = true;
         clearTimeout(deadline);
         session = crypto.randomUUID();
@@ -122,7 +129,7 @@ export class RuntimeService {
         return;
       }
       // No replay window: a command belongs to exactly this connection and runtime generation.
-      if (this.closing || m.type !== "call" || m.epoch !== this.epoch || m.session !== session || !Number.isSafeInteger(m.seq) || (m.seq as number) !== sequence + 1) { socket.destroy(); return; }
+      if (this.closing || m.type !== "call" || m.epoch !== this.epoch || m.session !== session || !Number.isSafeInteger(m.seq) || (m.seq as number) !== sequence + 1) { this.report("peer-command-envelope-rejected"); socket.destroy(); return; }
       sequence = m.seq as number;
       const seq = sequence;
       if (typeof m.deadline !== "number" || m.deadline < Date.now() || m.deadline > Date.now() + COMMAND_TTL_MS + 1000) {
@@ -132,10 +139,14 @@ export class RuntimeService {
       void (async () => {
         try {
           let result: unknown = null;
-          if (!id && !["ping", "stopAll", "shutdownRuntime"].includes(String(m.method))) throw new Error("Invalid server id");
+          if (!id && !["ping", "stopAll", "shutdownRuntime", "checkPaths"].includes(String(m.method))) throw new Error("Invalid server id");
           const entry = this.records[id];
           switch (m.method) {
             case "ping": break;
+            case "checkPaths":
+              if (typeof m.directory !== "string" || typeof m.javaPath !== "string" || m.directory.length > 4096 || m.javaPath.length > 4096) throw new Error("Invalid runtime paths");
+              result = await this.agent.checkPaths(m.directory, m.javaPath);
+              break;
             case "configure": {
               const spec = validateSpec(m.spec);
               this.records[id] = { spec, pid: entry?.pid ?? null };
@@ -189,7 +200,7 @@ export class RuntimeService {
           send({ type: "reply", seq, error: (err as Error).message });
         }
       })();
-    });
+    }, this.report);
     socket.once("close", () => {
       clearTimeout(deadline);
       this.broadcasts.delete(broadcast);
@@ -200,14 +211,18 @@ export class RuntimeService {
     });
   }
 
-  async close(timeoutMs = 90_000) {
-    if (this.closing) return;
+  close(timeoutMs = 90_000): Promise<void> {
+    return this.closePromise ??= this.shutdown(timeoutMs);
+  }
+
+  private async shutdown(timeoutMs: number) {
     this.closing = true;
     for (const peer of this.peers) peer.destroy();
     const closed = this.server.listening ? new Promise<void>((resolve) => this.server.close(() => resolve())) : Promise.resolve();
-    await this.agent.shutdown(timeoutMs);
-    if (this.initialized) await this.persist();
-    await closed;
+    try {
+      await this.agent.shutdown(timeoutMs);
+      if (this.initialized) await this.persist();
+    } finally { await closed; }
   }
 }
 
