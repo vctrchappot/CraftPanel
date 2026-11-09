@@ -166,7 +166,8 @@ function Install-CraftPanel {
       & icacls.exe $Root /grant "${account}:(OI)(CI)RX" | Out-Null
       if ($LASTEXITCODE -ne 0) { Fail "Could not grant runtime access to its program files." }
       $nodeDir = Split-Path -Parent ([IO.Path]::GetFullPath($node))
-      if ($node -notlike "$Root\*") {
+      # StartsWith, not -like: paths may legitimately contain wildcard characters such as [ ].
+      if (-not ([IO.Path]::GetFullPath($node)).StartsWith($Root.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
         & icacls.exe $nodeDir /grant "${account}:(OI)(CI)RX" | Out-Null
         if ($LASTEXITCODE -ne 0) {
           & icacls.exe $node /grant "${account}:RX" | Out-Null
@@ -175,12 +176,15 @@ function Install-CraftPanel {
       }
       # Node resolves every path component before loading its entry point. The service
       # needs attributes/traversal on private profile ancestors, without inherited file access.
+      # System ancestors (C:\Users, C:\Program Files) are protected and usually already
+      # traversable, so a failed grant is only a warning; starting the service is authoritative.
       $grantedParents = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
       foreach ($target in @($Root, $DataDir, $node)) {
         $parent = Split-Path -Parent ([IO.Path]::GetFullPath($target))
         while ($parent -and $parent.TrimEnd('\') -ne [IO.Path]::GetPathRoot($parent).TrimEnd('\')) {
           if ($grantedParents.Add($parent)) {
             & icacls.exe $parent /grant "${account}:(X,RA,REA,RC,S)" | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-Warning "Could not grant runtime traversal of $parent; continuing." }
           }
           $parent = Split-Path -Parent $parent
         }
