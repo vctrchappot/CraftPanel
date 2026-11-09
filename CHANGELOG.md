@@ -44,6 +44,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Concurrent first-run requests can create only one owner account. Windows task shutdown now owns the entire managed process tree, including failed startup before a control token exists.
 - Reverse-proxy setup requires the host's setup token even when the backend listens on loopback. Public clients require HTTPS and Secure cookies; missing proxy client-IP headers and ambiguous transport headers are rejected.
 - HTTP and WebSocket origin checks include the scheme and support an external origin when the proxy rewrites Host. Backend TLS and Secure cookies are no longer presented as proof of browser HTTPS.
+- The server section navigation can no longer be scrolled vertically by a pixel; it only scrolls sideways when the sections do not fit.
 - Two servers installing at the same time no longer break each other's Java download.
 - Switching from Paper or Purpur (Minecraft 1.21 and older) to Vanilla or Fabric no longer loses the Nether and the End: their folders are moved back into the world.
 - The Worlds tab shows the Nether and the End for Minecraft 26.x worlds.
