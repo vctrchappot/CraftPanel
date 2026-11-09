@@ -1,6 +1,6 @@
 {
   "name": "craftpanel",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Self-hosted Minecraft server manager",
   "license": "FSL-1.1-ALv2",

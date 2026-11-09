@@ -6,6 +6,8 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 
 ## Unreleased
 
+## 1.0.0 – 2026-11-09
+
 ### Upgrading
 First stable release. From 0.3.x, update from the dashboard or re-run the installer. From 0.2.x or older, follow "Upgrading from 0.2.x" under 0.3.0 once.
 
