@@ -6,6 +6,8 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 
 ## Unreleased
 
+## 0.3.0 – 2026-11-09
+
 ### Upgrading from 0.2.x
 This release moves Minecraft into its own runtime service. The first update saves and stops running servers once (servers with auto-start come back) and needs your explicit approval, so it can't be started from the dashboard of 0.2.x:
 - **Linux / Raspberry Pi:** `curl -fsSL https://github.com/vctrchappot/CraftPanel/releases/latest/download/install.sh | sudo bash -s -- --allow-runtime-restart`
