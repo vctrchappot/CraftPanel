@@ -150,6 +150,12 @@ describe("listPlugins (mods)", () => {
     expect(findInstalledAddon({ id: "9eGKb6K1", slug: "simple-voice-chat", title: "Simple Voice Chat", source: "modrinth" }, installed)?.file).toBe("simple-voice-chat-paper-2.5.0.jar.disabled");
     // Matched by normalized name/modId:
     expect(findInstalledAddon({ id: "P7dR8mSH", slug: "fabric-api", title: "Fabric API", source: "modrinth" }, installed)?.file).toBe("fabric-api-0.140.0.jar");
+    // A jar installed from Modrinth is not matched by a different Modrinth project that merely shares its name:
+    const veinminer = [{ file: "veinminer-paper-2.6.0.jar", name: "Veinminer", main: null, projectId: "AAAAAAAA", source: "modrinth" as const }];
+    expect(findInstalledAddon({ id: "BBBBBBBB", slug: "veinminer", title: "VeinMiner", source: "modrinth" }, veinminer)).toBeUndefined();
+    expect(findInstalledAddon({ id: "AAAAAAAA", slug: "vein-miner", title: "VeinMiner", source: "modrinth" }, veinminer)?.file).toBe("veinminer-paper-2.6.0.jar");
+    // ...but the same plugin listed on the other source still matches by name:
+    expect(findInstalledAddon({ id: "VeinMiner", slug: "VeinMiner", title: "VeinMiner", source: "hangar" }, veinminer)?.file).toBe("veinminer-paper-2.6.0.jar");
   });
 });
 

@@ -55,7 +55,7 @@ export function normalizeAddonKey(value: string | null | undefined): string {
 }
 
 /** Find an already-installed plugin or mod matching a marketplace entry (by project id, slug, name, mod id or jar stem). */
-export function findInstalledAddon<T extends Pick<PluginInfo, "file" | "name" | "main" | "projectId">>(
+export function findInstalledAddon<T extends Pick<PluginInfo, "file" | "name" | "main" | "projectId"> & { source?: PluginInfo["source"] }>(
   project: { id: string; slug: string; title: string; source?: "modrinth" | "hangar" },
   plugins: T[],
 ): T | undefined {
@@ -66,6 +66,8 @@ export function findInstalledAddon<T extends Pick<PluginInfo, "file" | "name" | 
   return plugins.find((p) => {
     const pid = p.projectId?.trim().toLowerCase();
     if (pid && (pid === idLower || pid === slugLower)) return true;
+    // A jar CraftPanel installed from this very source belongs to another project: a similar name is a coincidence.
+    if (pid && p.source && p.source === project.source) return false;
     const nameKey = normalizeAddonKey(p.name);
     if (nameKey && (nameKey === titleKey || nameKey === slugKey)) return true;
     if (p.main && !p.main.includes(".")) {

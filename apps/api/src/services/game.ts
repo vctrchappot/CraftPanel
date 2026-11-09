@@ -402,6 +402,16 @@ export class GameService {
       kind === "plugins" ? this.hangarIndex(row) : Promise.resolve({} as Record<string, { project: string; versionId: string }>),
       this.modrinthIndex(row),
     ]);
+    // Jars deleted outside CraftPanel leave their index entries behind; a later jar with the same name must not inherit them.
+    const present = new Set(list.map((p) => baseAddonFile(p.file)));
+    for (const stale of new Set([...Object.keys(hangar), ...Object.keys(modrinth)].filter((f) => !present.has(f)))) {
+      // Re-check on disk: an install may have finished since the listing was taken.
+      const dir = this.pluginsDir(row);
+      if ((await exists(path.join(dir, stale))) || (await exists(path.join(dir, `${stale}.disabled`)))) continue;
+      delete hangar[stale];
+      delete modrinth[stale];
+      await Promise.all([this.forgetHangar(row, stale), this.forgetModrinth(row, stale)]).catch(() => undefined);
+    }
     return list.map((p) => {
       const base = baseAddonFile(p.file);
       if (hangar[base]) return { ...p, source: "hangar" as const, projectId: hangar[base].project };

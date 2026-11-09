@@ -16,6 +16,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - New type system: Inter for text, Mona Sans for headers, titles and the wordmark, Mona Sans Mono for the console, commands and technical labels. All self-hosted; Geist Serif stays for release notes.
 
 ### Fixed
+- The plugin/mod browser no longer marks removed or never-installed entries as "Installed". The badge is derived from the live plugin list instead of the search result's snapshot (which lingered while a search refreshed), the list refreshes when switching tabs, a jar from a marketplace is only matched by its project id rather than a similar name, and marketplace records of jars deleted outside CraftPanel are dropped.
 - Signed-in devices no longer pile up: signing in again from a browser that is already signed in replaces its session, and a user keeps at most 20 sessions (the longest-idle ones end first).
 - `stop` or `restart` typed in the server console no longer shows the server as crashed. A stop is recognised as intended, a clean exit after startup (an in-game `/stop`) counts as a shutdown too, and `restart` starts the server again. A clean exit during startup, such as an unaccepted EULA, is still reported.
 - On Windows, removing, disabling or updating a plugin or mod the running server has loaded now says to stop the server first (409) instead of failing with a filesystem error, and a refused update no longer leaves a second copy of the jar behind.

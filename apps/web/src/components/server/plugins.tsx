@@ -41,9 +41,6 @@ interface MarketHit {
   iconUrl: string | null;
   compatible: boolean;
   source: "modrinth" | "hangar";
-  installed?: boolean;
-  installedVersion?: string | null;
-  installedFile?: string | null;
 }
 
 type Source = "modrinth" | "hangar";
@@ -74,7 +71,7 @@ export function PluginsTab({ server: s }: { server: ServerDetail }) {
         {t.Many} run with the same permissions as the Minecraft server on this machine. Only install {t.many} from authors you trust. CraftPanel verifies download checksums but cannot verify what a{" "}
         {t.one} does.
       </Callout>
-      <Tabs defaultValue="installed" className="space-y-4">
+      <Tabs defaultValue="installed" className="space-y-4" onValueChange={() => void q.refetch()}>
         <TabsList>
           <TabsTrigger value="installed">Installed ({q.data.plugins.length})</TabsTrigger>
           {canManage && <TabsTrigger value="browse">Browse</TabsTrigger>}
@@ -286,9 +283,10 @@ function Browse({ server: s, plugins }: { server: ServerDetail; plugins: PluginI
         <Panel>
           <ul className="divide-y divide-border">
             {q.data?.hits.map((h) => {
+              // Always derived from the live plugin list: the hit's own installed flag is a snapshot of when the search ran.
               const installed = findInstalledAddon(h, plugins);
-              const isInstalled = Boolean(installed || h.installed);
-              const installedVer = installed?.version ?? h.installedVersion;
+              const isInstalled = Boolean(installed);
+              const installedVer = installed?.version;
               const isInstalling = install.isPending && install.variables?.id === h.id;
               return (
                 <li key={h.id} className="flex items-start gap-4 px-4 py-3.5 text-[13px]">
