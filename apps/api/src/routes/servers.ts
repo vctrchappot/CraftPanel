@@ -397,19 +397,18 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
     const st = await fsp.stat(file);
     const stream = fs.createReadStream(file);
     stream.on("close", () => void fsp.rm(file, { force: true }));
-    return reply.header("Content-Type", "application/zip").header("Content-Length", st.size).header("Content-Disposition", `attachment; filename="${name.replace(/[^A-Za-z0-9_.-]/g, "_")}.zip"`).send(stream);
+    return reply.header("Content-Type", "application/zip").header("Content-Length", st.size).header("Content-Disposition", `attachment; filename="${name.replace(/[^A-Za-z0-9_.-]/g, "_")}-${new Date().toISOString().slice(0, 10)}.zip"`).send(stream);
   });
-  app.post<IdParams & { Querystring: { name?: string } }>("/api/servers/:id/worlds/import", async (req, reply) => {
+  app.post<IdParams & { Querystring: { name?: string; activate?: string } }>("/api/servers/:id/worlds/import", async (req) => {
     requirePermission(req, "worlds.manage");
     const name = parse(levelNameSchema, req.query.name);
     const r = await row(req.params.id);
     const up = await receiveUpload(ctx, req, 8 * 1024 ** 3);
     try {
-      await game.importWorld(r, up.file, name, actorOf(req));
+      return await game.importWorld(r, up.file, name, req.query.activate === "true", actorOf(req));
     } finally {
       await up.cleanup();
     }
-    return noContent(reply);
   });
 
   // ---- plugins --------------------------------------------------------------------------

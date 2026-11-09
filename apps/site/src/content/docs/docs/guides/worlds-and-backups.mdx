@@ -12,7 +12,8 @@ import { Aside } from "@astrojs/starlight/components";
 The **Worlds** tab lists a server's worlds with their size. You can:
 
 - **Create** a new world with its own seed and type, and **select** which one the server loads.
-- **Import** a world from a `.zip` (for example from singleplayer or another host) and **export** one as a download.
+- **Import** a world from a `.zip` (for example from singleplayer or another host): drop the file anywhere on the tab or press **Import**. CraftPanel looks into the archive first, shows which dimensions it holds, suggests a free name and can make it the active world right away. Zip the world's folder (the one with `level.dat`); a world inside one or two wrapper folders, or Paper's `world`, `world_nether` and `world_the_end` side by side, work too. Nothing existing is overwritten.
+- **Export** a world as a `.zip` download. The server may keep running; CraftPanel saves the world first. The archive contains the Nether and End and imports back into any CraftPanel.
 - **Delete** a world; CraftPanel makes a backup first.
 
 ## Files

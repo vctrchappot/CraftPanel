@@ -1,7 +1,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import { badRequest, conflict, findInstalledAddon, notFound, SOFTWARE_INFO, softwareLabel, type AddonKind, type GameRuleInfo, type PlayerProfile, type PlayerRosterEntry, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
+import { badRequest, conflict, findInstalledAddon, notFound, planWorldImport, SOFTWARE_INFO, softwareLabel, type AddonKind, type GameRuleInfo, type PlayerProfile, type PlayerRosterEntry, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
 import { PropertiesDocument, SETTINGS, SETTINGS_BY_KEY, parseJsonList, parseNbtFile, validateSetting, type BanEntry, type OpEntry, type WhitelistEntry } from "@craftpanel/config";
 import { and, desc, asc, eq, events, playerSessions, servers as serversTable, sql, type Database } from "@craftpanel/database";
 import { createZip, extractZip, listZip, readZipEntry } from "@craftpanel/backup";
@@ -481,20 +481,34 @@ export class GameService {
     return out;
   }
 
-  /** Import a world from an uploaded zip (level.dat at the root or inside one folder). */
-  async importWorld(row: ServerRow, zipFile: string, name: string, actor: Actor) {
+  /**
+   * Import a world from an uploaded zip. The world may sit at the top, in a wrapper folder, or (as Paper
+   * stores it) next to its Nether and End folders; they all land under `name`, `name_nether` and `name_the_end`.
+   */
+  async importWorld(row: ServerRow, zipFile: string, name: string, activate: boolean, actor: Actor): Promise<{ name: string; dimensions: string[]; activated: boolean }> {
     this.requireGameServer(row);
     const sb = this.servers.sandbox(row);
-    if (await sb.exists(name)) throw conflict(`A folder named "${name}" already exists`);
-    const entries = await listZip(zipFile);
-    const levelDat = entries.map((e) => e.name).filter((n) => /(^|\/)level\.dat$/.test(n)).sort((a, b) => a.length - b.length)[0];
-    if (!levelDat) throw badRequest("The archive does not contain a Minecraft world (level.dat not found)");
-    const prefix = levelDat.slice(0, -"level.dat".length);
-    if (prefix.split("/").filter(Boolean).length > 1) throw badRequest("level.dat is nested too deeply in the archive");
-    const target = await sb.resolve(name);
-    await extractZip({ file: zipFile, destination: target, stripPrefix: prefix || undefined });
-    await this.activity.event(row.id, "world.imported", `World "${name}" imported`, { actor });
+    const result = planWorldImport((await listZip(zipFile)).map((e) => e.name));
+    if (!result.ok) throw badRequest(result.message, result.hint);
+    const { folders, dimensions } = result.plan;
+    for (const f of folders) {
+      if (await sb.exists(name + f.suffix)) throw conflict(`A folder named "${name + f.suffix}" already exists`, "Pick another name for the world.");
+    }
+    const created: string[] = [];
+    try {
+      for (const f of folders) {
+        created.push(name + f.suffix);
+        await extractZip({ file: zipFile, destination: await sb.resolve(name + f.suffix), stripPrefix: f.source || undefined });
+        if (await sb.exists(path.posix.join(name + f.suffix, "__MACOSX"))) await sb.remove(path.posix.join(name + f.suffix, "__MACOSX")); // macOS Finder's resource forks
+      }
+    } catch (err) {
+      for (const dir of created) await sb.remove(dir).catch(() => undefined);
+      throw err;
+    }
+    await this.activity.event(row.id, "world.imported", `World "${name}" imported (${dimensions.join(", ")})`, { actor });
     await this.activity.audit(actor, "world.import", row.id, { name });
+    if (activate) await this.selectWorld(row, name, {}, actor);
+    return { name, dimensions, activated: activate };
   }
 
   // ---- plugins --------------------------------------------------------------
