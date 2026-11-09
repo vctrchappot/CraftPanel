@@ -36,13 +36,45 @@ function Assert-Database {
 try {
   Install-Fixture "99.0.0" $true
   Assert-Ready
+  $runtimeName = "$taskName Runtime"
+  $runtime = Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")
+  if ($runtime.State -ne "Running" -or $runtime.StartName -ne "NT SERVICE\$runtimeName") { throw "Runtime is not running under its virtual service account" }
+  $runtimeProcess = $runtime.ProcessId
+  # Stopping the dashboard task must not stop the independent SCM owner.
+  $firstDashboard = (Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw | ConvertFrom-Json).pid
+  Stop-ScheduledTask -TaskName $taskName
+  $taskDeadline = (Get-Date).AddSeconds(30)
+  while ((Get-ScheduledTask -TaskName $taskName).State -eq "Running") {
+    if ((Get-Date) -gt $taskDeadline) { throw "Dashboard task did not stop" }
+    Start-Sleep -Milliseconds 100
+  }
+  # The task leaves "Running" before its Job Object has finished killing the dashboard. A readiness
+  # probe in that window is answered by the dying process and control.json still holds its PID.
+  $deathDeadline = (Get-Date).AddSeconds(30)
+  while (Get-Process -Id $firstDashboard -ErrorAction SilentlyContinue) {
+    if ((Get-Date) -gt $deathDeadline) { throw "The first dashboard process $firstDashboard survived the task stop" }
+    Start-Sleep -Milliseconds 100
+  }
+  if ((Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")).ProcessId -ne $runtimeProcess) { throw "Dashboard task stop restarted the runtime service" }
+  Start-ScheduledTask -TaskName $taskName
+  $readyDeadline = (Get-Date).AddSeconds(30)
+  do {
+    try {
+      Assert-Ready
+      # Only the restarted dashboard counts: it replaces control.json before it reports ready.
+      if ((Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw | ConvertFrom-Json).pid -ne $firstDashboard) { break }
+    } catch { if ((Get-Date) -gt $readyDeadline) { throw } }
+    if ((Get-Date) -gt $readyDeadline) { throw "The restarted dashboard did not replace control.json" }
+    Start-Sleep -Milliseconds 250
+  } while ($true)
   $before = (Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw | ConvertFrom-Json).pid
   Install-Fixture "98.0.0" $false
   $after = (Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw | ConvertFrom-Json).pid
-  if ($before -ne $after) { throw "Unsupported archive stopped the existing process" }
+  if ($before -ne $after) { throw "Unsupported archive changed the dashboard process (control.json pid $before -> $after)" }
   foreach ($version in @("99.0.1", "99.0.2", "99.0.3")) {
     Install-Fixture $version $false
     Assert-Ready
+    if ((Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")).ProcessId -ne $runtimeProcess) { throw "Dashboard rollback restarted the runtime service" }
     Assert-Database
     $childFile = Join-Path $dataRoot "failed-child-pid.txt"
     if (Test-Path -LiteralPath $childFile) {
@@ -53,10 +85,47 @@ try {
     if ((Get-Content -LiteralPath (Join-Path $installRoot "release.json") -Raw | ConvertFrom-Json).version -ne "99.0.0") { throw "Release metadata was not restored" }
   }
   1..2 | ForEach-Object { Install-Fixture "99.0.0" $true; Assert-Ready }
+  if ((Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")).ProcessId -ne $runtimeProcess) { throw "Dashboard update restarted the runtime service" }
+  Install-Fixture "99.0.4" $false
+  Assert-Ready
+  if ((Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")).ProcessId -ne $runtimeProcess) { throw "Unapproved runtime update stopped the service" }
+  $env:CRAFTPANEL_ALLOW_RUNTIME_RESTART = "1"
+  Install-Fixture "99.0.5" $false
+  Assert-Ready
+  Assert-Database
+  Install-Fixture "99.0.4" $true
+  Remove-Item Env:CRAFTPANEL_ALLOW_RUNTIME_RESTART
+  Assert-Ready
+  # SCM recovery must replace a crashed wrapper; its Job Object also owns the child runtime.
+  $runtimeProcess = (Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")).ProcessId
+  Stop-Process -Id $runtimeProcess -Force
+  $recoveryDeadline = (Get-Date).AddSeconds(45)
+  do {
+    Start-Sleep -Milliseconds 250
+    $service = Get-CimInstance Win32_Service -Filter ("Name='" + $runtimeName.Replace("'", "''") + "'")
+    if ((Get-Date) -gt $recoveryDeadline) { throw "SCM did not recover the crashed runtime service" }
+  } while ($service.State -ne "Running" -or $service.ProcessId -eq $runtimeProcess)
+  $readyDeadline = (Get-Date).AddSeconds(30)
+  do { try { Assert-Ready; break } catch { if ((Get-Date) -gt $readyDeadline) { throw }; Start-Sleep -Milliseconds 250 } } while ($true)
   $points = @(Get-ChildItem -LiteralPath $installRoot -Directory -Filter 'state-*' | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "committed") })
   if ($points.Count -ne 2) { throw "Successful recovery retention is not bounded" }
   $passed = $true
   Write-Output "PASS: unsupported archive, failed migration, hanging startup, subsequent updates and recovery retention."
+} catch {
+  # CI runners discard retained artifacts, so print what is needed before cleanup removes it.
+  Write-Output "FAILURE: $($_.Exception.Message)"
+  Write-Output "before pid: $before, after pid: $after"
+  try {
+    $control = Get-Content -LiteralPath (Join-Path $dataRoot "control.json") -Raw -ErrorAction Stop | ConvertFrom-Json
+    Write-Output "control.json pid: $($control.pid), alive: $([bool](Get-Process -Id $control.pid -ErrorAction SilentlyContinue))"
+  } catch { Write-Output "control.json unreadable: $($_.Exception.Message)" }
+  $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
+  if ($info) { Write-Output "task last run: $($info.LastRunTime), last result: $($info.LastTaskResult)" }
+  foreach ($log in @("craftpanel.log", "craftpanel.err.log", "craftpanel.previous.log", "craftpanel.err.previous.log", "runtime.err.log", "runtime-host.err.log")) {
+    $file = Join-Path $dataRoot "logs\$log"
+    if (Test-Path -LiteralPath $file) { Write-Output "--- $log (tail)"; Get-Content -LiteralPath $file -Tail 25 }
+  }
+  throw
 } finally {
   $updater = Join-Path $installRoot "update.ps1"
   if (Test-Path -LiteralPath $updater) {
@@ -68,6 +137,13 @@ try {
       Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
       Unregister-ScheduledTask -TaskName $name -Confirm:$false
     }
+  }
+  # First-install failures may leave a service before update.ps1 was activated.
+  $runtimeName = "$taskName Runtime"
+  if (Get-Service -Name $runtimeName -ErrorAction SilentlyContinue) {
+    Stop-Service -Name $runtimeName -ErrorAction Stop
+    & sc.exe delete $runtimeName | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Could not clean up the isolated runtime service" }
   }
   if ($passed -and (Test-Path -LiteralPath $testRoot)) {
     $resolved = (Resolve-Path -LiteralPath $testRoot).Path

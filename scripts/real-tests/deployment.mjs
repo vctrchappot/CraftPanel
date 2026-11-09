@@ -19,6 +19,8 @@ const dist = path.resolve(distOption >= 0 ? args[distOption + 1] : path.join(rep
 const entry = path.join(dist, "index.js");
 await fs.access(entry);
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "craftpanel-deployment-"));
+const dataRoot = args.includes("--deep-data") ? path.join(root, "nested-" + "x".repeat(100)) : root;
+await fs.mkdir(dataRoot, { recursive: true });
 const processes = [];
 const servers = [];
 const sockets = new Set();
@@ -67,14 +69,22 @@ async function freePort() {
   return port;
 }
 
-async function start(name, env) {
-  const data = path.join(root, name);
+async function start(name, env, useDefaultData = false) {
+  const dataBase = path.join(dataRoot, name);
+  const data = useDefaultData ? process.platform === "darwin" ? path.join(dataBase, "Library", "Application Support", "CraftPanel")
+    : path.join(dataBase, process.platform === "win32" ? "CraftPanel" : "craftpanel") : dataBase;
   const port = await freePort();
   const variables = {
     ...inheritedEnv, CRAFTPANEL_HOST: "127.0.0.1", CRAFTPANEL_PORT: String(port),
     CRAFTPANEL_DATA_DIR: data, CRAFTPANEL_UPDATE_CHECK: "false", CRAFTPANEL_LOG_LEVEL: "warn",
     CRAFTPANEL_LOG_FORMAT: "json", ...env,
+    ...(useDefaultData ? { CRAFTPANEL_DATA_DIR: undefined, LOCALAPPDATA: dataBase, XDG_DATA_HOME: dataBase, HOME: dataBase } : {}),
   };
+  const runtime = spawn(process.execPath, [path.join(dist, "runtime.js")], { cwd: dist, env: variables, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+  const runtimeClosed = new Promise((resolve) => runtime.once("close", resolve));
+  processes.push({ child: runtime, closed: runtimeClosed, data, runtime: true, env: variables });
+  runtime.stderr.on("data", () => {});
+  runtime.stdout.on("data", () => {});
   const child = spawn(process.execPath, [entry], { cwd: dist, env: variables, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   let output = "";
   for (const stream of [child.stdout, child.stderr]) stream.on("data", (chunk) => { output = (output + chunk).slice(-64_000); });
@@ -124,6 +134,10 @@ function proxy(api, certificates, secureEdge = true) {
 }
 
 try {
+  const defaults = await start("default-data-path", { CRAFTPANEL_PROFILE: "local" }, true);
+  await fs.access(path.join(defaults.data, "runtime", "token"));
+  await fs.access(path.join(defaults.data, "craftpanel.db"));
+  console.log("PASS dashboard and runtime share the platform default data directory");
   const openssl = process.env.OPENSSL ?? (process.platform === "win32" ? "C:/Program Files/Git/usr/bin/openssl.exe" : "openssl");
   const cert = path.join(root, "localhost.pem");
   const key = path.join(root, "localhost.key");
@@ -211,8 +225,13 @@ try {
   for (const instance of processes.reverse()) {
     if (instance.child.exitCode !== null) continue;
     try {
+      if (instance.runtime) {
+        const stop = spawn(process.execPath, [path.join(dist, "runtime.js"), "--shutdown"], { cwd: dist, env: instance.env, windowsHide: true, stdio: "ignore" });
+        await new Promise((resolve) => stop.once("close", resolve));
+      } else {
       const control = JSON.parse(await fs.readFile(path.join(instance.data, "control.json"), "utf8"));
       await request(control.url + "/api/control/shutdown", { method: "POST", headers: { "x-craftpanel-control": control.token }, body: {} });
+      }
     } catch { /* A failed startup may not have written a control file. */ }
     await Promise.race([instance.closed, pause(5_000)]);
     if (instance.child.exitCode === null) { instance.child.kill(); await instance.closed; }

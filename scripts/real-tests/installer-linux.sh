@@ -11,7 +11,7 @@ data_dir="/var/lib/$instance"
 [[ ! -e $install_dir && ! -e $data_dir && ! -e /etc/systemd/system/$instance.service ]] || { echo "Refusing to change an existing test instance." >&2; exit 1; }
 original_pid=$(systemctl show craftpanel -p MainPID --value 2>/dev/null || true)
 node -e 'const s=require("net").createServer();s.on("error",()=>process.exit(1));s.listen(Number(process.argv[1]),"0.0.0.0",()=>s.close())' "$port"
-archive() { printf '%s/%s-v%s.tar.gz' "$fixtures" "$instance" "$1"; }
+archive() { printf '%s/craftpanel-v%s.tar.gz' "$fixtures" "$1"; }
 ready() { curl -fsS --noproxy '*' "http://$probe_host:$port/api/ready" >/dev/null; }
 verify_db() {
   node - "$data_dir/craftpanel.db" <<'NODE'

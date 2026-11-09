@@ -188,3 +188,11 @@ jobs:
           node scripts/real-tests/installer-fixtures.mjs test-results/installer-recovery
           powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/real-tests/installer-windows.ps1 -Fixtures test-results/installer-recovery
           if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Real Paper player stays connected; service stop saves and boot start restores it
+        shell: powershell
+        run: |
+          $tools = Join-Path $env:RUNNER_TEMP "mc-tools"
+          npm install --prefix $tools --no-audit --no-fund mineflayer@4.39.0
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          node scripts/real-tests/runtime-continuity-windows.mjs test-results/installer-recovery $tools
+          if ($LASTEXITCODE -ne 0) { exit 1 }

@@ -15,8 +15,10 @@ dist="${TMPDIR:-/tmp}/craftpanel-dist-$port"
 rm -rf "$dist" && cp -r "$repo/apps/api/dist" "$dist"
 [[ ${KEEP_DATA:-} ]] || rm -rf "$data"
 mkdir -p "$data"
+CRAFTPANEL_DATA_DIR=$data node "$dist/runtime.js" >"$data.runtime.log" 2>&1 &
+runtime=$!
 CRAFTPANEL_PORT=$port CRAFTPANEL_HOST=127.0.0.1 CRAFTPANEL_DATA_DIR=$data CRAFTPANEL_UPDATE_CHECK=false node "$dist/index.js" >"$data.api.log" 2>&1 &
 api=$!
-trap 'kill $api 2>/dev/null; wait $api 2>/dev/null; rm -rf "$dist"' EXIT
-for _ in $(seq 1 60); do curl -fsS -o /dev/null "http://127.0.0.1:$port/api/health" 2>/dev/null && break; sleep 1; done
+trap 'kill $api $runtime 2>/dev/null; wait $api 2>/dev/null; wait $runtime 2>/dev/null; rm -rf "$dist"' EXIT
+for _ in $(seq 1 60); do curl -fsS -o /dev/null "http://127.0.0.1:$port/api/ready" 2>/dev/null && break; sleep 1; done
 node "$here/$scenario" "http://127.0.0.1:$port" "$@"

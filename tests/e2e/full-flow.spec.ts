@@ -37,6 +37,7 @@ test("create, run, configure, back up and restore a real server", async ({ page 
 
   // Installation (downloads the official jar and, if needed, Java)
   await expect(page).toHaveURL(/\/server\/\?id=/);
+  const serverId = new URL(page.url()).searchParams.get("id")!;
   await page.screenshot(shot("07-installing"));
   const start = page.getByRole("button", { name: "Start", exact: true });
   await expect(start).toBeVisible({ timeout: 10 * 60 * 1000 });
@@ -89,4 +90,51 @@ test("create, run, configure, back up and restore a real server", async ({ page 
   await page.goto("/activity/");
   await expect(page.getByText(/Restored backup/).first()).toBeVisible();
   await page.screenshot(shot("14-activity"));
+
+  // The maintenance action saves/stops the real server from global settings.
+  await page.goto(`/server/?id=${serverId}`);
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await expect(page.getByRole("main").getByText("Running", { exact: true }).first()).toBeVisible({ timeout: 3 * 60 * 1000 });
+  await page.goto("/settings/?tab=about");
+  await page.getByRole("button", { name: "Stop all servers for maintenance" }).click();
+  const maintenance = page.getByRole("dialog");
+  await expect(maintenance.getByText("E2E Vanilla", { exact: true })).toBeVisible();
+  await page.screenshot(shot("15-runtime-maintenance"));
+  await maintenance.getByRole("button", { name: "Save and stop all servers" }).click();
+  await expect(page.getByText("All Minecraft servers stopped", { exact: true })).toBeVisible({ timeout: 120_000 });
+  await page.goto(`/server/?id=${serverId}`);
+  await expect(page.getByRole("button", { name: "Start", exact: true })).toBeVisible();
+
+  // Exercise preview wording/controls with controlled release metadata; never install a release here.
+  let interruption: "required" | "none" | "unknown" = "required";
+  await page.route("**/api/updates?*", async (route) => route.fulfill({ json: {
+    enabled: true, current: "0.1.0", latest: "999.0.0", available: true, canInstall: true,
+    source: "folder", install: { method: "linux-service", updateCommand: "update.sh" },
+    runtime: { protocol: 1, sha256: "a".repeat(64) }, interruption,
+    affectedServers: [{ id: serverId, name: "E2E Vanilla", autoStart: false }],
+  } }));
+  await page.route("**/api/updates", async (route) => route.fulfill({ json: {
+    enabled: true, current: "0.1.0", latest: "999.0.0", available: true, canInstall: true,
+    source: "folder", install: { method: "linux-service", updateCommand: "update.sh" },
+    runtime: { protocol: 1, sha256: "a".repeat(64) }, interruption,
+    affectedServers: [{ id: serverId, name: "E2E Vanilla", autoStart: false }],
+  } }));
+  for (const state of ["required", "none", "unknown"] as const) {
+    interruption = state;
+    await page.goto("/settings/?tab=about");
+    await page.getByRole("button", { name: "Update now", exact: true }).click();
+    const preview = page.getByRole("dialog");
+    if (state === "required") {
+      await expect(preview.getByText("E2E Vanilla", { exact: true })).toBeVisible();
+      await expect(preview.getByRole("button", { name: "Stop affected servers and update" })).toBeEnabled();
+    } else if (state === "none") {
+      await expect(preview.getByRole("button", { name: "Update dashboard", exact: true })).toBeEnabled();
+      await expect(preview.getByText("Dashboard update", { exact: true })).toBeVisible();
+    } else {
+      await expect(preview.getByText("Interruption could not be determined", { exact: true })).toBeVisible();
+      await expect(preview.getByRole("button", { name: "Stop affected servers and update" })).toBeDisabled();
+    }
+    await page.screenshot(shot(`16-update-preview-${state}`));
+    await preview.getByRole("button", { name: "Later", exact: true }).click();
+  }
 });

@@ -54,7 +54,62 @@ node scripts/real-tests/installer-fixtures.mjs test-results/installer-recovery
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/real-tests/installer-windows.ps1 -Fixtures test-results/installer-recovery
 ```
 
-Use a new fixture directory per run. Existing normal CraftPanel instances are not changed. Tests cover unsupported archives, failed migrations, hanging startup and descendants, subsequent updates and snapshot retention. Linux also checks a specific-interface proxy listener and an invalid unit; Windows checks an invalid launcher. Failed Windows test artifacts are retained for diagnosis.
+Use a new fixture directory per run. Existing normal CraftPanel instances are not changed. Windows service tests require an elevated shell under the dashboard owner's account. Tests cover unsupported archives, failed migrations, hanging startup and descendants, subsequent updates and snapshot retention. Linux also checks a specific-interface proxy listener and an invalid unit. Windows checks an invalid dashboard entry point, SCM identity/recovery and changed-runtime rollback. Failed Windows test artifacts are retained for diagnosis.
+
+## Installed runtime/player continuity (Linux)
+
+Generate fixtures with a fresh isolated name, then run as root on a disposable systemd test host with mineflayer already installed in a separate tools directory:
+
+```bash
+node scripts/real-tests/installer-fixtures.mjs test-results/runtime-acceptance craftpanel-ops-runtime-test
+sudo node scripts/real-tests/runtime-continuity.mjs test-results/runtime-acceptance craftpanel-ops-runtime-test 19689 /path/to/test-tools [/path/to/java]
+```
+
+The optional Java executable is copied into this instance's data directory; the original installation is read-only. The harness installs real Paper 1.21.4, holds a real offline player through dashboard restart/crash, successful dashboard update and migration/unit rollback, and checks unchanged PIDs, player connection, console replay and working commands. It also checks missing/expired/mismatched runtime approvals, changed-runtime rollback and successful maintenance update using a gold block in the real world, and graceful runtime-service restart with auto-start. That final scenario is not an actual host reboot. JSON evidence and installer logs remain in the fixture directory. Services are uninstalled even on failure; data is retained for diagnosis. Fixture names and ports must be unused. Playwright output is confined to `test-results/playwright` so it cannot delete these archives.
+
+## Dashboard-triggered updates and concurrent installers (Linux)
+
+```bash
+node scripts/real-tests/installer-fixtures.mjs test-results/dashboard-update craftpanel-ops-dash-test
+sudo node scripts/real-tests/dashboard-update.mjs test-results/dashboard-update craftpanel-ops-dash-test 19697
+```
+
+The scenario installs an isolated instance and points its settings file at a local release folder (`CRAFTPANEL_RELEASE_DIR`). It then updates through the dashboard API as "Update now" does, and the systemd path unit runs the installer. Checks:
+- A release with a failing migration rolls back. The dashboard shows the result and log after its restart, and the runtime is not restarted.
+- A runtime-changing release is refused without approval and installs with the exact approval.
+- Of two installers started at the same time, one is refused by the install lock.
+
+The instance is uninstalled afterwards. Fixture archives keep the real `craftpanel-vX.Y.Z` names, because the dashboard reads `craftpanel-vX.Y.Z/release.json` from them. Only service, user and path names are isolated.
+
+## Installed runtime/player continuity (Windows)
+
+Run in an elevated shell under the account that will own the dashboard, on a disposable machine (CI uses the hosted Windows runner):
+
+```powershell
+node scripts/real-tests/installer-fixtures.mjs test-results/installer-recovery
+npm install --prefix C:\path\to\test-tools mineflayer@4.39.0
+node scripts/real-tests/runtime-continuity-windows.mjs test-results/installer-recovery C:\path\to\test-tools
+```
+
+It installs into a temporary directory with its own scheduled task, SCM service and ports. A real Paper 1.21.4 server and offline player are kept through a dashboard task restart, a forced dashboard kill, a dashboard-only update and a failed-migration rollback. The scenario checks unchanged Java and service PIDs, commands and console replay. It also checks the boot start mode and preshutdown timeout. A service stop must save the world, including a block change without an explicit save, and exit with code 0. Starting the service again must bring back the auto-start server and its world. The wrapper handles stop and preshutdown with the same code, but Windows does not let applications send preshutdown, so this is not a host reboot. On failure, the scenario prints dashboard, runtime and Minecraft logs.
+
+## Graceful host shutdown and boot (Linux)
+
+`host-reboot.mjs` powers off its host between two phases, so run it only on a disposable systemd host. On Windows, clone the WSL test distro and remove the clone afterwards:
+
+```powershell
+wsl --export craftpanel-test C:\cpwsl\craftpanel-test.tar
+wsl --import craftpanel-reboot C:\cpwsl\reboot C:\cpwsl\craftpanel-test.tar
+wsl -d craftpanel-reboot -u root -- systemctl disable --now craftpanel   # keep the cloned instance off its ports
+# keep the clone alive in another terminal: wsl -d craftpanel-reboot -u root -- sleep infinity
+wsl -d craftpanel-reboot -u root -- node scripts/real-tests/host-reboot.mjs prepare FIXTURES craftpanel-ops-NAME PORT /path/to/test-tools [/path/to/java]
+wsl -d craftpanel-reboot -u root -- systemctl poweroff
+# boot it again (start the keep-alive), then:
+wsl -d craftpanel-reboot -u root -- node scripts/real-tests/host-reboot.mjs verify FIXTURES craftpanel-ops-NAME PORT /path/to/test-tools
+wsl --unregister craftpanel-reboot
+```
+
+Run the `node` commands from the checkout (`/mnt/c/...`). Generate fixtures with `installer-fixtures.mjs` as above. `prepare` installs the instance and two real Paper 1.21.4 servers, one with auto-start and one without. It connects a player, flushes a gold block and then places a diamond block without a save. `verify` checks for a new systemd boot (PID 1 start time; WSL journal boot IDs follow the shared kernel). It checks the journal since preparation for a runtime stop without SIGKILL or stop timeout and the previous Minecraft logs for a graceful stop and world save. It also checks that both units are enabled, only the auto-start server is running again, a player can join, and both blocks still exist. It then uninstalls the instance and writes `host-reboot-evidence.json`. A WSL distro poweroff is a full systemd shutdown and boot, not a kernel or firmware reboot.
 
 ## Conventions
 
