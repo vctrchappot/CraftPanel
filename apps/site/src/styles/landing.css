@@ -30,7 +30,7 @@
   --term-bg: var(--cp-console);
   --term-fg: var(--cp-console-fg);
   --noise-opacity: 0.045;
-  --font-display: var(--cp-font-sans);
+  --font-display: var(--cp-font-display);
   --font-text: var(--cp-font-sans);
   --font-mono: var(--cp-font-mono);
   --font-serif: var(--cp-font-serif);
@@ -133,7 +133,7 @@ code, pre, kbd, samp {
 .display {
   font-family: var(--font-display);
   font-weight: 500;
-  letter-spacing: var(--cp-tracking-heading);
+  letter-spacing: var(--cp-tracking-display);
   line-height: 1;
 }
 
@@ -270,8 +270,8 @@ p {
   align-items: center;
   gap: 10px;
   text-decoration: none;
-  font-family: var(--font-display);
-  font-weight: 500;
+  font-family: var(--font-text);
+  font-weight: 600;
   letter-spacing: -0.02em;
   font-size: 19px;
 }
@@ -353,6 +353,7 @@ p {
 .hero h1 {
   font-size: clamp(48px, 5vw, 72px);
   line-height: 1.02;
+  letter-spacing: -0.05em;
 }
 .mark {
   position: relative;
@@ -842,7 +843,7 @@ p {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 8px;
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   font-weight: 500;
   letter-spacing: -0.01em;
   font-size: 18px;
@@ -996,7 +997,7 @@ p {
 .pv-name {
   font-family: var(--font-display);
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--cp-tracking-heading);
   font-size: 30px;
   line-height: 1.1;
 }
@@ -1838,7 +1839,7 @@ p {
 .device h3 {
   font-family: var(--font-display);
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--cp-tracking-heading);
   font-size: 24px;
   line-height: 1.1;
 }
@@ -1901,7 +1902,7 @@ p {
 }
 .compare thead th {
   border-top: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-text);
   font-weight: 500;
   letter-spacing: -0.02em;
   font-size: 18px;

@@ -31,15 +31,20 @@ The mark keeps its own colours. Only the top face adapts: lighter on dark surfac
 
 ## Type
 
-Three Geist families, each with one job. Weights stay low, nothing above 600: precision comes from size and spacing, not from weight.
+Inter Display for large display headers and three Geist families for UI, code and editorial accents. Weights stay low, nothing above 600: precision comes from size and spacing, not from weight.
 
-Normal Sans text uses −0.01 em letter spacing; headings use −0.035 em. Commands, code and console output retain normal Mono spacing.
+Normal Sans text uses −0.01 em letter spacing; headings use −0.035 em; large display headers use −0.045 em to −0.05 em. Commands, code and console output retain normal Mono spacing.
 
 <div class="ds-type">
   <div>
+    <p class="ds-label">Inter Display: large display headers</p>
+    <p class="ds-specimen" style="font-family: var(--cp-font-display); font-weight: 500; letter-spacing: var(--cp-tracking-display)">Your server. Your hardware.</p>
+    <p style="font-family: var(--cp-font-sans)">Hero and section display titles (500) with tighter negative tracking.</p>
+  </div>
+  <div>
     <p class="ds-label">Geist Sans: everything by default</p>
-    <p class="ds-specimen" style="font-family: var(--cp-font-sans); font-weight: 500; letter-spacing: var(--cp-tracking-heading)">Your server. Your hardware.</p>
-    <p style="font-family: var(--cp-font-sans)">Body text (400), labels and headlines (500), the wordmark (600).</p>
+    <p class="ds-specimen" style="font-family: var(--cp-font-sans); font-weight: 500; letter-spacing: var(--cp-tracking-heading)">Six kinds of server. One wizard.</p>
+    <p style="font-family: var(--cp-font-sans)">Body text (400), UI labels and subheadings (500), the wordmark (600).</p>
   </div>
   <div>
     <p class="ds-label">Geist Mono: anything a machine reads</p>

@@ -1,8 +1,40 @@
-/* Geist, straight from Vercel's official `geist` package (SIL Open Font License), self-hosted: never load
-   fonts from a CDN, the dashboard promises no third-party requests. The dashboard loads the same files
-   through `geist/font/*` (next/font); the website and the OG image use this file. The declarations
-   mirror the package's own: Serif has a single weight (400), so never set it bolder.
+/* Geist (Vercel) and Inter Display (Rasmus Andersson), both SIL Open Font License, self-hosted:
+   never load fonts from a CDN, the dashboard promises no third-party requests. The dashboard loads
+   the same files through next/font (see apps/web/src/app/layout.tsx); the website and the OG image
+   use this file. Serif has a single weight (400), so never set it bolder.
    Which family goes where: docs/design/README.md. */
+
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/InterDisplay-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/InterDisplay-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/InterDisplay-SemiBold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/InterDisplay-Bold.woff2") format("woff2");
+}
 
 @font-face {
   font-family: "Geist";

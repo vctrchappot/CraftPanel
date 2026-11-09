@@ -24,13 +24,14 @@ Fonts are self-hosted from the `geist` npm package (Vercel, SIL Open Font Licens
 
 | Family | Weight | Used for |
 | --- | --- | --- |
-| **Geist** (Sans, variable) | 400 body, 500 labels and headlines (dashboard and website), 600 only for the wordmark and small emphasis | Everything by default. |
+| **Inter Display** (static WOFF2, v4.1) | 500 | Large display headers (`--cp-font-display`, `.display`, hero and section titles). |
+| **Geist** (Sans, variable) | 400 body, 500 labels and UI headlines, 600 only for the wordmark and small emphasis | Everything by default. |
 | **Geist Mono** (variable) | 400–500 | Console, logs, commands, paths, ports, versions, metrics, section numbers and labels, comparison table. |
 | **Geist Serif** | 400 only | Human voice: the "What's new" dialog title and the project statement on the website. Nothing else. |
 
-Keep weights low: nothing above 600. Large Geist at 700+ with tight tracking looks blunt; precision comes from size and spacing, not weight. Serif ships a single weight and `font-synthesis-weight: none` is set globally, so give it `font-normal` instead of inheriting a bold one. The wordmark is Geist Sans 600 next to the mark (the brand package's Archivo wordmark is not used).
+Keep weights low: nothing above 600. Large display headers use **Inter Display** at 500 with tighter negative tracking; precision comes from size and spacing, not weight. Serif ships a single weight and `font-synthesis-weight: none` is set globally, so give it `font-normal` instead of inheriting a bold one. The wordmark is Geist Sans 600 next to the mark (the brand package's Archivo wordmark is not used).
 
-Sans tracking is slightly negative: `--cp-tracking-body` −0.01 em for normal UI/body text, `--cp-tracking-heading` −0.035 em for headings. Mono commands and console output retain normal tracking for legibility.
+Sans tracking is negative: `--cp-tracking-body` −0.01 em for normal UI/body text, `--cp-tracking-heading` −0.035 em for standard headings, and `--cp-tracking-display` −0.045 em (−0.05 em on the hero H1) for large display headers. Mono commands and console output retain normal tracking for legibility.
 
 On the landing page, keep a clear size step between levels so headings do not compete: hero `clamp(48px, 5vw, 72px)`, section headings `clamp(32px, 3.5vw, 48px)`, feature card headings `22px`, body copy `16px` (`line-height: 1.55`), and technical labels `12–13px` Geist Mono.
 

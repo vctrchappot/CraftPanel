@@ -51,10 +51,16 @@ code, pre, kbd, samp, .ds-label {
   width: auto;
 }
 
-.sl-markdown-content :is(h1, h2, h3),
-h1#_top {
+.sl-markdown-content :is(h1, h2, h3) {
+  font-family: var(--cp-font-display);
   font-weight: 500;
   letter-spacing: var(--cp-tracking-heading);
+}
+
+h1#_top {
+  font-family: var(--cp-font-display);
+  font-weight: 500;
+  letter-spacing: var(--cp-tracking-display);
 }
 
 .sidebar-content a[aria-current="page"],
