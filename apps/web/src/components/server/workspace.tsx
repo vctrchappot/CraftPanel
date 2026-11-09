@@ -73,14 +73,16 @@ export function ServerWorkspace() {
       <div className="space-y-6">
         <Header server={s} />
         <Banners server={s} stream={stream} />
-        <nav className="scrollbar-thin -mx-1 flex gap-1 overflow-x-auto border-b border-border px-1" aria-label="Server sections">
+        {/* The baseline is an inset shadow, not a border: tabs overlapping a border would overflow
+            vertically, and overflow-x-auto makes that overflow scrollable. */}
+        <nav className="scrollbar-thin -mx-1 flex gap-1 overflow-x-auto overflow-y-hidden px-1 shadow-[inset_0_-1px_0_var(--color-border)]" aria-label="Server sections">
           {TABS.filter(([t]) => visible(t, SOFTWARE_INFO[s.software].proxy)).map(([t, label]) => (
             <Link
               key={t}
               href={`/server/?id=${id}${t === "overview" ? "" : `&tab=${t}`}`}
               scroll={false}
               className={cn(
-                "relative -mb-px whitespace-nowrap border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "relative whitespace-nowrap border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                 tab === t ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
               )}
               aria-current={tab === t ? "page" : undefined}
