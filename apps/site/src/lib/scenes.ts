@@ -166,26 +166,70 @@ export function piScene(): Box[] {
   return piBoard(0, 0);
 }
 
+/**
+ * A flat colour for decals. A thin box has a top and a side face a few hundredths wide; with three different
+ * shades they read as ragged outlines, with one shade they simply vanish into the decal.
+ */
+const flat = (c: string): Shades => [c, c, c];
+
 export function pcScene(): Box[] {
-  const parts: Box[] = [box(0, 0, 0, 2.2, 4, 4.6, C.case)];
-  // front panel faces +y: bays, power button, vents
-  parts.push(box(0.3, 4, 3.6, 1.6, 0.06, 0.55, C.bezel));
-  parts.push(box(0.3, 4, 2.9, 1.6, 0.06, 0.5, C.bezel));
-  parts.push(box(0.9, 4, 1.9, 0.4, 0.08, 0.4, C.led, "led"));
-  parts.push(box(1.45, 4, 2.0, 0.18, 0.08, 0.18, C.gold, "led-act"));
-  for (let i = 0; i < 4; i++) parts.push(box(0.3, 4, 0.3 + i * 0.32, 1.6, 0.04, 0.12, C.bezel));
-  // side window glow on +x side
-  parts.push(box(2.2, 0.5, 0.8, 0.04, 3, 3.2, ["#3a5f2a", "#2c4a20", "#3d6a2b"]));
-  // Side-panel framing and two quiet cooling fans, rather than an undifferentiated green window.
-  for (const y of [0.85, 2.15]) {
-    parts.push(box(2.25, y, 1.6, 0.025, 0.9, 0.9, C.bezel));
-    parts.push(box(2.28, y + 0.15, 1.75, 0.025, 0.6, 0.6, C.caseLight));
-    parts.push(box(2.3, y + 0.33, 1.93, 0.025, 0.24, 0.24, C.silver));
+  // Case: 2.2 wide (x), 4 deep (y), 4.6 tall. The front faces +y (left in the picture), the glass side panel +x (right).
+  const W = 2.2;
+  const D = 4;
+  const H = 4.6;
+  const dark = flat("#141311");
+  const slot = flat("#0d0c0b");
+  const panel = flat("#33302c");
+  const metal = flat("#8a9098");
+  const light = flat("#d3d6db");
+  /** Decal on the front (y = D): x/z span the face, o is the height above it. */
+  const front = (x: number, z: number, w: number, h: number, c: Shades, o = 0.02) => box(x, D + o, z, w, 0.02, h, c);
+  /** Decal on the glass side (x = W): y/z span the face. */
+  const side = (y: number, z: number, d: number, h: number, c: Shades, o = 0.02, cls?: string) => box(W + o, y, z, 0.02, d, h, c, cls);
+
+  // Four rubber feet, drawn first so the case covers whatever is behind it.
+  const parts: Box[] = [];
+  for (const x of [0.06, 1.74]) for (const y of [0.06, 3.54]) parts.push(box(x, y, -0.16, 0.4, 0.4, 0.16, C.bezel));
+  parts.push(box(0, 0, 0, W, D, H, C.case));
+
+  // Front: a framed panel with two drive bays, the power button, two USB ports and an intake grille.
+  parts.push(front(0.15, 0.3, 1.9, 4, panel, 0.01));
+  for (const z of [3.55, 2.85]) parts.push(front(0.3, z, 1.6, 0.55, dark));
+  parts.push(front(0.45, 3.82, 1.3, 0.06, slot, 0.04)); // optical drive slot
+  parts.push(front(1.6, 3.62, 0.2, 0.1, metal, 0.04)); // eject button
+  parts.push(front(0.3, 2.1, 0.5, 0.5, metal, 0.02)); // power button
+  parts.push(box(0.43, D + 0.04, 2.23, 0.24, 0.02, 0.24, C.led, "led")); // power LED
+  parts.push(box(1.62, D + 0.04, 2.25, 0.2, 0.02, 0.2, C.gold, "led-act")); // drive activity
+  for (const x of [0.3, 0.9]) parts.push(front(x, 1.7, 0.4, 0.14, dark));
+  for (let i = 0; i < 5; i++) parts.push(front(0.3, 0.42 + i * 0.22, 1.6, 0.09, dark));
+
+  // Glass side: a framed window with two identical fans and an LED strip, above a vented PSU shroud.
+  const wy = 0.4;
+  const wd = 3.2;
+  const wz = 1.95;
+  const wh = 1.8;
+  parts.push(side(wy - 0.12, wz - 0.12, wd + 0.24, wh + 0.24, dark, 0.01));
+  parts.push(side(wy, wz, wd, wh, flat("#1c3326"), 0.02));
+  for (const fy of [wy + 0.2, wy + 0.2 + 1.3 + 0.2]) {
+    const fz = wz + 0.3;
+    const cy = fy + 0.65;
+    const cz = fz + 0.65;
+    parts.push(side(fy, fz, 1.3, 1.3, flat("#2c2b2e"), 0.03)); // frame
+    parts.push(side(fy + 0.1, fz + 0.1, 1.1, 1.1, dark, 0.04)); // opening
+    parts.push(side(cy - 0.45, cz - 0.1, 0.9, 0.2, metal, 0.05)); // blades
+    parts.push(side(cy - 0.1, cz - 0.45, 0.2, 0.9, metal, 0.05));
+    parts.push(side(cy - 0.17, cz - 0.17, 0.34, 0.34, light, 0.06)); // hub
+    parts.push(side(cy - 0.07, cz - 0.07, 0.14, 0.14, flat("#5b6068"), 0.07));
+    for (const [dy, dz] of [[0.04, 0.04], [1.18, 0.04], [0.04, 1.18], [1.18, 1.18]]) parts.push(side(fy + dy, fz + dz, 0.08, 0.08, light, 0.04));
   }
-  parts.push(box(0.25, 0.35, -0.15, 0.4, 0.45, 0.15, C.bezel));
-  parts.push(box(1.65, 3.15, -0.15, 0.4, 0.45, 0.15, C.bezel));
+  parts.push(side(wy + 0.2, wz + 0.1, wd - 0.4, 0.07, flat("#5bbf4a"), 0.03, "led")); // LED strip
+  parts.push(side(wy, 0.35, wd, 1.2, flat("#3f3c38"), 0.01)); // PSU shroud
+  for (let i = 0; i < 4; i++) parts.push(side(wy + 0.35, 0.5 + i * 0.25, wd - 0.7, 0.09, dark, 0.02));
+
+  // Top: two rows of vent slits either side of the grass block.
+  for (const y of [0.35, 0.65, 0.95, 3.0, 3.3, 3.6]) parts.push(box(0.35, y, H, 1.5, 0.09, 0.01, slot));
   // a little grass block sitting on top, for scale and charm
-  parts.push(...grassBlock(0.6, 1.4, 4.6));
+  parts.push(...grassBlock(0.6, 1.5, H));
   return parts;
 }
 
