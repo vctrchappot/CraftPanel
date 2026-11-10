@@ -3,6 +3,8 @@ import { ROLES, SERVER_ROLES } from "./roles";
 import { SERVER_SOFTWARE } from "./software";
 import { NOTIFICATION_CATEGORIES } from "./types";
 import { PERFORMANCE_PRESETS } from "./performance";
+import { MOTD_MAX_LENGTH } from "./motd";
+import { ROTATION_MAX_FRAMES } from "./motd-rotation";
 
 export const usernameSchema = z
   .string()
@@ -126,6 +128,12 @@ export const proxyConfigSchema = z.object({
 
 /** A server icon as base64 PNG data; the API checks that it really is a 64×64 PNG. */
 export const serverIconSchema = z.object({ png: z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/, "Not base64 data").max(180_000) });
+
+/** Messages the server list shows in turn (Paper and Purpur); the API checks lines and emptiness per message. */
+export const motdRotationSchema = z.object({
+  interval: z.number().int().min(1).max(3600),
+  frames: z.array(z.string().max(MOTD_MAX_LENGTH).refine((s) => !/\r/.test(s), "Messages must not contain carriage returns")).max(ROTATION_MAX_FRAMES),
+});
 
 export const updateServerSchema = z.object({
   name: serverNameSchema.optional(),

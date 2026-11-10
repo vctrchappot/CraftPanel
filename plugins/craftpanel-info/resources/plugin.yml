@@ -1,8 +1,8 @@
 name: CraftPanelInfo
-version: "1.0.0"
+version: "1.1.0"
 main: site.vctr.craftpanel.CraftPanelInfo
 api-version: "1.13"
-description: Adds /craftpanel, a short info card about CraftPanel. Installed and managed by CraftPanel.
+description: Adds /craftpanel, a short info card about CraftPanel, and rotating server list messages. Installed and managed by CraftPanel.
 author: vctrchappot
 website: https://github.com/vctrchappot/CraftPanel
 commands:

@@ -20,6 +20,18 @@ function Scrambled({ text }: { text: string }) {
   return <>{shown}</>;
 }
 
+/** Which of `count` rotating messages is due now, advancing every `seconds`. Stands still for reduced motion. */
+export function useRotationIndex(count: number, seconds: number): number {
+  const [index, setIndex] = React.useState(0);
+  React.useEffect(() => {
+    setIndex(0);
+    if (count < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(() => setIndex((i) => (i + 1) % count), seconds * 1000);
+    return () => window.clearInterval(timer);
+  }, [count, seconds]);
+  return Math.min(index, Math.max(0, count - 1));
+}
+
 /** A message of the day as the game draws it: legacy and smooth colours on the list's dark background. */
 export function MotdText({ raw, className }: { raw: string; className?: string }) {
   const lines = parseMotd(raw);

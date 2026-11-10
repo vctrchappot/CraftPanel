@@ -42,13 +42,24 @@ Two modes decide how the colours are written:
 - A message has at most two lines and 2048 characters; a colour or style costs two characters, a smooth colour fourteen. Roughly 50 characters fit on a line before the game cuts them off.
 - A colour clears the styles before it, as in the game; **Clear** or a second colour returns to the default.
 - Obfuscated text shuffles in the game and in the preview (it stands still if your system asks for reduced motion).
-- The game draws the message once and keeps it until the list is refreshed; it can't animate by itself.
+- The game draws the message once and keeps it until the list is refreshed; it can't animate by itself. For a message that changes, see rotating messages below.
 - Minecraft reads the message at start-up, so restart the server after saving.
 - A Velocity proxy takes its message from `velocity.toml` (Files tab); the icon and description work for it too.
 
 <Aside>
   The message is the `motd` line of `server.properties`, written with the line break as an escape so the file stays valid. You can still edit it under Server properties or in the raw file.
 </Aside>
+
+## Rotating messages
+
+On Paper and Purpur servers the server list can show several messages one after the other. Design a message in the editor, click **Add the message above**, and repeat up to eight times; each one can be changed in its own box, moved up or down or removed, and **Use editor text** replaces it with what the editor holds. **Change every** sets how long a message stays (2 to 30 seconds), and the preview on the right plays the rotation.
+
+How it works: CraftPanel writes the messages to `plugins/CraftPanelInfo/motd.txt` and installs its small info plugin (the same one that adds `/craftpanel`), which answers the game's server list request with the message that is due. Minecraft asks for the message each time the list is opened or refreshed, so a player sees one message and then another after a refresh; the text doesn't move on its own while it is on screen.
+
+- Edits apply within seconds, with no restart. The first time, restart the server so the plugin loads; the dashboard marks the server as needing a restart if the plugin was added while it ran.
+- While rotating messages are set, they replace the single message above; remove them all to bring it back.
+- Switching off the in-game info command keeps the plugin for the messages but hides `/craftpanel`.
+- Vanilla, Fabric and NeoForge servers can't run the plugin and keep the single message. Smooth colours work in rotating messages as they do in the single one.
 
 ## The description
 

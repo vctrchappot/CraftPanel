@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Download, ImagePlus, RotateCcw, Save, Trash2, Wand2 } from "lucide-react";
 import { Button, Callout, ConfirmDialog, Field, Input, NativeSelect, Panel, SegmentedControl, Section, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
-import { MOTD_COLORS, MOTD_EFFECTS, MOTD_FORMATS, MOTD_MAX_LENGTH, MOTD_MAX_LINES, SOFTWARE_INFO, motdPlainOffset, motdProblem, motdRawIndex, paintMotd, restyleMotd, stripMotd, type MotdChange, type MotdFormatKey, type ServerDetail } from "@craftpanel/shared";
+import { MOTD_COLORS, MOTD_EFFECTS, MOTD_FORMATS, MOTD_MAX_LENGTH, MOTD_MAX_LINES, SOFTWARE_INFO, motdPlainOffset, motdProblem, motdRawIndex, paintMotd, restyleMotd, stripMotd, type MotdChange, type MotdFormatKey, type MotdRotation, type MotdRotationState, type ServerDetail } from "@craftpanel/shared";
 import { api, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
@@ -13,8 +13,9 @@ import { DEFAULT_CROP, ICON_PX, ICON_THEMES, clampPan, drawCrop, drawGenerated, 
 import { formatNumber } from "@/lib/format";
 import { StatusBadge } from "../status";
 import { ServerIcon, iconUrl } from "../server-icon";
-import { MotdText, ServerListEntry } from "./motd-preview";
+import { MotdText, ServerListEntry, useRotationIndex } from "./motd-preview";
 import { EffectTools, SymbolPicker } from "./motd-tools";
+import { RotationSection } from "./rotation";
 
 const DEFAULT_MOTD = "A Minecraft Server";
 
@@ -27,12 +28,24 @@ export function AppearanceTab({ server: s }: { server: ServerDetail }) {
     queryFn: () => api.get<{ values: Record<string, string> }>(`/api/servers/${s.id}/properties`),
     enabled: game,
   });
+  const rotationQuery = useQuery({
+    queryKey: ["motd-rotation", s.id],
+    queryFn: () => api.get<MotdRotationState>(`/api/servers/${s.id}/motd-rotation`),
+    enabled: game,
+  });
   const [iconDraft, setIconDraft] = React.useState<string | null>(null);
+  const [rotationDraft, setRotationDraft] = React.useState<MotdRotation | null>(null);
   const [motdDraft, setMotdDraft] = React.useState<string | null>(null);
   const [descDraft, setDescDraft] = React.useState<string | null>(null);
   const savedMotd = props.data?.values.motd ?? DEFAULT_MOTD;
   const motd = motdDraft ?? savedMotd;
   const description = descDraft ?? s.description;
+  const savedRotation = rotationQuery.data;
+  const rotation: MotdRotation | null = rotationDraft ?? savedRotation ?? null;
+  const rotatingFrames = savedRotation?.supported && rotation ? rotation.frames : [];
+  // While messages rotate, the preview plays them one after the other like the game's list does.
+  const due = useRotationIndex(rotatingFrames.length, rotation?.interval ?? 5);
+  const listed = rotatingFrames.length ? rotatingFrames[due] : motd;
 
   return (
     <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
@@ -44,6 +57,16 @@ export function AppearanceTab({ server: s }: { server: ServerDetail }) {
           ) : (
             <Skeleton className="h-64 rounded-lg" />
           ))}
+        {game && savedRotation && rotation && (
+          <RotationSection
+            server={s}
+            canEdit={canEdit}
+            saved={savedRotation}
+            value={rotation}
+            editorText={motd}
+            onChange={(next) => setRotationDraft(next.interval === savedRotation.interval && next.frames.length === savedRotation.frames.length && next.frames.every((f, i) => f === savedRotation.frames[i]) ? null : next)}
+          />
+        )}
         <DescriptionSection server={s} canEdit={canEdit} value={description} onChange={(v) => setDescDraft(v === s.description ? null : v)} />
       </div>
       <aside className="order-first min-w-0 space-y-6 xl:sticky xl:top-6 xl:order-none">
@@ -52,7 +75,12 @@ export function AppearanceTab({ server: s }: { server: ServerDetail }) {
             {game && (
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground">In Minecraft's server list</p>
-                <ServerListEntry server={s} motd={motd} iconSrc={iconDraft ?? undefined} />
+                <ServerListEntry server={s} motd={listed} iconSrc={iconDraft ?? undefined} />
+                {rotatingFrames.length > 0 && (
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    Rotating: message {due + 1} of {rotatingFrames.length}, every {rotation?.interval} seconds
+                  </p>
+                )}
               </div>
             )}
             {!game && (

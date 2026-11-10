@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readZipEntry } from "@craftpanel/backup";
 import { PropertiesDocument } from "@craftpanel/config";
-import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, CRAFTPANEL_VERSION, softwareLabel } from "@craftpanel/shared";
+import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, CRAFTPANEL_VERSION, ROTATION_INFO_OFF_FILE, softwareLabel } from "@craftpanel/shared";
 
 /**
  * In-game info card about CraftPanel, enabled by default and removable globally or per server.
@@ -188,16 +188,23 @@ export async function isInfoPlugin(file: string): Promise<boolean> {
 }
 
 /**
- * Install/update or remove the /craftpanel plugin in a Paper server's plugins/ folder.
- * A copy the user disabled in the Plugins tab (.jar.disabled) is left alone.
+ * Install/update or remove the CraftPanel plugin in a Paper server's plugins/ folder. It is wanted while the in-game
+ * info command is on or the server has rotating messages; with `infoCommand` off it stays only for the messages and
+ * a marker file tells it to hide /craftpanel. A copy the user disabled in the Plugins tab (.jar.disabled) is left alone.
  */
-export async function syncInfoPlugin(serverDir: string, enabled: boolean, source = bundledPluginPath()): Promise<boolean> {
+export async function syncInfoPlugin(serverDir: string, enabled: boolean, source = bundledPluginPath(), infoCommand = true): Promise<boolean> {
   const pluginsDir = path.join(serverDir, "plugins");
   const target = path.join(pluginsDir, INFO_PLUGIN_FILE);
+  const marker = path.join(serverDir, ...ROTATION_INFO_OFF_FILE.split("/"));
+  if (!enabled || infoCommand) await fsp.rm(marker, { force: true });
   if (!enabled) {
     if (!(await exists(target)) || !(await isInfoPlugin(target))) return false;
     await fsp.rm(target);
     return true;
+  }
+  if (!infoCommand) {
+    await fsp.mkdir(path.dirname(marker), { recursive: true });
+    await fsp.writeFile(marker, "CraftPanel keeps this plugin for the rotating server list messages only; /craftpanel is switched off.\n");
   }
   if (!source || (await exists(`${target}.disabled`))) return false;
   const wanted = await fsp.readFile(source);

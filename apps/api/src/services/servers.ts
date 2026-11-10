@@ -9,9 +9,16 @@ import {
   conflict,
   createServerSchema,
   notFound,
+  parseRotation,
   PRESET_INFO,
+  ROTATION_DEFAULT_INTERVAL,
+  ROTATION_FILE,
+  rotationProblem,
+  serializeRotation,
   SOFTWARE_INFO,
   type InstallProgress,
+  type MotdRotation,
+  type MotdRotationState,
   type ServerDetail,
   type ServerMetrics,
   type ServerSoftware,
@@ -27,7 +34,7 @@ import type { z } from "zod";
 import type { Hub } from "../hub";
 import type { AppConfig } from "../config";
 import { SYSTEM_ACTOR, type ActivityService, type Actor } from "./activity";
-import { infoStorageCommand, syncInfoPack, syncInfoPlugin } from "./info-pack";
+import { INFO_PLUGIN_FILE, infoStorageCommand, syncInfoPack, syncInfoPlugin } from "./info-pack";
 import { checkIcon, ICON_FILE } from "./server-icon";
 import { mergeSplitDimensions, separateDimensionLayout } from "./software-switch";
 import { MODPACK_RECORD, ModpackStaging, PENDING_MODPACK } from "./modpacks";
@@ -178,6 +185,40 @@ export class ServerService {
     if (this.agent.isRunning(row.id)) this.restartRequired.add(row.id);
     await this.activity.audit(actor, "server.icon_remove", row.id);
     await this.activity.event(row.id, "config.updated", "Removed the server icon", { actor });
+  }
+
+  /** Rotating messages need a plugin loader that can answer the server list ping: Paper and Purpur. */
+  private supportsRotation(row: ServerRow): boolean {
+    const info = SOFTWARE_INFO[row.software];
+    return info.addons === "plugins" && !info.proxy;
+  }
+
+  async rotation(row: ServerRow): Promise<MotdRotationState> {
+    const supported = this.supportsRotation(row);
+    const text = supported ? await this.sandbox(row).readTextIfExists(ROTATION_FILE) : null;
+    return { supported, ...(text ? parseRotation(text) : { interval: ROTATION_DEFAULT_INTERVAL, frames: [] }) };
+  }
+
+  /**
+   * Save the messages the server list shows in turn. The CraftPanel plugin reads the file again whenever it changes, so
+   * edits apply at once; the first time the plugin has to be installed and loaded, which needs a start.
+   */
+  async setRotation(row: ServerRow, rotation: MotdRotation, actor: Actor) {
+    if (!this.supportsRotation(row)) throw badRequest("Rotating messages need Paper or Purpur", "Vanilla, Fabric and NeoForge can only show the one message of server.properties.");
+    const problem = rotationProblem(rotation);
+    if (problem) throw badRequest(problem);
+    const sandbox = this.sandbox(row);
+    if (rotation.frames.length) await sandbox.writeText(ROTATION_FILE, serializeRotation(rotation));
+    else if (await sandbox.exists(ROTATION_FILE)) await sandbox.remove(ROTATION_FILE);
+    // A plugin the running server has loaded is left alone (replacing its jar can break it); a missing one is added.
+    const running = this.agent.isRunning(row.id);
+    if (!running || !(await sandbox.exists(`plugins/${INFO_PLUGIN_FILE}`))) {
+      const infoCommand = row.infoCommand ?? (await this.settings.get()).infoCommand;
+      const changed = await syncInfoPlugin(row.directory, infoCommand || rotation.frames.length > 0, undefined, infoCommand);
+      if (changed && running) this.restartRequired.add(row.id);
+    }
+    await this.activity.audit(actor, "server.motd_rotation", row.id);
+    await this.activity.event(row.id, "config.updated", rotation.frames.length ? `Set ${rotation.frames.length} rotating server list messages` : "Removed the rotating server list messages", { actor });
   }
 
   detail(row: ServerRow): ServerDetail {
@@ -572,7 +613,8 @@ export class ServerService {
     const enabled = row.infoCommand ?? (await this.settings.get()).infoCommand;
     try {
       await syncInfoPack(row.directory, enabled, { software: row.software, mcVersion: row.mcVersion });
-      await syncInfoPlugin(row.directory, enabled && SOFTWARE_INFO[row.software].addons === "plugins");
+      const rotating = (await this.rotation(row)).frames.length > 0;
+      await syncInfoPlugin(row.directory, (enabled || rotating) && SOFTWARE_INFO[row.software].addons === "plugins", undefined, enabled);
     } catch (err) {
       await this.activity.event(row.id, "server.info_command_failed", `Could not update the CraftPanel info command: ${(err as Error).message}`, { level: "warn" });
     }

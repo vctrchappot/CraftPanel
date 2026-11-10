@@ -549,3 +549,73 @@ describe("server appearance", () => {
     expect((await call(sessions.admin, "GET", `/api/servers/${serverId}/properties`)).json().values["enable-rcon"]).toBeUndefined();
   });
 });
+
+describe("rotating server list messages", () => {
+  let paperId: string;
+  let paperDir: string;
+  let viewer: Session;
+  const url = () => `/api/servers/${paperId}/motd-rotation`;
+  const frames = ["§6§lMoonlight\n§7Survival", "§bCome and play\n§7New friends welcome"];
+  const exists = (p: string) => fs.access(p).then(() => true, () => false);
+
+  beforeAll(async () => {
+    expect((await call(owner, "POST", "/api/users", { username: "rotation-viewer", password: "rotation-viewer-1", role: "viewer" })).statusCode).toBe(200);
+    viewer = await login("rotation-viewer", "rotation-viewer-1");
+    paperId = crypto.randomUUID();
+    paperDir = path.join(root, "servers", "paper-rotation");
+    await fs.mkdir(path.join(paperDir, "world"), { recursive: true });
+    await fs.writeFile(path.join(paperDir, "server.properties"), "motd=Test\n");
+    await fs.writeFile(path.join(paperDir, ".craftpanel"), "{}");
+    const now = Date.now();
+    await ctx.database.db.insert(servers).values({
+      id: paperId, name: "Paper", software: "paper", mcVersion: "1.21.4", javaMajor: 21, memoryMb: 1024, directory: paperDir, port: 25598,
+      installState: "installed", jarFile: "server.jar", createdAt: now, updatedAt: now,
+    });
+  });
+
+  it("starts empty and supported on Paper, and says it is not supported on Vanilla", async () => {
+    const r = await call(viewer, "GET", url());
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({ supported: true, interval: 5, frames: [] });
+    expect((await call(sessions.admin, "GET", `/api/servers/${serverId}/motd-rotation`)).json().supported).toBe(false);
+  });
+
+  it("writes the messages where the plugin reads them and installs the plugin", async () => {
+    expect((await call(viewer, "PUT", url(), { interval: 5, frames })).statusCode).toBe(403);
+    expect((await call(sessions.admin, "PUT", url(), { interval: 3, frames })).statusCode).toBe(204);
+    const file = await fs.readFile(path.join(paperDir, "plugins", "CraftPanelInfo", "motd.txt"), "utf8");
+    expect(file).toContain("interval=3");
+    expect(file.split("\n").filter((l) => l.startsWith("frame="))).toHaveLength(2);
+    expect((await call(viewer, "GET", url())).json()).toEqual({ supported: true, interval: 3, frames });
+    expect(await exists(path.join(paperDir, "plugins", "CraftPanelInfo.jar"))).toBe(true);
+    // The info command is on by default, so /craftpanel stays available.
+    expect(await exists(path.join(paperDir, "plugins", "CraftPanelInfo", "info-off"))).toBe(false);
+  });
+
+  it("refuses what the server list could not show, and Vanilla", async () => {
+    const bad: [string, object][] = [
+      ["three lines", { interval: 5, frames: ["a\nb\nc"] }],
+      ["an empty message", { interval: 5, frames: ["§6§l  "] }],
+      ["nine messages", { interval: 5, frames: Array.from({ length: 9 }, (_, i) => `m${i}`) }],
+      ["a carriage return", { interval: 5, frames: ["a\rb"] }],
+      ["no time", { interval: 0, frames: ["a"] }],
+    ];
+    for (const [label, body] of bad) expect((await call(sessions.admin, "PUT", url(), body)).statusCode, label).toBe(400);
+    expect((await call(sessions.admin, "PUT", `/api/servers/${serverId}/motd-rotation`, { interval: 5, frames: ["a"] })).statusCode).toBe(400);
+    expect((await call(viewer, "GET", url())).json().frames).toEqual(frames);
+  });
+
+  it("keeps the plugin for the messages when the info command is off, and hides /craftpanel", async () => {
+    expect((await call(sessions.admin, "PATCH", `/api/servers/${paperId}`, { infoCommand: false })).statusCode).toBe(200);
+    expect((await call(sessions.admin, "PUT", url(), { interval: 3, frames })).statusCode).toBe(204);
+    expect(await exists(path.join(paperDir, "plugins", "CraftPanelInfo.jar"))).toBe(true);
+    expect(await exists(path.join(paperDir, "plugins", "CraftPanelInfo", "info-off"))).toBe(true);
+  });
+
+  it("removes the messages, and the plugin with them when the info command is off too", async () => {
+    expect((await call(sessions.admin, "PUT", url(), { interval: 5, frames: [] })).statusCode).toBe(204);
+    expect(await exists(path.join(paperDir, "plugins", "CraftPanelInfo", "motd.txt"))).toBe(false);
+    expect(await exists(path.join(paperDir, "plugins", "CraftPanelInfo.jar"))).toBe(false);
+    expect((await call(viewer, "GET", url())).json().frames).toEqual([]);
+  });
+});

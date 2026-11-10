@@ -85,6 +85,19 @@ describe("info plugin (Paper)", () => {
     expect(await exists(jar())).toBe(false);
   });
 
+  it("marks the info command as off while the plugin stays for rotating messages, and clears the mark again", async () => {
+    const marker = path.join(dir, "plugins", "CraftPanelInfo", "info-off");
+    expect(await syncInfoPlugin(dir, true, BUNDLED, false)).toBe(true);
+    expect(await exists(jar())).toBe(true);
+    expect(await exists(marker)).toBe(true);
+    expect(await syncInfoPlugin(dir, true, BUNDLED, true)).toBe(false);
+    expect(await exists(marker)).toBe(false);
+    await syncInfoPlugin(dir, true, BUNDLED, false);
+    expect(await syncInfoPlugin(dir, false, BUNDLED, false)).toBe(true);
+    expect(await exists(jar())).toBe(false);
+    expect(await exists(marker)).toBe(false);
+  });
+
   it("respects a copy the user disabled in the Plugins tab", async () => {
     await syncInfoPlugin(dir, true, BUNDLED);
     await fsp.rename(jar(), jar() + ".disabled");

@@ -23,6 +23,7 @@ import {
   PRESET_INFO,
   presetJvmFlags,
   propertiesUpdateSchema,
+  motdRotationSchema,
   serverIconSchema,
   proxyConfigSchema,
   recommendPreset,
@@ -83,6 +84,17 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
   app.delete<IdParams>("/api/servers/:id/icon", async (req, reply) => {
     requirePermission(req, "server.configure");
     await servers.removeIcon(await row(req.params.id), actorOf(req));
+    return noContent(reply);
+  });
+
+  // Messages the server list shows in turn (Paper and Purpur; the CraftPanel plugin does the rotating).
+  app.get<IdParams>("/api/servers/:id/motd-rotation", async (req) => {
+    requirePermission(req, "server.view");
+    return servers.rotation(await row(req.params.id));
+  });
+  app.put<IdParams>("/api/servers/:id/motd-rotation", async (req, reply) => {
+    requirePermission(req, "server.configure");
+    await servers.setRotation(await row(req.params.id), parse(motdRotationSchema, req.body), actorOf(req));
     return noContent(reply);
   });
 
