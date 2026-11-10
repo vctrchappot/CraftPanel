@@ -116,11 +116,21 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
   });
 
   app.setErrorHandler((err: Error, req, reply) => {
+    // A streamed response (a proxied map file, a download) can break after its head went out, or the client can leave:
+    // there is nothing left to say, and it is not a server fault worth a log entry.
+    if (reply.raw.destroyed) return;
+    if (reply.raw.headersSent) {
+      reply.raw.destroy();
+      return;
+    }
+    // A proxied or streamed reply may have set another content type already; the error body is JSON.
+    reply.type("application/json; charset=utf-8");
     if (err instanceof AppError) {
       return reply.code(err.status).send({ error: { code: err.code, message: err.message, hint: err.hint, details: (err as AppError & { details?: unknown }).details } });
     }
     if (err instanceof PathError) return reply.code(400).send({ error: { code: "invalid_path", message: err.message } });
     const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ECONNRESET") return reply.code(502).send({ error: { code: "connection_reset", message: "A connection broke off while answering", hint: "Try again." } });
     if (code === "ENOENT") return reply.code(404).send({ error: { code: "not_found", message: "File or directory not found" } });
     if (code === "EEXIST") return reply.code(409).send({ error: { code: "conflict", message: "Already exists" } });
     if (code === "ENOSPC") return reply.code(507).send({ error: { code: "disk_full", message: "The disk is full", hint: "Free up space or move backups to another drive." } });

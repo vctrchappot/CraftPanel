@@ -62,6 +62,7 @@ describe("map activation and serving", () => {
   let viewer: { cookie: string; csrf: string };
   let limited: { cookie: string; csrf: string };
   let receivedCookie: string | undefined;
+  const logged: string[] = [];
   let privateLink: string;
   const commands: string[] = [];
   const session = (r: { headers: Record<string, unknown>; json: () => { csrfToken: string } }) => ({ cookie: String(r.headers["set-cookie"]).split(";")[0]!, csrf: r.json().csrfToken });
@@ -82,7 +83,7 @@ describe("map activation and serving", () => {
     vi.spyOn(ctx.servers, "start").mockImplementation(async () => { running = true; status = "running"; });
     vi.spyOn(ctx.servers, "stop").mockImplementation(async () => { running = false; status = "stopped"; });
     vi.spyOn(ctx.servers, "sendCommand").mockImplementation(async (_id, command) => { commands.push(command); });
-    app = await buildApp(ctx, { logger: false });
+    app = await buildApp(ctx, { logger: { level: "error", stream: { write: (line: string) => void logged.push(line) } } });
     owner = session(await call(null, "POST", "/api/auth/setup", { username: "owner", password: "owner-password-1" }));
     for (const [username, scope] of [["viewer", "all"], ["limited", "selected"]]) {
       await call(owner, "POST", "/api/users", { username, password: "viewer-password-1", role: "viewer", serverScope: scope, serverRoles: {} });
@@ -123,7 +124,8 @@ describe("map activation and serving", () => {
     const state = (await ctx.maps.state(row))!;
     upstream = http.createServer((req, res) => {
       receivedCookie = req.headers.cookie;
-      if (req.url === "/settings.json") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ version: "5.16", maps: ["world", "world_nether", "world_the_end"] })); }
+      if (req.url === "/assets/cut-off.png") { res.writeHead(200, { "content-type": "image/png", "content-length": "100" }); res.flushHeaders(); setTimeout(() => res.socket?.destroy(), 20); return; }
+      else if (req.url === "/settings.json") { res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ version: "5.16", maps: ["world", "world_nether", "world_the_end"] })); }
       else { res.setHeader("content-type", req.url?.endsWith(".js") ? "application/javascript" : "text/html"); res.setHeader("set-cookie", "bad=1"); res.end("<!doctype html><head></head><script>test</script>"); }
     });
     await new Promise<void>((resolve) => upstream.listen(state.port, "127.0.0.1", resolve));
@@ -167,6 +169,14 @@ describe("map activation and serving", () => {
     for (const asset of ["assets/%252e%252e/secrets", "assets/..%5csecret", "api/servers", "maps/unknown/settings.json"]) {
       expect((await call(null, "GET", publicBase + asset)).statusCode).toBe(404);
     }
+  });
+  it("drops a viewer file that breaks off before its first byte without an error of its own", async () => {
+    // The reply already carries the image's content type; what must not happen is a second failure while reporting the first.
+    const r = await call(null, "GET", `/map/${id}/t/public/v/assets/cut-off.png`);
+    expect(r.statusCode).toBe(502);
+    expect(r.headers["content-type"]).toMatch(/^application\/json/);
+    expect(logged.filter((line) => /invalid type|aborted/.test(line))).toEqual([]);
+    expect((await call(null, "GET", `/map/${id}/t/public/v/assets/test.js`)).statusCode).toBe(200);
   });
   it("protects password maps and invalidates old public and password grants immediately", async () => {
     await put({ access: "public" });
