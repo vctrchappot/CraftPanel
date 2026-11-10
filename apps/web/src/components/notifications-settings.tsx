@@ -45,7 +45,7 @@ export function NotificationSettings() {
   const [results, setResults] = React.useState<{ channel: string; ok: boolean; error?: string }[] | null>(null);
   const [testing, setTesting] = React.useState(false);
 
-  if (!f) return q.error ? <Callout variant="danger">{errorMessage(q.error)}</Callout> : <Skeleton className="h-64 rounded-xl" />;
+  if (!f) return q.error ? <Callout variant="danger">{errorMessage(q.error)}</Callout> : <Skeleton className="h-64 rounded-lg" />;
   const email = f.notifyEmail;
   const setEmail = (patch: Partial<EmailSettings>) => setF({ ...f, notifyEmail: { ...email, ...patch } });
   const dirty = JSON.stringify(f) !== JSON.stringify({ notifyDiscordWebhook: q.data?.notifyDiscordWebhook, notifyEmail: q.data?.notifyEmail, notifyEvents: q.data?.notifyEvents });

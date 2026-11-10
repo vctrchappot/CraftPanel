@@ -53,6 +53,11 @@ export function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString(APP_LOCALE, { hour12: false });
 }
 
+/** Hours and minutes (and seconds on request) on the 24-hour clock, for chart axes and hover readings. */
+export function formatClock(ts: number, seconds = false): string {
+  return new Date(ts).toLocaleTimeString(APP_LOCALE, { hour: "2-digit", minute: "2-digit", ...(seconds ? { second: "2-digit" } : {}), hour12: false });
+}
+
 const nf = new Intl.NumberFormat(APP_LOCALE);
 export const formatNumber = (n: number | null | undefined): string => (n === null || n === undefined || !Number.isFinite(n) ? "—" : nf.format(Math.round(n)));
 

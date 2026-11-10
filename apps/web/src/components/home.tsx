@@ -93,11 +93,11 @@ export function HomeView() {
 
       <Section title="Servers" actions={<Link href="/servers/" className="flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground">All servers <ArrowRight className="size-3.5" /></Link>}>
         {servers.isLoading ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}</div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 rounded-lg" />)}</div>
         ) : servers.data?.length ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {servers.data.map((srv) => (
-              <Link key={srv.id} href={`/server/?id=${srv.id}`} className="group rounded-xl border border-border bg-surface p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Link key={srv.id} href={`/server/?id=${srv.id}`} className="group rounded-lg border border-border bg-surface p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate font-medium">{srv.name}</p>

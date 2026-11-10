@@ -50,7 +50,7 @@ export function BackupTable({ backups, loading, showServer, serverStatus }: { ba
   const restore = useAction((id: string) => api.post(`/api/backups/${id}/restore`), { success: "Backup restored", invalidate: [["backups"], ["worlds"], ["server"]] });
   const remove = useAction((id: string) => api.del(`/api/backups/${id}`), { success: "Backup deleted", invalidate: [["backups"]] });
 
-  if (loading) return <Skeleton className="h-40 rounded-xl" />;
+  if (loading) return <Skeleton className="h-40 rounded-lg" />;
   if (!backups?.length) return <EmptyState icon={<Archive />} title="No backups yet" description="Create a backup manually or schedule automatic backups under Automation." />;
 
   return (

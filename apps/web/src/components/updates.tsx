@@ -270,7 +270,7 @@ export function UpdateOverlay() {
               const active = i === at && f.phase !== "done";
               return (
                 <li key={p.id} className={cn("flex items-center gap-3 text-[13px]", !done && !active && "text-muted-foreground")}>
-                  <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", done ? "border-success bg-success text-white" : active ? "border-foreground" : "border-border")}>
+                  <span className={cn("flex size-5 shrink-0 items-center justify-center rounded-full border", done ? "border-success bg-success text-background" : active ? "border-foreground" : "border-border")}>
                     {done ? <Check className="size-3" /> : active ? <Loader2 className="size-3 animate-spin" /> : null}
                   </span>
                   <span>

@@ -30,7 +30,7 @@ export function ProxyTab({ server: s }: { server: ServerDetail }) {
     invalidate: [["proxy", s.id], ["servers"]],
     onSuccess: () => setDraft(null),
   });
-  if (q.isLoading) return <Skeleton className="h-64 rounded-xl" />;
+  if (q.isLoading) return <Skeleton className="h-64 rounded-lg" />;
   if (q.error || !q.data) return <Callout variant="danger">{errorMessage(q.error)}</Callout>;
   const ov = q.data;
   const config = draft ?? ov.config;

@@ -6,7 +6,7 @@ import { AlertTriangle, Boxes, ChevronLeft, Search, Upload } from "lucide-react"
 import { Badge, Button, Callout, Field, Input, NativeSelect, Panel, Skeleton } from "@craftpanel/ui";
 import type { ServerSoftware } from "@craftpanel/shared";
 import { api, errorMessage } from "@/lib/api";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatNumber } from "@/lib/format";
 
 export interface PreparedModpack {
   id: string;
@@ -106,7 +106,7 @@ function Catalogue({ onPick }: { onPick: (p: ModpackHit) => void }) {
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search Fabric and NeoForge modpacks on Modrinth…" className="pl-8" aria-label="Search modpacks" />
       </div>
       {q.isLoading ? (
-        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-64 rounded-lg" />
       ) : q.error ? (
         <Callout variant="danger" icon={<AlertTriangle />}>
           {errorMessage(q.error)}
@@ -127,7 +127,7 @@ function Catalogue({ onPick }: { onPick: (p: ModpackHit) => void }) {
                       <span className="font-normal text-muted-foreground">by {h.author}</span>
                     </span>
                     <span className="line-clamp-2 block text-muted-foreground">{h.description}</span>
-                    <span className="block text-xs text-muted-foreground">{h.downloads.toLocaleString()} downloads</span>
+                    <span className="block text-xs text-muted-foreground">{formatNumber(h.downloads)} downloads</span>
                   </span>
                 </button>
               </li>

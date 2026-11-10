@@ -75,7 +75,7 @@ function PropertiesEditor({ server: s }: { server: ServerDetail }) {
   const [group, setGroup] = React.useState("general");
   const [saving, setSaving] = React.useState(false);
 
-  if (!q.data || !catalog.data) return <Skeleton className="h-96 rounded-xl" />;
+  if (!q.data || !catalog.data) return <Skeleton className="h-96 rounded-lg" />;
   const values = { ...q.data.values, ...edits };
   const dirty = Object.keys(edits).length > 0;
   const fl = filter.toLowerCase();
@@ -137,7 +137,7 @@ function PropertiesEditor({ server: s }: { server: ServerDetail }) {
           </p>
         )}
         {canEdit && (
-          <div className={cn("sticky bottom-4 flex items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-3 shadow-lg transition-opacity", dirty ? "opacity-100" : "pointer-events-none opacity-0")}>
+          <div className={cn("sticky bottom-4 flex items-center justify-between gap-4 rounded-lg border border-border bg-surface px-4 py-3 shadow-lg transition-opacity", dirty ? "opacity-100" : "pointer-events-none opacity-0")}>
             <p className="text-[13px]">
               {Object.keys(edits).length} unsaved change{Object.keys(edits).length === 1 ? "" : "s"}
               {s.status === "running" && <span className="text-muted-foreground"> · applies after restart</span>}
@@ -215,7 +215,7 @@ function GameRules({ server: s }: { server: ServerDetail }) {
     return (
       <div className="space-y-3">
         <p className="text-[13px] text-muted-foreground">Detecting the game rules available in Minecraft {s.mcVersion}… The first time this runs Mojang&apos;s data generator, which can take up to a minute.</p>
-        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-64 rounded-lg" />
       </div>
     );
   if (q.error) return <Callout variant="danger" icon={<AlertTriangle />}>{errorMessage(q.error)}</Callout>;
@@ -354,7 +354,7 @@ function RawEditor({ server: s }: { server: ServerDetail }) {
   }, [q.data]);
   const save = useAction(() => api.put(`/api/servers/${s.id}/properties/raw`, { raw: raw ?? "" }), { success: "server.properties saved", invalidate: [["properties", s.id], ["server", s.id]] });
   const fileRef = React.useRef<HTMLInputElement>(null);
-  if (raw === null) return <Skeleton className="h-96 rounded-xl" />;
+  if (raw === null) return <Skeleton className="h-96 rounded-lg" />;
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -384,12 +384,12 @@ function RawEditor({ server: s }: { server: ServerDetail }) {
           </Button>
         )}
       </div>
-      <textarea
+      <Textarea
         value={raw}
         onChange={(e) => setRaw(e.target.value)}
         readOnly={!canEdit}
         spellCheck={false}
-        className="scrollbar-thin h-[60vh] w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-[12px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring/25"
+        className="scrollbar-thin h-[60vh] resize-none rounded-lg p-4 font-mono text-[12px] leading-relaxed"
         aria-label="server.properties"
       />
     </div>

@@ -148,7 +148,7 @@ export function ActivityView() {
         }
       />
       {q.isLoading ? (
-        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-64 rounded-lg" />
       ) : events.length ? (
         <Panel>
           <EventList events={events} showServer={!serverId} />

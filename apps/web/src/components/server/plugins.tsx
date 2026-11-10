@@ -29,7 +29,7 @@ import { findInstalledAddon, SOFTWARE_INFO, softwareLabel, type PluginInfo, type
 import { api, errorMessage, upload } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatNumber } from "@/lib/format";
 import { MapPlugin } from "./map";
 
 interface MarketHit {
@@ -63,7 +63,7 @@ export function PluginsTab({ server: s }: { server: ServerDetail }) {
   const q = useQuery({ queryKey: key, queryFn: () => api.get<{ supported: boolean; plugins: PluginInfo[]; restartRequired: boolean }>(`/api/servers/${s.id}/plugins`) });
   const canManage = useCan("plugins.manage");
 
-  if (q.isLoading) return <Skeleton className="h-48 rounded-xl" />;
+  if (q.isLoading) return <Skeleton className="h-48 rounded-lg" />;
   if (!q.data?.supported) return <VanillaMigration server={s} />;
 
   return (
@@ -266,7 +266,7 @@ function Browse({ server: s, plugins }: { server: ServerDetail; plugins: PluginI
         </div>
       </div>
       {q.isLoading ? (
-        <Skeleton className="h-48 rounded-xl" />
+        <Skeleton className="h-48 rounded-lg" />
       ) : q.error ? (
         <Callout variant="danger" icon={<AlertTriangle />}>
           {errorMessage(q.error)}
@@ -296,7 +296,7 @@ function Browse({ server: s, plugins }: { server: ServerDetail; plugins: PluginI
                       )}
                     </p>
                     <p className="text-muted-foreground">{h.description}</p>
-                    <p className="text-xs text-muted-foreground">{h.downloads.toLocaleString()} downloads</p>
+                    <p className="text-xs text-muted-foreground">{formatNumber(h.downloads)} downloads</p>
                   </div>
                   {h.slug.toLowerCase() === "bluemap" ? <Button size="sm" variant="secondary" asChild><a href="#world-map-plugin">Set up world map</a></Button> : <Button
                     size="sm"
@@ -360,7 +360,7 @@ function Updates({ server: s }: { server: ServerDetail }) {
       }
     >
       {q.isLoading ? (
-        <Skeleton className="h-24 rounded-xl" />
+        <Skeleton className="h-24 rounded-lg" />
       ) : q.error ? (
         <Callout variant="danger">{errorMessage(q.error)}</Callout>
       ) : q.data?.length ? (

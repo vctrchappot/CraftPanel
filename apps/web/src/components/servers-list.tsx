@@ -30,7 +30,7 @@ export function ServersView() {
         }
       />
       {servers.isLoading ? (
-        <Skeleton className="h-48 rounded-xl" />
+        <Skeleton className="h-48 rounded-lg" />
       ) : !servers.data?.length ? (
         <EmptyState
           icon={<Boxes />}

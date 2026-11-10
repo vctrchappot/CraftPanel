@@ -75,8 +75,8 @@ export function PlayerProfileView({ server: s, name }: { server: ServerDetail; n
     return (
       <div className="space-y-6">
         {back}
-        <Skeleton className="h-24 rounded-xl" />
-        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-24 rounded-lg" />
+        <Skeleton className="h-64 rounded-lg" />
       </div>
     );
   const p = q.data;

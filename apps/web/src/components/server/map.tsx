@@ -65,7 +65,7 @@ export function MapTab({ server: s }: { server: ServerDetail }) {
   const action = useAction((value: string) => api.post(`/api/servers/${s.id}/map/action`, { action: value }), { success: "Map command sent", invalidate: inv });
   const uninstall = useAction(() => api.del(`/api/servers/${s.id}/map?deleteData=${deleteData}`), { success: "World map removed", invalidate: inv });
   const viewer = useQuery({ queryKey: ["map-link", s.id], queryFn: () => api.post<{ url: string }>(`/api/servers/${s.id}/map/link`), enabled: !!q.data?.pageReady && !!q.data.webserver, refetchInterval: 45 * 60_000 });
-  if (q.isLoading) return <Skeleton className="h-64 rounded-xl" />;
+  if (q.isLoading) return <Skeleton className="h-64 rounded-lg" />;
   if (q.error || !q.data) return <Callout variant="danger">{errorMessage(q.error)}</Callout>;
   const m = q.data;
   if (!m.pageReady) return <EmptyState title="The world map is not active" description="Activate World map under Plugins → Browse. The Map tab appears after setup finishes." />;

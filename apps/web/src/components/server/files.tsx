@@ -21,6 +21,7 @@ import {
   Input,
   Panel,
   Skeleton,
+  Textarea,
 } from "@craftpanel/ui";
 import type { FileEntry, ServerDetail } from "@craftpanel/shared";
 import { api, downloadUrl, errorMessage, upload } from "@/lib/api";
@@ -253,6 +254,7 @@ function Editor({ serverId, path, readOnly, onClose }: { serverId: string; path:
   const q = useQuery({ queryKey: ["file", serverId, path], queryFn: () => api.get<{ content: string }>(`/api/servers/${serverId}/files/content?path=${encodeURIComponent(path)}`), gcTime: 0 });
   const [content, setContent] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
+  const [discardOpen, setDiscardOpen] = React.useState(false);
   React.useEffect(() => {
     if (q.data) setContent(q.data.content);
   }, [q.data]);
@@ -272,7 +274,7 @@ function Editor({ serverId, path, readOnly, onClose }: { serverId: string; path:
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={() => (!dirty || confirm("Discard unsaved changes?")) && onClose()}>
+        <Button variant="ghost" size="sm" onClick={() => (dirty ? setDiscardOpen(true) : onClose())}>
           ← Files
         </Button>
         <p className="min-w-0 flex-1 truncate font-mono text-[13px]">{path}</p>
@@ -285,9 +287,9 @@ function Editor({ serverId, path, readOnly, onClose }: { serverId: string; path:
       {q.error ? (
         <Callout variant="danger">{errorMessage(q.error)}</Callout>
       ) : content === null ? (
-        <Skeleton className="h-96 rounded-xl" />
+        <Skeleton className="h-96 rounded-lg" />
       ) : (
-        <textarea
+        <Textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           readOnly={readOnly}
@@ -298,11 +300,20 @@ function Editor({ serverId, path, readOnly, onClose }: { serverId: string; path:
               if (dirty) void save();
             }
           }}
-          className="scrollbar-thin h-[65vh] w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-[12px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring/25"
+          className="scrollbar-thin h-[65vh] resize-none rounded-lg p-4 font-mono text-[12px] leading-relaxed"
           aria-label={`Contents of ${path}`}
         />
       )}
       {path === "server.properties" && <p className="text-xs text-muted-foreground">Tip: the Settings tab offers a validated editor for this file.</p>}
+      <ConfirmDialog
+        open={discardOpen}
+        onOpenChange={setDiscardOpen}
+        title="Discard unsaved changes?"
+        description={`Your edits to ${path} have not been saved and will be lost.`}
+        confirmLabel="Discard changes"
+        destructive
+        onConfirm={onClose}
+      />
     </div>
   );
 }

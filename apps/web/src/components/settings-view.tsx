@@ -138,7 +138,7 @@ function BackupSettings() {
     if (q.data && !f) setF({ dir: q.data.backupDirectory ?? "", retention: q.data.backupRetention });
   }, [q.data, f]);
   const save = useAction(() => api.put("/api/settings", { backupDirectory: f!.dir, backupRetention: f!.retention }), { success: "Backup settings saved", invalidate: [["app-settings"]] });
-  if (!f) return <Skeleton className="h-40 rounded-xl" />;
+  if (!f) return <Skeleton className="h-40 rounded-lg" />;
   return (
     <div className="max-w-lg space-y-5">
       <Field label="Backup destination" htmlFor="bdir" help={`Absolute path, e.g. an external drive. Empty uses ${system.data ? `${system.data.dataDir}/backups` : "the data directory"}. Existing backups are not moved.`}>
@@ -165,7 +165,7 @@ function DdnsSettings() {
   const test = useAction(() => api.post<{ ok: boolean; message: string }>("/api/settings/ddns/test"), {
     onSuccess: (r) => (r.ok ? toast.success(r.message) : toast.error(r.message)),
   });
-  if (!f) return <Skeleton className="h-40 rounded-xl" />;
+  if (!f) return <Skeleton className="h-40 rounded-lg" />;
   return (
     <div className="max-w-lg space-y-5">
       <p className="text-[13px] text-muted-foreground">Dynamic DNS gives players a stable name (e.g. myserver.duckdns.org) even when your home IP changes. This is optional and contacts the provider every 10 minutes.</p>
@@ -208,7 +208,7 @@ function JavaRuntimes() {
     <div className="max-w-3xl space-y-6">
       <Section title="Detected Java runtimes" description="Servers pick a compatible runtime automatically. Minecraft 1.17–1.20.4 needs Java 17, 1.20.5–1.21.x needs Java 21, 26.x needs Java 25, older versions need Java 8.">
         {q.isLoading ? (
-          <Skeleton className="h-24 rounded-xl" />
+          <Skeleton className="h-24 rounded-lg" />
         ) : q.data?.length ? (
           <Panel>
             <ul className="divide-y divide-border">
@@ -252,7 +252,7 @@ function JavaRuntimes() {
 
 function AuditLog() {
   const q = useQuery({ queryKey: ["audit"], queryFn: () => api.get<{ id: number; username: string | null; action: string; target: string | null; details: string | null; ip: string | null; createdAt: number }[]>("/api/audit") });
-  if (q.isLoading) return <Skeleton className="h-64 rounded-xl" />;
+  if (q.isLoading) return <Skeleton className="h-64 rounded-lg" />;
   if (q.error) return <Callout variant="danger">{errorMessage(q.error)}</Callout>;
   return (
     <Panel className="overflow-x-auto">
@@ -290,7 +290,7 @@ function InfoCommandSetting() {
     success: "Saved. Applies to each server on its next start.",
     invalidate: [["app-settings"]],
   });
-  if (!q.data) return <Skeleton className="h-16 rounded-xl" />;
+  if (!q.data) return <Skeleton className="h-16 rounded-lg" />;
   return (
     <div className="flex items-start justify-between gap-6">
       <p className="text-[13px] text-muted-foreground">

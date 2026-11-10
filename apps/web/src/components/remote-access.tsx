@@ -46,7 +46,7 @@ export function RemoteAccess() {
   );
 
   const d = system.data?.dashboard;
-  if (!form || !d) return <Skeleton className="h-64 rounded-xl" />;
+  if (!form || !d) return <Skeleton className="h-64 rounded-lg" />;
   const hasLan = d.urls.some((u) => u.kind === "lan" || u.kind === "vpn");
   const urls = d.urls.filter((u) => u.kind !== "virtual" || !hasLan);
   const encrypted = d.transportSecure;
@@ -114,7 +114,7 @@ export function RemoteAccess() {
       </Section>
 
       <Section title="Deployment checks" description="Checks run on the host as the CraftPanel service account. They do not change settings or restart servers." actions={<Button variant="secondary" size="sm" onClick={() => void diagnostics.refetch()} loading={diagnostics.isFetching}>Check again</Button>}>
-        {diagnostics.isLoading ? <Skeleton className="h-24 rounded-xl" /> : diagnostics.error ? <Callout variant="warning">Could not load deployment checks. Try again.</Callout> : <Panel className="divide-y divide-border">
+        {diagnostics.isLoading ? <Skeleton className="h-24 rounded-lg" /> : diagnostics.error ? <Callout variant="warning">Could not load deployment checks. Try again.</Callout> : <Panel className="divide-y divide-border">
           {diagnostics.data?.checks.map((check) => <div key={check.id} className="flex items-start gap-3 p-4 text-[13px]">
             <Badge variant={check.status === "error" ? "danger" : check.status === "warning" ? "warning" : "success"}>{check.status}</Badge>
             <div className="min-w-0"><p className="break-words">{check.message}</p>{check.hint && <p className="mt-1 text-xs text-muted-foreground">{check.hint}</p>}</div>

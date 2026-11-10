@@ -55,7 +55,7 @@ export function WorldsTab({ server: s }: { server: ServerDetail }) {
       }}
     >
       {dragging && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-background/85 text-sm font-medium">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-background/85 text-sm font-medium">
           <Upload className="mr-2 size-4" /> Drop the world .zip to import it
         </div>
       )}
@@ -76,7 +76,7 @@ export function WorldsTab({ server: s }: { server: ServerDetail }) {
         }
       >
         {q.isLoading ? (
-          <Skeleton className="h-40 rounded-xl" />
+          <Skeleton className="h-40 rounded-lg" />
         ) : !q.data?.length ? (
           <EmptyState
             icon={<Globe2 />}
@@ -276,7 +276,7 @@ function ImportWorldDialog({ open, onOpenChange, serverId, initialFile, existing
               void choose(e.dataTransfer.files[0] ?? null);
             }}
             className={cn(
-              "flex w-full flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "flex w-full flex-col items-center gap-2 rounded-lg border border-dashed px-6 py-10 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               over ? "border-primary bg-muted" : "border-border hover:bg-muted/50",
             )}
           >

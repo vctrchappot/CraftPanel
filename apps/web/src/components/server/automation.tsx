@@ -91,7 +91,7 @@ export function AutomationTab({ server: s }: { server: ServerDetail }) {
       }
     >
       {q.isLoading ? (
-        <Skeleton className="h-32 rounded-xl" />
+        <Skeleton className="h-32 rounded-lg" />
       ) : !q.data?.length ? (
         <EmptyState icon={<CalendarClock />} title="No scheduled tasks" description="Automate backups, restarts, announcements and maintenance." />
       ) : (

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Panel, cn } from "@craftpanel/ui";
+import { formatClock } from "@/lib/format";
 
 export interface Point {
   ts: number;
@@ -93,7 +94,7 @@ export function MetricChart({
           {shown && shown.v !== null ? (
             <>
               <span className="font-medium text-foreground">{format(shown.v)}</span>
-              {hover && <> · {new Date(hover.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</>}
+              {hover && <> · {formatClock(hover.ts, true)}</>}
             </>
           ) : (
             "—"

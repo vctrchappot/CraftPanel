@@ -58,7 +58,7 @@ function StepHeader({ title, description }: { title: string; description: string
   // The page around it already shows the first step's title.
   return (
     <div className="space-y-1.5">
-      {title !== "Set up two-factor sign-in" && <h2 className="text-base font-semibold tracking-tight">{title}</h2>}
+      {title !== "Set up two-factor sign-in" && <h2 className="text-base font-medium">{title}</h2>}
       <div className="text-sm text-muted-foreground">{description}</div>
     </div>
   );
@@ -321,7 +321,7 @@ export function SessionsSection() {
       }
     >
       {q.isLoading ? (
-        <Skeleton className="h-24 rounded-xl" />
+        <Skeleton className="h-24 rounded-lg" />
       ) : q.error ? (
         <Callout variant="danger">{errorMessage(q.error)}</Callout>
       ) : (

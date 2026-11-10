@@ -45,7 +45,7 @@ function PlayersList({ server: s }: { server: ServerDetail }) {
   const [dialog, setDialog] = React.useState<{ action: "kick" | "ban"; name: string } | null>(null);
   const [confirmOp, setConfirmOp] = React.useState<string | null>(null);
 
-  if (!q.data) return <Skeleton className="h-64 rounded-xl" />;
+  if (!q.data) return <Skeleton className="h-64 rounded-lg" />;
   const d = q.data;
 
   return (

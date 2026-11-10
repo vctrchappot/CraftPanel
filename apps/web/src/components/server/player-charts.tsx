@@ -24,7 +24,7 @@ export function Card({ title, hint, aside, className, children }: { title: React
 /** Key figures in one frame with 1 px dividers (the website's datasheet look). */
 export function KpiGrid({ items }: { items: { label: string; value: React.ReactNode; sub?: React.ReactNode }[] }) {
   return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3 xl:grid-cols-6">
       {items.map((i) => (
         <div key={i.label} className="min-w-0 space-y-1 bg-surface p-4">
           <div className="text-xs font-medium text-muted-foreground">{i.label}</div>

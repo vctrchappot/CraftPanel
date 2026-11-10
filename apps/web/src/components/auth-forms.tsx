@@ -152,7 +152,7 @@ export function TwoFactorRequired() {
   const router = useRouter();
   return (
     <AuthLayout title="Set up two-factor sign-in" subtitle="Your role requires a second factor. This takes about a minute.">
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <div className="rounded-lg border border-border bg-surface p-5">
         <TwoFactorEnrollment standalone onDone={() => void refresh()} />
       </div>
       <button

@@ -21,7 +21,7 @@ import {
 import { api, ApiError } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction, useServerLifecycle } from "@/lib/queries";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatNumber } from "@/lib/format";
 import { Choice } from "../wizard";
 import { MetricChart } from "../charts";
 import { Unavailable } from "../status";
@@ -123,7 +123,7 @@ export function PerformanceTab({ server: s, stream }: { server: ServerDetail; st
   return (
     <div className="space-y-10">
       <Section title="Insights" description={proxy ? "What the live numbers and settings say about this proxy." : "What the live numbers and the settings say, with a fix where there is one."}>
-        {insights ? <InsightList server={s} insights={insights} /> : <Skeleton className="h-24 rounded-xl" />}
+        {insights ? <InsightList server={s} insights={insights} /> : <Skeleton className="h-24 rounded-lg" />}
       </Section>
 
       <Section
@@ -263,7 +263,7 @@ function Presets({ server: s, info: d }: { server: ServerDetail; info: Performan
     invalidate: [["server", s.id], ["servers"], ["performance", s.id], ["properties", s.id]],
     onSuccess: () => setChosen(null),
   });
-  if (!d) return <Skeleton className="h-64 rounded-xl" />;
+  if (!d) return <Skeleton className="h-64 rounded-lg" />;
   const selected = chosen ?? d.current ?? d.recommended;
   const preset = d.presets.find((p) => p.id === selected)!;
   return (
@@ -325,7 +325,7 @@ function PerformanceProperties({ server: s }: { server: ServerDetail }) {
       onSuccess: () => (setEdits({}), setErrors({})),
     },
   );
-  if (!q.data) return <Skeleton className="h-64 rounded-xl" />;
+  if (!q.data) return <Skeleton className="h-64 rounded-lg" />;
   const defs = q.data.catalog.filter((d) => d.group === "performance");
   const values = { ...q.data.values, ...edits };
   const dirty = Object.keys(edits).length > 0;
@@ -425,7 +425,7 @@ function Pregeneration({ server: s }: { server: ServerDetail }) {
   return (
     <Section title="Pre-generate the world" description="Generate terrain around spawn ahead of time, so exploring players don't cause lag spikes. Takes a while; the server stays playable.">
       {!d ? (
-        <Skeleton className="h-28 rounded-xl" />
+        <Skeleton className="h-28 rounded-lg" />
       ) : !d.supported ? (
         <Callout icon={<Info />} title={`${SOFTWARE_INFO[s.software].label} can't pre-generate`}>
           Pre-generation uses Chunky, which needs Paper, Purpur, Fabric or NeoForge. You can switch in Settings → Software &amp; version; your world is kept.
@@ -465,7 +465,7 @@ function Pregeneration({ server: s }: { server: ServerDetail }) {
               </div>
               <Progress value={task.percent} />
               <p className="text-xs text-muted-foreground tabular-nums">
-                {task.chunks.toLocaleString()} chunks{task.rate !== null && <> · {task.rate} chunks/s</>}
+                {formatNumber(task.chunks)} chunks{task.rate !== null && <> · {task.rate} chunks/s</>}
                 {task.eta && <> · about {task.eta} left</>}
               </p>
               {canControl && (
@@ -489,14 +489,14 @@ function Pregeneration({ server: s }: { server: ServerDetail }) {
             <>
               {task?.state === "finished" && (
                 <p className="flex items-center gap-2 text-[13px]">
-                  <Badge variant="success">Done</Badge> {task.chunks.toLocaleString()} chunks generated in {task.world}.
+                  <Badge variant="success">Done</Badge> {formatNumber(task.chunks)} chunks generated in {task.world}.
                 </p>
               )}
-              <Field label="Radius around spawn" htmlFor="pgr" help={`About ${est.chunks.toLocaleString()} chunks and ${est.size} on disk. A Raspberry Pi manages roughly 20–60 chunks per second.`}>
+              <Field label="Radius around spawn" htmlFor="pgr" help={`About ${formatNumber(est.chunks)} chunks and ${est.size} on disk. A Raspberry Pi manages roughly 20–60 chunks per second.`}>
                 <NativeSelect id="pgr" value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="max-w-xs" disabled={!canControl}>
                   {RADII.map((r) => (
                     <option key={r} value={r}>
-                      {r.toLocaleString()} blocks
+                      {formatNumber(r)} blocks
                     </option>
                   ))}
                 </NativeSelect>

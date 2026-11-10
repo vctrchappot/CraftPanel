@@ -67,7 +67,7 @@ export function ServerWorkspace() {
   const stream = useServerStream(id);
 
   if (!id) return <EmptyState title="No server selected" action={<Link href="/servers/" className="text-sm underline">Back to servers</Link>} />;
-  if (server.isLoading) return <Skeleton className="h-40 rounded-xl" />;
+  if (server.isLoading) return <Skeleton className="h-40 rounded-lg" />;
   if (server.error || !server.data)
     return <EmptyState title="Server not found" description="It may have been deleted." action={<Link href="/servers/" className="text-sm underline">Back to servers</Link>} />;
 

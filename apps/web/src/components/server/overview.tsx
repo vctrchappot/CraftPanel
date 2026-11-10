@@ -65,7 +65,7 @@ export function OverviewTab({ server: s, stream }: { server: ServerDetail; strea
       <div className="grid gap-10 lg:grid-cols-3">
         <div className="grid min-h-0 gap-10 lg:col-span-2 lg:grid-rows-[auto_minmax(0,1fr)]">
           <Section title="Console" actions={<Link href={`/server/?id=${s.id}&tab=console`} className="flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground">Open console <ArrowRight className="size-3.5" /></Link>}>
-            <div className="h-64 overflow-hidden rounded-xl bg-console">
+            <div className="h-64 overflow-hidden rounded-lg bg-console">
               <ConsoleLines lines={stream.lines.slice(-40)} autoScroll className="h-full" />
             </div>
           </Section>

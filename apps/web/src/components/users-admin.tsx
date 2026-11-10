@@ -70,7 +70,7 @@ export function UsersAdmin() {
         }
       >
         {q.isLoading ? (
-          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-32 rounded-lg" />
         ) : (
           <Panel>
             <ul className="divide-y divide-border">
@@ -373,7 +373,7 @@ function TwoFactorPolicy() {
   return (
     <Section title="Require two-factor sign-in" description="Users with these roles must set up an authenticator app before they can use the dashboard. They are asked on their next page load.">
       {q.isLoading ? (
-        <Skeleton className="h-24 rounded-xl" />
+        <Skeleton className="h-24 rounded-lg" />
       ) : (
         <Panel>
           <ul className="divide-y divide-border">

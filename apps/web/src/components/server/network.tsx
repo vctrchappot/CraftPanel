@@ -39,7 +39,7 @@ export function NetworkTab({ server: s }: { server: ServerDetail }) {
   const [diag, setDiag] = React.useState<Diagnosis | null>(null);
   const diagnose = useAction((lookup: boolean) => api.post<Diagnosis>(`/api/servers/${s.id}/network/diagnose?lookupPublicIp=${lookup}`), { onSuccess: setDiag });
 
-  if (!q.data || !form) return <Skeleton className="h-96 rounded-xl" />;
+  if (!q.data || !form) return <Skeleton className="h-96 rounded-lg" />;
   const n = q.data;
   const portSuffix = n.port === 25565 ? "" : `:${n.port}`;
   // The router forwards to the real LAN address, never to a WSL, Docker or VPN adapter.
