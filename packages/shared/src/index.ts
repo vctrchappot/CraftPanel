@@ -10,3 +10,4 @@ export * from "./insights";
 export * from "./players";
 export * from "./world-archive";
 export * from "./map";
+export * from "./motd";

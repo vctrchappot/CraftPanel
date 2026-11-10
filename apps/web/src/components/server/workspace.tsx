@@ -37,6 +37,7 @@ import { NetworkTab } from "./network";
 import { ProxyTab } from "./proxy";
 import { PerformanceTab } from "./performance";
 import { MapTab, useMap } from "./map";
+import { ServerIcon } from "../server-icon";
 
 const TABS = [
   ["overview", "Overview"],
@@ -132,16 +133,19 @@ function Header({ server: s }: { server: ServerDetail }) {
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0 space-y-1.5">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="truncate text-2xl font-medium tracking-tight">{s.name}</h1>
-          <StatusBadge status={s.status} />
+      <div className="flex min-w-0 items-start gap-4">
+        <ServerIcon server={s} size={56} className="mt-0.5" />
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="truncate text-2xl font-medium tracking-tight">{s.name}</h1>
+            <StatusBadge status={s.status} />
+          </div>
+          <p className="text-[13px] text-muted-foreground">
+            {softwareLabel(s.software)} {s.mcVersion}
+            {s.build ? ` · ${(SOFTWARE_INFO[s.software].buildLabel ?? "build").toLowerCase()} ${s.build}` : ""} · Java {s.javaMajor} · {(s.memoryMb / 1024).toFixed(1)} GB · port {s.port}
+          </p>
+          {s.description && <p className="line-clamp-2 max-w-2xl whitespace-pre-line text-[13px] text-muted-foreground">{s.description}</p>}
         </div>
-        <p className="text-[13px] text-muted-foreground">
-          {softwareLabel(s.software)} {s.mcVersion}
-          {s.build ? ` · ${(SOFTWARE_INFO[s.software].buildLabel ?? "build").toLowerCase()} ${s.build}` : ""} · Java {s.javaMajor} · {(s.memoryMb / 1024).toFixed(1)} GB · port {s.port}
-          {s.description ? ` · ${s.description}` : ""}
-        </p>
       </div>
       {canControl && (
         <div className="flex shrink-0 items-center gap-2">

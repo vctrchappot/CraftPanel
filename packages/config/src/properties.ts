@@ -49,8 +49,9 @@ export class PropertiesDocument {
     return undefined;
   }
 
-  set(key: string, value: string): void {
-    if (/[\r\n]/.test(value)) throw new Error(`Value for ${key} must be a single line`);
+  /** A line break is only accepted where the setting allows it (the message of the day); it is written as an escape. */
+  set(key: string, value: string, opts: { multiline?: boolean } = {}): void {
+    if (/\r/.test(value) || (!opts.multiline && /\n/.test(value))) throw new Error(`Value for ${key} must be a single line`);
     const existing = this.lines.find((l): l is Extract<Line, { kind: "entry" }> => l.kind === "entry" && l.key === key);
     if (existing) existing.value = value;
     else this.lines.push({ kind: "entry", key, value });

@@ -157,7 +157,7 @@ describe("server configuration and files", () => {
     expect(managed.statusCode).toBe(400);
   });
   it("rejects newline injection in values and commands", async () => {
-    expect((await call(sessions.admin, "PUT", `/api/servers/${serverId}/properties`, { values: { motd: "a\nenable-rcon=true" } })).statusCode).toBe(400);
+    expect((await call(sessions.admin, "PUT", `/api/servers/${serverId}/properties`, { values: { "level-seed": "a\nenable-rcon=true" } })).statusCode).toBe(400);
     expect((await call(sessions.operator, "POST", `/api/servers/${serverId}/command`, { command: "say a\nstop" })).statusCode).toBe(400);
   });
   it("blocks path traversal in the file manager", async () => {
@@ -463,5 +463,89 @@ describe("player profiles", () => {
     expect((await call(viewer, "GET", `/api/skins/${alexUuid}`)).statusCode).toBe(404);
     expect((await call(viewer, "GET", "/api/skins/not-a-uuid")).statusCode).toBe(404);
     expect((await call(null, "GET", `/api/skins/${alexUuid}`)).statusCode).toBe(401);
+  });
+});
+
+describe("server appearance", () => {
+  const crc = (b: Buffer) => {
+    const out = Buffer.alloc(4);
+    out.writeUInt32BE(zlib.crc32(b));
+    return out;
+  };
+  const chunk = (type: string, body: Buffer) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(body.length);
+    const t = Buffer.concat([Buffer.from(type, "latin1"), body]);
+    return Buffer.concat([len, t, crc(t)]);
+  };
+  const png = (w = 64, h = 64) => {
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(w, 0);
+    ihdr.writeUInt32BE(h, 4);
+    ihdr.set([8, 6, 0, 0, 0], 8);
+    const rows = Buffer.alloc(h * (1 + w * 4), 0x7f);
+    for (let y = 0; y < h; y++) rows[y * (1 + w * 4)] = 0;
+    return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(rows)), chunk("IEND", Buffer.alloc(0))]);
+  };
+  const put = (s: Session | null, data: Buffer | string) => call(s, "PUT", `/api/servers/${serverId}/icon`, { png: typeof data === "string" ? data : data.toString("base64") });
+  const listed = async () => (await call(sessions.admin, "GET", "/api/servers")).json().find((x: { id: string }) => x.id === serverId);
+  let viewer: Session;
+
+  beforeAll(async () => {
+    expect((await call(owner, "POST", "/api/users", { username: "look-viewer", password: "look-viewer-1", role: "viewer" })).statusCode).toBe(200);
+    viewer = await login("look-viewer", "look-viewer-1");
+  });
+
+  it("has no icon at first", async () => {
+    expect((await call(viewer, "GET", `/api/servers/${serverId}/icon`)).statusCode).toBe(404);
+    expect((await listed()).iconVersion).toBeNull();
+  });
+
+  it("stores a 64×64 PNG as server-icon.png and serves it back to everyone who can see the server", async () => {
+    const file = png();
+    expect((await put(viewer, file)).statusCode).toBe(403);
+    expect((await put(sessions.admin, file)).statusCode).toBe(204);
+    expect(await fs.readFile(path.join(root, "servers", "test", "server-icon.png"))).toEqual(file);
+    const r = await call(viewer, "GET", `/api/servers/${serverId}/icon`);
+    expect(r.statusCode).toBe(200);
+    expect(r.headers["content-type"]).toBe("image/png");
+    expect(r.rawPayload).toEqual(file);
+    expect((await listed()).iconVersion).toBeGreaterThan(0);
+    expect((await call(null, "GET", `/api/servers/${serverId}/icon`)).statusCode).toBe(401);
+  });
+
+  it("refuses anything that is not a sound 64×64 PNG", async () => {
+    const good = png();
+    const damaged = Buffer.from(good);
+    damaged[40] ^= 0xff;
+    const cases: [string, Buffer | string][] = [
+      ["wrong size", png(32, 32)],
+      ["not a png", Buffer.from("GIF89a-not-a-png-at-all-just-text-padded-out-to-be-long-enough")],
+      ["damaged data", damaged],
+      ["cut off", good.subarray(0, good.length - 20)],
+      ["not base64", "***"],
+    ];
+    for (const [label, data] of cases) expect((await put(sessions.admin, data)).statusCode, label).toBe(400);
+    expect(await fs.readFile(path.join(root, "servers", "test", "server-icon.png"))).toEqual(good);
+  });
+
+  it("removes the icon", async () => {
+    expect((await call(viewer, "DELETE", `/api/servers/${serverId}/icon`)).statusCode).toBe(403);
+    expect((await call(sessions.admin, "DELETE", `/api/servers/${serverId}/icon`)).statusCode).toBe(204);
+    expect((await call(sessions.admin, "DELETE", `/api/servers/${serverId}/icon`)).statusCode).toBe(204);
+    expect((await call(viewer, "GET", `/api/servers/${serverId}/icon`)).statusCode).toBe(404);
+    expect((await listed()).iconVersion).toBeNull();
+  });
+
+  it("keeps a two-line message of the day as one escaped property and refuses a third line", async () => {
+    const motd = "§6§lWelcome\n§7to the server";
+    expect((await call(sessions.admin, "PUT", `/api/servers/${serverId}/properties`, { values: { motd } })).statusCode).toBe(204);
+    const text = await fs.readFile(path.join(root, "servers", "test", "server.properties"), "utf8");
+    expect(text.split("\n").filter((l) => l.startsWith("motd="))).toHaveLength(1);
+    expect((await call(sessions.admin, "GET", `/api/servers/${serverId}/properties`)).json().values.motd).toBe(motd);
+    expect((await call(sessions.admin, "PUT", `/api/servers/${serverId}/properties`, { values: { motd: "a\nb\nc" } })).statusCode).toBe(400);
+    const injected = await call(sessions.admin, "PUT", `/api/servers/${serverId}/properties`, { values: { motd: "a\nenable-rcon=true" } });
+    expect(injected.statusCode).toBe(204);
+    expect((await call(sessions.admin, "GET", `/api/servers/${serverId}/properties`)).json().values["enable-rcon"]).toBeUndefined();
   });
 });

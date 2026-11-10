@@ -10,6 +10,7 @@ import { useCan } from "@/lib/auth";
 import { useServersActiveFirst } from "@/lib/queries";
 import { formatBytes } from "@/lib/format";
 import { StatusBadge } from "./status";
+import { ServerIcon } from "./server-icon";
 import { EventList } from "./activity";
 
 export interface SystemInfo {
@@ -99,12 +100,15 @@ export function HomeView() {
             {servers.data.map((srv) => (
               <Link key={srv.id} href={`/server/?id=${srv.id}`} className="group rounded-lg border border-border bg-surface p-5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{srv.name}</p>
-                    <p className="mt-0.5 text-[13px] text-muted-foreground">
-                      {softwareLabel(srv.software)} {srv.mcVersion}
-                      {srv.build ? ` · #${srv.build}` : ""}
-                    </p>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <ServerIcon server={srv} size={40} />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{srv.name}</p>
+                      <p className="mt-0.5 text-[13px] text-muted-foreground">
+                        {softwareLabel(srv.software)} {srv.mcVersion}
+                        {srv.build ? ` · #${srv.build}` : ""}
+                      </p>
+                    </div>
                   </div>
                   <StatusBadge status={srv.status} />
                 </div>

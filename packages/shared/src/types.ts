@@ -77,6 +77,8 @@ export interface ServerSummary {
   startedAt: number | null;
   createdAt: number;
   restartRequired: boolean;
+  /** Changes whenever the server's icon (`server-icon.png`) does; null when it has none. Append it to the icon URL. */
+  iconVersion: number | null;
 }
 
 export interface ServerDetail extends ServerSummary {

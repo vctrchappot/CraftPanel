@@ -38,6 +38,15 @@ describe("PropertiesDocument", () => {
     expect(PropertiesDocument.parse(d.serialize()).get("motd")).toBe("Grüße §aGrün ✓");
   });
 
+  it("writes a line break of the message of the day as an escape and reads it back", () => {
+    const d = new PropertiesDocument();
+    d.set("motd", "§6Line one\n§7Line two", { multiline: true });
+    const out = d.serialize();
+    expect(out.split("\n").filter((l) => l.startsWith("motd="))).toHaveLength(1);
+    expect(PropertiesDocument.parse(out).get("motd")).toBe("§6Line one\n§7Line two");
+    expect(() => d.set("other", "a\nb", { multiline: true })).not.toThrow();
+  });
+
   it("handles continuation lines and CRLF", () => {
     const d = PropertiesDocument.parse("a=one\\\r\n   two\r\nb=3\r\n");
     expect(d.get("a")).toBe("onetwo");
@@ -58,7 +67,10 @@ describe("validateSetting", () => {
     expect(validateSetting("pvp", "yes")).toMatch(/true or false/);
     expect(validateSetting("difficulty", "hard")).toBeNull();
     expect(validateSetting("difficulty", "insane")).toMatch(/one of/);
-    expect(validateSetting("motd", "a\nb")).toMatch(/single line/);
+    expect(validateSetting("level-seed", "a\nb")).toMatch(/single line/);
+    expect(validateSetting("motd", "a\nb")).toBeNull();
+    expect(validateSetting("motd", "a\nb\nc")).toMatch(/two lines/);
+    expect(validateSetting("motd", "a\r\nb")).toMatch(/two lines/);
     expect(validateSetting("unknown-key", "anything")).toBeNull();
   });
 });

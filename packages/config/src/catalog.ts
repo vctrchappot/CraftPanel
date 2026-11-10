@@ -41,6 +41,8 @@ export interface SettingDefinition {
   restart: boolean;
   /** Settings CraftPanel manages itself (e.g. ports are set via Network). */
   managed?: boolean;
+  /** The value may span up to two lines (the message of the day); every other setting is a single line. */
+  multiline?: boolean;
   /** Minecraft version range this key exists in, when known. */
   since?: string;
   sensitive?: boolean;
@@ -53,7 +55,7 @@ const opts = (...o: [string, string][]) => ({ kind: "enum", options: o.map(([val
 
 export const SETTINGS: SettingDefinition[] = [
   // General
-  { key: "motd", label: "Message of the day", group: "general", type: str(120), default: "A Minecraft Server", help: "Shown below the server name in the multiplayer list. Supports § colour codes.", restart: true },
+  { key: "motd", label: "Message of the day", group: "general", type: str(256), default: "A Minecraft Server", help: "Shown below the server name in the multiplayer list, two lines at most. Supports § colour codes; Appearance has buttons for them.", restart: true, multiline: true },
   { key: "enable-status", label: "Show in server list", group: "general", type: bool, default: "true", help: "When disabled the server appears offline in the multiplayer list but players can still join.", restart: true },
   { key: "hide-online-players", label: "Hide online players", group: "general", type: bool, default: "false", help: "Hide the player sample in the server list.", restart: true },
   { key: "server-name", label: "Server name (legacy)", group: "general", type: str(64), default: "", help: "Not used by modern clients; kept for compatibility with some tools.", restart: true },
@@ -133,8 +135,11 @@ export const SETTINGS_BY_KEY = new Map(SETTINGS.map((s) => [s.key, s]));
 
 /** Validate a value for a key. Returns an error string, or null when valid. */
 export function validateSetting(key: string, value: string): string | null {
-  if (/[\r\n]/.test(value)) return "Value must be a single line";
   const def = SETTINGS_BY_KEY.get(key);
+  if (/[\r\n]/.test(value)) {
+    if (!def?.multiline) return "Value must be a single line";
+    if (/\r/.test(value) || value.split("\n").length > 2) return "At most two lines";
+  }
   if (!def) return value.length > 4096 ? "Value too long" : null;
   const t = def.type;
   switch (t.kind) {

@@ -1,0 +1,43 @@
+---
+title: Icon, message and description
+description: Give a server its own picture and message in Minecraft's server list, and a note that helps you and your team.
+sidebar:
+  order: 3
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Open a server, then **Settings → Appearance**. The preview on the right shows how the server looks in Minecraft's multiplayer list and in the dashboard, with your changes before you save them.
+
+## The icon
+
+The icon is the 64 × 64 picture players see next to the server in the game's list. CraftPanel writes it as `server-icon.png` into the server folder; you never have to resize anything yourself.
+
+- **From a picture.** Choose a file or drop one on the preview (PNG, JPEG, WebP, GIF or SVG, up to 16 MB). Drag the picture to move it, use the zoom slider or the arrow keys, and pick **Fill the icon** (crops the longer side) or **Whole picture** (shows all of it, on a transparent, dark, light or green backdrop). Turn **Smooth scaling** off for pixel art so the edges stay sharp. The picture is cropped and scaled in your browser; only the finished 64 × 64 PNG is sent.
+- **Generate one.** Pick lettering (an initial or an emoji, up to three characters; it starts with your server's initials), one of eight colours, a pattern and rounded or square corners.
+
+**Use this icon** saves it. **Download** gives you the current file, **Remove icon** deletes it again (Minecraft then shows its default picture). Minecraft reads the icon when the server starts, so a change shows after the next start; the dashboard marks the server as needing a restart while it runs.
+
+The icon also appears in the dashboard: in the server's header, on its card on the home page and in the server list. A server without one shows its first letter instead.
+
+## The message of the day
+
+The message is the two lines under the server name in the game's list. Select some text and click a colour or a style (bold, italic, underline, strikethrough or obfuscated); the buttons write the `§` codes for you, and **Clear** removes them from the selection. **Start from an example…** fills in a template with your server's name.
+
+- A message has at most two lines and 256 characters; each colour or style costs two characters. Roughly 50 characters fit on a line before the game cuts them off.
+- A colour clears the styles before it, as in the game; **Clear** or a second colour returns to the default.
+- Obfuscated text shuffles in the game; the preview only dims it.
+- Minecraft reads the message at start-up, so restart the server after saving.
+- A Velocity proxy takes its message from `velocity.toml` (Files tab); the icon and description work for it too.
+
+<Aside>
+  The message is the `motd` line of `server.properties`, written with the line break as an escape so the file stays valid. You can still edit it under Server properties or in the raw file.
+</Aside>
+
+## The description
+
+A free note of up to 280 characters, shown on the server's card, in the lists and under its name in the header. Use it for what the server is for or what to remember before changing it. Players never see it; it is not part of the game.
+
+## Who can change it
+
+Everyone with access to a server sees its Appearance tab; changing the icon, message and description needs the permission to configure the server (the Administrator and Owner roles).

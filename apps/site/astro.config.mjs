@@ -29,6 +29,7 @@ export default defineConfig({
           label: "Guides",
           items: [
             { slug: "docs/guides/server-software" },
+            { slug: "docs/guides/appearance" },
             { slug: "docs/guides/plugins-and-mods" },
             { slug: "docs/guides/worlds-and-backups" },
             { slug: "docs/guides/players" },

@@ -124,6 +124,9 @@ export const proxyConfigSchema = z.object({
   localOnly: z.boolean(),
 });
 
+/** A server icon as base64 PNG data; the API checks that it really is a 64×64 PNG. */
+export const serverIconSchema = z.object({ png: z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/, "Not base64 data").max(180_000) });
+
 export const updateServerSchema = z.object({
   name: serverNameSchema.optional(),
   description: z.string().max(280).optional(),
@@ -145,7 +148,7 @@ export const commandSchema = z.object({
 });
 
 export const propertiesUpdateSchema = z.object({
-  values: z.record(z.string().regex(/^[a-z0-9.\-_]+$/), z.string().max(4096).refine((s) => !/[\r\n]/.test(s), "Values must be a single line")),
+  values: z.record(z.string().regex(/^[a-z0-9.\-_]+$/), z.string().max(4096).refine((s) => !/\r/.test(s), "Values must not contain carriage returns")),
 });
 
 export const gameruleUpdateSchema = z.object({

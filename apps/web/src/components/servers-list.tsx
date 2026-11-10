@@ -9,6 +9,7 @@ import { useCan } from "@/lib/auth";
 import { useServersActiveFirst } from "@/lib/queries";
 import { formatDuration } from "@/lib/format";
 import { StatusBadge } from "./status";
+import { ServerIcon } from "./server-icon";
 
 export function ServersView() {
   const servers = useServersActiveFirst();
@@ -70,8 +71,13 @@ export function ServersView() {
                   className="cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
                 >
                   <td className="px-4 py-3">
-                    <p className="font-medium">{s.name}</p>
-                    {s.description && <p className="max-w-xs truncate text-xs text-muted-foreground">{s.description}</p>}
+                    <div className="flex items-center gap-3">
+                      <ServerIcon server={s} size={32} />
+                      <div className="min-w-0">
+                        <p className="font-medium">{s.name}</p>
+                        {s.description && <p className="max-w-xs truncate text-xs text-muted-foreground">{s.description.split("\n")[0]}</p>}
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={s.status} />

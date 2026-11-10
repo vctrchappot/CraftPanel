@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -27,6 +28,7 @@ import type { Hub } from "../hub";
 import type { AppConfig } from "../config";
 import { SYSTEM_ACTOR, type ActivityService, type Actor } from "./activity";
 import { infoStorageCommand, syncInfoPack, syncInfoPlugin } from "./info-pack";
+import { checkIcon, ICON_FILE } from "./server-icon";
 import { mergeSplitDimensions, separateDimensionLayout } from "./software-switch";
 import { MODPACK_RECORD, ModpackStaging, PENDING_MODPACK } from "./modpacks";
 import type { SettingsService } from "./settings";
@@ -43,6 +45,8 @@ export class ServerService {
   private installs = new Map<string, AbortController>();
   /** Sampled metrics of the current or last run; sampling only happens while a dashboard is open, so this can have gaps. */
   private metricSeries = new Map<string, ServerMetrics[]>();
+  /** When each server's icon file was last seen to change, kept for a few seconds so list polling doesn't touch the disk every time. */
+  private iconSeen = new Map<string, { at: number; version: number | null }>();
   readonly modpacks: ModpackStaging;
   /** Extension points (the proxy service writes Velocity and backend configuration here). */
   readonly hooks = {
@@ -126,7 +130,54 @@ export class ServerService {
       startedAt: info.startedAt,
       createdAt: row.createdAt,
       restartRequired: this.restartRequired.has(row.id),
+      iconVersion: this.iconVersion(row),
     };
+  }
+
+  /** The icon file's modification time (changes whenever the picture does), or null when the server has no icon. */
+  iconVersion(row: ServerRow): number | null {
+    const seen = this.iconSeen.get(row.id);
+    if (seen && Date.now() - seen.at < 3_000) return seen.version;
+    let version: number | null = null;
+    try {
+      // A fixed file name inside the server's own folder; nothing user-supplied reaches this path.
+      version = Math.round(fs.statSync(path.join(row.directory, ICON_FILE)).mtimeMs);
+    } catch {
+      version = null;
+    }
+    this.iconSeen.set(row.id, { at: Date.now(), version });
+    return version;
+  }
+
+  async openIcon(row: ServerRow) {
+    if (!(await this.sandbox(row).exists(ICON_FILE))) throw notFound("Icon");
+    return this.sandbox(row).openRead(ICON_FILE);
+  }
+
+  async setIcon(row: ServerRow, png: Buffer, actor: Actor) {
+    checkIcon(png);
+    const w = await this.sandbox(row).writeStream(ICON_FILE);
+    try {
+      await new Promise<void>((resolve, reject) => w.stream.once("error", reject).end(png, resolve));
+      await w.finalize();
+    } catch (err) {
+      await w.abort();
+      throw err;
+    }
+    this.iconSeen.delete(row.id);
+    // The game reads the icon when it starts.
+    if (this.agent.isRunning(row.id)) this.restartRequired.add(row.id);
+    await this.activity.audit(actor, "server.icon_set", row.id);
+    await this.activity.event(row.id, "config.updated", "Changed the server icon", { actor });
+  }
+
+  async removeIcon(row: ServerRow, actor: Actor) {
+    if (!(await this.sandbox(row).exists(ICON_FILE))) return;
+    await this.sandbox(row).remove(ICON_FILE);
+    this.iconSeen.delete(row.id);
+    if (this.agent.isRunning(row.id)) this.restartRequired.add(row.id);
+    await this.activity.audit(actor, "server.icon_remove", row.id);
+    await this.activity.event(row.id, "config.updated", "Removed the server icon", { actor });
   }
 
   detail(row: ServerRow): ServerDetail {

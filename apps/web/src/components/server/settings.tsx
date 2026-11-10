@@ -12,6 +12,7 @@ import { api, ApiError, downloadUrl, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
 import { ToggleRow } from "../wizard";
+import { AppearanceTab } from "./appearance";
 import { SoftwareSettings } from "./software";
 
 export interface SettingDef {
@@ -23,6 +24,7 @@ export interface SettingDef {
   help: string;
   restart: boolean;
   managed?: boolean;
+  multiline?: boolean;
   sensitive?: boolean;
 }
 
@@ -30,8 +32,9 @@ export function SettingsTab({ server: s }: { server: ServerDetail }) {
   // A proxy is configured in velocity.toml (Files) and the Proxy tab; it has no server.properties or game rules.
   const game = !SOFTWARE_INFO[s.software].proxy;
   return (
-    <Tabs defaultValue={game ? "properties" : "runtime"} className="space-y-6">
+    <Tabs defaultValue="appearance" className="space-y-6">
       <TabsList>
+        <TabsTrigger value="appearance">Appearance</TabsTrigger>
         {game && <TabsTrigger value="properties">Server properties</TabsTrigger>}
         {game && <TabsTrigger value="gamerules">Game rules</TabsTrigger>}
         <TabsTrigger value="runtime">Runtime</TabsTrigger>
@@ -39,6 +42,9 @@ export function SettingsTab({ server: s }: { server: ServerDetail }) {
         {game && <TabsTrigger value="raw">Raw file</TabsTrigger>}
         <TabsTrigger value="danger">Danger zone</TabsTrigger>
       </TabsList>
+      <TabsContent value="appearance">
+        <AppearanceTab server={s} />
+      </TabsContent>
       <TabsContent value="properties">
         <PropertiesEditor server={s} />
       </TabsContent>
@@ -186,6 +192,8 @@ export function SettingRow({ def, value, present, error, disabled, onChange }: {
               </option>
             ))}
           </NativeSelect>
+        ) : t.kind === "string" && def.multiline ? (
+          <Textarea id={id} rows={2} maxLength={t.maxLength} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} aria-invalid={!!error} className="font-mono text-[13px]" />
         ) : (
           <Input
             id={id}
@@ -275,16 +283,13 @@ function RuntimeSettings({ server: s }: { server: ServerDetail }) {
   const canEdit = useCan("server.configure");
   const java = useQuery({ queryKey: ["java"], queryFn: () => api.get<{ path: string; major: number; version: string; vendor: string | null; managed: boolean }[]>("/api/java") });
   // Memory and JVM arguments are edited on the Performance tab; leaving them out of this form keeps this save from overwriting them.
-  const [f, setF] = React.useState({ name: s.name, description: s.description, javaPath: s.javaPath ?? "", autoStart: s.autoStart, infoCommand: s.infoCommand });
+  const [f, setF] = React.useState({ name: s.name, javaPath: s.javaPath ?? "", autoStart: s.autoStart, infoCommand: s.infoCommand });
   const save = useAction(() => api.patch(`/api/servers/${s.id}`, { ...f, javaPath: f.javaPath || null }), { success: "Saved", invalidate: [["server", s.id], ["servers"]] });
   return (
     <div className="max-w-2xl space-y-6">
       <Section title="General">
-        <Field label="Name" htmlFor="rname">
+        <Field label="Name" htmlFor="rname" help={<>The icon, message and description are on the Appearance tab.</>}>
           <Input id="rname" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} disabled={!canEdit} maxLength={48} />
-        </Field>
-        <Field label="Description" htmlFor="rdesc">
-          <Input id="rdesc" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} disabled={!canEdit} maxLength={280} />
         </Field>
         <ToggleRow label="Start with CraftPanel" help="Start automatically when CraftPanel starts." checked={f.autoStart} onChange={(v) => setF({ ...f, autoStart: v })} disabled={!canEdit} />
         {!SOFTWARE_INFO[s.software].proxy && (

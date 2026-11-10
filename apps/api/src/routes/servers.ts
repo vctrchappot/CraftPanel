@@ -23,6 +23,7 @@ import {
   PRESET_INFO,
   presetJvmFlags,
   propertiesUpdateSchema,
+  serverIconSchema,
   proxyConfigSchema,
   recommendPreset,
   SERVER_SOFTWARE,
@@ -65,6 +66,24 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
   app.get("/api/servers", async (req) => {
     const me = requirePermission(req, "server.view");
     return (await servers.rows()).filter((r) => canSee(me, r.id)).map((r) => servers.summary(r));
+  });
+
+  // The icon players see next to the server in Minecraft's multiplayer list (`server-icon.png`, 64×64).
+  app.get<IdParams>("/api/servers/:id/icon", async (req, reply) => {
+    requirePermission(req, "server.view");
+    const icon = await servers.openIcon(await row(req.params.id));
+    return reply.header("content-type", "image/png").header("content-length", icon.size).header("cache-control", "private, max-age=86400").send(icon.stream);
+  });
+  app.put<IdParams>("/api/servers/:id/icon", async (req, reply) => {
+    requirePermission(req, "server.configure");
+    const body = parse(serverIconSchema, req.body);
+    await servers.setIcon(await row(req.params.id), Buffer.from(body.png, "base64"), actorOf(req));
+    return noContent(reply);
+  });
+  app.delete<IdParams>("/api/servers/:id/icon", async (req, reply) => {
+    requirePermission(req, "server.configure");
+    await servers.removeIcon(await row(req.params.id), actorOf(req));
+    return noContent(reply);
   });
 
   app.post("/api/servers", async (req) => {

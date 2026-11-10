@@ -95,7 +95,7 @@ export class GameService {
     if (Object.keys(errors).length) throw Object.assign(badRequest("Some settings are invalid"), { details: errors });
     const sb = this.servers.sandbox(row);
     const doc = PropertiesDocument.parse((await sb.readTextIfExists("server.properties")) ?? "");
-    for (const [k, v] of Object.entries(values)) doc.set(k, v);
+    for (const [k, v] of Object.entries(values)) doc.set(k, v, { multiline: SETTINGS_BY_KEY.get(k)?.multiline });
     if (values.hardcore === "true") doc.set("difficulty", "hard");
     await sb.writeText("server.properties", doc.serialize());
     if (values["max-players"]) await this.db.update(serversTable).set({ maxPlayers: Number(values["max-players"]) }).where(eq(serversTable.id, row.id));
