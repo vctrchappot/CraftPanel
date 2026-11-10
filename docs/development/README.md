@@ -46,6 +46,17 @@ In development the dashboard calls the API cross-origin (`NEXT_PUBLIC_API_URL`),
 - Every route calls `requirePermission(req, "<permission>")`. Add new permissions to `packages/shared/src/roles.ts`.
 - Never interpolate user input into shell commands; never call `spawn` with `shell: true`.
 
+## Forking
+
+A fork contains everything, including `apps/site` (the website source). Nothing is published from it: the site at craftpanel.vctr.site is deployed from this repository's `main` by the owner's Vercel project, and CI does not deploy it. A fork gets a live site only if its owner connects their own hosting (`apps/site/vercel.json` builds it).
+
+If you publish a fork or run it under your own name, change what points at this project:
+
+- `packages/shared/src/meta.ts`: repository, site URL and author, shown in the dashboard, the README and the in-game info card.
+- `package.json` (author, homepage, repository, bugs) and `apps/site/astro.config.mjs` (`site`, GitHub links, edit link, social image URL), plus `apps/site/src/pages/index.astro` and `src/scripts/landing.ts`, which link to the site.
+- The update check (`CRAFTPANEL_REPO` in `meta.ts`) and the installers (`REPO` in `deploy/install.sh`, `$Repo` in `deploy/install.ps1`) fetch releases from this repository; a fork that ships its own releases has to point all three at its own.
+- The name, logo and mark: the license grants no right to use the licensor's trademarks, trade names or product names beyond identifying the origin of the software and displaying the license details (see [License](#license)), so a public fork should carry its own name and artwork. This is a summary of the license text, not legal advice.
+
 ## License
 
 CraftPanel is licensed under the **Functional Source License 1.1, ALv2 Future License** (`FSL-1.1-ALv2`, [fsl.software](https://fsl.software)). It is source-available, and each version becomes open source two years after its release. Anyone may use, copy, modify and redistribute CraftPanel for any purpose other than a *Competing Use*. A Competing Use means offering it to others in a commercial product or service that substitutes for CraftPanel or offers substantially similar functionality, such as a paid hosting panel built on it. Internal use (including companies and paid game servers run with it), non-commercial education and research, and professional services for a licensee are explicitly permitted. Two years after a version is made available, it may additionally be used under the Apache License 2.0. Redistributed copies must keep the license and copyright notices.
