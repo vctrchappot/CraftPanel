@@ -55,7 +55,7 @@ export function summarize(samples: ServerMetrics[], pick: (m: ServerMetrics) => 
 }
 
 /** Milliseconds with a decimal while they are small, so a healthy 0.7 ms tick isn't shown as 1 ms. */
-const ms = (v: number) => (v < 10 ? v.toFixed(1) : v.toFixed(0));
+const ms = (v: number) => v.toFixed(1);
 const RANK: Record<InsightLevel, number> = { danger: 0, warning: 1, info: 2, ok: 3 };
 const MINECRAFT_DEFAULT_VIEW = 10;
 /** Minutes the samples span, at least one. */

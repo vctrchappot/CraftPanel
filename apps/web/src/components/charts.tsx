@@ -41,6 +41,7 @@ export function MetricChart({
   reference,
   alert,
   format,
+  axisFormat,
   empty,
   className,
   stat,
@@ -53,6 +54,8 @@ export function MetricChart({
   reference?: Reference;
   alert?: Alert;
   format: (v: number) => string;
+  /** Labels on the value axis; round numbers read better there than the one-decimal readings. Defaults to `format`. */
+  axisFormat?: (v: number) => string;
   empty: string;
   className?: string;
   stat?: { value: React.ReactNode; detail: string; hint: string; icon: React.ReactNode };
@@ -160,7 +163,7 @@ export function MetricChart({
         </svg>
         {[0, 50, 100].map((g) => (
           <span key={g} className="pointer-events-none absolute left-0 -translate-y-full pb-0.5 font-mono text-[10px] leading-none text-muted-foreground [text-shadow:0_0_3px_var(--surface),0_0_3px_var(--surface),0_0_2px_var(--surface)]" style={{ top: `${g}%` }}>
-            {format(max * (1 - g / 100))}
+            {(axisFormat ?? format)(max * (1 - g / 100))}
           </span>
         ))}
         {reference && reference.value <= max && (

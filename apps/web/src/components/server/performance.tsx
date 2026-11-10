@@ -51,7 +51,10 @@ const RANGES = [
   ["1 hour", 60],
 ] as const;
 const MAX_LIVE = 1000;
-const ms = (v: number) => (v < 10 ? v.toFixed(1) : v.toFixed(0));
+const ms = (v: number) => v.toFixed(1);
+const pct = (v: number) => `${v.toFixed(1)}%`;
+/** Memory readings always carry one decimal, so 244.0 MB and 1.4 GB line up from one sample to the next. */
+const mem = (bytes: number) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`);
 const gb = (mb: number) => `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB`;
 
 /** The metric history the API kept, followed by whatever the live stream delivered since. */
@@ -109,7 +112,7 @@ export function PerformanceTab({ server: s, stream }: { server: ServerDetail; st
   const tps = summarize(windowed, (m) => m.tps);
   const mspt = summarize(windowed, (m) => m.mspt);
   const cpu = summarize(windowed, (m) => m.cpuPercent);
-  const mem = summarize(windowed, (m) => m.memoryBytes);
+  const memory = summarize(windowed, (m) => m.memoryBytes);
   const players = summarize(windowed, (m) => m.playersOnline);
   const heap = s.memoryMb * 1024 * 1024;
   const pts = (pick: (m: ServerMetrics) => number | null) => samples.map((m) => ({ ts: m.ts, v: pick(m) }));
@@ -155,22 +158,22 @@ export function PerformanceTab({ server: s, stream }: { server: ServerDetail; st
               title="Tick time"
               stat={metric(live?.mspt != null ? `${ms(live.mspt)} ms` : unavailable, avgPeak(mspt, (v) => `${ms(v)} ms`), "Stay below the 50 ms tick budget", <Timer />)}
               points={pts((m) => m.mspt)} from={from} to={to}
-              max={Math.max(60, Math.ceil((mspt.max ?? 0) / 10) * 10)} reference={{ value: 50, label: "50 ms budget" }} alert={{ value: 50, label: "over the budget" }} format={(v) => `${ms(v)} ms`} empty={empty}
+              max={Math.max(60, Math.ceil((mspt.max ?? 0) / 10) * 10)} reference={{ value: 50, label: "50 ms budget" }} alert={{ value: 50, label: "over the budget" }} format={(v) => `${ms(v)} ms`} axisFormat={(v) => `${Math.round(v)} ms`} empty={empty}
             />
           </div>
         )}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <MetricChart
             title="CPU"
-            stat={metric(live?.cpuPercent != null ? `${live.cpuPercent.toFixed(0)}%` : unavailable, avgPeak(cpu, (v) => `${v.toFixed(0)}%`), "100% equals one fully used core", <Cpu />)}
+            stat={metric(live?.cpuPercent != null ? pct(live.cpuPercent) : unavailable, avgPeak(cpu, pct), "100% equals one fully used core", <Cpu />)}
             points={pts((m) => m.cpuPercent)} from={from} to={to}
-            max={Math.max(100, Math.ceil((cpu.max ?? 0) / 50) * 50)} reference={{ value: 100, label: "one core" }} format={(v) => `${v.toFixed(0)}%`} empty={empty}
+            max={Math.max(100, Math.ceil((cpu.max ?? 0) / 50) * 50)} reference={{ value: 100, label: "one core" }} format={pct} axisFormat={(v) => `${Math.round(v)}%`} empty={empty}
           />
           <MetricChart
             title="Memory"
-            stat={metric(live?.memoryBytes != null ? formatBytes(live.memoryBytes) : unavailable, mem.max === null ? undefined : `peak ${formatBytes(mem.max)}`, `${gb(s.memoryMb)} configured Java heap · process memory shown`, <MemoryStick />)}
-            points={pts((m) => m.memoryBytes)} from={from} to={to} max={Math.max(heap, mem.max ?? 0)}
-            reference={{ value: heap, label: "configured heap" }} format={(v) => formatBytes(v)} empty={empty}
+            stat={metric(live?.memoryBytes != null ? mem(live.memoryBytes) : unavailable, memory.max === null ? undefined : `peak ${mem(memory.max)}`, `${gb(s.memoryMb)} configured Java heap · process memory shown`, <MemoryStick />)}
+            points={pts((m) => m.memoryBytes)} from={from} to={to} max={Math.max(heap, memory.max ?? 0)}
+            reference={{ value: heap, label: "configured heap" }} format={mem} axisFormat={(v) => formatBytes(v)} empty={empty}
           />
           <MetricChart
             title="Players"
