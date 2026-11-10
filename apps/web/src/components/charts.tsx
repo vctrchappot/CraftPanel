@@ -17,6 +17,14 @@ interface Reference {
   label: string;
 }
 
+/** A zone that is bad to be in: the line turns amber where it enters it (tick time above the budget, TPS below 18). */
+interface Alert {
+  value: number;
+  below?: boolean;
+  /** Finishes "12% below 18 TPS" under the chart. */
+  label: string;
+}
+
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /**
@@ -31,6 +39,7 @@ export function MetricChart({
   to,
   max,
   reference,
+  alert,
   format,
   empty,
   className,
@@ -42,12 +51,15 @@ export function MetricChart({
   to: number;
   max: number;
   reference?: Reference;
+  alert?: Alert;
   format: (v: number) => string;
   empty: string;
   className?: string;
   stat?: { value: React.ReactNode; detail: string; hint: string; icon: React.ReactNode };
 }) {
   const box = React.useRef<HTMLDivElement>(null);
+  // url(#id) cannot contain the colons React puts in useId.
+  const gid = React.useId().replace(/:/g, "");
   const [hover, setHover] = React.useState<Point | null>(null);
   React.useEffect(() => setHover(null), [from, to]);
   const visible = React.useMemo(() => points.filter((p) => p.ts >= from && p.ts <= to), [points, from, to]);
@@ -78,6 +90,8 @@ export function MetricChart({
   }, [visible, from, to, max]);
 
   const latest = known[known.length - 1];
+  const breached = alert ? known.filter((p) => (alert.below ? p.v < alert.value : p.v > alert.value)).length : 0;
+  const share = known.length ? breached / known.length : 0;
   const shown = hover ?? latest ?? null;
   const onMove = (e: React.PointerEvent) => {
     const r = box.current?.getBoundingClientRect();
@@ -122,23 +136,42 @@ export function MetricChart({
         onPointerDown={onMove}
         onPointerLeave={() => setHover(null)}
       >
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible" aria-hidden>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible text-foreground" aria-hidden>
+          <defs>
+            <linearGradient id={`${gid}-fill`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="currentColor" stopOpacity="0.16" />
+              <stop offset="1" stopColor="currentColor" stopOpacity="0" />
+            </linearGradient>
+            {alert && (
+              <clipPath id={`${gid}-alert`}>
+                {alert.below ? <rect x="-5" y={y(alert.value)} width="110" height={105 - y(alert.value)} /> : <rect x="-5" y="-5" width="110" height={y(alert.value) + 5} />}
+              </clipPath>
+            )}
+          </defs>
           {[0, 50, 100].map((g) => (
             <line key={g} x1="0" x2="100" y1={g} y2={g} className="stroke-border" strokeWidth="1" vectorEffect="non-scaling-stroke" />
           ))}
           {reference && reference.value <= max && (
             <line x1="0" x2="100" y1={y(reference.value)} y2={y(reference.value)} className="stroke-warning" strokeWidth="1" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
           )}
-          {area && <path d={area} className="fill-foreground/[0.06]" />}
+          {area && <path d={area} fill={`url(#${gid}-fill)`} />}
           {line && <path d={line} fill="none" className="stroke-foreground" strokeWidth="1.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+          {line && alert && <path d={line} fill="none" className="stroke-warning" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" clipPath={`url(#${gid}-alert)`} />}
         </svg>
-        <span className="pointer-events-none absolute left-0 top-0 -translate-y-1/2 bg-surface pr-1 font-mono text-[10px] leading-none text-muted-foreground">{format(max)}</span>
+        {[0, 50, 100].map((g) => (
+          <span key={g} className="pointer-events-none absolute left-0 -translate-y-full pb-0.5 font-mono text-[10px] leading-none text-muted-foreground [text-shadow:0_0_3px_var(--surface),0_0_3px_var(--surface),0_0_2px_var(--surface)]" style={{ top: `${g}%` }}>
+            {format(max * (1 - g / 100))}
+          </span>
+        ))}
         {reference && reference.value <= max && (
           <span className="pointer-events-none absolute right-0 -translate-y-full pb-0.5 font-mono text-[10px] leading-none text-warning" style={{ top: `${y(reference.value)}%` }}>
             {reference.label}
           </span>
         )}
         {!known.length && <p className="absolute inset-0 grid place-items-center text-center text-xs text-muted-foreground">{empty}</p>}
+        {!hover && latest && (
+          <span className="pointer-events-none absolute size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground ring-2 ring-surface" style={{ left: `${x(latest.ts)}%`, top: `${y(latest.v)}%` }} />
+        )}
         {hover && hover.v !== null && (
           <>
             <span className="pointer-events-none absolute inset-y-0 w-px bg-foreground/30" style={{ left: `${x(hover.ts)}%` }} />
@@ -148,12 +181,20 @@ export function MetricChart({
       </div>
       {stat && (
         <>
-          <div className="mt-2 flex justify-between gap-2 font-mono text-[10px] text-muted-foreground">
+          <div className="mt-2.5 flex justify-between gap-2 font-mono text-[10px] text-muted-foreground">
             <span>{formatClock(from)}</span>
+            {span >= 120_000 && <span>{formatClock(from + span / 2)}</span>}
             <span>{formatClock(to)}</span>
           </div>
           <p className="mt-4 border-t border-border pt-3 text-xs tabular-nums text-muted-foreground" aria-live="off">
-            {hover?.v != null ? `${format(hover.v)} at ${formatClock(hover.ts, true)}` : stat.detail}
+            {hover?.v != null ? (
+              `${format(hover.v)} at ${formatClock(hover.ts, true)}`
+            ) : (
+              <>
+                {stat.detail}
+                {alert && share > 0 && <span className="text-warning"> · {share < 0.01 ? "<1" : Math.round(share * 100)}% {alert.label}</span>}
+              </>
+            )}
           </p>
         </>
       )}

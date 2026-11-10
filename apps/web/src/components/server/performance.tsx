@@ -149,13 +149,13 @@ export function PerformanceTab({ server: s, stream }: { server: ServerDetail; st
             <MetricChart
               title="TPS"
               stat={metric(live?.tps != null ? live.tps.toFixed(1) : unavailable, avgLow(tps, (v) => v.toFixed(1)), "20 ticks per second is the target", <Gauge />)}
-              points={pts((m) => m.tps)} from={from} to={to} max={20} format={(v) => v.toFixed(1)} empty={empty}
+              points={pts((m) => m.tps)} from={from} to={to} max={20} alert={{ value: 18, below: true, label: "below 18 TPS" }} format={(v) => v.toFixed(1)} empty={empty}
             />
             <MetricChart
               title="Tick time"
               stat={metric(live?.mspt != null ? `${ms(live.mspt)} ms` : unavailable, avgPeak(mspt, (v) => `${ms(v)} ms`), "Stay below the 50 ms tick budget", <Timer />)}
               points={pts((m) => m.mspt)} from={from} to={to}
-              max={Math.max(60, Math.ceil((mspt.max ?? 0) / 10) * 10)} reference={{ value: 50, label: "50 ms budget" }} format={(v) => `${ms(v)} ms`} empty={empty}
+              max={Math.max(60, Math.ceil((mspt.max ?? 0) / 10) * 10)} reference={{ value: 50, label: "50 ms budget" }} alert={{ value: 50, label: "over the budget" }} format={(v) => `${ms(v)} ms`} empty={empty}
             />
           </div>
         )}
