@@ -253,7 +253,7 @@ if (!reduced) {
   }, { threshold: 0.15, rootMargin: "0px 0px -6% 0px" });
   const groups: Element[][] = [
     ...[...document.querySelectorAll(".sec-head")].map((h) => [...h.querySelectorAll(".sec-no, h2, .sec-lead, [role=tablist]")]),
-    ...[...document.querySelectorAll(".bento, .devices, .faq")].map((g) => [...g.children]),
+    ...[...document.querySelectorAll(".bento, .devices, .compare tbody, .choices, .faq")].map((g) => [...g.children]),
     ...[...document.querySelectorAll(".px-rule")].map((r) => [r]),
   ];
   for (const group of groups)

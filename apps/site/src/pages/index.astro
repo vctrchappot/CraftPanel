@@ -287,17 +287,30 @@ const devices = [
   { name: "A small VPS", os: "Linux with systemd", scene: vpsScene(), ram: "4–8 GB", players: "10–20", note: "Choose a plan with a public IP and allow the Minecraft port in its firewall. Keep the dashboard behind a VPN, SSH tunnel or HTTPS reverse proxy." },
 ];
 
-const compare = {
-  cols: ["CraftPanel", "Managed Minecraft hosting"],
+// Each cell is marked as a strength (+), a trade-off (−) or "it depends" (~), so the table reads at a glance.
+type Mark = "pro" | "con" | "mid";
+const marks: Record<Mark, { icon: UiIconName; label: string }> = {
+  pro: { icon: "plus", label: "Strength" },
+  con: { icon: "minus", label: "Trade-off" },
+  mid: { icon: "tilde", label: "Depends" },
+};
+const compare: { cols: [string, string]; rows: { aspect: string; cells: [Mark, string][] }[] } = {
+  cols: ["CraftPanel on your machine", "Managed Minecraft hosting"],
   rows: [
-    ["Where it runs", "A PC, Pi or VPS you control", "Infrastructure operated by your provider"],
-    ["Getting started", "Linux/Windows installer; manual macOS setup", "Create an account and choose a plan"],
-    ["Software", "Paper, Purpur, Fabric, NeoForge, Vanilla or Velocity", "Software and versions offered by the provider"],
-    ["Worlds & files", "On your host, with direct file access", "On the provider's host; access depends on the plan"],
-    ["Maintenance", "You manage the machine, network and backups", "Responsibilities depend on the provider and plan"],
-    ["Costs", "Free panel; hardware, power and any VPS/network costs are yours", "Recurring hosting charge; pricing depends on the plan"],
+    { aspect: "Cost", cells: [["pro", "Free panel. You pay for power, or for a VPS."], ["con", "A monthly fee, by plan and memory."]] },
+    { aspect: "Files & worlds", cells: [["pro", "Every file on your own disk."], ["mid", "Through the host's file manager or SFTP, by plan."]] },
+    { aspect: "Server software", cells: [["pro", "Paper, Purpur, Fabric, NeoForge, Vanilla or Velocity."], ["mid", "What the host offers."]] },
+    { aspect: "Upkeep", cells: [["con", "Yours: the machine, its updates, the network. Backups run on a schedule."], ["pro", "The host looks after hardware and network."]] },
+    { aspect: "Uptime", cells: [["con", "As long as your machine is on."], ["pro", "Data-centre hardware, on around the clock."]] },
+    { aspect: "Reaching players", cells: [["mid", "Port forwarding or a VPS. CraftPanel checks whether friends can join."], ["pro", "A public address is included."]] },
+    { aspect: "Getting started", cells: [["mid", "One-line installer on Linux and Windows; manual setup on macOS."], ["pro", "Sign up and pick a plan."]] },
   ],
 };
+const choices: { title: string; text: string; link?: { href: string; label: string } }[] = [
+  { title: "Run CraftPanel if…", text: "you have a spare PC, a Raspberry Pi or a VPS, and want your worlds and settings on hardware you control.", link: { href: "#install", label: "Install it" } },
+  { title: "Rent a server if…", text: "nobody wants to look after a machine or a router, and the server has to stay online around the clock." },
+  { title: "Pick another panel if…", text: "you run many machines or games: Pterodactyl spreads servers across nodes in Docker, Crafty Controller also runs Bedrock. CraftPanel manages one host today; more are planned." },
+];
 
 const faqs: { id: string; q: string; a: string; more?: { href: string; label: string } }[] = [
   { id: "cost", q: "What does it cost?", a: "The CraftPanel software is free. You pay for hardware, electricity and any VPS or connectivity you use. It is source-available under FSL-1.1-ALv2, which restricts competing commercial uses. Each version becomes Apache-2.0 after two years.", more: { href: `${github}/blob/main/LICENSE`, label: "Read the license" } },
@@ -856,7 +869,7 @@ const backups = [
           <header class="sec-head">
             <p class="sec-no mono"><span>05</span>Hosting choices</p>
             <h2 id="compare-title" class="display">Run it yourself, or rent a managed server?</h2>
-            <p class="sec-lead">CraftPanel manages Minecraft on one host you control. A managed host takes on some of that work. Choose based on who should look after the machine, not just the price of the panel.</p>
+            <p class="sec-lead">Both are good answers. The real question is who looks after the machine.</p>
           </header>
           <div class="table-scroll" tabindex="0" role="region" aria-label="Self-hosting and managed Minecraft hosting comparison">
             <table class="compare">
@@ -864,17 +877,32 @@ const backups = [
                 <tr><th scope="col"><span class="sr-only">Aspect</span></th>{compare.cols.map((c, i) => <th scope="col" class={i === 0 ? "is-us" : undefined}>{c}</th>)}</tr>
               </thead>
               <tbody>
-                {compare.rows.map(([label, ...cells]) => (
+                {compare.rows.map((r) => (
                   <tr>
-                    <th scope="row" class="mono">{label}</th>
-                    {cells.map((c, i) => <td class={i === 0 ? "is-us" : undefined} data-label={compare.cols[i]}>{c}</td>)}
+                    <th scope="row" class="mono">{r.aspect}</th>
+                    {r.cells.map(([m, text], i) => (
+                      <td class={i === 0 ? "is-us" : undefined} data-mark={m}>
+                        <span class="cmp-col mono" aria-hidden="true">{i === 0 ? "CraftPanel" : "Managed"}</span>
+                        <span class="cmp-cell"><span class="cmp-mark"><UiIcon name={marks[m].icon} size={12} label={marks[m].label} /></span>{text}</span>
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p class="comparison-note">CraftPanel is free. Hardware, electricity and any VPS or connectivity costs are yours. Managed hosting varies by provider and plan.</p>
-          <p class="fineprint">Looking at other self-hosted panels? Pterodactyl and Crafty Controller are alternatives. CraftPanel currently manages one host; multiple hosts are planned.</p>
+          <p class="cmp-key mono" aria-hidden="true">
+            {(Object.keys(marks) as Mark[]).map((m) => <span data-mark={m}><span class="cmp-mark"><UiIcon name={marks[m].icon} size={12} /></span>{marks[m].label.toLowerCase()}</span>)}
+          </p>
+          <ul class="choices">
+            {choices.map((c, i) => (
+              <li class:list={["choice", { "is-us": i === 0 }]}>
+                <h3>{c.title}</h3>
+                <p>{c.text}</p>
+                {c.link && <a class="choice-link" href={c.link.href}>{c.link.label} <UiIcon name="arrow-right" size={12} /></a>}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

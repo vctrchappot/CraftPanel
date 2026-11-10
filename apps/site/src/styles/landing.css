@@ -2523,6 +2523,9 @@ p {
   vertical-align: top;
   border-top: 1px solid var(--line);
 }
+.compare thead th:first-child {
+  width: 170px;
+}
 .compare thead th {
   border-top: 0;
   font-family: var(--font-text);
@@ -2543,6 +2546,12 @@ p {
 .compare td {
   color: var(--muted);
 }
+.compare tbody :is(th, td:not(.is-us)) {
+  transition: background-color var(--dur-hover) var(--ease-out);
+}
+.compare tbody tr:hover :is(th, td:not(.is-us)) {
+  background: var(--surface-2);
+}
 .compare .is-us {
   background: color-mix(in srgb, var(--grass) 10%, var(--surface));
   color: var(--fg);
@@ -2552,18 +2561,96 @@ p {
   background: var(--grass);
   color: var(--grass-ink);
 }
-.fineprint {
-  margin-top: 16px;
-  font-size: 12.5px;
+.cmp-col {
+  display: none;
+}
+.cmp-cell {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+/* Strength, trade-off, depends: a small block in the row's colour, readable without colour by its sign. */
+.cmp-mark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
   color: var(--muted);
+}
+[data-mark="pro"] .cmp-mark {
+  border-color: color-mix(in srgb, var(--grass) 55%, transparent);
+  background: color-mix(in srgb, var(--grass) 18%, var(--surface));
+  color: var(--grass-text);
+}
+[data-mark="con"] .cmp-mark {
+  border-color: color-mix(in srgb, var(--ember-text) 45%, transparent);
+  background: color-mix(in srgb, var(--ember-text) 10%, var(--surface));
+  color: var(--ember-text);
+}
+.cmp-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cmp-key > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 40px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+.choice.is-us {
+  border-color: var(--grass);
+  box-shadow: inset 0 3px 0 var(--grass);
+}
+.choice h3 {
+  font-family: var(--font-text);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+}
+.choice p {
+  font-size: 15px;
+  color: var(--muted);
+}
+.choice-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 4px;
+  font-weight: 500;
+  color: var(--grass-text);
+}
+.choice-link .ui-icon {
+  transition: transform var(--dur-hover) var(--ease-out);
+}
+.choice-link:hover .ui-icon {
+  transform: translateX(3px);
 }
 
 /* ---- 06 trust ---- */
-.comparison-note {
-  margin-top: 24px;
-  font-size: 15px;
-  color: var(--fg);
-}
 .sec-trust {
   border-top: 1px solid var(--line);
 }
@@ -3285,6 +3372,18 @@ p {
   transform: none;
   filter: none;
 }
+/* Comparison rows: once a row is in, its marks drop into place like blocks. */
+.motion .compare [data-reveal] .cmp-mark {
+  transform: scale(0);
+  transition: transform 240ms steps(3, end);
+  transition-delay: calc(var(--i, 0) * var(--stagger) + 240ms);
+}
+.motion .compare [data-reveal] td + td .cmp-mark {
+  transition-delay: calc(var(--i, 0) * var(--stagger) + 360ms);
+}
+.motion .compare [data-reveal].is-in .cmp-mark {
+  transform: none;
+}
 /* Rules between sections are laid like blocks: left to right, one step at a time. */
 .motion .px-rule[data-reveal] {
   opacity: 1;
@@ -3363,6 +3462,7 @@ p {
   .types,
   .look,
   .trust,
+  .choices,
   .cta-in {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3561,7 +3661,7 @@ p {
   .device {
     padding: 20px;
   }
-  /* comparison: one card per aspect instead of a sideways-scrolling table */
+  /* comparison: one card per aspect, both answers side by side, instead of a sideways-scrolling table */
   .table-scroll {
     overflow: visible;
     border: 0;
@@ -3580,34 +3680,51 @@ p {
     display: none;
   }
   .compare tr {
-    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 10px;
     border: 1px solid var(--line-strong);
     background: var(--surface);
   }
+  .compare tbody tr:hover :is(th, td:not(.is-us)) {
+    background: none;
+  }
+  .compare tbody tr:hover th {
+    background: var(--surface-2);
+  }
   .compare tbody th {
+    grid-column: 1 / -1;
     position: static;
     width: auto;
-    padding: 10px 14px;
+    padding: 8px 12px;
     border-top: 0;
     background: var(--surface-2);
     color: var(--fg);
     font-weight: 600;
   }
   .compare td {
-    display: grid;
-    grid-template-columns: 112px minmax(0, 1fr);
-    gap: 12px;
-    padding: 10px 14px;
+    padding: 10px 12px 12px;
+    border-top: 0;
+    font-size: 14px;
   }
-  .compare td::before {
-    content: attr(data-label);
-    font-family: var(--font-mono);
-    font-size: 12px;
+  .compare td + td {
+    border-left: 1px solid var(--line);
+  }
+  .cmp-col {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 11px;
     color: var(--muted);
-    padding-top: 2px;
+  }
+  .cmp-cell {
+    gap: 8px;
+  }
+  .cmp-mark {
+    width: 18px;
+    height: 18px;
   }
   .compare .is-us {
-    box-shadow: inset 3px 0 0 var(--grass);
+    box-shadow: inset 0 3px 0 var(--grass);
   }
   .cta {
     padding: 72px 0;
