@@ -279,13 +279,14 @@ const compare = {
   ],
 };
 
-const faqs = [
-  { q: "What does it cost?", a: "The CraftPanel software is free. You pay for hardware, electricity and any VPS or connectivity you use. It is source-available under FSL-1.1-ALv2, which restricts competing commercial uses. Each version becomes Apache-2.0 after two years." },
-  { q: "What hardware do I need?", a: "Anything that runs Node.js 22.13 or newer: a Windows or Linux PC, a Mac, a Raspberry Pi 4/5 with a 64-bit OS, or a small VPS. Minecraft needs most of the memory: about 2 GB for a small Paper server, 4 GB or more for modpacks." },
-  { q: "Bedrock?", a: "Not yet. CraftPanel runs Minecraft Java Edition servers. A Bedrock adapter is on the roadmap." },
-  { q: "Can I bring my existing world?", a: "Yes. Create a server with the same software and version, then import the world as a zip in the Worlds tab, or upload files in the file manager." },
-  { q: "Should I open the dashboard to the internet?", a: "No. Only the Minecraft port should be public. Reach the dashboard through a VPN like Tailscale, an SSH tunnel or an HTTPS reverse proxy. By default CraftPanel only lets in private networks and refuses public clients without HTTPS." },
-  { q: "Does it phone home?", a: "No telemetry and no CraftPanel cloud account. You create local users on your installation. CraftPanel goes online for official downloads, Modrinth and Hangar when you browse add-ons, and an optional update check against GitHub." },
+const faqs: { id: string; q: string; a: string; more?: { href: string; label: string } }[] = [
+  { id: "cost", q: "What does it cost?", a: "The CraftPanel software is free. You pay for hardware, electricity and any VPS or connectivity you use. It is source-available under FSL-1.1-ALv2, which restricts competing commercial uses. Each version becomes Apache-2.0 after two years.", more: { href: `${github}/blob/main/LICENSE`, label: "Read the license" } },
+  { id: "hardware", q: "What hardware do I need?", a: "Anything that runs Node.js 22.13 or newer: a Windows or Linux PC, a Mac, a Raspberry Pi 4/5 with a 64-bit OS, or a small VPS. Minecraft needs most of the memory: about 2 GB for a small Paper server, 4 GB or more for modpacks.", more: { href: "/docs/getting-started/installation/", label: "Installation guide" } },
+  { id: "bedrock", q: "Bedrock?", a: "Not yet. CraftPanel runs Minecraft Java Edition servers. A Bedrock adapter is on the roadmap." },
+  { id: "world", q: "Can I bring my existing world?", a: "Yes. Create a server with the same software and version, then import the world as a zip in the Worlds tab, or upload files in the file manager.", more: { href: "/docs/guides/worlds-and-backups/", label: "Worlds and backups" } },
+  { id: "internet", q: "Should I open the dashboard to the internet?", a: "No. Only the Minecraft port should be public. Reach the dashboard through a VPN like Tailscale, an SSH tunnel or an HTTPS reverse proxy. By default CraftPanel only lets in private networks and refuses public clients without HTTPS.", more: { href: "/docs/administration/remote-access/", label: "Remote access" } },
+  { id: "ai", q: "Is there AI in it?", a: "Only if you want it. The optional assistant is off until the owner adds their own key for Claude, OpenAI or a local model such as Ollama. It acts with the asking user's permissions and asks before it changes anything.", more: { href: "/docs/guides/ai-assistant/", label: "AI assistant" } },
+  { id: "privacy", q: "Does it phone home?", a: "No telemetry and no CraftPanel cloud account. You create local users on your installation. CraftPanel goes online for official downloads, Modrinth and Hangar when you browse add-ons, and an optional update check against GitHub.", more: { href: "/docs/reference/security/", label: "Security and privacy" } },
 ];
 
 const backups = [
@@ -838,17 +839,36 @@ const backups = [
 
       <!-- 07 FAQ -->
       <section class="sec" aria-labelledby="faq-title">
-        <div class="wrap wrap-narrow">
-          <header class="sec-head">
-            <p class="sec-no mono"><span>07</span>Questions</p>
-            <h2 id="faq-title" class="display">Asked before.</h2>
-          </header>
+        <div class="wrap wrap-mid faq-layout">
+          <div class="faq-side">
+            <header class="sec-head">
+              <p class="sec-no mono"><span>07</span>Questions</p>
+              <h2 id="faq-title" class="display">Asked before.</h2>
+              <p class="sec-lead">Short answers to what people ask before installing. The docs have the long ones.</p>
+            </header>
+            <aside class="faq-help" aria-label="More help">
+              <p class="faq-help-title">Not on the list?</p>
+              <a href="/docs/reference/troubleshooting/">Troubleshooting guide <UiIcon name="arrow-right" size={12} /></a>
+              <a href={`${github}/issues`} rel="noopener">Ask on GitHub <UiIcon name="arrow-right" size={12} /></a>
+            </aside>
+          </div>
           <div class="faq">
             {
-              faqs.map((f) => (
-                <details>
-                  <summary>{f.q}</summary>
-                  <p>{f.a}</p>
+              faqs.map((f, i) => (
+                <details id={`faq-${f.id}`}>
+                  <summary>
+                    <span class="faq-no mono" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+                    <span class="faq-q">{f.q}</span>
+                    <span class="faq-icon" aria-hidden="true" />
+                  </summary>
+                  <div class="faq-a">
+                    <p>{f.a}</p>
+                    {f.more && (
+                      <a class="faq-more" href={f.more.href}>
+                        {f.more.label} <UiIcon name="arrow-right" size={12} />
+                      </a>
+                    )}
+                  </div>
                 </details>
               ))
             }

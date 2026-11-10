@@ -2428,6 +2428,57 @@ p {
 }
 
 /* ---- 07 faq ---- */
+/* Heading and help links stay in view on the left while the questions scroll on the right. */
+.faq-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr);
+  gap: 64px;
+  align-items: start;
+}
+.faq-side {
+  position: sticky;
+  top: 96px;
+}
+.faq-side .sec-head {
+  margin-bottom: 32px;
+}
+.faq-help {
+  display: grid;
+  gap: 2px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.faq-help-title {
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--muted);
+}
+.faq-help a,
+.faq-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 4px 0;
+  font-weight: 500;
+  color: var(--grass-text);
+  text-decoration: none;
+}
+.faq-help a :is(svg, .px-icon),
+.faq-more :is(svg, .px-icon) {
+  transition: transform var(--dur-hover) var(--ease-out);
+}
+.faq-help a:hover :is(svg, .px-icon),
+.faq-more:hover :is(svg, .px-icon) {
+  transform: translateX(3px);
+}
+.faq-help a:hover,
+.faq-more:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .faq details {
   border-top: 1px solid var(--line);
 }
@@ -2436,35 +2487,130 @@ p {
 }
 .faq summary {
   list-style: none;
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 24px;
+  align-items: start;
   gap: 16px;
-  padding: 20px 0;
+  margin-inline: -12px;
+  padding: 20px 12px;
   font-weight: 500;
   font-size: 19px;
+  line-height: 1.4;
   cursor: pointer;
+  transition: background-color var(--dur-hover) var(--ease-out);
 }
 .faq summary::-webkit-details-marker {
   display: none;
 }
-.faq summary::before {
-  content: "+";
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--line-strong);
-  font-family: var(--font-mono);
-  font-size: 15px;
+.faq summary:hover {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+.faq summary:focus-visible {
+  outline-offset: -2px;
+}
+.faq-no {
+  padding-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  transition: color var(--dur-hover) var(--ease-out);
+}
+.faq summary:hover .faq-no,
+.faq details[open] .faq-no {
   color: var(--grass-text);
 }
-.faq details[open] summary::before {
-  content: "−";
+/* A plus made of two pixel bars; the vertical one turns flat to make the minus. */
+.faq-icon {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  border: 1px solid var(--line-strong);
+  color: var(--grass-text);
+  transition: border-color var(--dur-hover) var(--ease-out), background-color var(--dur-hover) var(--ease-out);
 }
-.faq details p {
-  padding: 0 0 24px 40px;
+.faq-icon::before,
+.faq-icon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 10px;
+  height: 2px;
+  background: currentColor;
+  transition: transform var(--dur-state) var(--ease-out);
+}
+.faq-icon::after {
+  transform: rotate(90deg);
+}
+.faq summary:hover .faq-icon {
+  border-color: var(--grass-text);
+}
+.faq details[open] .faq-icon {
+  border-color: var(--grass-text);
+  background: color-mix(in srgb, var(--grass-text) 12%, transparent);
+}
+.faq details[open] .faq-icon::after {
+  transform: rotate(180deg);
+}
+.faq-a {
+  padding: 0 40px 24px 48px;
   color: var(--muted);
+}
+.faq-a p {
+  max-width: 60ch;
+}
+.faq-more {
+  margin-top: 10px;
+  font-size: 15px;
+}
+/* Answers fold open instead of jumping, where the browser can animate to the content's height. */
+@supports (interpolate-size: allow-keywords) {
+  .faq {
+    interpolate-size: allow-keywords;
+  }
+  .faq details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition: block-size var(--dur-panel) var(--ease-out), content-visibility var(--dur-panel) allow-discrete;
+  }
+  .faq details[open]::details-content {
+    block-size: auto;
+  }
+  .faq-a {
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity var(--dur-state) var(--ease-out), transform var(--dur-state) var(--ease-out);
+  }
+  .faq details[open] .faq-a {
+    opacity: 1;
+    transform: none;
+    transition-delay: 60ms;
+  }
+}
+@media (max-width: 880px) {
+  .faq-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .faq-side {
+    display: contents;
+  }
+  .faq-help {
+    order: 2;
+    margin-top: 32px;
+    border-top: 0;
+    padding-top: 0;
+  }
+}
+@media (max-width: 620px) {
+  .faq summary {
+    grid-template-columns: 24px minmax(0, 1fr) 24px;
+    gap: 12px;
+    font-size: 17px;
+  }
+  .faq-a {
+    padding: 0 0 22px 36px;
+  }
 }
 
 /* ---- CTA (grass) ---- */

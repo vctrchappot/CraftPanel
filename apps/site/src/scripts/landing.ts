@@ -253,7 +253,7 @@ if (!reduced) {
   }, { threshold: 0.15, rootMargin: "0px 0px -6% 0px" });
   const groups: Element[][] = [
     ...[...document.querySelectorAll(".sec-head")].map((h) => [...h.querySelectorAll(".sec-no, h2, .sec-lead, [role=tablist]")]),
-    ...[...document.querySelectorAll(".bento, .devices")].map((g) => [...g.children]),
+    ...[...document.querySelectorAll(".bento, .devices, .faq")].map((g) => [...g.children]),
     ...[...document.querySelectorAll(".px-rule")].map((r) => [r]),
   ];
   for (const group of groups)
@@ -263,6 +263,15 @@ if (!reduced) {
       reveal.observe(el);
     });
 }
+
+// ---- faq ---------------------------------------------------------------------------
+// A link to #faq-<id> opens that answer.
+const openFaq = () => {
+  const target = location.hash.startsWith("#faq-") ? document.getElementById(location.hash.slice(1)) : null;
+  if (target instanceof HTMLDetailsElement) target.open = true;
+};
+openFaq();
+addEventListener("hashchange", openFaq);
 
 // ---- experience bar ---------------------------------------------------------------
 // CSS fills the bar from a scroll timeline; without one (or with reduced motion) this sets it in the same steps.
