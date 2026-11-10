@@ -695,7 +695,15 @@ const backups = [
                     <div class="look-panel" role="tabpanel" id={`look-${l.key}`} aria-labelledby={`look-tab-${l.key}`} data-active={i === 0 ? "true" : "false"} inert={i !== 0}>
                       <Shot name={l.key} alt={l.alt} eager={i === 0} />
                       {l.spots.map((s, n) => (
-                        <button type="button" class="spot" style={`left:${s.x}%;top:${s.y}%`} aria-describedby={`spot-${l.key}-${n}`} data-spot={`${l.key}-${n}`}>
+                        <button
+                          type="button"
+                          class="spot"
+                          style={`left:${s.x}%;top:${s.y}%`}
+                          aria-describedby={`spot-${l.key}-${n}`}
+                          data-spot={`${l.key}-${n}`}
+                          data-v={s.y < 18 ? "below" : undefined}
+                          data-h={s.x > 74 ? "end" : s.x < 22 ? "start" : undefined}
+                        >
                           <span class="spot-n mono">{n + 1}</span>
                           <span class="spot-tip" role="tooltip" id={`spot-${l.key}-${n}`}>{s.text}</span>
                         </button>

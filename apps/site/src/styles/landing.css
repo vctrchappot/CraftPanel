@@ -2106,6 +2106,20 @@ p {
   pointer-events: none;
   transition: opacity 0.15s;
 }
+/* The stage clips what leaves it: near the top the tip opens below its marker, near a side edge it lines up with the marker's edge instead of centring on it. */
+.spot[data-v="below"] .spot-tip {
+  bottom: auto;
+  top: calc(100% + 10px);
+}
+.spot[data-h="end"] .spot-tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.spot[data-h="start"] .spot-tip {
+  left: 0;
+  transform: none;
+}
 .spot:hover .spot-tip,
 .spot:focus-visible .spot-tip,
 .spot.is-open .spot-tip {
