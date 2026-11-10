@@ -695,8 +695,15 @@ p {
 .term-tabs {
   display: flex;
   height: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.term-tabs::-webkit-scrollbar {
+  display: none;
 }
 .term-tabs button {
+  flex: none;
   border: 0;
   background: none;
   color: #9a948a;
@@ -710,15 +717,8 @@ p {
 }
 .term-tabs button[aria-selected="true"] {
   color: #e4e0d7;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.term-tabs::-webkit-scrollbar {
-  display: none;
   border-bottom-color: #5bbf4a;
 }
-  flex: none;
 .term-tabs button:focus-visible {
   outline-offset: -3px;
 }
@@ -782,6 +782,7 @@ p {
   color: var(--cp-signal-night);
   font: 600 14.5px/1 var(--font-text);
   cursor: pointer;
+  transition: filter 0.16s ease-out;
 }
 .term-copy:hover {
   filter: brightness(1.1);
@@ -790,6 +791,14 @@ p {
 .cta .term :focus-visible {
   outline: 2px solid #f4f1ea;
   outline-offset: 3px;
+}
+.term-note {
+  color: #d6d1c7;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.term-guide {
+  text-decoration: none;
 }
 .term-source {
   color: #d6d1c7;
@@ -808,18 +817,9 @@ p {
   gap: 12px;
   margin-top: 16px;
 }
-.term-note {
-  color: #d6d1c7;
-  font-size: 14.5px;
-  line-height: 1.6;
-}
-.term-guide {
-  text-decoration: none;
-}
 .term-full .term-copy {
   min-width: 190px;
   height: 36px;
-  transition: filter 0.16s ease-out;
   justify-content: center;
   border-color: var(--cp-signal);
   background: var(--cp-signal);
@@ -2508,11 +2508,58 @@ p {
 .cta-links {
   display: flex;
   flex-wrap: wrap;
+  gap: 14px 16px;
+  margin-top: 32px;
+}
+.cta-steps {
+  display: grid;
   gap: 12px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 17px;
+  line-height: 1.4;
+}
+.cta-steps li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.cta-step-no {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid #10200a;
+  font-size: 14px;
+  font-weight: 600;
+}
+.cta-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 2px solid #10200a;
+  font: 500 16.5px/1 var(--font-text);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s;
 }
 .cta-btn-primary {
   background: #10200a;
   color: #e9f5d6;
+  box-shadow: 3px 3px 0 color-mix(in srgb, #10200a 40%, transparent);
+}
+.cta-btn-primary:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 color-mix(in srgb, #10200a 40%, transparent);
+}
+.cta-btn-primary:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 color-mix(in srgb, #10200a 40%, transparent);
 }
 .cta-btn-secondary {
   background: transparent;
@@ -2575,58 +2622,11 @@ p {
   font-size: 13px;
 }
 .fc-out {
-  gap: 14px 16px;
-  margin-top: 32px;
-}
-.cta-steps {
-  display: grid;
   list-style: none;
-  margin: 28px 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 17px;
-  line-height: 1.4;
-}
-.cta-steps li {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.cta-step-no {
-  flex: none;
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 2px solid #10200a;
-  font-size: 14px;
-  font-weight: 600;
-}
-.cta-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 0 22px;
-  border: 2px solid #10200a;
-  font: 500 16.5px/1 var(--font-text);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s;
   margin: 0;
   padding: 12px 14px 0;
   min-height: 2.2em;
 }
-  box-shadow: 3px 3px 0 color-mix(in srgb, #10200a 40%, transparent);
-}
-.cta-btn-primary:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 color-mix(in srgb, #10200a 40%, transparent);
-}
-.cta-btn-primary:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 color-mix(in srgb, #10200a 40%, transparent);
 .fc-out li {
   white-space: pre-wrap;
   word-break: break-word;
@@ -2797,6 +2797,12 @@ p {
 }
 
 @media (max-width: 720px) {
+  .cta-links {
+    flex-direction: column;
+  }
+  .cta-btn {
+    width: 100%;
+  }
   body {
     font-size: 16px;
   }
@@ -2860,12 +2866,6 @@ p {
     width: 20px;
     height: 20px;
     font-size: 11px;
-  }
-  .cta-links {
-    flex-direction: column;
-  }
-  .cta-btn {
-    width: 100%;
   }
   .spot-tip {
     display: none;
