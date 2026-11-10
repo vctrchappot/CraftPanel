@@ -4,8 +4,8 @@ import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Download, ImagePlus, RotateCcw, Save, Trash2, Wand2 } from "lucide-react";
-import { Button, Callout, ConfirmDialog, Field, Input, NativeSelect, Panel, SegmentedControl, Section, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
-import { MOTD_COLORS, MOTD_EFFECTS, MOTD_FORMATS, MOTD_MAX_LENGTH, MOTD_MAX_LINES, SOFTWARE_INFO, motdPlainOffset, motdProblem, motdRawIndex, paintMotd, restyleMotd, stripMotd, type MotdChange, type MotdFormatKey, type MotdRotation, type MotdRotationState, type ServerDetail } from "@craftpanel/shared";
+import { Button, Callout, ConfirmDialog, Field, Input, Panel, SegmentedControl, Section, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
+import { MOTD_EFFECTS, MOTD_MAX_LENGTH, MOTD_MAX_LINES, SOFTWARE_INFO, motdPlainOffset, motdProblem, motdRawIndex, paintMotd, restyleMotd, stripMotd, type MotdChange, type MotdFormatKey, type MotdRotation, type MotdRotationState, type ServerDetail } from "@craftpanel/shared";
 import { api, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
@@ -14,7 +14,7 @@ import { formatNumber } from "@/lib/format";
 import { StatusBadge } from "../status";
 import { ServerIcon, iconUrl } from "../server-icon";
 import { MotdText, ServerListEntry, useRotationIndex } from "./motd-preview";
-import { EffectTools, SymbolPicker } from "./motd-tools";
+import { ColourStyleBar, MotdTools } from "./motd-tools";
 import { RotationSection } from "./rotation";
 
 const DEFAULT_MOTD = "A Minecraft Server";
@@ -546,43 +546,11 @@ function MotdSection({ server: s, canEdit, saved, value, onChange }: { server: S
     edit(value.slice(0, a) + symbol + value.slice(b), a + symbol.length, a + symbol.length);
   };
 
+  const examples = EXAMPLES.map((x) => ({ id: x.id, label: x.label, text: x.make(s.name, smooth) }));
+
   return (
     <Section title="Message of the day" description="The two lines under the server name in Minecraft's server list. Select some text, then pick a colour, a style or an effect; the preview on the right shows the result.">
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div role="group" aria-label="Colours" className="flex flex-wrap gap-1">
-            {MOTD_COLORS.map((c) => (
-              <button
-                key={c.code}
-                type="button"
-                disabled={!canEdit}
-                aria-label={c.name}
-                title={`${c.name} (§${c.code})`}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => insert(c.code)}
-                className="size-7 rounded-md border border-border outline-none transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ background: c.hex }}
-              />
-            ))}
-          </div>
-          <div role="group" aria-label="Styles" className="flex gap-1">
-            {MOTD_FORMATS.map((f) => (
-              <Button key={f.code} type="button" variant="secondary" size="icon-sm" disabled={!canEdit} aria-label={f.name} title={`${f.name} (§${f.code})`} onMouseDown={(e) => e.preventDefault()} onClick={() => toggle(f.key, f.code)}>
-                <span
-                  aria-hidden
-                  className={cn("text-[13px]", f.key === "bold" && "font-bold", f.key === "italic" && "italic", f.key === "underline" && "underline", f.key === "strike" && "line-through", f.key === "obfuscated" && "font-mono tracking-tighter")}
-                >
-                  {f.key === "obfuscated" ? "?!" : f.name[0]}
-                </span>
-              </Button>
-            ))}
-            <Button type="button" variant="ghost" size="sm" disabled={!canEdit} onMouseDown={(e) => e.preventDefault()} onClick={clear} title="Remove colours and styles from the selection, or from everything if nothing is selected">
-              Clear
-            </Button>
-          </div>
-        </div>
-        <EffectTools canEdit={canEdit} smooth={smooth} onSmooth={setSmooth} hexServer={hexServer} onPaint={paint} />
-        <SymbolPicker canEdit={canEdit} onPick={insertSymbol} />
         <Field
           label="Message"
           htmlFor="motd"
@@ -594,21 +562,26 @@ function MotdSection({ server: s, canEdit, saved, value, onChange }: { server: S
           }
           help={`${lines} of ${MOTD_MAX_LINES} lines. A colour or style takes two characters (§ and a letter or digit), a smooth colour fourteen. Roughly 50 characters fit on a line.`}
         >
-          <Textarea
-            id="motd"
-            ref={area}
-            rows={3}
-            value={value}
-            disabled={!canEdit}
-            spellCheck={false}
-            aria-invalid={!!problem}
-            onChange={(e) => (e.target.value.split("\n").length <= MOTD_MAX_LINES ? onChange(e.target.value) : undefined)}
-            className="font-mono text-[13px] leading-relaxed"
-          />
+          {/* One editor: the toolbar on top, the text in the middle and the message as the game draws it underneath. */}
+          <div className={cn("overflow-hidden rounded-lg border bg-surface focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/25", problem ? "border-destructive" : "border-border")}>
+            <ColourStyleBar canEdit={canEdit} onColor={insert} onToggle={toggle} onClear={clear} />
+            <Textarea
+              id="motd"
+              ref={area}
+              rows={4}
+              value={value}
+              disabled={!canEdit}
+              spellCheck={false}
+              aria-invalid={!!problem}
+              onChange={(e) => (e.target.value.split("\n").length <= MOTD_MAX_LINES ? onChange(e.target.value) : undefined)}
+              className="rounded-none border-0 bg-transparent font-mono text-[13px] leading-relaxed shadow-none focus-visible:ring-0"
+            />
+            <div className="border-t border-border bg-console px-3 py-2.5" aria-label="The message as the game draws it">
+              <MotdText raw={value} />
+            </div>
+          </div>
         </Field>
-        <div className="rounded-lg border border-border bg-console p-3">
-          <MotdText raw={value} />
-        </div>
+        <MotdTools canEdit={canEdit} smooth={smooth} onSmooth={setSmooth} hexServer={hexServer} onPaint={paint} onSymbol={insertSymbol} examples={examples} onExample={onChange} />
         {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!dirty || !!problem}>
@@ -619,22 +592,6 @@ function MotdSection({ server: s, canEdit, saved, value, onChange }: { server: S
                 Discard
               </Button>
             )}
-            <NativeSelect
-              aria-label="Start from an example"
-              value=""
-              onChange={(e) => {
-                const ex = EXAMPLES.find((x) => x.id === e.target.value);
-                if (ex) onChange(ex.make(s.name, smooth));
-              }}
-              className="ml-auto h-8 w-auto min-w-48 text-[13px]"
-            >
-              <option value="">Start from an example…</option>
-              {EXAMPLES.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.label}
-                </option>
-              ))}
-            </NativeSelect>
           </div>
         )}
         {s.status === "running" && dirty === false && <Callout variant="info">Minecraft reads the message when it starts, so a saved change shows after a restart.</Callout>}
