@@ -36,6 +36,8 @@ export class MapService {
   private sizes = new Map<string, { at: number; bytes: number }>();
   private timer: NodeJS.Timeout | null = null;
   private checking = false;
+  /** Servers whose BlueMap was told to stop during this run, so the periodic check doesn't repeat it into the console. */
+  private renderStopped = new Set<string>();
   private installing = false;
   private setup = new Map<string, "installing" | "starting" | "preparing">();
   private setupStarted = new Map<string, number>();
@@ -324,8 +326,8 @@ export class MapService {
     await this.apply(row, next);
     if (this.running(row)) {
       if (renderChanged) await this.servers.sendCommand(row.id, "bluemap reload light");
-      if (next.paused || next.diskLimitHit) await this.servers.sendCommand(row.id, "bluemap stop");
-      else if (resume) await this.servers.sendCommand(row.id, "bluemap start");
+      if (next.paused || next.diskLimitHit) await this.stopRendering(row);
+      else if (resume) await this.startRendering(row);
     }
     await this.activity.event(row.id, "map.settings", `Live map settings saved (${settings.access === "public" ? "public" : "sign-in required"}, ${settings.radius ? `${settings.radius} blocks` : "whole world"}, ${settings.detail === "3d" ? "3D" : "2D"})`, { actor });
     await this.activity.audit(actor, "map.settings", row.id, { access: settings.access, radius: settings.radius, detail: settings.detail });
@@ -391,6 +393,16 @@ export class MapService {
 
   // ---- commands ---------------------------------------------------------------------------
 
+  private async stopRendering(row: ServerRow) {
+    this.renderStopped.add(row.id);
+    await this.servers.sendCommand(row.id, "bluemap stop");
+  }
+
+  private async startRendering(row: ServerRow) {
+    this.renderStopped.delete(row.id);
+    await this.servers.sendCommand(row.id, "bluemap start");
+  }
+
   private running(row: ServerRow) {
     return this.servers.agent.isRunning(row.id) && this.servers.agent.status(row.id) === "running";
   }
@@ -402,14 +414,14 @@ export class MapService {
     if (!this.running(row)) throw conflict("Start the server first: BlueMap renders while it runs");
     if (action === "update") await this.servers.sendCommand(row.id, "bluemap update");
     else if (action === "pause") {
-      await this.servers.sendCommand(row.id, "bluemap stop");
+      await this.stopRendering(row);
       await this.save(row, { ...state, paused: true });
     }
     else if (action === "resume") {
       this.sizes.delete(row.id);
       if (state.settings.maxDiskMb && (await this.diskBytes(row)) >= state.settings.maxDiskMb * 1024 ** 2)
         throw conflict("The map has reached its disk limit. Raise the limit before resuming.");
-      await this.servers.sendCommand(row.id, "bluemap start");
+      await this.startRendering(row);
       await this.save(row, { ...state, diskLimitHit: false, paused: false });
     } else {
       const allowed = await this.allowedMaps(row);
@@ -418,7 +430,7 @@ export class MapService {
         if (allowed.includes(id) && MAP_ID.test(id)) await this.servers.sendCommand(row.id, `bluemap purge ${id}`);
       }
       await this.save(row, { ...state, rerenderRequired: false, diskLimitHit: false });
-      if (state.diskLimitHit && !state.paused) await this.servers.sendCommand(row.id, "bluemap start");
+      if (state.diskLimitHit && !state.paused) await this.startRendering(row);
     }
     await this.activity.event(row.id, "map.action", `Live map: ${action === "rerender" ? "re-render from scratch" : action}`, { actor });
   }
@@ -428,6 +440,8 @@ export class MapService {
     this.checking = true;
     try {
       for (const row of await this.servers.rows()) {
+        // A stopped server starts BlueMap afresh, so the next run needs its own "stop".
+        if (!this.running(row)) this.renderStopped.delete(row.id);
         if (this.supportReason(row) || !this.running(row) || this.servers.busy(row.id)) continue;
         await this.servers.withLock(row.id, "map limits", async () => {
           const state = await this.state(row, true);
@@ -435,13 +449,14 @@ export class MapService {
           // Newly discovered custom worlds also receive the dashboard's settings.
           await this.apply(row, state);
           if (state.paused || state.diskLimitHit) {
-            await this.servers.sendCommand(row.id, "bluemap stop");
+            if (!this.renderStopped.has(row.id)) await this.stopRendering(row);
             return;
           }
+          this.renderStopped.delete(row.id);
           if (!state.settings.maxDiskMb) return;
           this.sizes.delete(row.id);
           if ((await this.diskBytes(row)) < state.settings.maxDiskMb * 1024 * 1024) return;
-          await this.servers.sendCommand(row.id, "bluemap stop");
+          await this.stopRendering(row);
           await this.save(row, { ...state, diskLimitHit: true });
           await this.activity.event(row.id, "map.limit", `Map rendering paused: the map data reached its ${state.settings.maxDiskMb} MB limit`, { level: "warn" });
         });

@@ -201,6 +201,10 @@ describe("map activation and serving", () => {
     await ctx.maps.enforceLimits();
     expect((await call(owner, "GET", `/api/servers/${id}/map`)).json().diskLimitHit).toBe(true);
     expect(commands).toContain("bluemap stop");
+    // The periodic check must not print "bluemap stop" into the console again and again.
+    await ctx.maps.enforceLimits();
+    await ctx.maps.enforceLimits();
+    expect(commands.filter((c) => c === "bluemap stop")).toHaveLength(1);
     expect((await call(owner, "POST", `/api/servers/${id}/map/action`, { action: "resume" })).statusCode).toBe(409);
     await put({ maxDiskMb: 2 });
     expect((await call(owner, "GET", `/api/servers/${id}/map`)).json().diskLimitHit).toBe(false);
