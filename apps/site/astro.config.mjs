@@ -8,7 +8,7 @@ export default defineConfig({
     starlight({
       title: "CraftPanel",
       description: "Self-hosted Minecraft server management for your PC, Raspberry Pi or VPS.",
-      logo: { light: "./src/assets/mark-on-light.svg", dark: "./src/assets/mark-on-dark.svg", replacesTitle: false },
+      components: { SiteTitle: "./src/components/SiteTitle.astro" },
       favicon: "/favicon.svg",
       customCss: ["./src/styles/fonts.css", "./src/styles/docs.css"],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/vctrchappot/CraftPanel" }],

@@ -15,7 +15,7 @@ import { heroScene, pcScene, piScene, vpsScene } from "../lib/scenes";
 import { repoFacts, shownRelease } from "../lib/github";
 // release.mjs bumps every workspace package, so this matches the latest release.
 import pkg from "../../package.json";
-import Mark from "../components/Mark.astro";
+import Wordmark from "../components/Wordmark.astro";
 import avatar from "../assets/victor.jpg";
 
 const facts = await repoFacts();
@@ -327,7 +327,7 @@ const backups = [
 
     <header class="nav">
       <div class="wrap nav-in">
-        <a href="/" class="brand"><Mark size={30} /><span>CraftPanel</span></a>
+        <a href="/" class="brand"><Wordmark /></a>
         <nav aria-label="Main" class="nav-links">
           <a href="#install">Install</a>
           <a href="#features">Features</a>
@@ -457,7 +457,7 @@ const backups = [
                 </div>
                 <div class="pv-body">
                   <aside class="pv-side" aria-hidden="true">
-                    <span class="pv-brand"><Mark size={20} />CraftPanel</span>
+                    <span class="pv-brand"><Wordmark /></span>
                     <span class="pv-side-label mono">Servers</span>
                     <div class="pv-side-list" data-pv="servers">
                       {
@@ -879,7 +879,7 @@ const backups = [
     <footer class="foot">
       <div class="wrap foot-in">
         <div class="foot-brand">
-          <a href="/" class="brand"><Mark size={26} /><span>CraftPanel</span></a>
+          <a href="/" class="brand"><Wordmark /></a>
           <p>Built for people who'd rather play than configure. Made by <a href="https://www.vctr.site">Victor</a>.</p>
         </div>
         <nav class="foot-cols" aria-label="Footer">

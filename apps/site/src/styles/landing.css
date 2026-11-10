@@ -299,15 +299,9 @@ p {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
   text-decoration: none;
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.012em;
-  font-size: 19px;
-}
-.brand img {
-  display: block;
+  color: inherit;
+  font-size: 23px;
 }
 .nav-links {
   display: flex;
@@ -1174,9 +1168,7 @@ p {
 .pv-brand {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-weight: 500;
-  font-size: 15.5px;
+  font-size: 18px;
   margin-bottom: 22px;
 }
 .pv-side-label {

@@ -1,3 +1,25 @@
+import { cn } from "@craftpanel/ui";
+
+/**
+ * The CraftPanel wordmark: "Craft" in the heavier weight, "Panel" in the regular one, and a Signal green underscore
+ * after it, the cursor of the console prompt in the mark. It is the name wherever one is shown; the block mark below
+ * stands alone (loading state, sign-in, favicon). The cursor blinks three times when the page opens and keeps blinking
+ * while the pointer is over it (see globals.css); size comes from the font size of the parent or `className`.
+ */
+export function Wordmark({ className }: { className?: string }) {
+  return (
+    <span className={cn("cp-wordmark inline-flex items-baseline font-display leading-none tracking-tight", className)} role="img" aria-label="CraftPanel">
+      <span aria-hidden className="font-semibold">
+        Craft
+      </span>
+      <span aria-hidden className="font-normal">
+        Panel
+      </span>
+      <span aria-hidden className="cp-cursor" />
+    </span>
+  );
+}
+
 /**
  * The CraftPanel mark: an isometric block with a console prompt. Paths from the brand package
  * (small-size variant with the bolder prompt, since the dashboard never shows it above 48 px).

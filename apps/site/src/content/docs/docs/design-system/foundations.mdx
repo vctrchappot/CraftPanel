@@ -117,6 +117,8 @@ The website's pixel icons and isometric illustrations belong to its presentation
 
 The CraftPanel mark is an isometric block with a console prompt. Preserve its proportions and original colours. Only the top face changes with the theme: `#c6cbc5` in light mode and `#e6e8e3` in dark mode. Do not recolour the top face green or add effects around the mark.
 
+The name itself is a wordmark: "Craft" in Mona Sans 600, "Panel" in Mona Sans 400 and a Signal green underscore, the cursor of the console prompt, after it. Use it wherever the product name is shown (sidebar, mobile header, website navigation, documentation header) and let it take its size from the surrounding font size. The cursor blinks three times on load and while hovered, and stands still for reduced motion. Show the block mark on its own (loading state, sign-in, favicons) and not next to the wordmark.
+
 <Aside type="tip" title="Use roles, not raw colours">
   In React panel code, prefer `bg-surface`, `text-muted-foreground` and `text-warning`. In an Astro specimen, use `var(--cp-surface)` and the matching shared semantic tokens. The [implementation reference](/docs/design-system/implementation/#token-mapping) maps the names between both layers.
 </Aside>

@@ -13,7 +13,7 @@ import { api, setCsrfToken } from "@/lib/api";
 import { RealtimeProvider, useConnectionState } from "@/lib/realtime";
 import { useServers, useServersActiveFirst } from "@/lib/queries";
 import { StatusDot } from "./status";
-import { Logo } from "./logo";
+import { Logo, Wordmark } from "./logo";
 import { TwoFactorRequired } from "./auth-forms";
 import { UpdateNotice, UpdateOverlay, WhatsNew } from "./updates";
 
@@ -99,8 +99,7 @@ function Frame({ children }: { children: React.ReactNode }) {
           <Button variant="ghost" size="icon-sm" onClick={() => setMobileOpen((o) => !o)} aria-label="Toggle navigation">
             {mobileOpen ? <X /> : <Menu />}
           </Button>
-          <Logo className="h-5 w-[18px]" />
-          <span className="font-display text-[15px] font-semibold tracking-tight">CraftPanel</span>
+          <Wordmark className="text-[17px]" />
           <Button variant="ghost" size="icon-sm" className="ml-auto" onClick={() => setPaletteOpen(true)} aria-label="Search">
             <Search />
           </Button>
@@ -125,8 +124,7 @@ function Sidebar({ onSearch }: { onSearch: () => void }) {
   return (
     <>
       <div className="flex h-14 items-center gap-2.5 px-4">
-        <Logo className="h-6 w-[21px]" />
-        <span className="font-display text-base font-semibold tracking-tight">CraftPanel</span>
+        <Wordmark className="text-[19px]" />
         <span
           className={cn("ml-auto size-1.5 rounded-full", connection === "open" ? "bg-success" : connection === "connecting" ? "bg-warning animate-pulse" : "bg-destructive")}
           title={connection === "open" ? "Live updates connected" : connection === "connecting" ? "Connecting…" : "Disconnected — reconnecting"}

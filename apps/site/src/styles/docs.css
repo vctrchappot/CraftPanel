@@ -34,9 +34,6 @@
 }
 
 .site-title {
-  font-family: var(--cp-font-display);
-  font-weight: 600;
-  letter-spacing: -0.012em;
   color: var(--sl-color-white);
 }
 
@@ -46,10 +43,6 @@ body {
 
 code, pre, kbd, samp, .ds-label {
   letter-spacing: 0;
-}
-
-.site-title img {
-  width: auto;
 }
 
 .sl-markdown-content :is(h1, h2, h3) {

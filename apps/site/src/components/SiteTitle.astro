@@ -1,0 +1,19 @@
+---
+// The documentation's header title: the wordmark instead of the mark plus plain text.
+import Wordmark from "./Wordmark.astro";
+
+const href = Astro.locals.starlightRoute?.siteTitleHref ?? import.meta.env.BASE_URL;
+---
+
+<a {href} class="site-title" aria-label="CraftPanel home"><Wordmark /></a>
+
+<style>
+  .site-title {
+    display: flex;
+    align-items: center;
+    font-size: var(--sl-text-h4);
+    color: var(--sl-color-white);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+</style>

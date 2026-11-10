@@ -23,7 +23,7 @@ The documentation specimens are static Astro examples using the shared tokens; t
 | `apps/site/src/styles/landing.css` | The landing page's names for the tokens (top of the file). |
 | `apps/site/src/styles/docs.css` | Starlight's `--sl-*` variables on the tokens. |
 | `apps/site/scripts/og.html` | Social preview image; regenerate with `node apps/site/scripts/og.mjs`. |
-| `apps/web/src/components/logo.tsx`, `apps/site/src/components/Mark.astro` | The mark, inline so its top face follows the theme. |
+| `apps/web/src/components/logo.tsx`, `apps/site/src/components/Mark.astro` | The mark, inline so its top face follows the theme. `logo.tsx` also holds the dashboard's `Wordmark`; `apps/site/src/components/Wordmark.astro` is the website's. |
 | `apps/site/src/lib/scenes.ts`, `apps/site/src/components/Iso.astro` | Original, code-drawn isometric hardware and worlds; sharp at any size, no image downloads. |
 | `apps/site/src/components/RuntimeDiagram.astro` | Interactive update & runtime showcase: a panel update or rollback leaves the illustrated Minecraft runtime and players online. |
 | `apps/*/public/favicon.*`, `apple-touch-icon.png`, `apps/site/src/assets/mark-on-*.svg` | Files from the brand package (v1.0), unchanged. |
@@ -89,6 +89,10 @@ Buttons: brand button 7.6 (light, white text) / 7.3 (dark, dark text). Any new p
 ## The mark
 
 An isometric block with a console prompt, from the brand package. Its colours are its own and don't follow the tokens, except the top face: `#C6CBC5` on light surfaces, `#E6E8E3` on dark ones. Never colour the top face green, never distort or decorate it. The isometric Minecraft scenes on the website are the world, not the mark; their grass stays grass-block green.
+
+## The wordmark
+
+The name is shown as a wordmark, not as the mark next to plain text: "Craft" in Mona Sans 600, "Panel" in Mona Sans 400, and a Signal green underscore after it, the cursor of the console prompt in the mark (width 0.52 em, height 0.12 em, 0.1 em below the baseline). It is used for the name in the sidebar, the mobile header, the website's navigation, footer and showcase, the documentation header and the social preview; size comes from the font size around it (19 px in the sidebar, 23 px in the website's navigation). The cursor blinks three times when the page opens and keeps blinking while the name is hovered; it never blinks for reduced motion. The block mark appears on its own: loading state, sign-in, favicons and app icons. Don't put the mark next to the wordmark, and don't colour the cursor anything but Signal green.
 
 ## Product illustrations
 
