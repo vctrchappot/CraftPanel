@@ -22,6 +22,7 @@ export const PERMISSIONS = {
   "files.write": "admin",
   "plugins.manage": "admin",
   "worlds.manage": "admin",
+  "map.manage": "admin",
   "backup.restore": "admin",
   "backup.delete": "admin",
   "schedule.manage": "admin",

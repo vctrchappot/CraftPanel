@@ -16,6 +16,7 @@ import type { UpdateService } from "./services/updates";
 import type { PregenService } from "./services/pregen";
 import type { ProxyService } from "./services/proxy";
 import type { NotificationService } from "./services/notifications";
+import type { MapService } from "./services/map";
 
 export interface AppContext {
   config: AppConfig;
@@ -29,6 +30,7 @@ export interface AppContext {
   schedules: ScheduleService;
   game: GameService;
   pregen: PregenService;
+  maps: MapService;
   proxies: ProxyService;
   settings: SettingsService;
   updates: UpdateService;

@@ -36,12 +36,14 @@ import { SettingsTab } from "./settings";
 import { NetworkTab } from "./network";
 import { ProxyTab } from "./proxy";
 import { PerformanceTab } from "./performance";
+import { MapTab, useMap } from "./map";
 
 const TABS = [
   ["overview", "Overview"],
   ["console", "Console"],
   ["players", "Players"],
   ["worlds", "Worlds"],
+  ["map", "Map"],
   ["plugins", "Plugins"],
   ["files", "Files"],
   ["backups", "Backups"],
@@ -52,7 +54,7 @@ const TABS = [
   ["proxy", "Proxy"],
 ] as const;
 /** Tabs that only make sense for one kind of server: a proxy has no players or worlds, only proxies have backends. */
-const visible = (t: string, proxy: boolean) => (proxy ? t !== "players" && t !== "worlds" : t !== "proxy");
+const visible = (t: string, proxy: boolean) => (proxy ? t !== "players" && t !== "worlds" && t !== "map" : t !== "proxy");
 export type TabId = (typeof TABS)[number][0];
 
 export type Stream = ReturnType<typeof useServerStream>;
@@ -70,6 +72,12 @@ export function ServerWorkspace() {
     return <EmptyState title="Server not found" description="It may have been deleted." action={<Link href="/servers/" className="text-sm underline">Back to servers</Link>} />;
 
   const s = server.data;
+  return <ReadyWorkspace server={s} tab={tab} stream={stream} />;
+}
+
+function ReadyWorkspace({ server: s, tab, stream }: { server: ServerDetail; tab: TabId; stream: Stream }) {
+  const id = s.id;
+  const map = useMap(s);
   return (
     <ServerScope serverId={s.id}>
       <div className="space-y-6">
@@ -78,7 +86,7 @@ export function ServerWorkspace() {
         {/* The baseline is an inset shadow, not a border: tabs overlapping a border would overflow
             vertically, and overflow-x-auto makes that overflow scrollable. */}
         <nav className="scrollbar-thin -mx-1 flex gap-1 overflow-x-auto overflow-y-hidden px-1 shadow-[inset_0_-1px_0_var(--color-border)]" aria-label="Server sections">
-          {TABS.filter(([t]) => visible(t, SOFTWARE_INFO[s.software].proxy)).map(([t, label]) => (
+          {TABS.filter(([t]) => visible(t, SOFTWARE_INFO[s.software].proxy) && (t !== "map" || map.data?.pageReady)).map(([t, label]) => (
             <Link
               key={t}
               href={`/server/?id=${id}${t === "overview" ? "" : `&tab=${t}`}`}
@@ -99,6 +107,7 @@ export function ServerWorkspace() {
           {tab === "console" && <ConsoleTab server={s} stream={stream} />}
           {tab === "players" && <PlayersTab server={s} />}
           {tab === "worlds" && <WorldsTab server={s} />}
+          {tab === "map" && <MapTab server={s} />}
           {tab === "plugins" && <PluginsTab server={s} />}
           {tab === "files" && <FilesTab server={s} />}
           {tab === "backups" && <ServerBackupsTab server={s} />}

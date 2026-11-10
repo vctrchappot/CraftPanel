@@ -30,6 +30,7 @@ import { api, errorMessage, upload } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
 import { formatBytes } from "@/lib/format";
+import { MapPlugin } from "./map";
 
 interface MarketHit {
   id: string;
@@ -78,9 +79,11 @@ export function PluginsTab({ server: s }: { server: ServerDetail }) {
           {canManage && <TabsTrigger value="updates">Updates</TabsTrigger>}
         </TabsList>
         <TabsContent value="installed">
+          <MapPlugin server={s} discovery={q.data.plugins.some((p) => /^bluemap$/i.test(p.name ?? "") || /^bluemap.*\.jar/i.test(p.file))} />
           <Installed server={s} plugins={q.data.plugins} canManage={canManage} />
         </TabsContent>
         <TabsContent value="browse">
+          <MapPlugin server={s} discovery />
           <Browse server={s} plugins={q.data.plugins} />
         </TabsContent>
         <TabsContent value="updates">
@@ -97,6 +100,7 @@ function Installed({ server: s, plugins, canManage }: { server: ServerDetail; pl
     ["plugin-updates", s.id],
     ["market", s.id],
     ["server", s.id],
+    ["map", s.id],
   ];
   const t = addonTerms(s);
   const toggle = useAction((v: { file: string; enabled: boolean }) => api.patch(`/api/servers/${s.id}/plugins/${encodeURIComponent(v.file)}`, { enabled: v.enabled }), {
@@ -294,7 +298,7 @@ function Browse({ server: s, plugins }: { server: ServerDetail; plugins: PluginI
                     <p className="text-muted-foreground">{h.description}</p>
                     <p className="text-xs text-muted-foreground">{h.downloads.toLocaleString()} downloads</p>
                   </div>
-                  <Button
+                  {h.slug.toLowerCase() === "bluemap" ? <Button size="sm" variant="secondary" asChild><a href="#world-map-plugin">Set up world map</a></Button> : <Button
                     size="sm"
                     variant="secondary"
                     disabled={!h.compatible || isInstalled || isInstalling}
@@ -310,7 +314,7 @@ function Browse({ server: s, plugins }: { server: ServerDetail; plugins: PluginI
                         <Download /> Install
                       </>
                     )}
-                  </Button>
+                  </Button>}
                 </li>
               );
             })}

@@ -26,6 +26,35 @@ Under **Browse**, results are filtered to your server's software and show whethe
 
 You can also **upload a `.jar`** you got elsewhere. Changes take effect after a restart; CraftPanel shows when one is needed. On Windows, a running server locks the jars it has loaded: stop the server before you remove, disable or update one of those.
 
+## Optional world map
+
+Open **Plugins → Browse** (or **Mods → Browse**) and activate **World map · BlueMap**. CraftPanel installs a version compatible with your server from Modrinth, writes the configuration and starts the server. A running server is stopped gracefully and restarted; activation explains this before you continue. You must also accept Mojang's EULA for BlueMap's texture download.
+
+The **Map** tab stays hidden until BlueMap has finished loading and serves its viewer. Installation progress and errors appear with the plugin. Once ready, the tab stays available when the Minecraft server is offline and explains that the server must be started to explore the map. Disabling or removing BlueMap hides the tab again.
+
+BlueMap renders saved terrain and updates it as the world changes. It does not generate unexplored chunks. Large worlds take time to render; live player positions and rendered world changes update at different speeds. A periodic scan checks for missed world changes every five minutes.
+
+The Map tab offers these settings:
+
+| Setting | Initial value | Effect |
+| --- | --- | --- |
+| Area | ±3,000 blocks around X=0, Z=0 | A square in each dimension's own coordinates. Set radius to **0** to render the entire generated world. |
+| Dimensions | Overworld, Nether, End | Disabled dimensions are also blocked at their old map-data URLs. The Nether ceiling is omitted. |
+| Detail | 2D and 3D | Choose 2D only to reduce render time and disk use. Re-render after changing detail or cave visibility to replace old tiles. |
+| Caves | Off in the Overworld | Including underground blocks increases map size. Nether and End terrain remain visible. |
+| Inhabited chunks only | Off | Optionally skip chunks where players have spent less than 30 seconds nearby. |
+| CPU | One render thread | Balanced uses about half the available cores; Fast leaves one core for Minecraft. |
+| Disk | 5,120 MB | Rendering pauses at this size. Checked every 30 seconds, so this is a soft limit and can be exceeded between checks. Raising the limit allows rendering to resume. |
+| Busy-server threshold | 10 online players | Rendering pauses automatically at this count and resumes when players leave. Set 0 to disable this threshold. |
+| Access | CraftPanel sign-in | Only users with access to that server may view it. Public sharing optionally uses a separate map password. |
+| Live players | On | Show names and positions. Sneaking, vanished, invisible and spectator players are hidden by default. |
+
+Use **Copy public map link** after saving public access to share the map. Public visitors need no CraftPanel account. They must still be able to reach this CraftPanel installation under **Settings → Remote access**; public sharing does not open ports or bypass network restrictions. Live positions can reveal player bases, so review that setting before sharing.
+
+The viewer runs in a browser sandbox and BlueMap's own web port listens only on loopback; all access goes through CraftPanel. Private viewer links expire after an hour and stop working when their CraftPanel session is ended. Changing map settings or a map password invalidates existing viewer links. BlueMap shares Minecraft's JVM memory allocation, so allow extra RAM on busy servers. Vanilla and proxies cannot render maps; Paper, Purpur, Fabric and NeoForge require a compatible BlueMap release.
+
+For BlueMap's upstream behaviour, see its [installation guide](https://bluemap.bluecolored.de/wiki/getting-started/Installation.html), [map settings](https://bluemap.bluecolored.de/wiki/configs/Maps.html) and [render commands](https://bluemap.bluecolored.de/wiki/getting-started/Commands.html).
+
 ## Updates
 
 The **Updates** tab checks installed add-ons against their source:

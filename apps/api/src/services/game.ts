@@ -431,7 +431,7 @@ export class GameService {
 
   // ---- worlds ---------------------------------------------------------------
 
-  private async levelName(row: ServerRow) {
+  async levelName(row: ServerRow) {
     const doc = PropertiesDocument.parse((await this.servers.sandbox(row).readTextIfExists("server.properties")) ?? "");
     return doc.get("level-name") || "world";
   }

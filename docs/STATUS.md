@@ -1,5 +1,11 @@
 # Implementation status
 
+## Optional live world map (2026-11-10)
+
+- World map is activated under Plugins/Mods → Browse. CraftPanel installs/configures BlueMap and starts or gracefully restarts Minecraft. Setup progress stays with the plugin; the Map tab is revealed only after BlueMap serves a working settings file, and remains discoverable while the server is offline. Removing/disabling the jar hides it again.
+- Map settings cover the whole generated world or a square radius, dimensions, flat-only versus 3D detail, caves, inhabited chunks, render threads, a player-count pause threshold, disk use, public/password access and live-player visibility. Map-data requests for disabled dimensions are refused even if old tiles remain on disk. A cookie-free proxy and opaque browser sandbox isolate map code; temporary browser storage keeps BlueMap's marker controls working inside that sandbox.
+- ✅ Paper 1.21.11 with BlueMap 5.16: automatic activation/start, delayed page visibility, actual viewer/assets through the proxy, 2D configuration, dimension and player privacy, pause/resume, password access and Chromium WebGL initialization verified by `scripts/real-tests/live-map.mjs --browser`. The browser check reproduced and fixed missing language-file routing and BlueMap's unconditional localStorage access. 🧪 Nine focused tests cover configuration, RBAC, private session revocation, public/password grants, proxy isolation and disk-limit enforcement. Full suite: 380 passed, four skipped; workspace typecheck and production dashboard/API build pass. Other loaders and Minecraft versions have not been exercised with a real map yet.
+
 ## Design system and brand (2026-11-09)
 
 Shared tokens and one type system (Inter text, Mona Sans headers, Mona Sans Mono for machine text, Geist Serif accents) for the dashboard, website and docs, plus the new mark from the brand package (v1.0). Rules: [design/README.md](design/README.md).
