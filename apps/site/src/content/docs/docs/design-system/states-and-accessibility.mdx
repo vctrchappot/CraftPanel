@@ -1,0 +1,108 @@
+---
+title: States and accessibility
+description: "Lifecycle colours, loading and error states, permissions, contrast, keyboard access and accessibility review criteria."
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import Specimen from "../../../../components/design-system/Specimen.astro";
+
+A panel needs to stay understandable while a server starts, a request fails or measurements are unavailable. Design those states with the main view, rather than treating them as exceptional copy added at the end.
+
+## Server lifecycle
+
+`StatusBadge` and `StatusDot` in `apps/web/src/components/status.tsx` own the mapping below. A dot supplies a quick visual cue; the adjacent label supplies its meaning without relying on colour.
+
+<Specimen kind="states" />
+
+| API status | Visible label | Dot | Badge variant |
+| --- | --- | --- | --- |
+| `running` | Running | Signal | `success` |
+| `starting` | Starting | Amber, pulsing | `warning` |
+| `stopping` | Stopping | Amber, pulsing | `warning` |
+| `stopped` | Stopped | Ash | `default` |
+| `crashed` | Crashed | Ember | `danger` |
+| `error` | Error | Ember | `danger` |
+| `installing` | Installing | Amber, pulsing | `info` |
+| `orphaned` | Detached | Amber | `warning` |
+| `unknown` | Connection lost | Ash | `warning` |
+
+“Connection lost” does not mean “Stopped”: CraftPanel cannot currently establish the game's state. A detached process also needs a different explanation from a stopped server because console access is unavailable. Preserve those distinctions in labels and controls.
+
+Activity events use `eventStyle` in `apps/web/src/lib/activity.ts`. A successful panel update, plugin install, backup or configuration change normally stays neutral; a lifecycle event follows the server palette. This prevents every successful task from looking like a server started.
+
+## Data and request states
+
+| State | Representation | Wording / action |
+| --- | --- | --- |
+| Loading for the first time | Sized `Skeleton` or labelled progress | Show what is loading; avoid displaying a fabricated reading |
+| Loaded with no records | `EmptyState` or a short list message | “No backups yet”; offer “Create backup” if permitted |
+| No matches after filtering | Local empty result | “No matching settings”; preserve the filter so it can be changed |
+| Metric unavailable | `Unavailable`, an em dash and a reason | “Waiting for the next sample” or “Server is not running” |
+| Feature unsupported | Explanation in context | Name the software limitation; do not imply a request is still loading |
+| Historical data only | Explicit recorded-state label | “Last run”; keep the charts visible without calling them live |
+| Request failed | Persistent explanation and a relevant recovery action | Preserve drafts; distinguish failure from an empty result |
+| Action in progress | `Button loading` or progress with text | Prevent duplicate submission; report completion or failure |
+| Saved but not active yet | Saved feedback plus restart requirement | “Settings are saved. Restart the server to apply them.” |
+
+Zero is a valid measurement. `null` is an unavailable one. In code, use checks such as `value != null` so zero is not accidentally hidden. An indeterminate `Progress` receives `null`, not a made-up percentage.
+
+An empty state should describe the current context, not expose an implementation error. If a failed request has no usable data, show the error explicitly instead of a skeleton that never finishes.
+
+## Permissions and consequences
+
+Hide actions the current role cannot perform, or disable a visible control when its unavailable state helps explain the task. A reader can still inspect settings; they should not receive an actionable Save button. Use `useCan` with the current server scope for panel controls. The API remains responsible for enforcing access.
+
+Do not hide sensitive values only with CSS. Personal data, secrets and other restricted fields must also be absent from responses when the caller lacks access. For example, player IP addresses require `players.manage`.
+
+Use confirmation for a consequential operation such as restoring a backup over the current world, deleting server files or force-killing a process. Explain the concrete effect and name the record involved. Routine edits should not need an extra confirmation dialog.
+
+## Contrast and readable colour
+
+The following ratios are the existing opaque semantic **text** colours against the page canvas and panel surface. They are recorded in the contributor design notes and can be recalculated from the source tokens.
+
+| Text token | Light: canvas / surface | Dark: canvas / surface |
+| --- | --- | --- |
+| `fg`, `accent` | 15.3 / 16.5 | 14.8 / 13.1 |
+| `fg-muted` | 6.1 / 6.5 | 7.1 / 6.3 |
+| `brand-text`, `success` | 5.7 / 6.2 | 7.7 / 6.9 |
+| `warning` | 5.3 / 5.7 | 9.2 / 8.2 |
+| `danger` | 5.3 / 5.7 | 5.4 / 4.8 |
+| `neutral` | 5.4 / 5.8 | 6.9 / 6.1 |
+
+For new work, check at least **4.5:1 for ordinary text** and **3:1 for essential non-text indicators and control boundaries** against adjacent colours. Decorative separators can remain quieter when they are not needed to identify a control. Test actual foreground/background pairs, including tints and overlays: these base ratios do not certify every badge, filled button or disabled style.
+
+<Aside type="caution" title="Status fill is not status text">
+  The bright Signal, Amber, Ember and Ash values are intended for dots and bars. Their matching semantic ink tokens adapt between themes. Copying the dot colour into a small light-theme text label can make the label unreadable.
+</Aside>
+
+## Keyboard and screen readers
+
+These are review requirements for new or changed screens:
+
+- Use native links for navigation and native buttons for actions. Keep a visible focus indicator and a logical tab order.
+- Give each form control a visible, associated label. Connect help and validation messages using IDs and `aria-describedby` where needed; set `aria-invalid` on an invalid control.
+- Name icon-only actions. Hide decorative icons from assistive technology, and accompany state dots with text.
+- Use heading levels that reflect the page. Mark navigation and give multiple navigation regions distinct names.
+- Preserve Radix keyboard behaviour in tabs, menus and dialogs. Check arrow keys where applicable, Escape to dismiss, focus containment and focus return to the trigger.
+- Give scrollable regions an accessible name and keyboard access when users must interact with their content. Keep a table's headers associated with its cells.
+- Announce significant asynchronous outcomes with a suitable live region or existing toast system. Do not announce every metric sample or continuously updated console line as an urgent alert.
+- Keep a readable current value or summary beside a chart. A hover crosshair is supplemental, not the sole source of essential data.
+
+The primitives provide useful building blocks, but composition still matters. `Field` does not automatically wire descriptions to controls, and `Callout` is not automatically an ARIA alert. Test the completed interaction rather than assuming the wrapper guarantees accessibility.
+
+## Touch, zoom and motion
+
+Check narrow layouts at 320 and 390 CSS pixels and with browser zoom increased. Long translations, usernames, paths and errors should wrap or scroll within their own region. Space compact icon controls apart; use larger controls where a dense 28–32 px target would be difficult to operate by touch.
+
+Keep animation limited to feedback that explains a state: a pending request, a running task or an opening overlay. New motion should respect `prefers-reduced-motion`; use a stable indicator and text when motion is reduced. Existing primitives use pulse, spin and indeterminate progress animations, so inspect their motion behaviour when changing those components. Do not claim a complete reduced-motion audit from the existence of a media query on the website.
+
+## Review checklist
+
+- Can the screen distinguish loading, empty, unavailable, unsupported and failed?
+- Can a keyboard user reach and operate every meaningful control?
+- Do labels, descriptions, status text and numeric values remain readable in both themes?
+- Do focus, dialog dismissal and focus return behave correctly?
+- Do small screens and zoom preserve content and action labels?
+- Do permissions match both the visible controls and the returned data?
+- Does feedback state the outcome and whether another action, such as a restart, is needed?
+- Are remaining verification gaps recorded honestly rather than described as complete compliance?

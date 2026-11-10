@@ -1,0 +1,122 @@
+---
+title: Foundations
+description: "CraftPanel's exact colour tokens, typography, spacing, corners and panel icon rules."
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import TokenTable from "../../../../components/design-system/TokenTable.astro";
+import Specimen from "../../../../components/design-system/Specimen.astro";
+
+The panel uses warm greys, restrained typography and small corners. These choices come from shared tokens, not per-page styling. The tables below resolve values directly from `packages/ui/src/styles/tokens.css` at build time.
+
+## Colour architecture
+
+Palette names describe a pigment: `--cp-sandstone-*`, `--cp-deepslate-*`, Signal, Amber, Ember and Ash. **Semantic names describe a job:** `--cp-surface`, `--cp-fg`, `--cp-warning`. Components use the semantic names, so they adapt to light and dark mode without choosing a second palette themselves.
+
+### Surfaces and text
+
+<TokenTable group="surfaces" />
+
+Use `bg` for the page canvas, `surface` for a panel or control, and `surface-muted` for a quieter fill. Separate areas with spacing or a border before adding another background. `fg-muted` still carries readable information; it is not a disabled state.
+
+The console has its own dark surface in both themes. Use `console-fg` with it rather than the page's text colour, `console-muted` (5.8:1 on the surface) for timestamps, system lines, the prompt and placeholders, Signal green (`brand`) for commands you sent, and the status tokens for severity. Never reach for a palette colour such as `neutral-500` or `sky-300`, or a `white/10` border: those ignore the tokens and fall below the contrast floor.
+
+### Brand, interaction and status
+
+<TokenTable group="roles" />
+
+| Role | Use | Avoid |
+| --- | --- | --- |
+| **Brand** | Logo, setup, update announcements and website calls to action | Making every panel action green |
+| **Accent** | Neutral focus ring, selected choice, active tab and ordinary primary action | Using amber as an interaction accent |
+| **Status fill** | Small dots and bars identifying a lifecycle state | Reusing a bright status fill for small text on a light surface |
+| **Status ink** | `success`, `warning`, `danger`, `neutral` text and tinted feedback | Decorative colour unrelated to the data |
+
+Running and the brand share Signal green, but their roles remain distinct. A green running badge describes a server. A selected preset uses a neutral border even if it is the recommended option.
+
+Status fills stay constant between themes. Text colours become darker in light mode for readability. See [States and accessibility](/docs/design-system/states-and-accessibility/) for the exact lifecycle mapping and contrast limits.
+
+## Typography
+
+<Specimen kind="type" />
+
+| Family | Weight | Role |
+| --- | --- | --- |
+| **Mona Sans** | 500; 600 for the wordmark | Page, section, card and dialog headings |
+| **Inter** | 400 body; 500 labels/buttons; occasional 600 emphasis | Default interface copy, descriptions and controls |
+| **Mona Sans Mono** | 400–500 | Commands, logs, file paths, ports, versions, chart axes and technical labels |
+| **Geist Serif** | 400 only | The “What's new” heading and rare editorial brand copy |
+
+Use tabular numerals for values that update or need comparison. The `Stat` primitive uses sans numerals with `tabular-nums`; technical strings and chart axes use Mono. Do not turn an entire form into monospace text.
+
+### Size hierarchy in the panel
+
+These sizes describe the shared helpers and common product patterns. They are not the website's much larger hero scale.
+
+| Use | Size / Tailwind | Typical implementation |
+| --- | --- | --- |
+| Page title | 24 px / `text-2xl` | `PageHeader`, server header |
+| Primary reading | 20 px / `text-xl` | `Stat`; performance cards use 30 px / `text-3xl` |
+| Major local heading | 16 px / `text-base` | Performance overview, tuning, dialog title |
+| Section heading | 14 px / `text-sm` | `Section` |
+| Control text | 14 px, or 13 px compact | `Button`, `Input`, compact actions |
+| Label / description | 13 px | `Field`, `PageHeader` descriptions, settings rows |
+| Supporting text | 12 px / `text-xs` | Help, badges, secondary metric context |
+| Dense machine metadata | 10–11 px | Chart axes, keyboard hints and property keys; keep essential instructions larger |
+
+`DialogHeader` currently uses 600 for its title; most headings use 500. Reuse the helper rather than overriding its weight on each screen. Nothing in the panel needs a weight above 600.
+
+### Tracking and font delivery
+
+| Token | Value | Application |
+| --- | --- | --- |
+| `--cp-tracking-body` | −0.01 em | Inter body and UI copy |
+| `--cp-tracking-heading` | −0.02 em | Headings; `tracking-tight` in the panel |
+| `--cp-tracking-display` | −0.03 em | Large displays |
+
+Code and monospace content reset tracking to zero. Geist Serif has one weight; `font-synthesis-weight: none` prevents fake bold. All four families are self-hosted. The panel loads its local font files through `next/font/local` and `geist/font/serif`; the website and docs use the shared font stylesheet.
+
+## Spacing and density
+
+Use the 4 px spacing scale for the main layout. Small component details also use half steps, such as the 6 px gap inside a badge.
+
+| Distance | Tailwind | Typical job |
+| --- | --- | --- |
+| 4 px | `gap-1`, `space-y-1` | Label and short value |
+| 8 px | `gap-2`, `space-y-2` | Field content, adjacent actions |
+| 12 px | `gap-3`, `p-3` | Compact rows and small groups |
+| 16 px | `gap-4`, `p-4` | Panel content, chart cards, console padding |
+| 20–24 px | `p-5`, `p-6`, `gap-5`, `gap-6` | More spacious cards and dialogs |
+| 32–40 px | `space-y-8`, `space-y-10` | Major page sections |
+
+Keep descriptions attached to the setting or metric they explain. Use larger gaps between independent tasks than between a label and its control.
+
+## Corners, borders and elevation
+
+<div class="ds-radii">
+  <div style="border-radius: var(--cp-radius-sm)"><b>2 px</b><small>Badges and small parts</small></div>
+  <div style="border-radius: var(--cp-radius)"><b>4 px</b><small>Buttons and inputs</small></div>
+  <div style="border-radius: var(--cp-radius-lg)"><b>6 px</b><small>Panels and dialogs</small></div>
+</div>
+
+| Token | Panel utility mapping |
+| --- | --- |
+| `--cp-radius-sm` | `rounded-xs`, `rounded-sm` |
+| `--cp-radius` | `rounded-md` |
+| `--cp-radius-lg` | `rounded-lg`, `rounded-xl`, `rounded-2xl` |
+
+The radius names are mapped in `apps/web/src/app/globals.css`. `rounded-xl` therefore means **6 px**, not Tailwind's usual larger corner. Circular status dots, switches and avatars keep their circular shapes.
+
+Major surfaces use thin borders and no decorative elevation. Dialogs, menus and tooltips use shadows to establish an overlay layer; existing primitives also include small control shadows. Do not add a large drop shadow to an ordinary panel. Solid dividers are the default; dashed outlines are reserved for patterns such as empty or drop areas.
+
+## Icons and the mark
+
+The panel uses **Lucide React** icons: usually 16 px in buttons and rows, 12 px in badges, and 14 px in compact contexts. Use `currentColor` through semantic classes. Keep icon meaning consistent: play for start, square for stop, rotate for restart, and a warning triangle for a problem. Give an icon-only action an accessible name.
+
+The website's pixel icons and isometric illustrations belong to its presentation language. They do not replace the panel's Lucide controls.
+
+The CraftPanel mark is an isometric block with a console prompt. Preserve its proportions and original colours. Only the top face changes with the theme: `#c6cbc5` in light mode and `#e6e8e3` in dark mode. Do not recolour the top face green or add effects around the mark.
+
+<Aside type="tip" title="Use roles, not raw colours">
+  In React panel code, prefer `bg-surface`, `text-muted-foreground` and `text-warning`. In an Astro specimen, use `var(--cp-surface)` and the matching shared semantic tokens. The [implementation reference](/docs/design-system/implementation/#token-mapping) maps the names between both layers.
+</Aside>

@@ -1,0 +1,97 @@
+---
+title: Layout and data
+description: "Panel layout patterns for navigation, responsive pages, settings, metrics, tables, activity and consoles."
+---
+
+import Specimen from "../../../../components/design-system/Specimen.astro";
+
+## Application shell
+
+The shell keeps global navigation separate from the selected server's work. The persistent sidebar contains the product mark, search, application destinations, servers and the account menu. A server workspace starts with its identity, lifecycle state and control actions, followed by links to server sections.
+
+<Specimen kind="layout" />
+
+| Area | Current panel implementation |
+| --- | --- |
+| Desktop sidebar | 240 px (`w-60`), fixed; visible from `lg` / 1024 px |
+| Main content | Centred `max-w-7xl` / 1280 px area, including horizontal padding |
+| Main padding | 16 px horizontal on narrow screens, 24 px from `sm`, 40 px from `lg`; 24 / 32 px vertical |
+| Mobile header | 48 px high, sticky; navigation toggle, mark and search |
+| Server header | Stacked on mobile; identity and actions align across a row when space allows |
+| Server navigation | Single horizontal, scrollable row with a 2 px active underline |
+
+Keep the shell in `apps/web/src/components/shell.tsx` and server navigation in `server/workspace.tsx`. A new tab should not create a second sidebar or repeat the server's main controls.
+
+## Page hierarchy
+
+Read from identity to observation to action:
+
+1. **Identify:** page or server title, status and the main controls.
+2. **Understand:** current readings, content or configuration relevant to the selected view.
+3. **Resolve:** a diagnosis or an explanation connected to the available action.
+4. **Adjust:** configuration grouped by task, with advanced options revealed on demand.
+
+For example, Performance places TPS and tick time first, resources and players next, then insights and tuning. The preset selector, memory editor and world-generation controls are separate tasks, rather than one long settings form. A player profile groups overview, inventory, statistics and activity into addressable views.
+
+Use `space-y-8` or `space-y-10` between major groups. Use a `Section` header and short description when a group needs an explanation. An outer panel is useful when it contains a single cohesive control or dataset; avoid a chain of panels inside panels.
+
+## Responsive composition
+
+The panel uses Tailwind's `sm` (640 px), `md` (768 px), `lg` (1024 px) and `xl` (1280 px) breakpoints. The sidebar appears at `lg`, so available content width can actually decrease as that breakpoint is crossed. Choose column changes based on the space left inside the shell.
+
+```tsx
+<div className="grid items-start gap-5 xl:grid-cols-2">
+  <Panel className="min-w-0 p-5 sm:p-6">{/* Memory settings */}</Panel>
+  <Panel className="min-w-0 p-5 sm:p-6">{/* World generation */}</Panel>
+</div>
+```
+
+Use `min-w-0` on grid and flex children that contain long values. Let action groups wrap and move labels above controls on narrow screens. A tab strip, code block or data table may scroll internally; the entire page should not scroll sideways. Preserve source order when a grid stacks.
+
+Truncate a server name in a crowded header only when the complete identity remains available elsewhere. Allow explanatory text to wrap. Do not clip errors, save consequences or action labels to make a row fit.
+
+## Settings and progressive disclosure
+
+Keep related values and their save action in the same group. A regular setting has a visible label, a short explanation, a control and its current value. Property names, restart badges and managed/default metadata can sit beside the human label.
+
+Use disclosures for material most users do not need on every visit: raw JVM flags, advanced server properties or implementation detail. Keep important validation errors discoverable even when the parent group is collapsed. A changed or invalid field must not disappear without a clear indication.
+
+Dirty state should be explicit: enable Save when there are changes, offer Discard where appropriate, preserve the draft on error, and state whether a restart is required. The reusable settings editor uses a bounded, sticky save bar for longer groups.
+
+## Metrics and charts
+
+| Rule | Example |
+| --- | --- |
+| Keep the reading and its context together | `19.8` TPS with a target of `20`, plus its recent history |
+| Label the scope of a summary | “avg 19.9 · low 19.6” for the selected chart range |
+| Show useful units | `8.2 ms`, `34%`, `1.8 GB`, `2 / 20` players |
+| Explain thresholds | 50 ms tick budget; 100% CPU means one fully used core |
+| Name what is measured | Process memory is not Java heap usage; show the configured heap as a reference |
+| Separate now from history | “Live”, “Waiting for data”, “Last run” or “Offline” |
+| Preserve missing samples | Break the line across a sampling gap; never interpolate a plausible measurement |
+
+`MetricChart` is a product component, not an export of `@craftpanel/ui`. It accepts points shaped as `{ ts, v }`, where `v` can be `null`, a time window (`from`, `to`), a maximum, a formatter, empty text and an optional reference line. Its optional `stat` header combines a current value, hint, summary and icon in the same card.
+
+The current chart uses a zero baseline, three quiet gridlines, a neutral line and a light filled area. Its reference line is dashed and labelled. A gap over 45 seconds breaks the series. Hover or touch reveals a measured value and timestamp. The selected range changes the chart and summaries, while the large current reading remains live.
+
+Do not use decorative gradients, an unexplained score or a “healthy” label without supporting evidence. Keep a textual reading or summary available alongside the graphic; pointer inspection should not be the only way to obtain essential information.
+
+## Lists, tables and activity
+
+Choose a table when people compare the same fields across records, such as backups or sessions. Choose a list for a timeline, a ranked statistic or records with varying detail. Put numeric columns in a consistent unit and alignment, and keep row actions attached to their record.
+
+Compact activity feeds remain bounded by their surrounding layout. The overview feed scrolls internally, with a 320 px cap on mobile, and exposes a keyboard-focusable region. Newest events appear first. The complete activity page remains paginated rather than growing the overview indefinitely.
+
+Use an icon for the event kind and a status tone only where the event carries that meaning. Installing software, changing settings or updating CraftPanel is normally neutral; running, starting, stopping and failure have lifecycle colours. See [state mapping](/docs/design-system/states-and-accessibility/#server-lifecycle).
+
+## Console and technical content
+
+Console output uses `console`, `console-fg` and `console-muted`, Mono text and 16 px padding on all sides, including above the first line. Keep the output region scrollable without taking over page scrolling. If users inspect earlier output, do not force them back to the bottom on every new line; expose the follow-output state clearly.
+
+Commands, paths, ports, property keys and versions use Mono with normal tracking. Provide a copy action for values people need elsewhere, with short feedback such as “Copied”. Keep secrets and personal data subject to the same permission rules as the API response.
+
+## Language and formatting
+
+The panel's UI locale is English, defined by `APP_LOCALE` in `packages/shared/src/meta.ts`. Use the existing formatting helpers for relative times, dates, bytes, distances and playtime instead of letting the browser's language change individual labels.
+
+Keep copy specific: “Server is not running”, “Waiting for the next sample” and “No matching settings” describe different states. Refer to an observed cause as a possibility when the measurements cannot establish it. The UI should explain the task's outcome; internal protocol or storage details belong in contributor docs unless they affect a user's decision.

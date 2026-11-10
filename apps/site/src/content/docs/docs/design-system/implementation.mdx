@@ -1,0 +1,124 @@
+---
+title: Implementation
+description: "Where the design system lives, how tokens map to panel utilities, and how to implement and review consistent screens."
+---
+
+## Source map
+
+| Source | Responsibility |
+| --- | --- |
+| `packages/ui/src/styles/tokens.css` | Palette, light/dark semantics, fonts, tracking and radii; canonical token values |
+| `packages/ui/src/styles/fonts.css` | Self-hosted font declarations for the website and docs |
+| `packages/ui/src/primitives.tsx` | Buttons, form controls, badges, skeletons, progress, tooltips and keyboard hints |
+| `packages/ui/src/layout.tsx` | `PageHeader`, `Section`, `Panel`, `Field`, `Stat`, `EmptyState`, `Callout` |
+| `packages/ui/src/overlays.tsx` | Radix-backed tabs, dialogs, confirmations and menus |
+| `packages/ui/src/segmented.tsx` | Segmented choices and the shared sliding selection indicator |
+| `apps/web/src/app/globals.css` | Shared tokens mapped to the panel's Tailwind utilities and base styles |
+| `apps/web/src/app/layout.tsx` | Local font loading and application providers |
+| `apps/web/src/components/shell.tsx` | Sidebar, mobile header and main content area |
+| `apps/web/src/components/server/workspace.tsx` | Server identity, lifecycle actions and section navigation |
+| `apps/web/src/components/status.tsx` | Server status labels, dots, badges and unavailable readings |
+| `apps/web/src/components/charts.tsx` | Time-series metric chart |
+| `apps/web/src/lib/activity.ts`, `format.ts` | Event icon/tone mapping and display formatting |
+| `apps/site/src/styles/docs.css` | Starlight's colours and typography mapped to the same foundations |
+| `docs/design/README.md` | Contributor notes, brand assets and website illustration rules |
+
+Shared UI exports are collected by `packages/ui/src/index.tsx`. Product-specific helpers are imported from the web app; adding a chart or server feature does not automatically make it a shared UI primitive.
+
+## Token mapping
+
+There are two naming layers. Shared CSS uses `--cp-*`. The panel maps those values to variables and exposes Tailwind utilities through `@theme inline`. Use the panel utility names when composing React components.
+
+| Shared token | Panel variable | Example utility |
+| --- | --- | --- |
+| `--cp-bg` | `--background` | `bg-background`, `text-background` |
+| `--cp-surface` | `--surface` | `bg-surface` |
+| `--cp-surface-muted` | `--muted` | `bg-muted` |
+| `--cp-fg` | `--foreground` | `text-foreground`, `bg-foreground` |
+| `--cp-fg-muted` | `--muted-foreground` | `text-muted-foreground` |
+| `--cp-border` | `--border` | `border-border`, `divide-border` |
+| `--cp-accent` | `--accent`, `--ring` | `bg-accent`, `ring-ring` |
+| `--cp-accent-fg` | `--accent-foreground` | `text-accent-foreground` |
+| `--cp-success` | `--success` | `text-success` |
+| `--cp-warning` | `--warning` | `text-warning` |
+| `--cp-danger` | `--destructive` | `text-destructive` |
+| `--cp-console`, `--cp-console-fg`, `--cp-console-muted` | `--console`, `--console-foreground`, `--console-muted` | `bg-console`, `text-console-foreground`, `text-console-muted` |
+| `--cp-status-running` and sibling states | `--status-running`, etc. | `bg-status-running`, `bg-status-starting`, `bg-status-stopped`, `bg-status-crashed` |
+
+Not every `--cp-*` token has a Tailwind alias. For example, `--cp-border-strong` and `--cp-neutral` do not currently have dedicated panel colour utilities. Check the actual `@theme` mapping before inventing a class name.
+
+The panel enables dark mode with `.dark`; the website and docs use `data-theme="dark"`. Shared tokens support both selectors. A normal component should not need hard-coded light and dark hex values.
+
+## Compose before extending
+
+Start with existing exports and semantic classes. This is a complete presentational example of the composition pattern; saving, querying and authorization belong in the consuming feature.
+
+```tsx
+import { Button, Field, Input, Panel, Section } from "@craftpanel/ui";
+
+export function ServerNameForm({
+  name,
+  onNameChange,
+  onSave,
+  dirty,
+  saving,
+}: {
+  name: string;
+  onNameChange: (name: string) => void;
+  onSave: () => void;
+  dirty: boolean;
+  saving: boolean;
+}) {
+  return (
+    <Section title="Identity" description="How this server appears in CraftPanel.">
+      <Panel className="space-y-4 p-5">
+        <Field label="Server name" htmlFor="server-name">
+          <Input
+            id="server-name"
+            value={name}
+            onChange={(event) => onNameChange(event.target.value)}
+          />
+        </Field>
+        <Button onClick={onSave} disabled={!dirty} loading={saving}>
+          Save name
+        </Button>
+      </Panel>
+    </Section>
+  );
+}
+```
+
+In a Next.js feature, place interactive state and handlers under a client boundary. Use the repo's current `AGENTS.md` and bundled Next.js guides before changing that boundary; this example does not establish one by itself.
+
+Use `cn` from `@craftpanel/ui` to compose conditional classes. Keep complete Tailwind class names visible to the scanner; avoid constructing a status class such as `text-${status}` dynamically. Prefer the established status helper or an explicit mapping.
+
+Extract a new shared component when multiple features need the same responsibility and behaviour. A one-off server-specific control can stay with its feature. Avoid introducing a parallel button, dialog or token system just to match one screen.
+
+## Changing a foundation
+
+1. Find the current semantic token or component before adding another one.
+2. For a new colour role, define both themes in `tokens.css`; add a panel alias only when panel code needs one.
+3. Recalculate actual contrast pairs and update the documented contrast table if a recorded pair changes.
+4. Check every consumer affected by the token: panel, website and docs. The token tables in this section update from the source at build time, but prose and examples still need review.
+5. Update the component reference and contributor notes when a prop, default size, state or mapping changes.
+
+Keep fonts self-hosted and preserve their licences. Brand assets are source files, not something to approximate with a new icon. Updating Geist Serif requires keeping the UI and web packages in step.
+
+## Verify a change
+
+| Change | Relevant verification |
+| --- | --- |
+| Documentation or specimen | `pnpm --filter @craftpanel/site build`; check generated links, navigation and the affected examples |
+| Panel composition | `pnpm --filter @craftpanel/web typecheck` and the relevant web build / interaction check |
+| Shared component or token | Workspace typecheck plus builds and browser checks for affected consumers |
+| Product behaviour | Tests for the actual state transition or API effect; use an isolated test instance where real server behaviour matters |
+
+Check both themes and widths around 390, 768, 1024 and 1440 px, including the sidebar breakpoint. Add 320 px for minimum-width review. Inspect long content, keyboard focus, permission differences, failure feedback and reduced motion where relevant. Use a disposable instance; do not alter someone's running Minecraft server just to review styling.
+
+Record the scope of verification in `docs/STATUS.md`: a build confirms compilation, a fixture-based browser check confirms those supplied states, and a real-server check confirms the exercised runtime path. None of those alone establishes a complete accessibility audit.
+
+## Maintain this reference
+
+This section is the public panel design reference. Keep the older [reference URL](/docs/reference/design-system/) as a pointer so bookmarks continue to work. Keep `docs/design/README.md` as the contributor entry point, with links here for detailed component and layout guidance.
+
+When adding a new pattern, document its purpose, anatomy, states, responsive behaviour and implementation location. If the recommendation differs from existing code, label it as a recommendation or a known gap instead of presenting it as shipped behaviour.

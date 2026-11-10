@@ -13,6 +13,7 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 - **Player profiles** (unreleased): every player has a profile (Overview, Inventory, Statistics, Activity) built from CraftPanel's session log and Minecraft's per-player files; verified on Paper 1.21.4 and Vanilla 26.1 (`scripts/real-tests/player-profile.mjs`). Ideas not done: shulker box contents, per-world statistics, a server-wide leaderboard.
 - **Real-server test scenarios** used for the ✅ entries live in `scripts/real-tests/` (see its README).
 - **Design and polish:** dashboard, website and docs share Inter, Mona Sans and Mona Sans Mono and the Signal/Amber/Ember/Ash palette. Connected landing-page displays and original isometric hardware/runtime graphics are implemented; locale, adapter labels, activity icons and console spacing are verified on a throwaway Paper instance. Rules and evidence: [design/README.md](design/README.md), [STATUS.md](STATUS.md).
+- **Panel design-system reference:** a dedicated six-chapter docs section documents foundations, shared component APIs, responsive layouts, data presentation, states, accessibility review and implementation. Colour tables read the actual shared tokens; theme-aware examples accompany the reference. Existing design-system bookmarks remain valid.
 
 ## Done
 

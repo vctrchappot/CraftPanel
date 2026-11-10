@@ -1,136 +1,24 @@
 ---
 title: Design system
-description: Type, colour, shape and the rules behind CraftPanel's dashboard, website and docs.
-sidebar:
-  order: 4
+description: "Find the dedicated panel design-system section and the shared brand reference."
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-The dashboard, this website and these docs share one set of design tokens and one type system: [Inter](https://rsms.me/inter/) for text, [Mona Sans and Mona Sans Mono](https://github.com/mona-sans) by GitHub for headers and machine text. The swatches on this page follow the theme switch in the header.
+The panel design system now has its own section in the docs navigation. Start with the [design-system overview](/docs/design-system/) for the principles and the relationship between shared tokens, React components and product patterns.
 
-<Aside>
-  For contributors: the tokens live in `packages/ui/src/styles/tokens.css`. How to change them is described in [`docs/design/README.md`](https://github.com/vctrchappot/CraftPanel/blob/main/docs/design/README.md).
-</Aside>
+## Detailed reference
 
-## Principles
+<CardGrid>
+  <LinkCard title="Foundations" description="Source-derived light/dark colours, typography, spacing, corners and icons." href="/docs/design-system/foundations/" />
+  <LinkCard title="Components" description="Shared React APIs, button variants, fields, feedback and overlays." href="/docs/design-system/components/" />
+  <LinkCard title="Layout and data" description="Application shell, responsive pages, charts, lists and console patterns." href="/docs/design-system/layout-and-data/" />
+  <LinkCard title="States and accessibility" description="Lifecycle mapping, request states, permissions, contrast and keyboard access." href="/docs/design-system/states-and-accessibility/" />
+  <LinkCard title="Implementation" description="Source files, token mapping, composition and verification." href="/docs/design-system/implementation/" />
+</CardGrid>
 
-- **Hardware workshop, not cloud console.** Warm greys, block textures on the website, real terminal output. Nothing glows.
-- **Precise dashboard, clear brand.** Inside the dashboard, colour means state. Signal green links the logo, brand moments and running servers; focus and selection use neutral ink.
-- **Self-hosted all the way down.** Fonts come from the official releases and ship with CraftPanel. The dashboard never makes a third-party request.
+## Shared brand and website
 
-## The mark
+The panel, website and docs share their fonts and semantic tokens. The panel uses compact Lucide controls and neutral interaction colours; the website adds pixel icons, isometric illustrations and larger display typography. Detailed website and asset rules remain in the [contributor design notes](https://github.com/vctrchappot/CraftPanel/blob/main/docs/design/README.md).
 
-An isometric block with a console prompt: the server on your own hardware and the console you run it from.
-
-<div class="ds-marks">
-  <img src="/favicon.svg" alt="CraftPanel mark" width="72" height="72" />
-</div>
-
-The mark keeps its own colours. Only the top face adapts: lighter on dark surfaces, a shade darker on light ones. The wordmark next to it is Mona Sans at 600.
-
-## Type
-
-Mona Sans for headers and displays, Inter for everything you read, Mona Sans Mono for anything a machine reads, and Geist Serif as a rare editorial accent. Weights stay low, nothing above 600: precision comes from size and spacing, not from weight.
-
-Inter text uses −0.01 em letter spacing; Mona Sans headings use −0.02 em; large display headers use −0.03 em to −0.035 em. Commands, code and console output retain normal Mono spacing.
-
-<div class="ds-type">
-  <div>
-    <p class="ds-label">Mona Sans: headers and displays</p>
-    <p class="ds-specimen" style="font-family: var(--cp-font-display); font-weight: 500; letter-spacing: var(--cp-tracking-display)">Your server. Your hardware.</p>
-    <p style="font-family: var(--cp-font-sans)">Page, section, card and dialog titles and the hero (500) with negative tracking; the wordmark (600).</p>
-  </div>
-  <div>
-    <p class="ds-label">Inter: everything by default</p>
-    <p class="ds-specimen" style="font-family: var(--cp-font-sans); font-weight: 500; letter-spacing: var(--cp-tracking-heading)">Six kinds of server. One wizard.</p>
-    <p style="font-family: var(--cp-font-sans)">Body text (400), UI labels and buttons (500).</p>
-  </div>
-  <div>
-    <p class="ds-label">Mona Sans Mono: anything a machine reads</p>
-    <p class="ds-specimen" style="font-family: var(--cp-font-mono)">[20:03:14 INFO]: Done (8.412s)!</p>
-    <p style="font-family: var(--cp-font-sans)">Console, logs, commands, paths, ports, versions, metrics, section numbers and small labels.</p>
-  </div>
-  <div>
-    <p class="ds-label">Geist Serif: a human voice</p>
-    <p class="ds-specimen" style="font-family: var(--cp-font-serif); font-weight: 400">Built by Victor.</p>
-    <p style="font-family: var(--cp-font-sans)">The "What's new" dialog and the project statement on the website. One weight (400). Nothing else.</p>
-  </div>
-</div>
-
-Serif has a single weight, so CraftPanel turns off synthetic bold (`font-synthesis-weight: none`): it always renders as drawn.
-
-## Colour
-
-### Surfaces and text
-
-Warm greys: *deepslate* in dark mode, *sandstone* in light mode.
-
-<div class="ds-swatches">
-  <div><span style="background: var(--cp-bg)"></span><b>bg</b><code>#f4f1ea · #171614</code></div>
-  <div><span style="background: var(--cp-surface)"></span><b>surface</b><code>#fbfaf6 · #23211e</code></div>
-  <div><span style="background: var(--cp-surface-muted)"></span><b>surface-muted</b><code>#ece8de · #2a2824</code></div>
-  <div><span style="background: var(--cp-border)"></span><b>border</b><code>#d9d3c7 · #37332e</code></div>
-  <div><span style="background: var(--cp-fg)"></span><b>fg</b><code>#1c1b18 · #ece8df</code></div>
-  <div><span style="background: var(--cp-fg-muted)"></span><b>fg-muted</b><code>#5f5a52 · #a8a197</code></div>
-  <div><span style="background: var(--cp-console)"></span><b>console</b><code>#1a1917 · #0f0e0d</code></div>
-</div>
-
-### Roles
-
-Three roles that never stand in for each other:
-
-<div class="ds-swatches">
-  <div><span style="background: var(--cp-brand)"></span><b>brand · signal</b><code>#5bbf4a</code><small>The logo's prompt. "Update available", setup, website calls to action.</small></div>
-  <div><span style="background: var(--cp-accent)"></span><b>accent · neutral</b><code>#1c1b18 · #ece8df</code><small>Focus, selection and active controls. Links have an underline.</small></div>
-  <div><span style="background: var(--cp-status-running)"></span><b>running · Signal</b><code>#5bbf4a</code><small>Running, done, healthy. Same green as the brand.</small></div>
-  <div><span style="background: var(--cp-status-starting)"></span><b>starting · Amber</b><code>#e8b04a</code><small>Starting, stopping, needs attention.</small></div>
-  <div><span style="background: var(--cp-status-crashed)"></span><b>crashed · Ember</b><code>#ef5a4f</code><small>Failed, crashed, destructive actions.</small></div>
-  <div><span style="background: var(--cp-status-stopped)"></span><b>stopped · Ash</b><code>#9aa1a8</code><small>Stopped or disconnected.</small></div>
-</div>
-
-Status fills stay identical in both themes. Small text uses the semantic ink tokens: darker Signal, Amber, Ember and Ash in light mode so labels remain readable. Signal is also the brand colour; other status colours are reserved for state.
-
-### Contrast
-
-Every text colour meets WCAG AA (4.5:1) on the background and on surfaces, in both themes.
-
-| Token | Light (on bg / surface) | Dark (on bg / surface) |
-| --- | --- | --- |
-| `fg` | 15.3 / 16.5 | 14.8 / 13.1 |
-| `fg-muted` | 6.1 / 6.5 | 7.1 / 6.3 |
-| `brand-text`, `success` | 5.7 / 6.2 | 7.7 / 6.9 |
-| `accent` | 15.3 / 16.5 | 14.8 / 13.1 |
-| `warning` | 5.3 / 5.7 | 9.2 / 8.2 |
-| `danger` | 5.3 / 5.7 | 5.4 / 4.8 |
-| `neutral` | 5.4 / 5.8 | 6.9 / 6.1 |
-
-Filled brand buttons: 7.6 (light) / 7.3 (dark).
-
-## Shape
-
-Corners stay small, like blocks.
-
-<div class="ds-radii">
-  <div style="border-radius: var(--cp-radius-sm)"><b>2 px</b><small>badges, small parts</small></div>
-  <div style="border-radius: var(--cp-radius)"><b>4 px</b><small>buttons, inputs</small></div>
-  <div style="border-radius: var(--cp-radius-lg)"><b>6 px</b><small>cards, panels, dialogs</small></div>
-</div>
-
-- Spacing follows a 4 px grid.
-- The dashboard is flat: borders instead of shadows, sections with dividers instead of nested cards. Only overlays (menus, dialogs) cast a shadow.
-- Lines and dividers are solid; the hero underline is a 6 px Signal bar.
-- Hard offset shadows mean active or selected: chosen software, interactive cards on hover/focus, open hotspot tooltips. Static panels stay flat. Cast shadows inside the isometric artwork are the intentional exception.
-- Feature displays connect under one outer frame, with 1 px internal dividers. Product demos and the unified update/runtime showcase share that frame; on small screens they stack in the same reading order.
-
-## Illustrations
-
-Original isometric hardware shows the physical machine behind the panel: PCB traces and sockets on the Pi, cooling fans on the PC, rack ears on the VPS. Small shelters, paths and terrain suggest inhabited worlds without official Minecraft assets.
-
-The unified update and runtime graphic lets you try both a panel update and a failed-update rollback. Its Minecraft processes and connected players keep running while the dashboard restarts or rolls back. The illustration runs locally in the page; it does not control a real server. An update to the runtime itself still requires a planned stop, as the adjacent explanation says.
-
-The technical graphics read like a datasheet: a frame, hairline dividers, a tab on the frame edge and small registration squares in the corners. Filled voxel scenes are the Minecraft side; outlined isometric drawings are CraftPanel's side. Only what is active turns green.
-
-## Motion
-
-Short and purposeful: state changes, typing terminals and demos on the website. The isometric scenes loop small, pixel-sized movements that show the machine at work: the world floats above the Pi that runs it while data rises to it, drive lights blink, players walk and chimneys smoke while the dashboard updates. Feature tiles and hardware cards settle in once as you scroll. Scenes pause off-screen. Everything respects `prefers-reduced-motion`; with it, demos show their end state and scenes stand still.
+This address remains available for existing bookmarks. Use `/docs/design-system/` for new links to the panel reference.

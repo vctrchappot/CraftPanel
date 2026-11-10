@@ -1,0 +1,49 @@
+---
+title: Panel design system
+description: "The rules, tokens, components and interaction patterns used to build the CraftPanel dashboard."
+---
+
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+CraftPanel's panel is a workspace for running Minecraft servers on your own hardware. Its design helps you answer three questions quickly: **What is happening? What needs attention? What can I do next?** This section documents the system behind that workspace, from the values in the stylesheet to complete page layouts.
+
+The panel, website and docs share colour tokens and fonts. Their composition differs: the panel is compact and task-oriented; the website has larger displays and product illustrations. A website hero is not a template for a settings page.
+
+## Explore the system
+
+<CardGrid>
+  <LinkCard title="Foundations" description="Exact light/dark colours, typography, spacing, corners and icons." href="/docs/design-system/foundations/" />
+  <LinkCard title="Components" description="Buttons, forms, panels, badges, feedback and overlays, with the real React API." href="/docs/design-system/components/" />
+  <LinkCard title="Layout and data" description="Application shell, navigation, responsive grids, charts, tables and consoles." href="/docs/design-system/layout-and-data/" />
+  <LinkCard title="States and accessibility" description="Lifecycle states, missing data, permissions, keyboard access and readable feedback." href="/docs/design-system/states-and-accessibility/" />
+  <LinkCard title="Implementation" description="Source files, token mapping, composition examples and the review process." href="/docs/design-system/implementation/" />
+</CardGrid>
+
+## Principles
+
+| Principle | What it means in a panel screen |
+| --- | --- |
+| **Make the server understandable** | Put identity, lifecycle state and relevant actions together. Keep related values and explanations close. |
+| **Use colour for meaning** | Warm neutral surfaces carry the workspace. Green, amber and red communicate state. Selection and ordinary actions use neutral ink. |
+| **Keep the hierarchy quiet** | Use size, spacing and a small number of borders. Large surfaces stay flat; a stack of decorative cards adds no information. |
+| **Show what is known** | Separate live data, recorded history, loading, unsupported features and unavailable readings. A missing measurement is not zero. |
+| **Make consequences clear** | Explain what a change affects and when it applies. Use specific verbs such as “Save settings”, “Restart server” and “Restore backup”. |
+| **Keep the system local** | Ship fonts and assets with CraftPanel. Do not add CDN fonts, icon scripts or remote embeds to panel screens. |
+
+## One system, three layers
+
+1. **Foundations:** `packages/ui/src/styles/tokens.css` defines palette, semantic roles, fonts and radii. The same semantic name adapts to each theme.
+2. **Shared components:** `@craftpanel/ui` supplies the panel's React primitives and composition helpers. Use their variants before introducing custom styles.
+3. **Product patterns:** `apps/web/src/components` composes the primitives into server headers, settings editors, performance charts, player profiles and other tasks.
+
+The documentation describes existing implementation where it gives a token, prop, dimension or source file. Recommendations and review checklists define how new work should fit that implementation; they are not a claim that every existing screen has been audited against every criterion.
+
+<Aside type="note" title="Using the examples">
+  The visual specimens in this section are static documentation examples built with the shared tokens. They do not connect to a Minecraft server. The accompanying React snippets show the components to use in the panel.
+</Aside>
+
+## Starting a new screen
+
+Start with the task and the data the user needs. Choose an existing page pattern, compose shared components, and fill in loading, empty, error and permission states before polishing the spacing. Check both themes and a narrow viewport as part of the same change.
+
+For implementation details and source links, continue to [Implementation](/docs/design-system/implementation/). The [contributor design notes](https://github.com/vctrchappot/CraftPanel/blob/main/docs/design/README.md) also cover the website's illustrations and brand assets.

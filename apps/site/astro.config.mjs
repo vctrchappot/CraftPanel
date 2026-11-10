@@ -48,12 +48,22 @@ export default defineConfig({
           ],
         },
         {
+          label: "Design system",
+          items: [
+            { label: "Overview", slug: "docs/design-system" },
+            { slug: "docs/design-system/foundations" },
+            { slug: "docs/design-system/components" },
+            { slug: "docs/design-system/layout-and-data" },
+            { slug: "docs/design-system/states-and-accessibility" },
+            { slug: "docs/design-system/implementation" },
+          ],
+        },
+        {
           label: "Reference",
           items: [
             { slug: "docs/reference/security" },
             { slug: "docs/reference/architecture" },
             { slug: "docs/reference/troubleshooting" },
-            { slug: "docs/reference/design-system" },
             { label: "Changelog", link: "https://github.com/vctrchappot/CraftPanel/blob/main/CHANGELOG.md", attrs: { target: "_blank" } },
           ],
         },

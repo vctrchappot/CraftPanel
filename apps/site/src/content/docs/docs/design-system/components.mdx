@@ -1,0 +1,187 @@
+---
+title: Components
+description: "How to choose and compose the panel's shared React components, with variants, sizes and usage examples."
+---
+
+import Specimen from "../../../../components/design-system/Specimen.astro";
+
+Import panel components from `@craftpanel/ui`. They define the shared appearance, sizing, focus treatment and disabled behaviour. Product-specific components, such as `StatusBadge` and `MetricChart`, live in `apps/web/src/components`.
+
+## Buttons and action hierarchy
+
+<Specimen kind="controls" />
+
+Use a clear primary action for the current task. Put related secondary actions next to it. Less frequent actions belong in a menu; consequential ones should state exactly what they will do.
+
+| `Button` variant | Role |
+| --- | --- |
+| `default` | Primary action, neutral foreground fill: save, create, apply |
+| `secondary` | Bordered alternative: cancel, restart, export |
+| `ghost` | Low-emphasis action: inspect, dismiss, reveal more |
+| `link` | Text action with underline on hover |
+| `destructive` | Destructive confirmation: delete, force-kill |
+| `destructive-ghost` | Destructive item before confirmation, with quieter emphasis |
+| `accent` | Semantic accent fill; the panel's accent is neutral |
+
+| `size` | Height | Use |
+| --- | --- | --- |
+| `xs` | 28 px | Dense inline action |
+| `sm` | 32 px | Table rows and compact toolbars |
+| `default` | 36 px | Regular forms and page actions |
+| `lg` | 40 px | More prominent action |
+| `icon` / `icon-sm` | 36 / 32 px square | Named icon-only control |
+
+```tsx
+import { Button } from "@craftpanel/ui";
+import { RotateCw, Save } from "lucide-react";
+
+<Button loading={saving} disabled={!dirty} onClick={save}>
+  <Save /> Save settings
+</Button>
+
+<Button variant="secondary" size="sm" onClick={restart}>
+  <RotateCw /> Restart server
+</Button>
+```
+
+`loading` adds a spinner and disables repeat activation. `disabled` is for an unavailable action; explain the reason nearby if it is not obvious. The component's default icon size is 16 px. Avoid adding a second spinner in the button's children.
+
+Use navigation links for a change of location. `asChild` lets the button styling wrap an appropriate link:
+
+```tsx
+<Button asChild variant="secondary">
+  <Link href="/servers/new/">Create a server</Link>
+</Button>
+```
+
+An icon-only control still needs a label such as `aria-label="Restart server"`. A tooltip may explain it, but is not a substitute for its accessible name.
+
+## Fields and controls
+
+`Field` groups a label, control, help or error message, and an optional aside. `Input`, `Textarea`, `NativeSelect` and `Switch` provide the control itself. Keep the label visible; placeholders are examples, not labels.
+
+| Component | Important props / behaviour |
+| --- | --- |
+| `Field` | `label`, `htmlFor`, `help`, `error`, `aside`; an error replaces the help message |
+| `Input` | Native input props; 36 px high, full width, styles `aria-invalid` |
+| `Textarea` | Native textarea props; use `rows` for the task's expected length |
+| `NativeSelect` | Native select props and keyboard behaviour; child `option` elements |
+| `Switch` | `checked`, `onCheckedChange`, `disabled`, `id`; backed by Radix |
+
+```tsx
+<Field
+  label="Server name"
+  htmlFor="server-name"
+  help={<span id="server-name-help">Shown in the sidebar and overview.</span>}
+>
+  <Input
+    id="server-name"
+    value={name}
+    onChange={(event) => setName(event.target.value)}
+    aria-describedby="server-name-help"
+  />
+</Field>
+```
+
+For validation, pass the message string to `Field.error` and set `aria-invalid` on the input. `Field` does not create description IDs or `aria-describedby` automatically; provide an identifiable description or error element in the composition when associating it with the control. Group related controls and place the save action at the end of that group. Show whether changes apply immediately or after a restart. Do not clear the user's draft when a save fails.
+
+For structured server properties, reuse the product's `SettingRow` pattern: label and explanation on the left, control on the right, stacking on narrow screens. A raw file editor belongs behind an explicit choice.
+
+## Page structure
+
+| Component | Responsibility | Main props |
+| --- | --- | --- |
+| `PageHeader` | Page identity, description and page actions | `title`, `description`, `actions` |
+| `Section` | One related task or information group | `title`, `description`, `actions`, `children` |
+| `Panel` | Border, surface and 6 px corner | Native div props and `className` |
+| `Stat` | A labelled reading and short context | `label`, `value`, `sub` |
+| `Separator` | A quiet divider | `vertical`, `className` |
+
+`Panel` adds no padding: choose `p-4`, `p-5` or `p-6` where it is composed. `Section` normally has 16 px between its header and children. Do not wrap every field in its own panel; a section with a divider is often clearer.
+
+`Stat` displays a 20 px value with tabular numerals. Its subtext is a short summary, not a place for essential multiline instructions: the implementation truncates it. Put longer explanations outside the stat.
+
+```tsx
+<Section title="Memory" description="Process memory for this server.">
+  <Panel className="p-5">
+    <Stat label="Current usage" value="1.8 GB" sub="4 GB Java heap configured" />
+  </Panel>
+</Section>
+```
+
+## Badges and feedback
+
+| Component | Use |
+| --- | --- |
+| `Badge` | Short state or metadata label; variants `default`, `info`, `outline`, `success`, `warning`, `danger` |
+| `Callout` | Context or consequence that belongs in the page; variants `info`, `warning`, `danger`, `success` |
+| `EmptyState` | No records or no selection; explain why and offer a relevant next action |
+| `Skeleton` | An area still loading; choose dimensions matching the expected content |
+| `Progress` | Determinate progress with `value` from 0 to 100; `null` means indeterminate |
+| `Tooltip` | Short supplemental explanation around a trigger |
+| `Kbd` | A keyboard shortcut hint |
+
+`Callout` accepts `title`, `icon` and `children`. Keep its action close to the explanation. It is a visual wrapper: it does not automatically announce itself as an alert. Use an appropriate live region when dynamically arriving feedback needs an announcement.
+
+```tsx
+<Callout icon={<RotateCw />} title="Restart required">
+  Settings are saved. Restart the server to apply them.
+</Callout>
+
+<Badge variant="warning">Restart required</Badge>
+<Progress value={42} />
+```
+
+Use `StatusBadge` for a server lifecycle state rather than manually recreating a `Badge` and dot. Toast feedback is handled by the product's `useAction` helper and Sonner; put persistent, actionable problems in the page as well.
+
+## Navigation and overlays
+
+| Pattern | Implementation | When to use it |
+| --- | --- | --- |
+| Server section navigation | Links in `ServerWorkspace` | Addressable views such as Console, Players and Performance |
+| Local tabs | `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent` | Related panels within one view; backed by Radix |
+| Segmented choice | `SegmentedControl` | One of a few options, such as a chart range; buttons report `aria-pressed` |
+| Choice cards | `ChoiceCard` | One of several options that need a title and a description (software, performance preset, network mode, schedule preset). Put them in a `role="group"` with an `aria-label`; the selection is a border and a faint fill |
+| Option switch | `SegmentedControl` | One of a few options shown side by side (time range, source); the selection slides to the new option. `Tabs` slide the same way; both use `SlidingIndicator` and respect reduced motion |
+| Disclosure | Native `details` / `summary` | Occasional advanced options, without leaving the task |
+| Action menu | `DropdownMenu` family | Secondary actions attached to a record or header |
+| Dialog | `Dialog`, `DialogContent`, `DialogHeader`, `DialogFooter` | A focused task that needs an overlay |
+| Consequential confirmation | `ConfirmDialog` | A destructive or costly action whose consequence needs acknowledgement |
+
+`SegmentedControl` takes `value`, `onValueChange` and an `options` array of `{ value, label, disabled? }`. Give the group `aria-label` or `aria-labelledby`. It uses the shared `SlidingIndicator` for a neutral selection highlight. Local `TabsList` uses the same indicator; a boolean on/off setting still uses `Switch`.
+
+```tsx
+<SegmentedControl
+  aria-label="Time range"
+  value={range}
+  onValueChange={setRange}
+  options={[
+    { value: 5, label: "5 min" },
+    { value: 15, label: "15 min" },
+    { value: 60, label: "1 hour" },
+  ]}
+/>
+```
+
+The indicator moves over 200 ms with an ease-out transition after its first placement. It skips that transition for reduced motion. Use `indicatorClassName` only when the surrounding pattern requires a different indicator treatment; preserve the shared motion and focus behaviour.
+
+Do not use `window.confirm`, `alert` or `prompt`. A question about a consequence is a `ConfirmDialog` (for example "Discard unsaved changes?"); feedback after an action is a toast.
+
+Dialogs use a 24 px content inset, a default `max-w-md` width and at most 90 vh with internal scrolling. `wide` selects `max-w-3xl`; the remaining viewport margin is 16 px on each side. Include a meaningful title and description. Keep cancel and confirm labels explicit.
+
+`ConfirmDialog` takes `open`, `onOpenChange`, `title`, `description`, `confirmLabel`, `destructive`, optional `confirmText`, and `onConfirm`. It keeps the dialog open until the returned promise resolves; typed confirmation must match `confirmText` exactly.
+
+```tsx
+<ConfirmDialog
+  open={deleteOpen}
+  onOpenChange={setDeleteOpen}
+  title="Delete Survival?"
+  description="The server files and worlds will be removed. Create a backup first."
+  confirmLabel="Delete server"
+  confirmText="Survival"
+  destructive
+  onConfirm={() => deleteServer(id)}
+/>
+```
+
+Check the actual operation before writing its consequence text: do not promise that backups are kept or deleted unless that operation does so. Confirmation should help users understand an action, not interrupt routine reversible edits.

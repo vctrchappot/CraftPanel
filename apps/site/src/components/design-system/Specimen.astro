@@ -1,0 +1,112 @@
+---
+interface Props {
+  kind: "type" | "controls" | "states" | "layout";
+}
+const { kind } = Astro.props;
+---
+
+<figure class="ds-example not-content" data-design-specimen={kind}>
+  <div class="ds-example-body">
+    {kind === "type" && (
+      <div class="ds-fonts">
+        <div><span class="ds-caption">Mona Sans · headings · 500</span><p class="ds-display">Your server. Your hardware.</p></div>
+        <div><span class="ds-caption">Inter · interface · 400 / 500</span><p>Everything you need to run your world.</p></div>
+        <div><span class="ds-caption">Mona Sans Mono · machine text · 400</span><p class="ds-mono">[20:03:14 INFO]: Done (8.412s)!</p></div>
+        <div><span class="ds-caption">Geist Serif · release notes · 400</span><p class="ds-serif">What's new in CraftPanel</p></div>
+      </div>
+    )}
+    {kind === "controls" && (
+      <div class="ds-stack">
+        <div class="ds-row" aria-label="Static button examples">
+          <span class="ds-button ds-primary">Save changes</span>
+          <span class="ds-button ds-secondary">Cancel</span>
+          <span class="ds-button ds-ghost">View details</span>
+          <span class="ds-button ds-destructive">Delete server</span>
+          <span class="ds-button ds-primary ds-disabled">Saving…</span>
+        </div>
+        <div class="ds-field">
+          <label for="ds-server-name">Server name</label>
+          <input id="ds-server-name" type="text" value="Survival" aria-describedby="ds-server-name-help" />
+          <small id="ds-server-name-help">Used in the sidebar and server overview. This example is not saved.</small>
+        </div>
+        <details class="ds-disclosure">
+          <summary>Advanced settings</summary>
+          <p>Keep occasional configuration here, close to the task it affects. Native disclosure remains keyboard accessible.</p>
+        </details>
+      </div>
+    )}
+    {kind === "states" && (
+      <div class="ds-stack">
+        <div class="ds-row" aria-label="Server status examples">
+          <span class="ds-badge ds-success"><span class="ds-dot" style="background: var(--cp-status-running)"></span>Running</span>
+          <span class="ds-badge ds-warning"><span class="ds-dot" style="background: var(--cp-status-starting)"></span>Starting</span>
+          <span class="ds-badge ds-default"><span class="ds-dot" style="background: var(--cp-status-stopped)"></span>Stopped</span>
+          <span class="ds-badge ds-danger"><span class="ds-dot" style="background: var(--cp-status-crashed)"></span>Crashed</span>
+        </div>
+        <div class="ds-callout"><strong>Restart required</strong><p>Your settings are saved. Restart the server to apply them.</p></div>
+        <div class="ds-reading"><span>Tick time</span><strong>—</strong><small>Waiting for the next sample</small></div>
+      </div>
+    )}
+    {kind === "layout" && (
+      <div class="ds-stack">
+        <div class="ds-example-header"><div><p class="ds-example-title">Survival</p><small>Paper 1.21.11 · Java 21 · 4 GB</small></div><span class="ds-badge ds-success"><span class="ds-dot" style="background: var(--cp-status-running)"></span>Running</span></div>
+        <div class="ds-example-nav"><span>Overview</span><span>Console</span><span class="ds-current">Performance</span><span>Settings</span></div>
+        <div class="ds-example-metrics">
+          <div class="ds-reading"><span>TPS</span><strong>20.0</strong><small>20 is the target</small></div>
+          <div class="ds-reading"><span>CPU</span><strong>34%</strong><small>100% = one core</small></div>
+          <div class="ds-reading"><span>Process memory</span><strong>1.8 GB</strong><small>4 GB Java heap configured</small></div>
+        </div>
+        <div class="ds-console"><div>[20:03:14 INFO]: Done (8.412s)!</div><div>[20:04:02 INFO]: Alex joined the game</div></div>
+      </div>
+    )}
+  </div>
+  <figcaption>Static panel specimen · colours and fonts follow the docs theme</figcaption>
+</figure>
+
+<style>
+  .ds-example { margin: 1.5rem 0; overflow: hidden; border: 1px solid var(--cp-border); border-radius: var(--cp-radius-lg); background: var(--cp-bg); color: var(--cp-fg); font-family: var(--cp-font-sans); font-size: 0.8125rem; line-height: 1.5; letter-spacing: var(--cp-tracking-body); }
+  .ds-example-body { padding: 1.25rem; }
+  .ds-example p { margin: 0; }
+  .ds-example strong { font-weight: 500; }
+  .ds-example small { color: var(--cp-fg-muted); font-size: 0.75rem; }
+  .ds-example figcaption { border-top: 1px solid var(--cp-border); padding: 0.625rem 1rem; color: var(--cp-fg-muted); font-size: 0.75rem; }
+  .ds-stack, .ds-fonts { display: grid; gap: 1.25rem; }
+  .ds-fonts > div + div { border-top: 1px solid var(--cp-border); padding-top: 1rem; }
+  .ds-caption { display: block; margin-bottom: 0.5rem; color: var(--cp-fg-muted); font-size: 0.75rem; }
+  .ds-display { font-family: var(--cp-font-display); font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 500; line-height: 1.2; letter-spacing: var(--cp-tracking-heading); }
+  .ds-mono, .ds-console { font-family: var(--cp-font-mono); letter-spacing: 0; overflow-wrap: anywhere; }
+  .ds-serif { font-family: var(--cp-font-serif); font-size: 1.5rem; font-weight: 400; }
+  .ds-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+  .ds-button { display: inline-flex; min-height: 2.25rem; align-items: center; justify-content: center; padding: 0.25rem 0.875rem; border: 1px solid transparent; border-radius: var(--cp-radius); font-size: 0.875rem; font-weight: 500; }
+  .ds-primary { background: var(--cp-fg); color: var(--cp-bg); }
+  .ds-secondary { background: var(--cp-surface); color: var(--cp-fg); border-color: var(--cp-border); }
+  .ds-ghost { color: var(--cp-fg-muted); }
+  .ds-destructive { background: var(--cp-danger); color: white; }
+  .ds-disabled { opacity: 0.5; }
+  .ds-field { display: grid; gap: 0.5rem; max-width: 24rem; }
+  .ds-field label { font-weight: 500; }
+  .ds-field input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 2.25rem; padding: 0.375rem 0.75rem; border: 1px solid var(--cp-border); border-radius: var(--cp-radius); background: var(--cp-surface); color: var(--cp-fg); font: inherit; }
+  .ds-field input:focus-visible, .ds-disclosure summary:focus-visible { outline: 2px solid var(--cp-accent); outline-offset: 3px; }
+  .ds-disclosure { border-top: 1px solid var(--cp-border); padding-top: 1rem; }
+  .ds-disclosure summary { cursor: pointer; font-weight: 500; }
+  .ds-disclosure p { margin-top: 0.75rem; color: var(--cp-fg-muted); }
+  .ds-badge { display: inline-flex; flex: none; align-items: center; gap: 0.375rem; padding: 0.125rem 0.375rem; border: 1px solid var(--cp-border); border-radius: var(--cp-radius-sm); font-size: 0.75rem; font-weight: 500; white-space: nowrap; }
+  .ds-dot { width: 0.375rem; height: 0.375rem; border-radius: 50%; }
+  .ds-success { color: var(--cp-success); border-color: color-mix(in srgb, var(--cp-success) 20%, transparent); background: color-mix(in srgb, var(--cp-success) 10%, transparent); }
+  .ds-warning { color: var(--cp-warning); border-color: color-mix(in srgb, var(--cp-warning) 25%, transparent); background: color-mix(in srgb, var(--cp-warning) 10%, transparent); }
+  .ds-danger { color: var(--cp-danger); border-color: color-mix(in srgb, var(--cp-danger) 20%, transparent); background: color-mix(in srgb, var(--cp-danger) 10%, transparent); }
+  .ds-default { color: var(--cp-fg-muted); background: var(--cp-surface-muted); }
+  .ds-callout { display: grid; gap: 0.25rem; padding: 0.75rem 1rem; border: 1px solid var(--cp-border); border-radius: var(--cp-radius-lg); background: var(--cp-surface-muted); }
+  .ds-callout p { color: var(--cp-fg-muted); }
+  .ds-reading { display: grid; gap: 0.25rem; min-width: 0; padding: 1rem; border: 1px solid var(--cp-border); border-radius: var(--cp-radius-lg); background: var(--cp-surface); }
+  .ds-reading > span { color: var(--cp-fg-muted); font-size: 0.75rem; font-weight: 500; }
+  .ds-reading strong { font-size: 1.5rem; line-height: 1.25; font-variant-numeric: tabular-nums; letter-spacing: var(--cp-tracking-heading); }
+  .ds-example-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+  .ds-example-title { font-family: var(--cp-font-display); font-size: 1.5rem; font-weight: 500; letter-spacing: var(--cp-tracking-heading); }
+  .ds-example-nav { display: flex; gap: 1.25rem; overflow-x: auto; border-bottom: 1px solid var(--cp-border); color: var(--cp-fg-muted); }
+  .ds-example-nav span { flex: none; padding: 0.5rem 0; }
+  .ds-example-nav .ds-current { border-bottom: 2px solid var(--cp-fg); color: var(--cp-fg); font-weight: 500; }
+  .ds-example-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+  .ds-console { padding: 1rem; border-radius: var(--cp-radius-lg); background: var(--cp-console); color: var(--cp-console-fg); font-size: 0.75rem; }
+  @media (max-width: 42rem) { .ds-example-metrics { grid-template-columns: 1fr; } .ds-example-body { padding: 1rem; } }
+</style>

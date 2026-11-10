@@ -1,5 +1,10 @@
 # Implementation status
 
+## Panel design-system documentation (2026-11-10)
+
+- Dedicated six-page docs section: overview, foundations, components, layout/data, states/accessibility and implementation. Colour tables resolve 24 semantic tokens from the shared stylesheet at build time; four static specimen types follow the docs theme. The old reference URL remains available, with links to the new chapters, and contributor notes link to the detailed reference.
+- 🧪 The 28-page production site build passes. Chromium checks cover all six chapters and their sidebar active states, 48 local links/anchors, the legacy URL, both themes at 320/390/768/1024/1440 px, input focus and keyboard disclosure, with no page overflow, browser errors or failed requests. These checks verify the documentation and examples, not a complete panel accessibility audit.
+
 ## Optional live world map (2026-11-10)
 
 - World map is activated under Plugins/Mods → Browse. CraftPanel installs/configures BlueMap and starts or gracefully restarts Minecraft. Setup progress stays with the plugin; the Map tab is revealed only after BlueMap serves a working settings file, and remains discoverable while the server is offline. Removing/disabling the jar hides it again.

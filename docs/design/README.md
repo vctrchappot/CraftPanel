@@ -1,6 +1,16 @@
 # Design system
 
-One set of tokens and one type family for the dashboard (`apps/web`), the website and the user docs (`apps/site`). The public reference with swatches and examples is [craftpanel.vctr.site/docs/reference/design-system/](https://craftpanel.vctr.site/docs/reference/design-system/); this page is for changing it.
+One set of tokens and one type family for the dashboard (`apps/web`), the website and the user docs (`apps/site`). The detailed public panel reference is [craftpanel.vctr.site/docs/design-system/](https://craftpanel.vctr.site/docs/design-system/); this page is the contributor entry point and also covers website branding and illustrations. The old `/docs/reference/design-system/` URL remains as a pointer.
+
+## Panel reference
+
+- [Foundations](https://craftpanel.vctr.site/docs/design-system/foundations/): exact token values resolved from the source, type hierarchy, spacing, corners and panel icons.
+- [Components](https://craftpanel.vctr.site/docs/design-system/components/): shared React APIs, variants, sizes, form composition and overlays.
+- [Layout and data](https://craftpanel.vctr.site/docs/design-system/layout-and-data/): shell dimensions, responsive composition, settings, charts, lists and console patterns.
+- [States and accessibility](https://craftpanel.vctr.site/docs/design-system/states-and-accessibility/): lifecycle mapping, request states, permissions, contrast and interaction review requirements.
+- [Implementation](https://craftpanel.vctr.site/docs/design-system/implementation/): source map, token aliases, composition and verification workflow.
+
+The documentation specimens are static Astro examples using the shared tokens; the panel continues to use the React primitives in `@craftpanel/ui`. Recommendations and review requirements are distinguished from existing behaviour and are not a claim of a complete accessibility audit.
 
 ## Where things live
 
