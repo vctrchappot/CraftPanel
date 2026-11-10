@@ -498,8 +498,43 @@ if (backupEl) {
 }
 
 // ---- closer look ---------------------------------------------------------------
+// Picking a legend number zooms the screenshot onto that spot; picking it again, the button, Esc or a click zooms out.
+const look = document.querySelector<HTMLElement>("[data-look]");
+const lookOut = document.querySelector<HTMLButtonElement>("[data-look-out]");
+let zoomed: string | null = null;
+const zoom = (ref: string | null) => {
+  zoomed = ref;
+  if (look) look.toggleAttribute("data-zoomed", !!ref);
+  if (lookOut) lookOut.hidden = !ref;
+  for (const b of document.querySelectorAll<HTMLElement>("[data-spot-ref]")) b.setAttribute("aria-pressed", String(b.dataset.spotRef === ref));
+  for (const s of document.querySelectorAll<HTMLElement>(".spot")) {
+    const on = s.dataset.spot === ref;
+    s.classList.toggle("is-hint", on);
+    const stage = s.closest<HTMLElement>(".look-zoom");
+    if (!on || !stage) continue;
+    stage.style.setProperty("--zx", `${s.dataset.x}%`);
+    stage.style.setProperty("--zy", `${s.dataset.y}%`);
+    // Ask for a sharper source at the zoomed size; the browser keeps the larger one once it has it.
+    const width = Math.round(stage.offsetWidth * (matchMedia("(max-width: 620px)").matches ? 3 : 2));
+    stage.querySelectorAll("img").forEach((img) => (img.sizes = `${width}px`));
+  }
+};
+for (const b of document.querySelectorAll<HTMLButtonElement>("[data-spot-ref]")) {
+  b.addEventListener("click", () => zoom(zoomed === b.dataset.spotRef ? null : b.dataset.spotRef!));
+  b.addEventListener("mouseenter", () => !zoomed && document.querySelector(`[data-spot="${b.dataset.spotRef}"]`)?.classList.add("is-hint"));
+  b.addEventListener("mouseleave", () => !zoomed && document.querySelector(`[data-spot="${b.dataset.spotRef}"]`)?.classList.remove("is-hint"));
+}
+lookOut?.addEventListener("click", () => zoom(null));
+document.querySelectorAll(".look-zoom").forEach((z) => z.addEventListener("click", (e) => {
+  if (zoomed && !(e.target as Element).closest(".spot")) zoom(null);
+}));
+addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && zoomed) zoom(null);
+});
+
 const lookTabs = [...document.querySelectorAll<HTMLButtonElement>("[data-look-tabs] [role=tab]")];
 roving(lookTabs, (tab) => {
+  zoom(null);
   for (const t of lookTabs) {
     const on = t === tab;
     t.setAttribute("aria-selected", String(on));
@@ -512,18 +547,9 @@ roving(lookTabs, (tab) => {
     if (legend) legend.hidden = !on;
   }
 });
-// Touch: a tap toggles the tooltip; the legend highlights its hotspot on hover.
+// A marker zooms like its legend entry; while zoomed out, hover and focus still show its tooltip.
 for (const spot of document.querySelectorAll<HTMLButtonElement>(".spot")) {
-  spot.addEventListener("click", () => {
-    const open = spot.classList.toggle("is-open");
-    document.querySelectorAll(".spot.is-open").forEach((s) => s !== spot && s.classList.remove("is-open"));
-    if (!open) spot.blur();
-  });
-}
-for (const item of document.querySelectorAll<HTMLElement>("[data-spot-ref]")) {
-  const spot = document.querySelector<HTMLElement>(`[data-spot="${item.dataset.spotRef}"]`);
-  item.addEventListener("mouseenter", () => spot?.classList.add("is-hint"));
-  item.addEventListener("mouseleave", () => spot?.classList.remove("is-hint"));
+  spot.addEventListener("click", () => zoom(zoomed === spot.dataset.spot ? null : spot.dataset.spot!));
 }
 
 // ---- footer console --------------------------------------------------------------

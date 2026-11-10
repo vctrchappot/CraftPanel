@@ -26,7 +26,7 @@ In development the dashboard calls the API cross-origin (`NEXT_PUBLIC_API_URL`),
 
 `apps/site` is the public website at [craftpanel.vctr.site](https://craftpanel.vctr.site): a landing page (`src/pages/index.astro`) and the user documentation (`src/content/docs/docs/*.mdx`). Vercel builds it from `main` with `apps/site` as the root directory (`apps/site/vercel.json`). It isn't part of the release archive.
 
-- Screenshots in `src/assets/screenshots` come from a throwaway instance with demo servers: `node scripts/site-screenshots.mjs <base> <user> <password> <serverId>` (dark and light).
+- Screenshots in `src/assets/screenshots` come from a throwaway instance with demo servers: `node scripts/site-screenshots.mjs <base> <user> <password> <serverId>` (dark and light). Keep the server running with a dashboard open on it for about 15 minutes first (metrics are only sampled while someone watches), ideally with a few mineflayer bots online. The assistant shot uses a scripted model on localhost and puts the instance's assistant settings back afterwards. After a refresh, check the hotspot positions in `apps/site/src/pages/index.astro` (`looks`; percentages of the 1440×900 viewport).
 - The social preview `public/og.png` is rendered from `scripts/og.html` with `node apps/site/scripts/og.mjs`.
 - When behaviour that users see changes, update the matching docs page in the same commit.
 

@@ -222,10 +222,10 @@ const looks = [
     label: "Overview",
     alt: "Server overview with players, CPU, memory, TPS, uptime, storage, the last console lines and connection addresses",
     spots: [
-      { x: 96.2, y: 20.5, text: "Players, CPU, memory, TPS, uptime and disk, refreshed live." },
-      { x: 65.9, y: 47.2, text: "The newest console lines, without opening the console." },
-      { x: 95.2, y: 39.2, text: "Addresses to copy for this computer, your LAN and your VPN." },
-      { x: 87.7, y: 10.7, text: "Start, stop, restart. Force-kill is for Administrators only." },
+      { x: 95.8, y: 20.5, text: "Players, CPU, memory, TPS, uptime and disk, refreshed live." },
+      { x: 66, y: 50, text: "The newest console lines, without opening the console." },
+      { x: 89.5, y: 49.5, text: "Addresses to copy for this computer, your LAN and your VPN." },
+      { x: 88.3, y: 9.6, text: "Start, stop, restart. Force-kill is for Administrators only." },
     ],
   },
   {
@@ -233,9 +233,19 @@ const looks = [
     label: "Console",
     alt: "Live Minecraft console with a filter, level selector and command input",
     spots: [
-      { x: 66.6, y: 21.9, text: "Filter by text or log level. Download or copy the log." },
-      { x: 31.2, y: 27.1, text: "Live. After a dashboard restart it reconnects and replays what you missed." },
-      { x: 88, y: 91.6, text: "Commands go to Minecraft only, never to a shell. ↑ and ↓ browse history." },
+      { x: 72.5, y: 21.7, text: "Filter by text or log level. Download or copy the log." },
+      { x: 31, y: 27, text: "Live. After a dashboard restart it reconnects and replays what you missed." },
+      { x: 88, y: 92, text: "Commands go to Minecraft only, never to a shell. ↑ and ↓ browse history." },
+    ],
+  },
+  {
+    key: "performance",
+    label: "Performance",
+    alt: "Performance tab with live charts for TPS, tick time, CPU, memory and players",
+    spots: [
+      { x: 66, y: 30.6, text: "TPS and tick time against the 50 ms budget. Lag shows where it happened." },
+      { x: 52.5, y: 70.6, text: "CPU, memory against the Java heap, and players over the same hour." },
+      { x: 78, y: 22.7, text: "Five minutes to an hour. Hover or touch a chart to read a moment." },
     ],
   },
   {
@@ -243,20 +253,30 @@ const looks = [
     label: "Plugins",
     alt: "Plugin browser with Modrinth results marked as compatible with Minecraft 1.21.4",
     spots: [
-      { x: 96.1, y: 20.3, text: "Plugins are code. CraftPanel says so, every time." },
-      { x: 18.2, y: 46.4, text: "Switch between Modrinth and Hangar." },
-      { x: 41, y: 52.4, text: "Checked against your exact Minecraft version before you install." },
-      { x: 87.4, y: 53.4, text: "One click. The download is verified against its checksum." },
+      { x: 95.5, y: 22.5, text: "Plugins are code. CraftPanel says so, every time." },
+      { x: 30, y: 57.4, text: "Switch between Modrinth and Hangar." },
+      { x: 44, y: 74.6, text: "Checked against your exact Minecraft version before you install." },
+      { x: 89, y: 75.1, text: "One click. The download is verified against its checksum." },
+    ],
+  },
+  {
+    key: "assistant",
+    label: "Assistant",
+    alt: "The optional AI assistant beside the server overview, asking for approval before it whitelists a player",
+    spots: [
+      { x: 95, y: 15.8, text: "Ask in plain words. It reads status, players and the console for you." },
+      { x: 85.5, y: 32.7, text: "Changes wait for Approve. Decline, and nothing happens." },
+      { x: 80, y: 3.5, text: "Optional, with your own key: Claude, OpenAI or a local model." },
     ],
   },
   {
     key: "servers",
     label: "All servers",
-    alt: "Server list with a running Paper server and a stopped Fabric server",
+    alt: "Server list with a running Paper server and two stopped servers",
     spots: [
-      { x: 39.1, y: 19.4, text: "Status at a glance: running, stopped, starting, crashed." },
-      { x: 85.6, y: 7.9, text: "The eight-step wizard: software, version, world, memory, network." },
-      { x: 11.3, y: 36.7, text: "Every server one click away, with its player count." },
+      { x: 42.5, y: 19.7, text: "Status at a glance: running, stopped, starting, crashed." },
+      { x: 87.5, y: 7.8, text: "The eight-step wizard: software, version, world, memory, network." },
+      { x: 15.5, y: 42, text: "Every server one click away, with its player count." },
     ],
   },
 ] as const;
@@ -698,41 +718,51 @@ const backups = [
               }
             </div>
           </header>
-          <div class="look">
+          <div class="look" data-look>
             <div class="window">
               <div class="window-bar" aria-hidden="true"><span class="pv-dots"><i></i><i></i><i></i></span><span class="mono">craftpanel · localhost:8080</span></div>
               <div class="look-stage">
                 {
                   looks.map((l, i) => (
                     <div class="look-panel" role="tabpanel" id={`look-${l.key}`} aria-labelledby={`look-tab-${l.key}`} data-active={i === 0 ? "true" : "false"} inert={i !== 0}>
-                      <Shot name={l.key} alt={l.alt} eager={i === 0} />
-                      {l.spots.map((s, n) => (
-                        <button
-                          type="button"
-                          class="spot"
-                          style={`left:${s.x}%;top:${s.y}%`}
-                          aria-describedby={`spot-${l.key}-${n}`}
-                          data-spot={`${l.key}-${n}`}
-                          data-v={s.y < 18 ? "below" : undefined}
-                          data-h={s.x > 74 ? "end" : s.x < 22 ? "start" : undefined}
-                        >
-                          <span class="spot-n mono">{n + 1}</span>
-                          <span class="spot-tip" role="tooltip" id={`spot-${l.key}-${n}`}>{s.text}</span>
-                        </button>
-                      ))}
+                      <div class="look-zoom">
+                        <Shot name={l.key} alt={l.alt} eager={i === 0} />
+                        {l.spots.map((s, n) => (
+                          <button
+                            type="button"
+                            class="spot"
+                            style={`left:${s.x}%;top:${s.y}%`}
+                            aria-describedby={`spot-${l.key}-${n}`}
+                            data-spot={`${l.key}-${n}`}
+                            data-x={s.x}
+                            data-y={s.y}
+                            data-v={s.y < 18 ? "below" : undefined}
+                            data-h={s.x > 74 ? "end" : s.x < 22 ? "start" : undefined}
+                          >
+                            <span class="spot-n mono">{n + 1}</span>
+                            <span class="spot-tip" role="tooltip" id={`spot-${l.key}-${n}`}>{s.text}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   ))
                 }
+                <button type="button" class="look-out mono" data-look-out hidden>
+                  <UiIcon name="search" size={12} /> Whole screen
+                </button>
               </div>
             </div>
             <div class="look-legend">
+              <p class="look-hint mono">Pick a number to zoom in.</p>
               {
                 looks.map((l, i) => (
-                  <ol class="legend mono" data-legend={l.key} hidden={i !== 0}>
+                  <ol class="legend" data-legend={l.key} hidden={i !== 0}>
                     {l.spots.map((s, n) => (
-                      <li data-spot-ref={`${l.key}-${n}`}>
-                        <span class="legend-n">{n + 1}</span>
-                        <span>{s.text}</span>
+                      <li>
+                        <button type="button" data-spot-ref={`${l.key}-${n}`} aria-pressed="false">
+                          <span class="legend-n mono">{n + 1}</span>
+                          <span>{s.text}</span>
+                        </button>
                       </li>
                     ))}
                   </ol>
@@ -828,7 +858,7 @@ const backups = [
                 <span class="fact-badge mono">{release.tag}</span>{releaseDate && <span class="muted"> {releaseDate}</span>} · <a href={release.url}>Release notes</a>
               </dd>
             </div>
-            <div><dt class="mono">tests</dt><dd>260+ automated tests, plus real-server scenarios with a bot that joins and chats</dd></div>
+            <div><dt class="mono">tests</dt><dd>400+ automated tests, plus real-server scenarios with a bot that joins and chats</dd></div>
             <div><dt class="mono">ci</dt><dd>Every push: Linux, Windows, macOS and ARM64</dd></div>
             <div><dt class="mono">license</dt><dd><a href={`${github}/blob/main/LICENSE`}>FSL-1.1-ALv2</a>, Apache-2.0 after two years</dd></div>
             <div><dt class="mono">telemetry</dt><dd><span class="fact-none"><UiIcon name="check" size={12} /><strong>None.</strong></span> Not even a counter.</dd></div>

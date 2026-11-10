@@ -4,7 +4,7 @@ import { Image } from "astro:assets";
 import type { ImageMetadata } from "astro";
 
 interface Props {
-  name: "overview" | "console" | "plugins" | "servers" | "new-server";
+  name: "overview" | "console" | "performance" | "plugins" | "assistant" | "servers" | "new-server";
   alt: string;
   eager?: boolean;
 }
@@ -12,7 +12,7 @@ const { name, alt, eager = false } = Astro.props;
 const images = import.meta.glob<{ default: ImageMetadata }>("../assets/screenshots/*.png", { eager: true });
 const pick = (scheme: string) => images[`../assets/screenshots/${name}-${scheme}.png`].default;
 const widths = [720, 1200, 1600, 2400];
-const sizes = "(min-width: 1280px) 900px, 100vw";
+const sizes = "(min-width: 1280px) 1170px, 100vw";
 ---
 
 <Image class="shot-img if-dark" src={pick("dark")} alt={alt} widths={widths} sizes={sizes} format="webp" quality={82} loading={eager ? "eager" : "lazy"} />
