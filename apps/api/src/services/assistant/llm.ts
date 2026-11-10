@@ -1,0 +1,169 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { AppError, ASSISTANT_PROVIDER_INFO, type AssistantSettings } from "@craftpanel/shared";
+
+// One model call in a provider-neutral shape. The assistant keeps its history in these types and each provider
+// translates it; Anthropic's own content blocks are kept as they came back, because thinking blocks must be
+// sent back unchanged.
+
+export interface ToolSpec {
+  name: string;
+  description: string;
+  /** JSON Schema of the input object. */
+  parameters: Record<string, unknown>;
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export type ChatMessage =
+  | { role: "user"; text: string }
+  | { role: "assistant"; text: string; toolCalls: ToolCall[]; raw?: { provider: "anthropic"; content: unknown[] } }
+  | { role: "tool"; results: { id: string; content: string; isError: boolean }[] };
+
+export interface ModelReply {
+  text: string;
+  toolCalls: ToolCall[];
+  raw?: { provider: "anthropic"; content: unknown[] };
+  /** "refusal": the model declined; "length": it ran out of output tokens. */
+  stop: "end" | "tool" | "length" | "refusal";
+}
+
+export interface ModelRequest {
+  system: string;
+  messages: ChatMessage[];
+  tools: ToolSpec[];
+  signal?: AbortSignal;
+}
+
+export type ModelClient = (req: ModelRequest) => Promise<ModelReply>;
+
+const TIMEOUT_MS = 90_000;
+
+// Current Claude models accept a server-side fallback when their safety classifiers decline a request.
+const FALLBACK_MODELS = new Set(["claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"]);
+
+export function createModelClient(settings: AssistantSettings, fetchImpl: typeof fetch = fetch): ModelClient {
+  return settings.provider === "anthropic" ? anthropicClient(settings, fetchImpl) : chatCompletionsClient(settings, fetchImpl);
+}
+
+function anthropicClient(s: AssistantSettings, fetchImpl: typeof fetch): ModelClient {
+  const client = new Anthropic({
+    apiKey: s.apiKey,
+    baseURL: s.baseUrl || undefined,
+    fetch: fetchImpl,
+    timeout: TIMEOUT_MS,
+    maxRetries: 2,
+  });
+  const fallback = FALLBACK_MODELS.has(s.model) && !s.baseUrl;
+  return async ({ system, messages, tools, signal }) => {
+    try {
+      const res = await client.beta.messages.create(
+        {
+          model: s.model,
+          max_tokens: 16000,
+          system,
+          messages: messages.map(toAnthropic) as Anthropic.Beta.BetaMessageParam[],
+          tools: tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters as Anthropic.Beta.BetaTool["input_schema"] })),
+          ...(fallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+        },
+        { signal },
+      );
+      const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n").trim();
+      const toolCalls = res.content.flatMap((b) => (b.type === "tool_use" ? [{ id: b.id, name: b.name, input: (b.input ?? {}) as Record<string, unknown> }] : []));
+      const stop = res.stop_reason === "refusal" ? "refusal" : res.stop_reason === "max_tokens" ? "length" : toolCalls.length ? "tool" : "end";
+      return { text, toolCalls, stop, raw: { provider: "anthropic", content: res.content } };
+    } catch (err) {
+      throw providerError(err instanceof Anthropic.APIError ? err.status : undefined, err);
+    }
+  };
+}
+
+function toAnthropic(m: ChatMessage): unknown {
+  if (m.role === "user") return { role: "user", content: m.text };
+  if (m.role === "tool")
+    return { role: "user", content: m.results.map((r) => ({ type: "tool_result", tool_use_id: r.id, content: r.content, is_error: r.isError })) };
+  if (m.raw?.provider === "anthropic") return { role: "assistant", content: m.raw.content };
+  return {
+    role: "assistant",
+    content: [...(m.text ? [{ type: "text", text: m.text }] : []), ...m.toolCalls.map((c) => ({ type: "tool_use", id: c.id, name: c.name, input: c.input }))],
+  };
+}
+
+interface ChatCompletion {
+  choices?: {
+    finish_reason?: string;
+    message?: { content?: string | null; refusal?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] };
+  }[];
+  error?: { message?: string };
+}
+
+function chatCompletionsClient(s: AssistantSettings, fetchImpl: typeof fetch): ModelClient {
+  const base = (s.baseUrl || ASSISTANT_PROVIDER_INFO[s.provider].defaultBaseUrl).replace(/\/+$/, "");
+  return async ({ system, messages, tools, signal }) => {
+    const body = {
+      model: s.model,
+      messages: [{ role: "system", content: system }, ...messages.flatMap(toChatCompletions)],
+      tools: tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })),
+    };
+    let res: Response;
+    try {
+      res = await fetchImpl(`${base}/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(s.apiKey ? { authorization: `Bearer ${s.apiKey}` } : {}) },
+        body: JSON.stringify(body),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]) : AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch (err) {
+      throw providerError(undefined, err);
+    }
+    const json = (await res.json().catch(() => ({}))) as ChatCompletion;
+    if (!res.ok) throw providerError(res.status, new Error(json.error?.message ?? res.statusText));
+    const choice = json.choices?.[0];
+    const msg = choice?.message ?? {};
+    const toolCalls = (msg.tool_calls ?? []).map((c) => ({ id: c.id, name: c.function.name, input: parseArguments(c.function.arguments) }));
+    if (msg.refusal) return { text: msg.refusal, toolCalls: [], stop: "refusal" };
+    const stop = choice?.finish_reason === "length" ? "length" : toolCalls.length ? "tool" : "end";
+    return { text: (msg.content ?? "").trim(), toolCalls, stop };
+  };
+}
+
+function toChatCompletions(m: ChatMessage): unknown[] {
+  if (m.role === "user") return [{ role: "user", content: m.text }];
+  if (m.role === "tool") return m.results.map((r) => ({ role: "tool", tool_call_id: r.id, content: r.isError ? `Error: ${r.content}` : r.content }));
+  return [
+    {
+      role: "assistant",
+      content: m.text || null,
+      ...(m.toolCalls.length
+        ? { tool_calls: m.toolCalls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.input) } })) }
+        : {}),
+    },
+  ];
+}
+
+function parseArguments(raw: string): Record<string, unknown> {
+  try {
+    const v = JSON.parse(raw || "{}");
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Turns a provider failure into a message the dashboard can show, without echoing the key. */
+function providerError(status: number | undefined, err: unknown): AppError {
+  const detail = err instanceof Error ? err.message.slice(0, 300) : "";
+  if ((err as Error)?.name === "AbortError" || (err as Error)?.name === "APIUserAbortError") return new AppError(499, "assistant_cancelled", "Stopped");
+  if (status === 401 || status === 403)
+    return new AppError(502, "assistant_auth", "The AI provider rejected the API key", "Check the key in Settings → AI assistant.");
+  if (status === 404)
+    return new AppError(502, "assistant_model", "The AI provider does not know this model or endpoint", "Check the model name and the base URL in Settings → AI assistant.");
+  if (status === 429)
+    return new AppError(502, "assistant_rate_limited", "The AI provider is rate limiting requests or the account is out of credit", "Wait a moment, or check the plan and billing with the provider.");
+  if (status === undefined)
+    return new AppError(502, "assistant_unreachable", "Could not reach the AI provider", detail || "Check the base URL and this computer's internet connection.");
+  return new AppError(502, "assistant_provider_error", `The AI provider answered with an error (${status})`, detail || undefined);
+}

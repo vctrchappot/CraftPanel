@@ -19,10 +19,11 @@ import { PregenService } from "./services/pregen";
 import { ProxyService } from "./services/proxy";
 import { NotificationService } from "./services/notifications";
 import { runtimeAccess } from "./services/runtime-access";
+import { AssistantService } from "./services/assistant/service";
 import { MapService } from "./services/map";
 
 /** Wire up persistence, runtime and services. Does not start listening. */
-export async function createContext(config: AppConfig, opts: { migrationsFolder?: string; installRoot?: string; agent?: RuntimeAgent } = {}): Promise<AppContext> {
+export async function createContext(config: AppConfig, opts: { migrationsFolder?: string; installRoot?: string; agent?: RuntimeAgent; assistantFetch?: typeof fetch } = {}): Promise<AppContext> {
   const L = config.layout;
   for (const dir of [L.root, L.servers, L.backups, L.java, L.cache, L.logs, L.tmp]) await fsp.mkdir(dir, { recursive: true });
   // Clear leftovers from interrupted uploads/exports.
@@ -51,6 +52,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const proxies = new ProxyService(servers, game, activity);
   const notifications = new NotificationService(settings, updates);
   activity.listen((event, serverName) => notifications.onEvent(event, serverName));
+  const assistant = new AssistantService({ settings, sessions, servers, game, backups, schedules, activity }, opts.assistantFetch);
 
   // First-run protection: on non-loopback binds, creating the owner needs a token
   // that only someone with access to the host (console or data dir) can read.
@@ -62,5 +64,5 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
     await fsp.writeFile(tokenFile, setupToken + "\n", { mode: 0o600 });
   } else await fsp.rm(tokenFile, { force: true });
 
-  return { config, database, agent, hub, sessions, activity, servers, backups, schedules, game, pregen, maps, proxies, settings, updates, notifications, java, setupToken };
+  return { config, database, agent, hub, sessions, activity, servers, backups, schedules, game, pregen, maps, proxies, settings, updates, notifications, java, assistant, setupToken };
 }

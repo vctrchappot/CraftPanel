@@ -12,6 +12,7 @@ scripts/real-tests/run.sh <api-port> <data-dir> <scenario.mjs> [args…]
 | Scenario | Args | What it checks |
 |---|---|---|
 | `live-map.mjs` | `[mcVersion] [mcPort] [--browser]` | Activate BlueMap on Paper, automatic setup/start and delayed page visibility, real protected viewer/assets, 2D settings, hidden dimensions and players, pause/resume, public password access. Optional Chromium check starts the actual WebGL viewer. `CP_MAP_SERVER` reuses a throwaway server fixture. |
+| `assistant.mjs` | `[mcPort] [modelPort]` | AI assistant on Paper with a scripted OpenAI-compatible model on localhost: status read without approval, an approved `list` returns the real console answer, an approved whitelist change, a declined ban, audit entries as "owner (AI assistant)". `KEEP_OPEN=<file>` keeps the instance up for a browser look. |
 | `software-switch.mjs` | – | A block placed in Paper's Nether survives Paper → Vanilla → Fabric → Paper; downgrade guard. |
 | `info-card.mjs` | `<phase> <state-file> <tools-dir> [mcVersion] [mcPort]` | `/craftpanel` card with a real player (mineflayer): current version and software, read from the running game; two phases around a dashboard-only restart. |
 | `host-fit.mjs` | `[mcVersion] [mcPort]` | Host detection (board, usable memory, cores) in `/api/system` and the hardware fit of a server plan against this machine. |

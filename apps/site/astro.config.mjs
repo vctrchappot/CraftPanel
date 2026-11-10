@@ -34,6 +34,7 @@ export default defineConfig({
             { slug: "docs/guides/worlds-and-backups" },
             { slug: "docs/guides/players" },
             { slug: "docs/guides/automation-and-notifications" },
+            { slug: "docs/guides/ai-assistant" },
             { slug: "docs/guides/performance" },
             { slug: "docs/guides/velocity" },
             { slug: "docs/guides/networking" },

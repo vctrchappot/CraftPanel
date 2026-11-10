@@ -1,6 +1,6 @@
 import { appSettings, eq, type Database } from "@craftpanel/database";
 import type { AccessPolicy } from "@craftpanel/network";
-import { NOTIFICATION_CATEGORIES, type NotificationCategory, type Role } from "@craftpanel/shared";
+import { ASSISTANT_DEFAULTS, NOTIFICATION_CATEGORIES, type AssistantSettings, type NotificationCategory, type Role } from "@craftpanel/shared";
 
 export interface EmailSettings {
   enabled: boolean;
@@ -45,6 +45,8 @@ export interface AppSettings {
   lastRunVersion: string | null;
   /** finishedAt of the last installer result already reported. */
   lastUpdateResultAt: number | null;
+  /** The optional AI assistant (Settings → AI assistant); off until the owner adds a provider. */
+  assistant: AssistantSettings;
 }
 
 const DEFAULTS: AppSettings = {
@@ -65,6 +67,7 @@ const DEFAULTS: AppSettings = {
   notifyLastUpdate: null,
   lastRunVersion: null,
   lastUpdateResultAt: null,
+  assistant: ASSISTANT_DEFAULTS,
 };
 
 export class SettingsService {
@@ -109,6 +112,7 @@ export class SettingsService {
       // The webhook URL is itself the credential.
       notifyDiscordWebhook: s.notifyDiscordWebhook ? REDACTED : "",
       notifyEmail: { ...s.notifyEmail, password: s.notifyEmail.password ? REDACTED : "" },
+      assistant: { ...ASSISTANT_DEFAULTS, ...s.assistant, apiKey: s.assistant?.apiKey ? REDACTED : "" },
     };
   }
 }

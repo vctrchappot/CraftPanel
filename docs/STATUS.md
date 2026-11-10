@@ -1,5 +1,10 @@
 # Implementation status
 
+## Optional AI assistant (2026-11-10)
+
+- Bring-your-own-key assistant in the dashboard (sidebar entry, Ctrl+I) with an owner settings page. Providers: Anthropic through the official SDK (thinking blocks passed back unchanged, server-side refusal fallback on current Claude models), OpenAI and OpenAI-compatible Chat Completions APIs. 19 tools in eight switchable groups (servers, console, players, plugins, backups, automation, server settings, files) call the same services as the routes; each call re-resolves the user's session and checks their per-server permission, and changes wait for approval (all or only risky ones). Conversations are in memory only.
+- ✅ `scripts/real-tests/assistant.mjs` on a real Paper 1.21.4 server with a scripted OpenAI-compatible model on localhost: status read without approval, `list` waits for approval and returns the real console answer, an approved whitelist change lands in the server's whitelist, a declined ban is not run and the model is told, and the audit log names "owner (AI assistant)". Chromium: settings page, panel, approval card and result in dark (1440 px) and light (390 px) without browser errors. 🧪 12 API tests with a stubbed provider cover settings and key redaction, minimum role, both request formats, approval, decline, permission refusal and conversation ownership. 🟡 Not yet run against a real Anthropic, OpenAI or local Ollama model (no key on the test machine).
+
 ## Panel design-system documentation (2026-11-10)
 
 - Dedicated six-page docs section: overview, foundations, components, layout/data, states/accessibility and implementation. Colour tables resolve 24 semantic tokens from the shared stylesheet at build time; four static specimen types follow the docs theme. The old reference URL remains available, with links to the new chapters, and contributor notes link to the detailed reference.

@@ -33,6 +33,7 @@ import { UpdateSection } from "./updates";
 import { SessionsSection, TwoFactorSection } from "./account-security";
 import { UsersAdmin } from "./users-admin";
 import { NotificationSettings } from "./notifications-settings";
+import { AssistantSettingsSection } from "./assistant-settings";
 
 export function SettingsView() {
   const params = useSearchParams();
@@ -40,7 +41,7 @@ export function SettingsView() {
   const canAudit = useCan("audit.view");
   const sections: [string, string][] = [
     ["account", "Account"],
-    ...(canOwner ? ([["users", "Users"], ["backups", "Backups"], ["access", "Remote access"], ["network", "Dynamic DNS"], ["notifications", "Notifications"]] as [string, string][]) : []),
+    ...(canOwner ? ([["users", "Users"], ["backups", "Backups"], ["access", "Remote access"], ["network", "Dynamic DNS"], ["notifications", "Notifications"], ["assistant", "AI assistant"]] as [string, string][]) : []),
     ["java", "Java"],
     ...(canAudit ? ([["audit", "Audit log"]] as [string, string][]) : []),
     ["about", "Security & about"],
@@ -73,6 +74,7 @@ export function SettingsView() {
         <TabsContent value="access">{canOwner && <RemoteAccess />}</TabsContent>
         <TabsContent value="network">{canOwner && <DdnsSettings />}</TabsContent>
         <TabsContent value="notifications">{canOwner && <NotificationSettings />}</TabsContent>
+        <TabsContent value="assistant">{canOwner && <AssistantSettingsSection />}</TabsContent>
         <TabsContent value="java">
           <JavaRuntimes />
         </TabsContent>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Command } from "cmdk";
-import { Activity, Archive, Boxes, ChevronsUpDown, ExternalLink, Globe, LayoutGrid, LogOut, Menu, Monitor, Moon, Plus, Search, Settings, Sun, Server as ServerIcon, KeyRound, X } from "lucide-react";
+import { Activity, Archive, Boxes, ChevronsUpDown, ExternalLink, Globe, Sparkles, LayoutGrid, LogOut, Menu, Monitor, Moon, Plus, Search, Settings, Sun, Server as ServerIcon, KeyRound, X } from "lucide-react";
 import { Button, cn, Dialog, DialogContent, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Kbd, Skeleton } from "@craftpanel/ui";
 import { CRAFTPANEL_SITE_URL, ROLE_LABELS } from "@craftpanel/shared";
 import { useAuth, useCan } from "@/lib/auth";
@@ -17,6 +17,7 @@ import { SidebarServer } from "./sidebar-servers";
 import { Logo, Wordmark } from "./logo";
 import { TwoFactorRequired } from "./auth-forms";
 import { UpdateNotice, UpdateOverlay, WhatsNew } from "./updates";
+import { Assistant, toggleAssistant, useAssistantStatus } from "./assistant";
 
 const NAV = [
   { href: "/", label: "Overview", icon: LayoutGrid },
@@ -76,6 +77,7 @@ function Frame({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const pathname = usePathname();
+  const assistantOn = !!useAssistantStatus().data?.available;
 
   React.useEffect(() => setMobileOpen(false), [pathname]);
   React.useEffect(() => {
@@ -101,7 +103,8 @@ function Frame({ children }: { children: React.ReactNode }) {
             {mobileOpen ? <X /> : <Menu />}
           </Button>
           <Wordmark className="text-[17px]" />
-          <Button variant="ghost" size="icon-sm" className="ml-auto" onClick={() => setPaletteOpen(true)} aria-label="Search">
+          <AssistantButton className="ml-auto" />
+          <Button variant="ghost" size="icon-sm" className={assistantOn ? "" : "ml-auto"} onClick={() => setPaletteOpen(true)} aria-label="Search">
             <Search />
           </Button>
         </header>
@@ -110,6 +113,7 @@ function Frame({ children }: { children: React.ReactNode }) {
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <UpdateOverlay />
       <WhatsNew />
+      <Assistant />
     </div>
   );
 }
@@ -140,6 +144,7 @@ function Sidebar({ onSearch }: { onSearch: () => void }) {
           Search…
           <Kbd className="ml-auto">Ctrl K</Kbd>
         </button>
+        <AssistantSidebarButton />
       </div>
       <nav className="space-y-0.5 px-3 py-2" aria-label="Primary">
         {NAV.map((item) => {
@@ -177,6 +182,29 @@ function Sidebar({ onSearch }: { onSearch: () => void }) {
       <UpdateNotice />
       <UserMenu />
     </>
+  );
+}
+
+function AssistantButton({ className }: { className?: string }) {
+  if (!useAssistantStatus().data?.available) return null;
+  return (
+    <Button variant="ghost" size="icon-sm" className={className} onClick={toggleAssistant} aria-label="Ask the AI assistant">
+      <Sparkles />
+    </Button>
+  );
+}
+
+function AssistantSidebarButton() {
+  if (!useAssistantStatus().data?.available) return null;
+  return (
+    <button
+      onClick={toggleAssistant}
+      className="mt-1.5 flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Sparkles className="size-3.5" />
+      Ask the assistant
+      <Kbd className="ml-auto">Ctrl I</Kbd>
+    </button>
   );
 }
 

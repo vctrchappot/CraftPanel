@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "@craftpanel/backup": "workspace:*",
     "@craftpanel/config": "workspace:*",
     "@craftpanel/database": "workspace:*",
