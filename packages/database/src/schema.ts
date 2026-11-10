@@ -166,6 +166,27 @@ export const scheduleRuns = sqliteTable(
   (t) => [uniqueIndex("schedule_runs_slot_idx").on(t.scheduleId, t.slot)],
 );
 
+/** "When this holds for a while, do that" rules of a server (see packages/shared/src/rules.ts). */
+export const rules = sqliteTable(
+  "rules",
+  {
+    id: text("id").primaryKey(),
+    serverId: text("server_id").notNull(),
+    name: text("name").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    /** JSON of the rule's condition, hold time and action. */
+    definition: text("definition").notNull(),
+    /** A reversible action is in effect, so the next release undoes it even after CraftPanel restarted. */
+    active: integer("active", { mode: "boolean" }).notNull().default(false),
+    /** The rule put the server to sleep; the wake listener comes back after a restart of CraftPanel. */
+    sleeping: integer("sleeping", { mode: "boolean" }).notNull().default(false),
+    lastTriggeredAt: integer("last_triggered_at"),
+    lastResult: text("last_result"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("rules_server_idx").on(t.serverId)],
+);
+
 export const playerSessions = sqliteTable(
   "player_sessions",
   {

@@ -12,7 +12,7 @@
 - **Live console** over WebSockets, real CPU/RAM/TPS/MSPT metrics, player tracking.
 - Validated **server.properties editor**, version-aware **game rules**, whitelist/ops/bans, **performance presets** and world pre-generation.
 - **Plugins and mods** from Modrinth and Hangar with compatibility checks, uploads and updates; **Modrinth modpacks** with one click; switching between server software and versions with a preview and automatic backup.
-- **Worlds, file manager, backups** (consistent live backups, verification, restore with automatic safety backup) and **scheduled tasks**.
+- **Worlds, file manager, backups** (consistent live backups, verification, restore with automatic safety backup), **scheduled tasks** and **rules** (stop, freeze, restart or back up on conditions such as an empty or lagging server; sleeping servers wake when a player connects).
 - **LAN/WAN guidance** with diagnostics (CGNAT detection), optional DuckDNS.
 - **Notifications** via Discord or e-mail when a server crashes, a backup fails or an update is available.
 - **Multi-user** with Owner / Administrator / Operator / Viewer roles, per-server access (e.g. a moderator for one server), two-factor sign-in, a list of signed-in devices and an audit log.

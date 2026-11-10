@@ -17,6 +17,7 @@ import {
   gameruleUpdateSchema,
   ipBanSchema,
   levelNameSchema,
+  notFound,
   PERFORMANCE_PRESETS,
   playerActionSchema,
   portSchema,
@@ -24,6 +25,7 @@ import {
   presetJvmFlags,
   propertiesUpdateSchema,
   motdRotationSchema,
+  ruleSchema,
   serverIconSchema,
   proxyConfigSchema,
   recommendPreset,
@@ -95,6 +97,28 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
   app.put<IdParams>("/api/servers/:id/motd-rotation", async (req, reply) => {
     requirePermission(req, "server.configure");
     await servers.setRotation(await row(req.params.id), parse(motdRotationSchema, req.body), actorOf(req));
+    return noContent(reply);
+  });
+
+  // Rules: "when this holds for a while, do that" (stop, restart, throttle, back up, notify …).
+  app.get<IdParams>("/api/servers/:id/rules", async (req) => {
+    requirePermission(req, "server.view");
+    await row(req.params.id);
+    return ctx.rules.list(req.params.id);
+  });
+  app.post<IdParams>("/api/servers/:id/rules", async (req) => {
+    requirePermission(req, "schedule.manage");
+    return ctx.rules.create(req.params.id, parse(ruleSchema, req.body), actorOf(req));
+  });
+  app.put<{ Params: { id: string; ruleId: string } }>("/api/servers/:id/rules/:ruleId", async (req) => {
+    requirePermission(req, "schedule.manage");
+    if ((await ctx.rules.serverIdOf(req.params.ruleId)) !== req.params.id) throw notFound("Rule");
+    return ctx.rules.update(req.params.ruleId, parse(ruleSchema, req.body), actorOf(req));
+  });
+  app.delete<{ Params: { id: string; ruleId: string } }>("/api/servers/:id/rules/:ruleId", async (req, reply) => {
+    requirePermission(req, "schedule.manage");
+    if ((await ctx.rules.serverIdOf(req.params.ruleId)) !== req.params.id) throw notFound("Rule");
+    await ctx.rules.remove(req.params.ruleId, actorOf(req));
     return noContent(reply);
   });
 

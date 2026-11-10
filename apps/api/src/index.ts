@@ -75,6 +75,7 @@ async function main() {
   await ctx.updates.recordStartup(async (kind, message, level) => void (await ctx.activity.event(null, kind, message, { level }))).catch(() => undefined);
   ctx.notifications.start();
   ctx.maps.start();
+  await ctx.rules.start();
   const housekeeping = setInterval(() => {
     void ctx.sessions.purgeExpired();
     void ctx.activity.prune();
@@ -104,6 +105,7 @@ async function main() {
     ctx.schedules.stop();
     ctx.notifications.stop();
     ctx.maps.stop();
+    await ctx.rules.stop();
     ctx.updates.stop();
     await ctx.agent.disconnect();
     await app.close();

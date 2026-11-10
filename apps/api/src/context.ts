@@ -10,6 +10,7 @@ import type { ActivityService, Actor } from "./services/activity";
 import type { ServerService } from "./services/servers";
 import type { BackupService } from "./services/backups";
 import type { ScheduleService } from "./services/schedules";
+import type { RuleService } from "./services/rules";
 import type { GameService } from "./services/game";
 import type { SettingsService } from "./services/settings";
 import type { UpdateService } from "./services/updates";
@@ -29,6 +30,7 @@ export interface AppContext {
   servers: ServerService;
   backups: BackupService;
   schedules: ScheduleService;
+  rules: RuleService;
   game: GameService;
   pregen: PregenService;
   maps: MapService;

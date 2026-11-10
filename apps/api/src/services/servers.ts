@@ -59,6 +59,9 @@ export class ServerService {
   readonly hooks = {
     created: [] as ((row: ServerRow, input: z.output<typeof createServerSchema>) => Promise<void>)[],
     beforeStart: [] as ((row: ServerRow) => Promise<void>)[],
+    /** Runs first in every start, before the port is checked (a sleeping server's wake listener lets go of it here). */
+    prepareStart: [] as ((id: string) => Promise<void>)[],
+    deleted: [] as ((id: string) => Promise<void>)[],
   };
 
   constructor(
@@ -480,6 +483,7 @@ export class ServerService {
 
   async start(id: string, actor: Actor): Promise<void> {
     await this.withLock(id, "start", async () => {
+      for (const hook of this.hooks.prepareStart) await hook(id);
       const row = await this.row(id);
       if (row.installState !== "installed") throw conflict("The server is not installed yet", row.installState === "failed" ? "Retry the installation from the server overview." : undefined);
       if (!row.eulaAccepted) throw new AppError(409, "eula_required", "You must accept the Minecraft EULA before starting this server", "https://aka.ms/MinecraftEULA");
@@ -676,6 +680,7 @@ export class ServerService {
       await this.db.delete(servers).where(eq(servers.id, id));
       await this.agent.forget(id);
       this.restartRequired.delete(id);
+      for (const hook of this.hooks.deleted) await hook(id).catch(() => undefined);
       await this.activity.event(null, "server.deleted", `Server "${row.name}" deleted${opts.deleteFiles ? " (files removed)" : " (files kept)"}`, { actor, level: "warn" });
       await this.activity.audit(actor, "server.delete", id, { name: row.name, deleteFiles: opts.deleteFiles });
     });

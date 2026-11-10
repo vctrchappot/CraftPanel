@@ -12,6 +12,7 @@ import { ActivityService } from "./services/activity";
 import { ServerService } from "./services/servers";
 import { BackupService } from "./services/backups";
 import { ScheduleService } from "./services/schedules";
+import { RuleService } from "./services/rules";
 import { GameService } from "./services/game";
 import { SettingsService } from "./services/settings";
 import { UpdateService } from "./services/updates";
@@ -51,6 +52,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const maps = new MapService(servers, game, settings, activity);
   const proxies = new ProxyService(servers, game, activity);
   const notifications = new NotificationService(settings, updates);
+  const rules = new RuleService(db, servers, backups, maps, notifications, activity);
   activity.listen((event, serverName) => notifications.onEvent(event, serverName));
   const assistant = new AssistantService({ settings, sessions, servers, game, backups, schedules, activity }, opts.assistantFetch);
 
@@ -64,5 +66,5 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
     await fsp.writeFile(tokenFile, setupToken + "\n", { mode: 0o600 });
   } else await fsp.rm(tokenFile, { force: true });
 
-  return { config, database, agent, hub, sessions, activity, servers, backups, schedules, game, pregen, maps, proxies, settings, updates, notifications, java, assistant, setupToken };
+  return { config, database, agent, hub, sessions, activity, servers, backups, schedules, rules, game, pregen, maps, proxies, settings, updates, notifications, java, assistant, setupToken };
 }

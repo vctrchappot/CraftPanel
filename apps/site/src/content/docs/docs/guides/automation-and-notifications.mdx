@@ -1,6 +1,6 @@
 ---
 title: Automation and notifications
-description: Schedule restarts, backups and commands, and get notified on Discord or by e-mail.
+description: Schedule restarts, backups and commands, let rules react to what happens on the server, and get notified on Discord or by e-mail.
 sidebar:
   order: 4
 ---
@@ -23,12 +23,46 @@ Presets cover common schedules: every day at 04:00, every 6 hours, every hour, e
 
 Each task runs at most once per minute and never overlaps itself, even if the previous run is still going.
 
+## Rules
+
+Schedules act at a time; **rules** act on a situation. A rule on the **Automation** tab reads "when *this* holds for *n* minutes, do *that*". CraftPanel looks at the server every 15 seconds, and a rule only acts once its condition has held without a break for the time you set. If the condition ends before that, the clock starts over. The rule then waits for the condition to end before it can act again, so it doesn't repeat itself.
+
+| When | Looks at |
+| --- | --- |
+| Nobody is online | The player count, counted from the moment the server is online (a server nobody ever joins counts too) |
+| The server lags | TPS below your limit (Paper, Purpur and Vanilla from 1.20.3, Fabric and NeoForge likewise) |
+| The machine runs out of memory | Memory in use on the whole computer |
+| Disk space runs low | Free space on the disk that holds the server's folder |
+| The server has been up for a long time | Hours since it finished starting |
+
+"Only while nobody is online" can be added to any of them, so a restart for lag or age waits for an empty server.
+
+| Then | What it does |
+| --- | --- |
+| Stop / Restart the server | Warns players first if any are online; an empty server is stopped right away |
+| Run a console command | Optionally with a second command that runs when the condition ends, such as `tick freeze` and `tick unfreeze` |
+| Announce in chat | Broadcasts a message with `/say` |
+| Create a backup | A normal backup, marked with the rule's name |
+| Send a notification | Discord or e-mail, as set up under Settings → Notifications |
+| Pause the map renderer | Pauses BlueMap while the condition holds and lets it continue afterwards |
+
+Five templates get you going: **Sleep when empty**, **Freeze when empty**, **Back up after the last player left**, **Restart when it lags** and **Warn about low disk space**. Each rule shows what it is doing (watching, waiting 3 of 10 minutes, in effect, asleep) and what happened the last time it ran. A restart rule waits at least ten minutes between runs, so a problem that outlasts the restart can't turn into a restart loop. Rules are managed with the same permission as scheduled tasks.
+
+### Sleeping servers
+
+A rule that stops the server when nobody is online can also **wake it when a player connects**. While the server sleeps, CraftPanel itself answers on the server's port: the server list shows "Asleep. Join to wake the server up" with the usual icon, version and slots, and the first player who tries to join gets a message that the server is waking up and starts it. After about a minute they join again. Pinging the server doesn't wake it, only a join attempt does, and further attempts within a minute don't start it twice.
+
+- A sleeping server is *stopped*: it uses no memory and no CPU, and the dashboard shows it as stopped. Starting it by hand works as usual.
+- The server has to be reachable on its own port by the players (the same address as always); CraftPanel only takes over that port while it sleeps. If CraftPanel is restarted, sleeping servers go back to sleep. If it is stopped, the port is free and the server stays stopped.
+- Anyone who can reach the port can wake the server by trying to join, just like they could by joining a running one. If the server is public and should not wake for strangers, don't use this rule there, or put it behind a proxy that checks players first.
+- A server that is woken and not joined stops again after the rule's waiting time.
+
 ## Notifications
 
 **Settings → Notifications** sends a message when something needs your attention:
 
 - a server **crashes** or **fails to start**,
-- a **backup** or a **scheduled task** fails,
+- a **backup**, a **scheduled task** or a **rule** fails, or a sleeping server can't wake up,
 - a **CraftPanel update** is available.
 
 Choose the categories per channel:

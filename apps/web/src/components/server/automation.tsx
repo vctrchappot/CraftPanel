@@ -31,6 +31,7 @@ import { api } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
 import { formatDateTime, timeAgo } from "@/lib/format";
+import { RulesSection } from "./rules";
 
 const ACTIONS: { value: ScheduleAction; label: string; help: string }[] = [
   { value: "backup", label: "Back up", help: "Create a backup. Retention settings apply." },
@@ -67,6 +68,15 @@ interface Draft {
 const emptyDraft: Draft = { name: "Nightly backup", cron: "0 4 * * *", action: "backup", enabled: true, message: "", command: "", keep: 10, olderThanDays: 14, warnSeconds: 60 };
 
 export function AutomationTab({ server: s }: { server: ServerDetail }) {
+  return (
+    <div className="space-y-10">
+      <RulesSection server={s} />
+      <ScheduledTasks server={s} />
+    </div>
+  );
+}
+
+function ScheduledTasks({ server: s }: { server: ServerDetail }) {
   const key = ["schedules", s.id];
   const q = useQuery({ queryKey: key, queryFn: () => api.get<ScheduleInfo[]>(`/api/schedules?serverId=${s.id}`) });
   const canManage = useCan("schedule.manage");

@@ -22,6 +22,13 @@
       "when": 1794091533953,
       "tag": "0002_fantastic_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1794320045046,
+      "tag": "0003_amused_argent",
+      "breakpoints": true
     }
   ]
 }
