@@ -35,7 +35,7 @@ disconnection leaves servers running. On runtime boot only configured auto-start
 start. A live PID left by a runtime crash is held as orphaned instead of duplicated;
 runtime crash reattachment is outside this phase's dashboard-crash guarantee.
 
-The installer fingerprints both runtime code and service wrappers. Dashboard-only
+The installer fingerprints both runtime code and service wrappers. The fingerprint is the hash of the bundled `runtime.js`, so the bundle must hold only what the runtime uses: `@craftpanel/shared` is marked `"sideEffects": false`, which keeps its dashboard-only modules (schemas, permissions, performance advice, the map) out, and `apps/api/test/runtime-bundle.test.ts` fails if one slips in. A release that only changes the dashboard, the web UI or those shared modules therefore leaves the fingerprint alone and keeps games running; only a change to the runtime itself (or the software catalogue and error type it imports) asks for a maintenance restart. Dashboard-only
 transactions leave the runtime process untouched, including failed dashboard updates.
 Runtime changes require explicit, expiring approval for the target fingerprint. After
 graceful runtime shutdown, the standalone recovery helper snapshots its registry with
