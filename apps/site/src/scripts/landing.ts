@@ -48,16 +48,11 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
     const os = panel.dataset.panel!;
     const typed = panel.querySelector<HTMLElement>(".term-typed");
     if (!typed) return; // the macOS tab has no command to type
-    const lines = [...panel.querySelectorAll<HTMLElement>(".term-out .term-line")];
     if (!full || reduced || typedOnce.has(os)) {
       typed.textContent = typed.dataset.command!;
-      lines.forEach((l) => l.classList.add("is-in"));
-      panel.classList.add("is-done");
       return;
     }
     typedOnce.add(os);
-    panel.classList.remove("is-done");
-    lines.forEach((l) => l.classList.remove("is-in"));
     const cmd = typed.dataset.command!;
     panel.classList.add("is-typing");
     for (let i = 0; i <= cmd.length; i += 2) {
@@ -66,8 +61,13 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
     }
     typed.textContent = cmd;
     panel.classList.remove("is-typing");
-    await wait(260);
-    for (const l of lines) {
+  }
+
+  /** After the command was copied: what the installer is going to print, once per panel. */
+  async function preview(panel: HTMLElement) {
+    if (panel.classList.contains("is-ran")) return;
+    panel.classList.add("is-ran");
+    for (const l of panel.querySelectorAll<HTMLElement>(".term-out .term-line")) {
       l.classList.add("is-in");
       await wait(l.classList.contains("term-ok") ? 420 : 170);
     }
@@ -106,6 +106,8 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
     const label = btn.querySelector<HTMLElement>(".term-copy-label")!;
     const idleLabel = label.textContent;
     btn.addEventListener("click", async () => {
+      const panel = btn.closest<HTMLElement>("[data-panel]");
+      if (full && panel) void preview(panel);
       try {
         await navigator.clipboard.writeText(btn.dataset.copy ?? "");
         btn.classList.add("is-copied");
@@ -116,7 +118,7 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
         }, 2000);
       } catch {
         // No clipboard access (insecure context, permission denied): select the command so Ctrl+C works.
-        const cmd = btn.closest<HTMLElement>("[data-panel]")?.querySelector(".term-typed");
+        const cmd = panel?.querySelector(".term-typed");
         if (cmd) {
           const range = document.createRange();
           range.selectNodeContents(cmd);

@@ -363,8 +363,8 @@ const backups = [
       <div class="wrap nav-in">
         <a href="/" class="brand"><Wordmark /></a>
         <nav aria-label="Main" class="nav-links">
-          <a href="#install">Install</a>
           <a href="#features">Features</a>
+          <a href="#dashboard">Dashboard</a>
           <a href="#compare">Compare</a>
           <a href="/docs/">Docs</a>
         </nav>
@@ -378,6 +378,18 @@ const backups = [
             <UiIcon name="sun" size={24} class="if-dark" />
             <UiIcon name="moon" size={24} class="if-light" />
           </button>
+          <a class="nav-install" href="#install">Install</a>
+          <!-- The links of the bar, for screens too narrow to show them. -->
+          <details class="nav-menu">
+            <summary aria-label="Menu"><UiIcon name="menu" size={24} /></summary>
+            <nav aria-label="Main, compact" class="nav-menu-list">
+              <a href="#features">Features</a>
+              <a href="#dashboard">Dashboard</a>
+              <a href="#compare">Compare</a>
+              <a href="/docs/">Docs</a>
+              <a href={github} rel="noopener">GitHub</a>
+            </nav>
+          </details>
         </div>
       </div>
       <!-- Scroll progress as a Minecraft experience bar; the level is the section you are reading. -->
@@ -398,9 +410,9 @@ const backups = [
               Run Minecraft Java servers on your PC, Raspberry Pi or VPS. Manage them from your browser.
             </p>
             <Terminal version={version} id="hero-term" />
-            <div class="install-help">
-              <a href="/docs/getting-started/installation/">Installation guide <span aria-hidden="true">↗</span></a>
-              <a href="/docs/getting-started/installation/#macos">macOS: manual setup <span aria-hidden="true">↗</span></a>
+            <div class="hero-next">
+              <a class="hero-btn" href="#dashboard">See the dashboard <span aria-hidden="true">↓</span></a>
+              <a class="hero-link" href="/docs/getting-started/installation/">Installation guide <span aria-hidden="true">↗</span></a>
             </div>
             <ul class="hero-facts mono" aria-label="Supported platforms">
               <li>Windows · Linux · macOS</li>
@@ -762,7 +774,7 @@ const backups = [
       </section>
 
       <!-- 03 Closer look -->
-      <section class="sec" aria-labelledby="look-title">
+      <section class="sec" id="dashboard" aria-labelledby="look-title">
         <div class="wrap">
           <header class="sec-head sec-head-row">
             <div>

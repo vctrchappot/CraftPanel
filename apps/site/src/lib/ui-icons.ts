@@ -32,6 +32,7 @@ export const uiIcons = {
   "chart": "M2 2h2v18H2zm0 18h20v2H2zM6 14h2v2H6zm2-2h2v2H8zm2-2h2v2h-2zm2 2h2v2h-2zm2-4h2v4h-2zm2-2h2v2h-2zm2-4h2v4h-2z",
   "plus": "M11 5h2v14h-2zM5 11h14v2H5z",
   "minus": "M5 11h14v2H5z",
+  "menu": "M3 5h18v2H3zm0 6h18v2H3zm0 6h18v2H3z",
   "tilde": "M4 12h2v2H4zm2-2h4v2H6zm4 2h4v2h-4zm4 2h4v2h-4zm4-2h2v2h-2z"
 } as const;
 export type UiIconName = keyof typeof uiIcons;

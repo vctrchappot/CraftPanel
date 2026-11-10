@@ -1,6 +1,6 @@
 ---
-// The install command as a terminal window. The full variant types itself once and prints the installer's real
-// output; the compact variant is just the command with tabs and a copy button.
+// The install command as a terminal window. The full variant types itself once and, after the command was copied,
+// prints the installer's real output as a preview; the compact variant is just the command with tabs and a copy button.
 import UiIcon from "./UiIcon.astro";
 
 interface Props {
@@ -106,10 +106,12 @@ const allTabs = [...tabs, mac];
               <span class="term-copy-label" aria-live="polite">Copy install command</span>
             </button>
             <span class="term-requirement">{t.os === "windows" ? "PowerShell as administrator" : "Linux with systemd"}</span>
+            <a class="term-source" href={`https://github.com/vctrchappot/CraftPanel/blob/main/deploy/${t.script}`} rel="noopener">Read the script first</a>
           </div>
         )}
         {!compact && (
           <div class="term-out" aria-live="off">
+            <div class="term-line term-info term-out-note">What the installer prints:</div>
             {t.output.map(([kind, text]) => (
               <div class={`term-line term-${kind}`}>{text}</div>
             ))}
