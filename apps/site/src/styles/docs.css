@@ -57,13 +57,106 @@ h1#_top {
   letter-spacing: var(--cp-tracking-display);
 }
 
+/* Sidebar: group labels are quiet mono captions like the landing page's section numbers, so the pages carry the
+   weight. The guide line beside each group is the indicator: it marks the hovered page and turns green for the
+   current one, instead of a second bar inside the item. */
+.sidebar-content {
+  --sb-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sidebar-content .top-level > li + li {
+  margin-top: 1.25rem;
+}
+.sidebar-content summary {
+  padding-block: 0.3rem;
+  border-radius: var(--cp-radius);
+  transition: background-color 150ms var(--sb-ease);
+}
+.sidebar-content summary .large {
+  font-family: var(--cp-font-mono);
+  font-size: var(--sl-text-xs);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: lowercase;
+  color: var(--sl-color-gray-3);
+  transition: color 150ms var(--sb-ease);
+}
+.sidebar-content summary:hover .large {
+  color: var(--sl-color-white);
+}
+.sidebar-content summary .caret {
+  --sl-icon-size: 1rem;
+  color: var(--sl-color-gray-4);
+  transition: transform 200ms var(--sb-ease), color 150ms var(--sb-ease);
+}
+.sidebar-content summary:hover .caret {
+  color: var(--sl-color-gray-2);
+}
+.sidebar-content details > ul {
+  margin-top: 0.25rem;
+}
+.sidebar-content ul ul li {
+  margin-inline-start: 0.6rem;
+  padding-inline-start: 0.4rem;
+}
+.sidebar-content a {
+  position: relative;
+  padding-block: 0.35em;
+  border-radius: var(--cp-radius);
+  transition: color 150ms var(--sb-ease), background-color 150ms var(--sb-ease);
+}
+.sidebar-content ul ul a::before {
+  content: "";
+  position: absolute;
+  inset-block: 0.3rem;
+  /* on the li's guide line: its padding plus the 1 px border */
+  inset-inline-start: calc(-0.4rem - 1px);
+  width: 2px;
+  background: transparent;
+  transition: background-color 150ms var(--sb-ease);
+}
+.sidebar-content a:hover {
+  color: var(--sl-color-white);
+  /* a tint of the text colour reads on the sidebar background in both themes */
+  background-color: color-mix(in srgb, var(--sl-color-white) 6%, transparent);
+}
+.sidebar-content ul ul a:hover::before {
+  background: var(--sl-color-gray-4);
+}
+.sidebar-content a:focus-visible,
+.sidebar-content summary:focus-visible {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: -2px;
+}
 .sidebar-content a[aria-current="page"],
 .sidebar-content a[aria-current="page"]:hover,
 .sidebar-content a[aria-current="page"]:focus {
-  background-color: var(--sl-color-accent-low);
   color: var(--sl-color-white);
-  font-weight: 600;
-  box-shadow: inset 3px 0 0 var(--sl-color-accent);
+  font-weight: 500;
+  background-color: color-mix(in srgb, var(--sl-color-accent) 12%, transparent);
+}
+.sidebar-content ul ul a[aria-current="page"]::before {
+  background: var(--sl-color-accent);
+}
+/* Groups fold open and shut instead of jumping, where the browser can animate to auto height. */
+@supports (interpolate-size: allow-keywords) {
+  @media (prefers-reduced-motion: no-preference) {
+    .sidebar-content details {
+      interpolate-size: allow-keywords;
+    }
+    .sidebar-content details::details-content {
+      height: 0;
+      overflow: clip;
+      transition: height 240ms var(--sb-ease), content-visibility 240ms allow-discrete;
+    }
+    .sidebar-content details[open]::details-content {
+      height: auto;
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-content :is(a, a::before, summary, summary .large, summary .caret) {
+    transition: none;
+  }
 }
 
 .sl-markdown-content :is(img) {
