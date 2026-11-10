@@ -38,6 +38,8 @@ export interface ModelRequest {
   messages: ChatMessage[];
   tools: ToolSpec[];
   signal?: AbortSignal;
+  /** Receives the answer's text as it is written, for the live view. */
+  onText?: (delta: string) => void;
 }
 
 export type ModelClient = (req: ModelRequest) => Promise<ModelReply>;
@@ -60,9 +62,10 @@ function anthropicClient(s: AssistantSettings, fetchImpl: typeof fetch): ModelCl
     maxRetries: 2,
   });
   const fallback = FALLBACK_MODELS.has(s.model) && !s.baseUrl;
-  return async ({ system, messages, tools, signal }) => {
+  return async ({ system, messages, tools, signal, onText }) => {
     try {
-      const res = await client.beta.messages.create(
+      // Streamed, so the answer shows while it is written; the final message is the same as without streaming.
+      const stream = client.beta.messages.stream(
         {
           model: s.model,
           max_tokens: 16000,
@@ -73,6 +76,8 @@ function anthropicClient(s: AssistantSettings, fetchImpl: typeof fetch): ModelCl
         },
         { signal },
       );
+      if (onText) stream.on("text", (delta) => onText(delta));
+      const res = await stream.finalMessage();
       const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n").trim();
       const toolCalls = res.content.flatMap((b) => (b.type === "tool_use" ? [{ id: b.id, name: b.name, input: (b.input ?? {}) as Record<string, unknown> }] : []));
       const stop = res.stop_reason === "refusal" ? "refusal" : res.stop_reason === "max_tokens" ? "length" : toolCalls.length ? "tool" : "end";
@@ -111,12 +116,20 @@ const chatHeaders = (s: AssistantSettings): Record<string, string> => ({
 
 function chatCompletionsClient(s: AssistantSettings, fetchImpl: typeof fetch): ModelClient {
   const base = chatBase(s);
-  return async ({ system, messages, tools, signal }) => {
+  return async ({ system, messages, tools, signal, onText }) => {
     // OpenAI and others reject an empty tools array, so it is left out (the connection test has none).
     const body = {
       model: s.model,
       messages: [{ role: "system", content: system }, ...messages.flatMap(toChatCompletions)],
       ...(tools.length ? { tools: tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })) } : {}),
+      stream: true,
+    };
+    // A streamed answer may take long overall; it fails only when the provider goes quiet for TIMEOUT_MS.
+    const idle = new AbortController();
+    let timer = setTimeout(() => idle.abort(new DOMException("The AI provider stopped answering", "TimeoutError")), TIMEOUT_MS);
+    const alive = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => idle.abort(new DOMException("The AI provider stopped answering", "TimeoutError")), TIMEOUT_MS);
     };
     let res: Response;
     try {
@@ -124,11 +137,15 @@ function chatCompletionsClient(s: AssistantSettings, fetchImpl: typeof fetch): M
         method: "POST",
         headers: { "content-type": "application/json", ...chatHeaders(s) },
         body: JSON.stringify(body),
-        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]) : AbortSignal.timeout(TIMEOUT_MS),
+        signal: signal ? AbortSignal.any([signal, idle.signal]) : idle.signal,
       });
+      if (res.ok && res.headers.get("content-type")?.includes("text/event-stream")) return await readChatStream(res, onText, alive);
     } catch (err) {
-      throw providerError(undefined, err);
+      throw err instanceof AppError ? err : providerError(undefined, err);
+    } finally {
+      clearTimeout(timer);
     }
+    // Some servers answer with one JSON document even when asked to stream.
     const json = (await res.json().catch(() => ({}))) as ChatCompletion;
     if (!res.ok) throw providerError(res.status, new Error(json.error?.message ?? res.statusText));
     if (!json.choices) throw providerError(res.status, new Error("The answer is not a Chat Completions response. Check the base URL."));
@@ -139,6 +156,77 @@ function chatCompletionsClient(s: AssistantSettings, fetchImpl: typeof fetch): M
     const stop = choice?.finish_reason === "length" ? "length" : toolCalls.length ? "tool" : "end";
     return { text: (msg.content ?? "").trim(), toolCalls, stop, ...(msg.reasoning_content ? { reasoning: msg.reasoning_content } : {}) };
   };
+}
+
+interface ChatChunk {
+  choices?: {
+    finish_reason?: string | null;
+    delta?: {
+      content?: string | null;
+      refusal?: string | null;
+      reasoning_content?: string | null;
+      tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[];
+    };
+  }[];
+  error?: { message?: string };
+}
+
+/** Reads a streamed Chat Completions answer (server-sent events), passing text on as it arrives. */
+async function readChatStream(res: Response, onText: ((delta: string) => void) | undefined, alive: () => void): Promise<ModelReply> {
+  let text = "";
+  let reasoning = "";
+  let refusal = "";
+  let finish: string | null | undefined;
+  // Tool calls arrive in pieces, keyed by index: the id and name first, the arguments spread over many chunks.
+  const calls: { id: string; name: string; args: string }[] = [];
+  const handle = (data: string) => {
+    if (data === "[DONE]") return;
+    let chunk: ChatChunk;
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      return;
+    }
+    if (chunk.error) throw providerError(500, new Error(chunk.error.message ?? "The AI provider reported an error"));
+    const choice = chunk.choices?.[0];
+    if (!choice) return;
+    if (choice.finish_reason) finish = choice.finish_reason;
+    const d = choice.delta ?? {};
+    if (d.content) {
+      text += d.content;
+      onText?.(d.content);
+    }
+    if (d.reasoning_content) reasoning += d.reasoning_content;
+    if (d.refusal) refusal += d.refusal;
+    for (const tc of d.tool_calls ?? []) {
+      const at = tc.index ?? calls.length;
+      const call = (calls[at] ??= { id: "", name: "", args: "" });
+      if (tc.id) call.id = tc.id;
+      if (tc.function?.name && !call.name) call.name = tc.function.name;
+      if (tc.function?.arguments) call.args += tc.function.arguments;
+    }
+  };
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    for await (const part of res.body as unknown as AsyncIterable<Uint8Array>) {
+      alive();
+      buffer += decoder.decode(part, { stream: true });
+      let nl: number;
+      while ((nl = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (line.startsWith("data:")) handle(line.slice(5).trim());
+      }
+    }
+    if (buffer.trim().startsWith("data:")) handle(buffer.trim().slice(5).trim());
+  } catch (err) {
+    throw err instanceof AppError ? err : providerError(undefined, err);
+  }
+  if (refusal) return { text: refusal, toolCalls: [], stop: "refusal" };
+  const toolCalls = calls.filter(Boolean).map((c, i) => ({ id: c.id || `call_${Date.now()}_${i}`, name: c.name, input: parseArguments(c.args) }));
+  const stop = finish === "length" ? "length" : toolCalls.length ? "tool" : "end";
+  return { text: text.trim(), toolCalls, stop, ...(reasoning ? { reasoning } : {}) };
 }
 
 function toChatCompletions(m: ChatMessage): unknown[] {

@@ -29,6 +29,8 @@ import type { AssistantConversationView, AssistantItem, AssistantStatus } from "
 import { api, errorMessage } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { useServers } from "@/lib/queries";
+import { useRealtimeEvent } from "@/lib/realtime";
+import { AssistantEmbed } from "./assistant-embeds";
 import { Markdown } from "./markdown";
 
 type ToolItem = Extract<AssistantItem, { kind: "tool" }>;
@@ -81,7 +83,7 @@ export function Assistant() {
   if (!status.data?.available) return null;
   return (
     <>
-      {open && <div className="fixed inset-0 z-30 bg-black/20 sm:hidden" onClick={() => setOpen(false)} />}
+      {open && <div className="fixed inset-0 z-30 bg-black/20 duration-200 animate-in fade-in sm:hidden motion-reduce:animate-none" onClick={() => setOpen(false)} />}
       <aside
         role="dialog"
         aria-label="AI assistant"
@@ -130,7 +132,11 @@ function Panel({ status, open, wide, onToggleWide, onClose }: { status: Assistan
     queryFn: () => api.get<AssistantConversationView>(`/api/assistant/conversations/${conversationId}`),
     enabled: !!conversationId && open,
     retry: false,
-    refetchInterval: (q) => (q.state.data?.status === "running" ? 700 : false),
+    // Changes arrive over the WebSocket as they happen; polling only covers a dropped connection.
+    refetchInterval: (q) => (q.state.data?.status === "running" ? 2500 : false),
+  });
+  useRealtimeEvent((msg) => {
+    if (msg.type === "assistant") qc.setQueryData(["assistant-conversation", msg.conversation.id], msg.conversation);
   });
   // A conversation the panel no longer has (restart, expired): start fresh.
   React.useEffect(() => {
@@ -218,14 +224,22 @@ function Panel({ status, open, wide, onToggleWide, onClose }: { status: Assistan
   const itemCount = data?.items.length ?? 0;
   const lastItem = data?.items.at(-1);
   React.useEffect(() => {
-    if (atBottom || sending) toBottom();
+    // While an answer is being written, jump instead of gliding: a smooth scroll per update would lag behind.
+    if (atBottom || sending) toBottom(lastItem?.kind === "assistant" && lastItem.streaming ? "instant" : "smooth");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- scroll on new content, not on scroll position changes
-  }, [itemCount, data?.status, sending, lastItem && "state" in lastItem ? lastItem.state : null]);
+  }, [itemCount, data?.status, sending, lastItem && "state" in lastItem ? lastItem.state : null, lastItem?.kind === "assistant" ? lastItem.text.length : 0]);
   React.useEffect(() => {
     if (open) toBottom("instant");
   }, [open, conversationId]);
 
+  // Items already there when a conversation opens appear at once; later ones slide in.
+  const settled = React.useRef<{ id: string | null; count: number }>({ id: null, count: 0 });
+  if (data && settled.current.id !== data.id) settled.current = { id: data.id, count: sending ? 0 : data.items.length };
+  if (!data && !sending) settled.current = { id: null, count: 0 };
+  const fresh = (index: number) => !!data && settled.current.id === data.id && index >= settled.current.count;
+
   const lastQuestion = [...(data?.items ?? [])].reverse().find((i) => i.kind === "user")?.text;
+  const writing = lastItem?.kind === "assistant" && !!lastItem.streaming;
   const activeTool = data?.items.findLast((i): i is ToolItem => i.kind === "tool" && i.state === "running");
   const waitingCount = data?.items.filter((i) => i.kind === "tool" && i.state === "waiting").length ?? 0;
   const pastConversations = history.data ?? [];
@@ -295,24 +309,30 @@ function Panel({ status, open, wide, onToggleWide, onClose }: { status: Assistan
               <Welcome serverName={serverId ? serverName : null} approval={status.approval} onPick={(t) => void send(t)} />
             ) : (
               <>
-                {groupItems(data?.items ?? []).map((g, i) =>
-                  g.kind === "steps" ? (
-                    <StepGroup key={i} items={g.items} />
-                  ) : (
-                    <Item key={i} item={g.item} onDecide={decide} onRetry={lastQuestion && !busy ? () => void send(lastQuestion) : undefined} />
-                  ),
+                {groupItems(data?.items ?? []).map((g) => (
+                  <div key={g.start} className={cn(fresh(g.start) && !(g.kind === "item" && g.item.kind === "user") && "duration-300 ease-out animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none")}>
+                    {g.kind === "steps" ? (
+                      <StepGroup items={g.items} />
+                    ) : (
+                      <Item item={g.item} onDecide={decide} onRetry={lastQuestion && !busy ? () => void send(lastQuestion) : undefined} />
+                    )}
+                  </div>
+                ))}
+                {sending && (
+                  <div className="duration-200 ease-out animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none">
+                    <UserBubble text={sending} pending />
+                  </div>
                 )}
-                {sending && <UserBubble text={sending} pending />}
               </>
             )}
-            {busy && data?.status !== "awaiting" && <Thinking label={activeTool ? activeTool.title : sending ? "Sending…" : "Thinking…"} />}
+            {busy && data?.status !== "awaiting" && !writing && <Thinking label={activeTool ? activeTool.title : "Thinking…"} />}
           </div>
         </div>
         {!atBottom && (
           <button
             type="button"
             onClick={() => toBottom()}
-            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface px-3 py-1 text-xs shadow-md transition-colors hover:bg-muted"
+            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface px-3 py-1 text-xs shadow-md transition-colors duration-200 animate-in fade-in slide-in-from-bottom-1 hover:bg-muted motion-reduce:animate-none"
           >
             <ArrowDown className="size-3.5" /> Latest
           </button>
@@ -328,7 +348,7 @@ function Panel({ status, open, wide, onToggleWide, onClose }: { status: Assistan
       >
         <div className={cn("mx-auto", wide && "max-w-[640px]")}>
           {waitingCount > 0 && (
-            <p className="mb-2 flex items-center gap-1.5 text-xs text-warning">
+            <p className="mb-2 flex items-center gap-1.5 text-xs text-warning duration-200 animate-in fade-in slide-in-from-bottom-1 motion-reduce:animate-none">
               <ShieldAlert className="size-3.5" /> {waitingCount === 1 ? "A change waits for your approval above." : `${waitingCount} changes wait for your approval above.`}
             </p>
           )}
@@ -387,30 +407,35 @@ function Panel({ status, open, wide, onToggleWide, onClose }: { status: Assistan
   );
 }
 
-type Group = { kind: "item"; item: AssistantItem } | { kind: "steps"; items: ToolItem[] };
+type Group = ({ kind: "item"; item: AssistantItem } | { kind: "steps"; items: ToolItem[] }) & { start: number };
 
-/** Runs of finished or running tool calls collapse into one "steps" row; waiting calls stay cards of their own. */
+/**
+ * Runs of finished or running tool calls collapse into one "steps" row; waiting calls stay cards of their own,
+ * and a shown live card is drawn as the card itself.
+ */
 function groupItems(items: AssistantItem[]): Group[] {
   const out: Group[] = [];
-  for (const item of items) {
+  items.forEach((item, start) => {
     const last = out.at(-1);
-    if (item.kind === "tool" && item.state !== "waiting") {
+    if (item.kind === "tool" && item.state !== "waiting" && !(item.embed && item.state === "done")) {
       if (last?.kind === "steps") last.items.push(item);
-      else out.push({ kind: "steps", items: [item] });
-    } else out.push({ kind: "item", item });
-  }
+      else out.push({ kind: "steps", items: [item], start });
+    } else out.push({ kind: "item", item, start });
+  });
   return out;
 }
 
 function Thinking({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-      <span className="flex gap-1" aria-hidden>
-        {[0, 1, 2].map((i) => (
-          <span key={i} className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60 motion-reduce:animate-none" style={{ animationDelay: `${i * 160}ms` }} />
-        ))}
+    <div className="flex items-center gap-2 text-[13px] text-muted-foreground duration-300 animate-in fade-in motion-reduce:animate-none">
+      <span className="cp-dots flex gap-1" aria-hidden>
+        <span className="size-1.5 rounded-full bg-muted-foreground" />
+        <span className="size-1.5 rounded-full bg-muted-foreground" />
+        <span className="size-1.5 rounded-full bg-muted-foreground" />
       </span>
-      <span className="truncate">{label}</span>
+      <span key={label} className="truncate duration-200 animate-in fade-in motion-reduce:animate-none">
+        {label}
+      </span>
     </div>
   );
 }
@@ -431,12 +456,13 @@ function Welcome({ serverName, approval, onPick }: { serverName: string | null; 
       <div className="space-y-1.5">
         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Try</p>
         <div className="flex flex-col items-stretch gap-1.5">
-          {suggestions.map((s) => (
+          {suggestions.map((s, i) => (
             <button
               key={s}
               type="button"
               onClick={() => onPick(s)}
-              className="group flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-[13px] transition-colors duration-150 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99]"
+              style={{ animationDelay: `${i * 40}ms`, animationFillMode: "backwards" }}
+              className="group flex items-center gap-2 duration-300 ease-out animate-in fade-in slide-in-from-bottom-1 motion-reduce:animate-none rounded-lg border border-border bg-surface px-3 py-2 text-left text-[13px] transition-colors duration-150 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99]"
             >
               <span className="flex-1">{s}</span>
               <SendHorizontal className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
@@ -454,7 +480,8 @@ function UserBubble({ text, pending }: { text: string; pending?: boolean }) {
 
 function Item({ item, onDecide, onRetry }: { item: AssistantItem; onDecide: (item: ToolItem, approve: boolean) => void; onRetry?: () => void }) {
   if (item.kind === "user") return <UserBubble text={item.text} />;
-  if (item.kind === "assistant") return <Answer text={item.text} />;
+  if (item.kind === "assistant") return <Answer text={item.text} writing={!!item.streaming} />;
+  if (item.kind === "tool" && item.embed && item.state === "done") return <AssistantEmbed embed={item.embed} />;
   if (item.kind === "error")
     return (
       <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[13px]">
@@ -470,12 +497,12 @@ function Item({ item, onDecide, onRetry }: { item: AssistantItem; onDecide: (ite
   return <ApprovalCard item={item} onDecide={onDecide} />;
 }
 
-function Answer({ text }: { text: string }) {
+function Answer({ text, writing }: { text: string; writing: boolean }) {
   const [copied, setCopied] = React.useState(false);
   return (
     <div className="group/answer relative text-[13px] leading-relaxed">
-      <Markdown text={text} />
-      <button
+      <Markdown text={text} className={cn(writing && "cp-writing")} />
+      {!writing && <button
         type="button"
         onClick={async () => {
           try {
@@ -487,7 +514,7 @@ function Answer({ text }: { text: string }) {
         className="absolute -top-1 right-0 flex items-center gap-1 rounded-md border border-border bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground opacity-0 shadow-xs transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/answer:opacity-100"
       >
         {copied ? <Check className="size-3" /> : <Copy className="size-3" />} {copied ? "Copied" : "Copy"}
-      </button>
+      </button>}
     </div>
   );
 }
@@ -532,13 +559,13 @@ function StepGroup({ items }: { items: ToolItem[] }) {
         <ChevronDown className={cn("size-3.5 shrink-0 transition-transform duration-200", open && "rotate-180")} />
       </button>
       {!open && items.length === 1 && items[0].state === "failed" && items[0].result && <p className="pl-5.5 text-xs text-destructive">{items[0].result}</p>}
-      {open && (
+      <Collapse open={open}>
         <ol className="mt-1 space-y-1 border-l border-border pl-3">
           {items.map((t) => (
             <Step key={t.id} item={t} defaultOpen={items.length === 1} />
           ))}
         </ol>
-      )}
+      </Collapse>
     </div>
   );
 }
@@ -552,8 +579,19 @@ function Step({ item, defaultOpen }: { item: ToolItem; defaultOpen: boolean }) {
         <span className={cn("min-w-0 flex-1 truncate", item.state === "rejected" && "text-muted-foreground line-through")}>{item.title}</span>
         <span className="font-mono text-[10px] text-muted-foreground">{item.name}</span>
       </button>
-      {open && <Details item={item} />}
+      <Collapse open={open}>
+        <Details item={item} />
+      </Collapse>
     </li>
+  );
+}
+
+/** Opens and closes its content by height, without measuring (grid rows from 0fr to 1fr). */
+function Collapse({ open, children }: { open: boolean; children: React.ReactNode }) {
+  return (
+    <div className={cn("grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none", open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")} inert={!open}>
+      <div className="min-h-0 overflow-hidden">{children}</div>
+    </div>
   );
 }
 

@@ -1,5 +1,6 @@
 import type { Access, Role, ServerRole, ServerScope } from "./roles";
 import type { ServerSoftware } from "./software";
+import type { AssistantConversationView } from "./assistant";
 export type { ServerSoftware };
 
 export type Edition = "java";
@@ -143,7 +144,9 @@ export type WsServerMessage =
   | { type: "install"; progress: InstallProgress }
   | { type: "backup"; serverId: string; backupId: string; status: string; percent?: number | null; message?: string }
   | { type: "event"; event: ActivityEvent }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  /** A conversation with the AI assistant changed (sent only to the user it belongs to). */
+  | { type: "assistant"; conversation: AssistantConversationView };
 
 /** Messages sent from browser to API over the WebSocket. */
 export type WsClientMessage =

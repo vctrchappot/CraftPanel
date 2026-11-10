@@ -31,7 +31,21 @@ Usage is billed by your provider. **Steps per request** caps how many model call
 
 Click **Ask the assistant** in the sidebar (or the sparkle button on a phone), or press <kbd>Ctrl</kbd>+<kbd>I</kbd>. On a server's page the assistant knows which server you mean ("this server"); the server's name under the message field shows it, and clicking it switches to questions about all servers. Suggestions on an empty conversation give you a start. <kbd>Enter</kbd> sends, <kbd>Shift</kbd>+<kbd>Enter</kbd> starts a new line, and the arrows button at the top widens the panel.
 
-Answers are formatted (lists, bold, code) and can be copied. What the assistant looked at folds into one line such as "Checked 3 things"; click it to see each step, what was sent and what came back. Changes that wait for you show as a card with what will change, and **Approve** or **Decline**.
+Answers appear while the model writes them, formatted (lists, bold, code), and can be copied. What the assistant looked at folds into one line such as "Checked 3 things"; click it to see each step, what was sent and what came back. Changes that wait for you show as a card with what will change, and **Approve** or **Decline**.
+
+### Live cards
+
+When you ask how a server is doing, who is online, what the console says or which backups there are, the assistant puts a live card into the conversation instead of copying numbers into its answer:
+
+| Card | Shows |
+| --- | --- |
+| Status | State, uptime, players, CPU and memory |
+| Performance | TPS, MSPT, CPU and memory of the last ten minutes as small charts |
+| Players | Who is online and for how long |
+| Console | The latest lines, optionally only those containing a text (for example `ERROR`) |
+| Backups | The latest backups with size and age |
+
+Cards keep updating while the conversation is open and read the data with your own access, like the server's pages do. The arrow in a card's corner opens the matching tab.
 
 ### Approvals
 
@@ -50,7 +64,7 @@ The owner switches whole areas on or off under **What it may do**:
 
 | Area | Tools |
 | --- | --- |
-| Servers | List servers, status and live performance, start, stop, restart |
+| Servers | List servers, status and live performance, live cards, start, stop, restart |
 | Console | Read the latest lines (optionally filtered), send a command and read its answer |
 | Players | Online players, whitelist, operators and bans; whitelist, op, kick, ban, pardon |
 | Plugins and mods | Installed add-ons, Modrinth search, install the newest compatible version |

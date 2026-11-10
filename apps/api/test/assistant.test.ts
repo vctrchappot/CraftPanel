@@ -38,8 +38,38 @@ const fakeFetch: typeof fetch = async (input, init) => {
   if (!next) return new Response(JSON.stringify({ error: { message: "no scripted reply" } }), { status: 500 });
   const out = next(req);
   if (out instanceof Response) return out;
+  // The Anthropic client streams: replay the scripted message as server-sent events.
+  if (req.body.stream && (out as { type?: string }).type === "message") return new Response(anthropicEvents(out as AnthropicMessage), { status: 200, headers: { "content-type": "text/event-stream", "request-id": "req_test" } });
   return new Response(JSON.stringify(out), { status: 200, headers: { "content-type": "application/json", "request-id": "req_test" } });
 };
+
+type AnthropicBlock = { type: string; text?: string; thinking?: string; signature?: string; id?: string; name?: string; input?: unknown };
+type AnthropicMessage = { content: AnthropicBlock[]; stop_reason: string } & Record<string, unknown>;
+
+/** The Messages API's streaming events for a finished message. */
+function anthropicEvents(m: AnthropicMessage) {
+  const ev = (type: string, data: object) => `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`;
+  let out = ev("message_start", { message: { ...m, content: [], stop_reason: null } });
+  m.content.forEach((b, index) => {
+    if (b.type === "text") {
+      out += ev("content_block_start", { index, content_block: { type: "text", text: "" } });
+      out += ev("content_block_delta", { index, delta: { type: "text_delta", text: b.text } });
+    } else if (b.type === "thinking") {
+      out += ev("content_block_start", { index, content_block: { type: "thinking", thinking: "", signature: "" } });
+      out += ev("content_block_delta", { index, delta: { type: "signature_delta", signature: b.signature } });
+    } else {
+      out += ev("content_block_start", { index, content_block: { type: "tool_use", id: b.id, name: b.name, input: {} } });
+      out += ev("content_block_delta", { index, delta: { type: "input_json_delta", partial_json: JSON.stringify(b.input) } });
+    }
+    out += ev("content_block_stop", { index });
+  });
+  out += ev("message_delta", { delta: { stop_reason: m.stop_reason, stop_sequence: null }, usage: { output_tokens: 5 } });
+  return out + ev("message_stop", {});
+}
+
+/** A Chat Completions stream: text in pieces, then a tool call whose arguments arrive in two parts. */
+const chatEvents = (chunks: object[]) =>
+  new Response(chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join("") + "data: [DONE]\n\n", { status: 200, headers: { "content-type": "text/event-stream" } });
 
 /** An Anthropic Messages API response. */
 const claude = (content: unknown[], stop_reason = "end_turn") => () => ({
@@ -321,5 +351,47 @@ describe("assistant providers", () => {
     expect(requests[0].headers.authorization).toBe("Bearer sk-deepseek");
     const msgs = requests[1].body.messages as { role: string; reasoning_content?: string }[];
     expect(msgs.find((m) => m.role === "assistant")).toMatchObject({ reasoning_content: "Check the server list first." });
+  });
+});
+
+describe("assistant streaming and live cards", () => {
+  it("reads a streamed Chat Completions answer, tool calls in pieces included, and pushes it live", async () => {
+    await call(sessions.owner, "PUT", "/api/assistant/settings", { ...anthropicSettings, provider: "openai", model: "gpt-test", apiKey: "sk-openai", approval: "risky" });
+    // A fake dashboard socket of the operator, to see what is pushed while the answer is written.
+    const user = (await call(sessions.operator, "GET", "/api/auth/state")).json().user;
+    const pushed: { type: string; conversation?: AssistantConversationView }[] = [];
+    const socket = { readyState: 1, bufferedAmount: 0, send: (d: string) => pushed.push(JSON.parse(d)) };
+    const client = { socket, userId: user.id, username: "operator", access: user, sessionId: "s", subscriptions: new Map() } as never;
+    ctx.hub.add(client);
+    script = [
+      () =>
+        chatEvents([
+          { choices: [{ delta: { content: "Let me " } }] },
+          { choices: [{ delta: { content: "look." } }] },
+          { choices: [{ delta: { tool_calls: [{ index: 0, id: "s1", function: { name: "show_card", arguments: '{"card":' } }] } }] },
+          { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '"players"}' } }] }, finish_reason: "tool_calls" }] },
+        ]),
+      () => chatEvents([{ choices: [{ delta: { content: "Nobody is **online**." }, finish_reason: "stop" }] }]),
+    ];
+    const v = await ask(sessions.operator, "Who is online?");
+    await new Promise((r) => setTimeout(r, 120)); // pushes are batched for 60 ms
+    ctx.hub.remove(client);
+    expect(requests[0].body.stream).toBe(true);
+    expect(v.items.map((i) => i.kind)).toEqual(["user", "assistant", "tool", "assistant"]);
+    expect(v.items[1]).toEqual({ kind: "assistant", text: "Let me look.", at: expect.any(Number) });
+    expect(v.items[2]).toMatchObject({ name: "show_card", state: "done", title: "Show players of survival", embed: { card: "players", serverId, serverName: "survival" } });
+    expect(JSON.parse(String((requests[1].body.messages as { role: string; content: string }[]).at(-1)!.content))).toMatchObject({ online: [] });
+    expect(v.items[3]).toMatchObject({ text: "Nobody is **online**." });
+    // Live pushes reached the user's socket, the last one with the finished conversation.
+    const views = pushed.filter((m) => m.type === "assistant").map((m) => m.conversation!);
+    expect(views.length).toBeGreaterThan(0);
+    expect(views.at(-1)!.items.at(-1)).toMatchObject({ text: "Nobody is **online**." });
+  });
+
+  it("shows a viewer a status card", async () => {
+    await call(sessions.owner, "PUT", "/api/assistant/settings", { ...anthropicSettings, minRole: "viewer" });
+    script = [claude([toolUse("v1", "show_card", { card: "status" })], "tool_use"), claude([{ type: "text", text: "Here it is." }])];
+    const v = await ask(sessions.viewer, "How is it?");
+    expect(v.items.find((i) => i.kind === "tool")).toMatchObject({ state: "done", embed: { card: "status" } });
   });
 });

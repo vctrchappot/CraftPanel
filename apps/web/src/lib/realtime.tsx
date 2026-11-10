@@ -10,7 +10,9 @@ export type ConnectionState = "connecting" | "open" | "closed";
 
 /**
  * Single WebSocket per tab with exponential-backoff reconnection.
- * Subscriptions are reference counted and re-sent after reconnecting.
+ * Subscriptions are reference counted and re-sent after reconnecting. The latest console lines, players and
+ * metrics of each subscribed server are kept, so a second view of the same server starts with them too (the
+ * server sends its replay only for the first subscription).
  */
 class RealtimeClient {
   private ws: WebSocket | null = null;
@@ -22,6 +24,7 @@ class RealtimeClient {
   state: ConnectionState = "closed";
   private stateListeners = new Set<(s: ConnectionState) => void>();
   private closeListeners = new Set<(code: number) => void>();
+  private latest = new Map<string, { lines: ConsoleLine[]; players: OnlinePlayer[] | null; metrics: ServerMetrics | null }>();
 
   connect() {
     this.closedByUser = false;
@@ -43,10 +46,12 @@ class RealtimeClient {
       } catch {
         return;
       }
+      this.remember(msg);
       for (const l of this.listeners) l(msg);
     };
     ws.onclose = (ev) => {
       this.ws = null;
+      this.latest.clear();
       this.setState("closed");
       for (const l of this.closeListeners) l(ev.code);
       if (this.closedByUser || ev.code === 4001) return;
@@ -83,6 +88,20 @@ class RealtimeClient {
     this.listeners.add(l);
     return () => void this.listeners.delete(l);
   }
+  /** What is known about a subscribed server so far. */
+  snapshot(serverId: string) {
+    return this.latest.get(serverId);
+  }
+  private remember(msg: WsServerMessage) {
+    if (msg.type !== "console" && msg.type !== "players" && msg.type !== "metrics" && msg.type !== "status") return;
+    if (!this.subs.has(msg.serverId)) return;
+    const entry = this.latest.get(msg.serverId) ?? { lines: [], players: null, metrics: null };
+    if (msg.type === "console") entry.lines = mergeLines(entry.lines, msg.lines, msg.replay);
+    else if (msg.type === "players") entry.players = msg.players;
+    else if (msg.type === "metrics") entry.metrics = msg.metrics;
+    else if (msg.status !== "running") entry.metrics = null;
+    this.latest.set(msg.serverId, entry);
+  }
   subscribe(serverId: string) {
     const n = this.subs.get(serverId) ?? 0;
     this.subs.set(serverId, n + 1);
@@ -91,6 +110,7 @@ class RealtimeClient {
       const c = (this.subs.get(serverId) ?? 1) - 1;
       if (c <= 0) {
         this.subs.delete(serverId);
+        this.latest.delete(serverId);
         this.send({ type: "unsubscribe", serverId });
       } else this.subs.set(serverId, c);
     };
@@ -170,6 +190,14 @@ export function useRealtimeEvent(handler: Listener) {
 
 const MAX_LINES = 5000;
 
+/** Appends lines newer than the last one held (a replay replaces them), keeping at most MAX_LINES. */
+function mergeLines(prev: ConsoleLine[], lines: ConsoleLine[], replay?: boolean) {
+  if (replay) return lines;
+  const lastSeq = prev.length ? prev[prev.length - 1].seq : 0;
+  const next = prev.concat(lines.filter((l) => l.seq > lastSeq));
+  return next.length > MAX_LINES ? next.slice(next.length - MAX_LINES) : next;
+}
+
 /** Console lines, metrics and players for one server (subscribes while mounted). */
 export function useServerStream(serverId: string | null) {
   const c = useRealtime();
@@ -180,18 +208,12 @@ export function useServerStream(serverId: string | null) {
 
   React.useEffect(() => {
     if (!serverId) return;
-    setLines([]);
-    setMetrics(null);
+    const seed = c.snapshot(serverId);
+    setLines(seed?.lines ?? []);
+    setMetrics(seed?.metrics ?? null);
+    setPlayers(seed?.players ?? null);
     const off = c.on((msg) => {
-      if (msg.type === "console" && msg.serverId === serverId) {
-        setLines((prev) => {
-          if (msg.replay) return msg.lines;
-          const lastSeq = prev.length ? prev[prev.length - 1].seq : 0;
-          const fresh = msg.lines.filter((l) => l.seq > lastSeq);
-          const next = prev.concat(fresh);
-          return next.length > MAX_LINES ? next.slice(next.length - MAX_LINES) : next;
-        });
-      } else if (msg.type === "metrics" && msg.serverId === serverId) setMetrics(msg.metrics);
+      if (msg.type === "console" && msg.serverId === serverId) setLines((prev) => mergeLines(prev, msg.lines, msg.replay)); else if (msg.type === "metrics" && msg.serverId === serverId) setMetrics(msg.metrics);
       else if (msg.type === "players" && msg.serverId === serverId) setPlayers(msg.players);
       else if (msg.type === "install" && msg.progress.serverId === serverId) setInstall(msg.progress.done && !msg.progress.error ? null : msg.progress);
       else if (msg.type === "status" && msg.serverId === serverId && msg.status !== "running") setMetrics(null);

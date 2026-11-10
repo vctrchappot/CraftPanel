@@ -122,12 +122,25 @@ export const assistantDecisionSchema = z.object({
   approve: z.boolean(),
 });
 
+/** Live cards the assistant can put into the conversation; the dashboard fills them with current data. */
+export const ASSISTANT_CARDS = ["status", "performance", "players", "console", "backups"] as const;
+export type AssistantCard = (typeof ASSISTANT_CARDS)[number];
+
+export interface AssistantEmbed {
+  card: AssistantCard;
+  serverId: string;
+  serverName: string;
+  /** Console card: only lines containing this text. */
+  filter?: string;
+}
+
 export type AssistantRisk = "read" | "change" | "risky";
 export type AssistantToolState = "waiting" | "running" | "done" | "failed" | "rejected";
 
 export type AssistantItem =
   | { kind: "user"; text: string; at: number }
-  | { kind: "assistant"; text: string; at: number }
+  /** `streaming`: the model is still writing this answer. */
+  | { kind: "assistant"; text: string; at: number; streaming?: boolean }
   | {
       kind: "tool";
       id: string;
@@ -139,6 +152,8 @@ export type AssistantItem =
       state: AssistantToolState;
       /** Short result or error shown under the call. */
       result?: string;
+      /** A live card the dashboard draws in the conversation (the show_card tool). */
+      embed?: AssistantEmbed;
       at: number;
     }
   | { kind: "error"; text: string; at: number };

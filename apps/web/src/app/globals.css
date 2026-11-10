@@ -155,3 +155,31 @@
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent) transparent;
 }
+
+/* AI assistant: the "thinking" dots rise in turn, and a caret follows an answer while it is written. */
+.cp-dots > span {
+  animation: cp-dot 1.2s ease-in-out infinite;
+}
+.cp-dots > span:nth-child(2) { animation-delay: 0.15s; }
+.cp-dots > span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes cp-dot {
+  0%, 70%, 100% { opacity: 0.3; transform: translateY(0); }
+  35% { opacity: 1; transform: translateY(-2px); }
+}
+.cp-writing > :last-child:not(ul, ol, pre)::after,
+.cp-writing > :is(ul, ol):last-child > li:last-child::after {
+  content: "";
+  display: inline-block;
+  width: 0.45em;
+  height: 1em;
+  margin-left: 0.15em;
+  vertical-align: -0.15em;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.55;
+  animation: cp-caret 1s steps(1, end) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cp-dots > span,
+  .cp-writing :is(p, li, blockquote)::after { animation: none; }
+}

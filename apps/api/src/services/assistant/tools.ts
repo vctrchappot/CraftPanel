@@ -1,11 +1,13 @@
 import { z } from "zod";
 import {
   AppError,
+  ASSISTANT_CARDS,
   canAccess,
   canSeeServer,
   commandSchema,
   playerNameSchema,
   scheduleSchema,
+  type AssistantEmbed,
   type AssistantRisk,
   type AssistantToolGroup,
   type Permission,
@@ -32,6 +34,8 @@ export interface PreparedCall {
   title: string;
   risk: AssistantRisk;
   run: () => Promise<unknown>;
+  /** A live card the dashboard draws for this call. */
+  embed?: AssistantEmbed;
 }
 
 interface ToolDef<S extends z.ZodType = z.ZodType> {
@@ -109,6 +113,43 @@ const TOOLS: ToolDef[] = [
         run: async () => {
           const s = env.ctx.servers.summary(row);
           return { ...s, metrics: env.ctx.servers.agent.latestMetrics(row.id), busy: env.ctx.servers.busy(row.id) };
+        },
+      };
+    },
+  }),
+  tool({
+    name: "show_card",
+    group: "servers",
+    description:
+      "Put a live card into the chat that keeps updating with current data: status (state, players, CPU, memory, uptime), performance (TPS, MSPT, CPU and memory over the last minutes), players (who is online), console (the latest lines, optionally only those containing a text) or backups (the latest backups). Use it whenever the user asks how a server is doing, who is online, what the console says or which backups exist, instead of listing the numbers in text. You get the current values back: add what they mean, don't repeat them all.",
+    input: z.object({
+      server: serverField,
+      card: z.enum(ASSISTANT_CARDS),
+      filter: z.string().max(80).optional().describe("Console card only: show only lines containing this text, e.g. ERROR or a player name."),
+    }),
+    async prepare(input, env) {
+      const row = await resolveServer(env, input.server);
+      need(env, input.card === "console" ? "console.read" : "server.view", row);
+      const label = { status: "status", performance: "performance", players: "players", console: "console", backups: "backups" }[input.card];
+      const filter = input.card === "console" && input.filter?.trim() ? input.filter.trim() : undefined;
+      return {
+        title: `Show ${label} of ${row.name}`,
+        risk: "read",
+        embed: { card: input.card, serverId: row.id, serverName: row.name, ...(filter ? { filter } : {}) },
+        run: async () => {
+          const agent = env.ctx.servers.agent;
+          const note = "The user now sees this as a live card in the chat.";
+          if (input.card === "status" || input.card === "performance") {
+            const sum = env.ctx.servers.summary(row);
+            return { note, status: sum.status, players: `${sum.playersOnline}/${sum.maxPlayers}`, memoryMb: sum.memoryMb, metrics: agent.latestMetrics(row.id) };
+          }
+          if (input.card === "players") return { note, online: agent.info(row.id).players.map((p) => ({ name: p.name, since: new Date(p.joinedAt).toISOString() })) };
+          if (input.card === "console") {
+            let lines = agent.history(row.id, 2000);
+            if (filter) lines = lines.filter((l) => l.text.toLowerCase().includes(filter.toLowerCase()));
+            return { note, lines: lines.slice(-25).map((l) => l.text) };
+          }
+          return { note, backups: (await env.ctx.backups.list(row.id)).slice(0, 5).map((b) => ({ kind: b.kind, status: b.status, sizeBytes: b.size, created: new Date(b.createdAt).toISOString() })) };
         },
       };
     },

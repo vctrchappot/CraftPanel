@@ -54,7 +54,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const notifications = new NotificationService(settings, updates);
   const rules = new RuleService(db, servers, backups, maps, notifications, activity);
   activity.listen((event, serverName) => notifications.onEvent(event, serverName));
-  const assistant = new AssistantService({ settings, sessions, servers, game, backups, schedules, activity }, opts.assistantFetch);
+  const assistant = new AssistantService({ settings, sessions, servers, game, backups, schedules, activity, hub }, opts.assistantFetch);
 
   // First-run protection: on non-loopback binds, creating the owner needs a token
   // that only someone with access to the host (console or data dir) can read.

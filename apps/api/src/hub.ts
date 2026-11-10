@@ -41,6 +41,12 @@ export class Hub {
     }
   }
 
+  /** Send to every open dashboard of one user (their assistant conversations). */
+  toUser(userId: string, msg: WsServerMessage) {
+    const data = JSON.stringify(msg);
+    for (const c of this.clients) if (c.userId === userId && c.socket.readyState === 1 && c.socket.bufferedAmount < 8 * 1024 * 1024) c.socket.send(data);
+  }
+
   /** Send only to clients subscribed to a server (console, metrics, players). */
   toSubscribers(serverId: string, msg: WsServerMessage) {
     const data = JSON.stringify(msg);
