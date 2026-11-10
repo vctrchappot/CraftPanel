@@ -15,10 +15,13 @@ export async function assistantRoutes(app: FastifyInstance, ctx: AppContext) {
 
   // ---- settings (owner) -------------------------------------------------------------------
 
-  /** The submitted settings, with the redacted placeholder replaced by the stored key. */
+  /** The submitted settings, with the redacted placeholder replaced by the stored key (never another provider's). */
   const incoming = async (body: unknown): Promise<AssistantSettings> => {
     const s = parse(assistantSettingsSchema, body);
-    if (s.apiKey === REDACTED) s.apiKey = (await assistant.config()).apiKey;
+    if (s.apiKey === REDACTED) {
+      const stored = await assistant.config();
+      s.apiKey = stored.provider === s.provider ? stored.apiKey : "";
+    }
     return s;
   };
 
@@ -39,6 +42,10 @@ export async function assistantRoutes(app: FastifyInstance, ctx: AppContext) {
   app.post("/api/assistant/settings/test", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req) => {
     requirePermission(req, "app.configure");
     return assistant.test(await incoming(req.body));
+  });
+  app.post("/api/assistant/settings/models", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (req) => {
+    requirePermission(req, "app.configure");
+    return assistant.models(await incoming(req.body));
   });
 
   // ---- conversations -------------------------------------------------------------------------

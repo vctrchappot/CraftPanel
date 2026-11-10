@@ -18,12 +18,12 @@ The assistant reads status, performance and the console, and makes changes throu
 
 Open **Settings → AI assistant** (owner only):
 
-1. Switch on **Turn on the assistant**.
-2. Choose a **provider** and paste your **API key**:
-   - **Anthropic (Claude)**: a key from the Anthropic Console. The default model is `claude-opus-5-5`; `claude-sonnet-5-5` or `claude-haiku-5-5` cost less.
-   - **OpenAI**: a key from your OpenAI account and the model name.
-   - **OpenAI-compatible API**: any service that speaks the Chat Completions API. **Fill in…** sets the address for OpenRouter, Mistral, Groq or Google Gemini, or for a model on this computer with Ollama (`http://localhost:11434/v1`) or LM Studio. Local models need no key; pick one that supports tool calling.
-3. Click **Test connection**, then **Save**.
+1. Pick a **provider**: Anthropic (Claude), OpenAI, DeepSeek, Google Gemini, OpenRouter, Mistral, Groq, Ollama or LM Studio on this computer, or **Other** for any service that speaks the OpenAI Chat Completions API.
+2. Paste your **API key**. **Create a key at …** next to the field opens the provider's key page. Ollama and LM Studio need no key; if they run on another computer, enter its address (ending in `/v1`).
+3. Pick the **model**. Once the key is in, CraftPanel loads the provider's model list; type to filter it. Anthropic defaults to `claude-opus-5-5` (`claude-sonnet-5-5` and `claude-haiku-5-5` cost less), DeepSeek to `deepseek-chat` (`deepseek-reasoner` thinks first and answers more slowly). Local models must support tool calling.
+4. Click **Test connection**. When it answers, **Turn on and save** switches the assistant on.
+
+A proxy or gateway in front of a cloud provider goes under **Custom address**. The saved key belongs to its provider: switching to another provider asks for that provider's key.
 
 Usage is billed by your provider. **Steps per request** caps how many model calls one question may take.
 

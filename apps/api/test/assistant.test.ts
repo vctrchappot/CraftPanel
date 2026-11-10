@@ -270,3 +270,56 @@ describe("assistant conversations (OpenAI-compatible)", () => {
     await new Promise((r) => setTimeout(r, 300)); // let the background backup finish before cleanup
   });
 });
+
+describe("assistant providers", () => {
+  it("sends no empty tools array when testing a Chat Completions provider", async () => {
+    script = [() => ({ choices: [{ finish_reason: "stop", message: { content: "Hi there." } }] })];
+    const r = await call(sessions.owner, "POST", "/api/assistant/settings/test", { ...anthropicSettings, provider: "openai", model: "gpt-test", apiKey: "sk-openai" });
+    expect(r.json()).toEqual({ ok: true, reply: "Hi there." });
+    expect(requests[0].url).toBe("https://api.openai.com/v1/chat/completions");
+    expect(requests[0].body).not.toHaveProperty("tools");
+  });
+
+  it("never sends the saved key to a different provider", async () => {
+    await call(sessions.owner, "PUT", "/api/assistant/settings", anthropicSettings);
+    script = [() => ({ data: [] })];
+    await call(sessions.owner, "POST", "/api/assistant/settings/models", { ...anthropicSettings, provider: "deepseek", apiKey: "••••••••" });
+    expect(requests[0].headers.authorization).toBeUndefined();
+  });
+
+  it("lists chat models from the provider", async () => {
+    script = [() => ({ object: "list", data: [{ id: "models/gemini-pro-test" }, { id: "text-embedding-004" }, { id: "models/gemini-flash-test" }] })];
+    const r = await call(sessions.owner, "POST", "/api/assistant/settings/models", { ...anthropicSettings, provider: "gemini", model: "", apiKey: "AIza-test" });
+    expect(r.json()).toEqual({ models: ["gemini-flash-test", "gemini-pro-test"] });
+    expect(requests[0].url).toBe("https://generativelanguage.googleapis.com/v1beta/openai/models");
+    expect(requests[0].headers.authorization).toBe("Bearer AIza-test");
+  });
+
+  it("lists Anthropic models", async () => {
+    script = [() => ({ data: [{ type: "model", id: "claude-opus-5-5", display_name: "Claude Opus 5.5", created_at: "2026-01-01T00:00:00Z" }], has_more: false, first_id: "claude-opus-5-5", last_id: "claude-opus-5-5" })];
+    const r = await call(sessions.owner, "POST", "/api/assistant/settings/models", { ...anthropicSettings, apiKey: "••••••••" });
+    expect(r.json()).toEqual({ models: ["claude-opus-5-5"] });
+    expect(requests[0].url).toContain("https://api.anthropic.com/v1/models");
+  });
+
+  it("explains an address that is not an API", async () => {
+    script = [() => new Response("<html>not here</html>", { status: 200, headers: { "content-type": "text/html" } })];
+    const r = await call(sessions.owner, "POST", "/api/assistant/settings/models", { ...anthropicSettings, provider: "openai-compatible", baseUrl: "http://localhost:9/", apiKey: "" });
+    expect(r.statusCode).toBe(502);
+    expect(r.json().error.hint).toMatch(/model list/);
+  });
+
+  it("talks to DeepSeek and hands its reasoning back during a tool loop", async () => {
+    await call(sessions.owner, "PUT", "/api/assistant/settings", { ...anthropicSettings, provider: "deepseek", model: "deepseek-reasoner", apiKey: "sk-deepseek", approval: "risky" });
+    script = [
+      () => ({ choices: [{ finish_reason: "tool_calls", message: { content: "", reasoning_content: "Check the server list first.", tool_calls: [{ id: "d1", type: "function", function: { name: "list_servers", arguments: "{}" } }] } }] }),
+      () => ({ choices: [{ finish_reason: "stop", message: { content: "survival is the only server.", reasoning_content: "Done." } }] }),
+    ];
+    const v = await ask(sessions.operator, "Which servers are there?");
+    expect(v.items.at(-1)).toMatchObject({ kind: "assistant", text: "survival is the only server." });
+    expect(requests[0].url).toBe("https://api.deepseek.com/v1/chat/completions");
+    expect(requests[0].headers.authorization).toBe("Bearer sk-deepseek");
+    const msgs = requests[1].body.messages as { role: string; reasoning_content?: string }[];
+    expect(msgs.find((m) => m.role === "assistant")).toMatchObject({ reasoning_content: "Check the server list first." });
+  });
+});

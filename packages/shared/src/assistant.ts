@@ -4,25 +4,41 @@ import { ROLES, type Role } from "./roles";
 // The optional AI assistant: the owner brings an API key for a model provider, and users ask in plain language.
 // The assistant acts through tools with the asking user's own permissions; changes wait for approval.
 
-/** "openai-compatible" covers any Chat Completions API: OpenRouter, Mistral, Groq, Gemini's OpenAI endpoint, Ollama, LM Studio. */
-export const ASSISTANT_PROVIDERS = ["anthropic", "openai", "openai-compatible"] as const;
+/**
+ * Anthropic speaks its Messages API; every other provider speaks Chat Completions at its own address.
+ * "openai-compatible" is any other Chat Completions API, at a base URL the owner enters.
+ */
+export const ASSISTANT_PROVIDERS = ["anthropic", "openai", "deepseek", "gemini", "openrouter", "mistral", "groq", "ollama", "lmstudio", "openai-compatible"] as const;
 export type AssistantProvider = (typeof ASSISTANT_PROVIDERS)[number];
 
-export const ASSISTANT_PROVIDER_INFO: Record<AssistantProvider, { label: string; defaultModel: string; defaultBaseUrl: string; keyRequired: boolean }> = {
-  anthropic: { label: "Anthropic (Claude)", defaultModel: "claude-opus-5-5", defaultBaseUrl: "https://api.anthropic.com", keyRequired: true },
-  openai: { label: "OpenAI", defaultModel: "", defaultBaseUrl: "https://api.openai.com/v1", keyRequired: true },
-  "openai-compatible": { label: "OpenAI-compatible API", defaultModel: "", defaultBaseUrl: "", keyRequired: false },
-};
+export interface AssistantProviderInfo {
+  label: string;
+  /** One line under the name in the provider picker. */
+  note: string;
+  /** "" = pick one from the provider's model list. */
+  defaultModel: string;
+  /** "" = the owner has to enter one. */
+  defaultBaseUrl: string;
+  keyRequired: boolean;
+  /** Runs on the owner's own machine: no key, nothing leaves the network. */
+  local: boolean;
+  /** Where to create an API key. */
+  keyUrl: string | null;
+  keyPlaceholder: string;
+}
 
-/** Base URLs offered for the OpenAI-compatible provider; any other URL works too. */
-export const ASSISTANT_ENDPOINT_PRESETS = [
-  { label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1" },
-  { label: "Mistral", baseUrl: "https://api.mistral.ai/v1" },
-  { label: "Groq", baseUrl: "https://api.groq.com/openai/v1" },
-  { label: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
-  { label: "Ollama (this computer)", baseUrl: "http://localhost:11434/v1" },
-  { label: "LM Studio (this computer)", baseUrl: "http://localhost:1234/v1" },
-] as const;
+export const ASSISTANT_PROVIDER_INFO: Record<AssistantProvider, AssistantProviderInfo> = {
+  anthropic: { label: "Anthropic", note: "Claude", defaultModel: "claude-opus-5-5", defaultBaseUrl: "https://api.anthropic.com", keyRequired: true, local: false, keyUrl: "https://console.anthropic.com/settings/keys", keyPlaceholder: "sk-ant-…" },
+  openai: { label: "OpenAI", note: "GPT models", defaultModel: "", defaultBaseUrl: "https://api.openai.com/v1", keyRequired: true, local: false, keyUrl: "https://platform.openai.com/api-keys", keyPlaceholder: "sk-…" },
+  deepseek: { label: "DeepSeek", note: "DeepSeek chat and reasoner", defaultModel: "deepseek-chat", defaultBaseUrl: "https://api.deepseek.com/v1", keyRequired: true, local: false, keyUrl: "https://platform.deepseek.com/api_keys", keyPlaceholder: "sk-…" },
+  gemini: { label: "Google Gemini", note: "Gemini via its OpenAI endpoint", defaultModel: "", defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", keyRequired: true, local: false, keyUrl: "https://aistudio.google.com/apikey", keyPlaceholder: "AIza…" },
+  openrouter: { label: "OpenRouter", note: "Many models, one key", defaultModel: "", defaultBaseUrl: "https://openrouter.ai/api/v1", keyRequired: true, local: false, keyUrl: "https://openrouter.ai/settings/keys", keyPlaceholder: "sk-or-…" },
+  mistral: { label: "Mistral", note: "Mistral and Codestral", defaultModel: "", defaultBaseUrl: "https://api.mistral.ai/v1", keyRequired: true, local: false, keyUrl: "https://console.mistral.ai/api-keys", keyPlaceholder: "API key" },
+  groq: { label: "Groq", note: "Fast open models", defaultModel: "", defaultBaseUrl: "https://api.groq.com/openai/v1", keyRequired: true, local: false, keyUrl: "https://console.groq.com/keys", keyPlaceholder: "gsk_…" },
+  ollama: { label: "Ollama", note: "On this computer, no key", defaultModel: "", defaultBaseUrl: "http://localhost:11434/v1", keyRequired: false, local: true, keyUrl: null, keyPlaceholder: "" },
+  lmstudio: { label: "LM Studio", note: "On this computer, no key", defaultModel: "", defaultBaseUrl: "http://localhost:1234/v1", keyRequired: false, local: true, keyUrl: null, keyPlaceholder: "" },
+  "openai-compatible": { label: "Other", note: "Any OpenAI-compatible API", defaultModel: "", defaultBaseUrl: "", keyRequired: false, local: false, keyUrl: null, keyPlaceholder: "Optional" },
+};
 
 /** Tool groups the owner can switch on or off. Each tool still checks the user's permission. */
 export const ASSISTANT_TOOL_GROUPS = ["servers", "console", "players", "plugins", "backups", "schedules", "settings", "files"] as const;

@@ -2,10 +2,9 @@
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Plug, Save, XCircle } from "lucide-react";
+import { CheckCircle2, ExternalLink, Plug, RefreshCw, Save, XCircle } from "lucide-react";
 import { Button, Callout, ChoiceCard, Field, Input, NativeSelect, Panel, Section, SegmentedControl, Skeleton, Switch, Textarea } from "@craftpanel/ui";
 import {
-  ASSISTANT_ENDPOINT_PRESETS,
   ASSISTANT_PROVIDER_INFO,
   ASSISTANT_PROVIDERS,
   ASSISTANT_TOOL_GROUP_INFO,
@@ -26,18 +25,61 @@ export function AssistantSettingsSection() {
     if (q.data && !f) setF(q.data);
   }, [q.data, f]);
   // After saving, start over from the stored (redacted) values so the form is clean again.
-  const save = useAction(() => api.put("/api/assistant/settings", { ...f! }), { success: "AI assistant settings saved", invalidate: [["assistant-settings"], ["assistant"]], onSuccess: () => setF(null) });
+  const save = useAction((s: AssistantSettings) => api.put("/api/assistant/settings", { ...s }), { success: "AI assistant settings saved", invalidate: [["assistant-settings"], ["assistant"]], onSuccess: () => setF(null) });
   const [test, setTest] = React.useState<{ ok: boolean; text: string } | null>(null);
   const [testing, setTesting] = React.useState(false);
+  const [models, setModels] = React.useState<{ list: string[] | null; loading: boolean; error: string | null }>({ list: null, loading: false, error: null });
+  const request = React.useRef(0);
+
+  // Key, address and provider are enough to ask the provider for its models.
+  const ready = !!f && (ASSISTANT_PROVIDER_INFO[f.provider].keyRequired ? !!f.apiKey : f.provider !== "openai-compatible" || !!f.baseUrl);
+  const canList = ready && !!f && /^https?:\/\/\S+$|^$/.test(f.baseUrl);
+  const loadModels = React.useCallback(async () => {
+    if (!f) return;
+    const id = ++request.current;
+    setModels((m) => ({ ...m, loading: true, error: null }));
+    try {
+      const r = await api.post<{ models: string[] }>("/api/assistant/settings/models", { ...f });
+      if (id === request.current) setModels({ list: r.models, loading: false, error: null });
+    } catch (err) {
+      if (id === request.current) setModels({ list: null, loading: false, error: errorMessage(err) });
+    }
+  }, [f]);
+  // Load the list on its own once the connection details are filled in (and again when they change).
+  const listKey = f ? `${f.provider} ${f.baseUrl} ${f.apiKey}` : "";
+  React.useEffect(() => {
+    request.current++;
+    setModels({ list: null, loading: false, error: null });
+    if (!canList) return;
+    const t = setTimeout(() => void loadModels(), 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the connection details matter, not the rest of the form
+  }, [listKey, canList]);
 
   if (!f) return q.error ? <Callout variant="danger">{errorMessage(q.error)}</Callout> : <Skeleton className="h-64 rounded-lg" />;
   const set = (patch: Partial<AssistantSettings>) => {
     setF({ ...f, ...patch });
     setTest(null);
   };
+  // Another provider starts from its own defaults; going back to the saved one restores its key and model.
+  const pickProvider = (p: AssistantProvider) => {
+    const saved = q.data?.provider === p ? q.data : null;
+    set({ provider: p, apiKey: saved?.apiKey ?? "", model: saved?.model ?? ASSISTANT_PROVIDER_INFO[p].defaultModel, baseUrl: saved?.baseUrl ?? "" });
+  };
+  const runTest = async () => {
+    setTesting(true);
+    setTest(null);
+    try {
+      const r = await api.post<{ reply: string }>("/api/assistant/settings/test", { ...f });
+      setTest({ ok: true, text: r.reply });
+    } catch (err) {
+      setTest({ ok: false, text: errorMessage(err) });
+    } finally {
+      setTesting(false);
+    }
+  };
   const info = ASSISTANT_PROVIDER_INFO[f.provider];
   const dirty = JSON.stringify(f) !== JSON.stringify(q.data);
-  const local = /^http:\/\/(localhost|127\.|\[::1\])/.test(f.baseUrl);
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -55,77 +97,87 @@ export function AssistantSettingsSection() {
       </Section>
 
       <Section title="Provider" description="Requests go from this computer straight to the provider you choose, with your key. Usage is billed by the provider.">
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Provider">
           {ASSISTANT_PROVIDERS.map((p) => (
             <ChoiceCard
               key={p}
+              role="radio"
+              aria-checked={f.provider === p}
               selected={f.provider === p}
-              onClick={() => set({ provider: p, model: p === f.provider ? f.model : ASSISTANT_PROVIDER_INFO[p].defaultModel, baseUrl: p === f.provider ? f.baseUrl : "" })}
-              className="px-3 py-2.5 text-left text-[13px] font-medium"
+              onClick={() => p !== f.provider && pickProvider(p)}
+              className="flex flex-col items-start gap-0.5 px-3 py-2.5 text-left"
             >
-              {ASSISTANT_PROVIDER_INFO[p].label}
+              <span className="text-[13px] font-medium">{ASSISTANT_PROVIDER_INFO[p].label}</span>
+              <span className="text-[11px] leading-snug text-muted-foreground">{ASSISTANT_PROVIDER_INFO[p].note}</span>
             </ChoiceCard>
           ))}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="API key" htmlFor="ai-key" help={info.keyRequired ? "Stored on this computer and never shown again." : "Optional; local servers such as Ollama need none."}>
-            <Input id="ai-key" type="password" value={f.apiKey} onChange={(e) => set({ apiKey: e.target.value })} placeholder={f.provider === "anthropic" ? "sk-ant-…" : "sk-…"} autoComplete="new-password" spellCheck={false} />
-          </Field>
-          <Field label="Model" htmlFor="ai-model" help={modelHelp(f.provider)}>
-            <Input id="ai-model" value={f.model} onChange={(e) => set({ model: e.target.value.trim() })} placeholder={info.defaultModel || "model name"} autoComplete="off" spellCheck={false} />
-          </Field>
-          {f.provider !== "anthropic" && (
+
+        <Panel className="space-y-4 p-4">
+          {!info.local && (
             <Field
-              label="Base URL"
-              htmlFor="ai-base"
-              className="sm:col-span-2"
-              help={f.provider === "openai" ? "Leave empty for api.openai.com." : "The address ending in /v1 (or the provider's equivalent)."}
+              label="API key"
+              htmlFor="ai-key"
+              help={info.keyRequired ? "Stored on this computer and never shown again." : "Only if the service asks for one."}
               aside={
-                f.provider === "openai-compatible" && (
-                  <NativeSelect aria-label="Known providers" className="h-7 w-auto text-xs" value="" onChange={(e) => e.target.value && set({ baseUrl: e.target.value })}>
-                    <option value="">Fill in…</option>
-                    {ASSISTANT_ENDPOINT_PRESETS.map((p) => (
-                      <option key={p.baseUrl} value={p.baseUrl}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </NativeSelect>
+                info.keyUrl && (
+                  <a href={info.keyUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                    Create a key at {new URL(info.keyUrl).hostname} <ExternalLink className="size-3" />
+                  </a>
                 )
               }
             >
+              <Input id="ai-key" type="password" value={f.apiKey} onChange={(e) => set({ apiKey: e.target.value.trim() })} placeholder={info.keyPlaceholder} autoComplete="new-password" spellCheck={false} />
+            </Field>
+          )}
+          {(info.local || !info.defaultBaseUrl) && (
+            <Field label="Address" htmlFor="ai-base" help={info.local ? `Leave empty for ${info.label} on this computer. Another computer: its address, ending in /v1.` : "The API address ending in /v1 (or the provider's equivalent)."}>
               <Input id="ai-base" value={f.baseUrl} onChange={(e) => set({ baseUrl: e.target.value.trim() })} placeholder={info.defaultBaseUrl || "https://…/v1"} autoComplete="off" spellCheck={false} />
             </Field>
           )}
-        </div>
-        {local && <p className="text-xs text-muted-foreground">A model on this computer keeps everything local. It needs to support tool calling; small models often get multi-step tasks wrong.</p>}
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            loading={testing}
-            disabled={!f.model}
-            onClick={async () => {
-              setTesting(true);
-              setTest(null);
-              try {
-                const r = await api.post<{ reply: string }>("/api/assistant/settings/test", { ...f });
-                setTest({ ok: true, text: r.reply });
-              } catch (err) {
-                setTest({ ok: false, text: errorMessage(err) });
-              } finally {
-                setTesting(false);
-              }
-            }}
+          <Field
+            label="Model"
+            htmlFor="ai-model"
+            help={models.error ? <span className="text-destructive">{models.error}</span> : modelHelp(f.provider, models.list)}
+            aside={
+              <Button variant="ghost" size="xs" loading={models.loading} disabled={!canList} onClick={() => loadModels()}>
+                <RefreshCw /> {models.list ? "Reload list" : "Load models"}
+              </Button>
+            }
           >
-            <Plug /> Test connection
-          </Button>
-          {test && (
-            <span className={`flex min-w-0 items-center gap-1.5 text-[13px] ${test.ok ? "text-success" : "text-destructive"}`}>
-              {test.ok ? <CheckCircle2 className="size-4 shrink-0" /> : <XCircle className="size-4 shrink-0" />}
-              <span className="truncate">{test.ok ? `Connected: “${test.text}”` : test.text}</span>
-            </span>
+            <Input id="ai-model" list="ai-models" value={f.model} onChange={(e) => set({ model: e.target.value.trim() })} placeholder={info.defaultModel || (models.list?.length ? "Pick or type a model" : "model name")} autoComplete="off" spellCheck={false} />
+            <datalist id="ai-models">
+              {models.list?.map((m) => <option key={m} value={m} />)}
+            </datalist>
+          </Field>
+          {!info.local && info.defaultBaseUrl && (
+            <details className="group text-[13px]" open={!!f.baseUrl || undefined}>
+              <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">Custom address (proxy or gateway)</summary>
+              <div className="pt-3">
+                <Field label="Address" htmlFor="ai-base" help={`Leave empty for ${info.defaultBaseUrl}.`}>
+                  <Input id="ai-base" value={f.baseUrl} onChange={(e) => set({ baseUrl: e.target.value.trim() })} placeholder={info.defaultBaseUrl} autoComplete="off" spellCheck={false} />
+                </Field>
+              </div>
+            </details>
           )}
-        </div>
+          {info.local && <p className="text-xs text-muted-foreground">A model on this computer keeps everything local. It needs to support tool calling; small models often get multi-step tasks wrong.</p>}
+          <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+            <Button variant="secondary" size="sm" loading={testing} disabled={!f.model || !ready} onClick={runTest}>
+              <Plug /> Test connection
+            </Button>
+            {test && (
+              <span className={`flex min-w-0 items-center gap-1.5 text-[13px] ${test.ok ? "text-success" : "text-destructive"}`}>
+                {test.ok ? <CheckCircle2 className="size-4 shrink-0" /> : <XCircle className="size-4 shrink-0" />}
+                <span className="truncate">{test.ok ? `Connected: “${test.text}”` : test.text}</span>
+              </span>
+            )}
+            {test?.ok && !f.enabled && (
+              <Button size="sm" className="ml-auto" loading={save.isPending} onClick={() => save.mutate({ ...f, enabled: true })}>
+                Turn on and save
+              </Button>
+            )}
+          </div>
+        </Panel>
       </Section>
 
       <Section title="Approvals" description="Reading is always allowed. Decide which changes wait for a click on Approve.">
@@ -192,15 +244,18 @@ export function AssistantSettingsSection() {
         What users ask, plus the console lines, player names and settings the assistant reads, go to the provider. Conversations are kept in memory on this computer only and are gone after a restart. Every change appears in the audit log as “user (AI assistant)”.
       </Callout>
 
-      <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!dirty}>
+      <Button onClick={() => save.mutate(f)} loading={save.isPending} disabled={!dirty}>
         <Save /> Save
       </Button>
     </div>
   );
 }
 
-function modelHelp(p: AssistantProvider) {
-  if (p === "anthropic") return "For example claude-opus-5-5, or claude-sonnet-5-5 / claude-haiku-5-5 for lower cost.";
-  if (p === "openai") return "The model name from your OpenAI account.";
-  return "As the provider names it, e.g. llama3.3 in Ollama.";
+function modelHelp(p: AssistantProvider, list: string[] | null) {
+  const found = list ? `${list.length} model${list.length === 1 ? "" : "s"} available; type to filter. ` : "";
+  if (p === "anthropic") return `${found}claude-sonnet-5-5 or claude-haiku-5-5 cost less than claude-opus-5-5.`;
+  if (p === "deepseek") return `${found}deepseek-chat answers directly; deepseek-reasoner thinks first and answers more slowly.`;
+  if (p === "ollama" || p === "lmstudio") return list ? found.trim() : "Start the app, then load the list, or type the name, e.g. llama3.3.";
+  if (list) return `${found}Pick one that supports tool calling.`;
+  return "Enter the key above to load the list, or type the name as the provider writes it.";
 }

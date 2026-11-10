@@ -13,7 +13,7 @@ import {
 } from "@craftpanel/shared";
 import type { SessionUser } from "../../auth/sessions";
 import type { AppContext } from "../../context";
-import { createModelClient, type ChatMessage, type ModelClient, type ToolCall } from "./llm";
+import { createModelClient, listModels, type ChatMessage, type ModelClient, type ToolCall } from "./llm";
 import { prepareCall, toolSpecs, toolsFor, type PreparedCall, type ToolEnv } from "./tools";
 
 // Conversations with the assistant. They live in memory only: nothing the user asks or the model answers is
@@ -165,6 +165,11 @@ export class AssistantService {
     return { ok: true, reply: reply.text.slice(0, 300) || "(empty answer)" };
   }
 
+  /** The provider's models for the settings form; also shows whether the key and address work. */
+  async models(settings: AssistantSettings): Promise<{ models: string[] }> {
+    return { models: (await listModels(settings, this.fetchImpl)).slice(0, 500) };
+  }
+
   // ---- the run --------------------------------------------------------------------------
 
   private start(conv: Conversation) {
@@ -193,7 +198,7 @@ export class AssistantService {
       const tools = toolsFor(s.toolGroups);
       const reply = await model({ system: await this.systemPrompt(conv, user, s), messages: conv.history, tools: toolSpecs(tools), signal });
       if (signal.aborted) return;
-      conv.history.push({ role: "assistant", text: reply.text, toolCalls: reply.toolCalls, raw: reply.raw });
+      conv.history.push({ role: "assistant", text: reply.text, toolCalls: reply.toolCalls, raw: reply.raw, reasoning: reply.reasoning });
       if (reply.text) conv.items.push({ kind: "assistant", text: reply.text, at: Date.now() });
       if (reply.stop === "refusal") {
         conv.items.push({ kind: "error", text: "The model declined this request.", at: Date.now() });

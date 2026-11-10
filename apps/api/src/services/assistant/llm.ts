@@ -20,13 +20,15 @@ export interface ToolCall {
 
 export type ChatMessage =
   | { role: "user"; text: string }
-  | { role: "assistant"; text: string; toolCalls: ToolCall[]; raw?: { provider: "anthropic"; content: unknown[] } }
+  | { role: "assistant"; text: string; toolCalls: ToolCall[]; raw?: { provider: "anthropic"; content: unknown[] }; reasoning?: string }
   | { role: "tool"; results: { id: string; content: string; isError: boolean }[] };
 
 export interface ModelReply {
   text: string;
   toolCalls: ToolCall[];
   raw?: { provider: "anthropic"; content: unknown[] };
+  /** Chat Completions reasoning (DeepSeek's reasoning_content), sent back while a tool loop runs. */
+  reasoning?: string;
   /** "refusal": the model declined; "length": it ran out of output tokens. */
   stop: "end" | "tool" | "length" | "refusal";
 }
@@ -66,7 +68,7 @@ function anthropicClient(s: AssistantSettings, fetchImpl: typeof fetch): ModelCl
           max_tokens: 16000,
           system,
           messages: messages.map(toAnthropic) as Anthropic.Beta.BetaMessageParam[],
-          tools: tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters as Anthropic.Beta.BetaTool["input_schema"] })),
+          ...(tools.length ? { tools: tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters as Anthropic.Beta.BetaTool["input_schema"] })) } : {}),
           ...(fallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
         },
         { signal },
@@ -95,24 +97,32 @@ function toAnthropic(m: ChatMessage): unknown {
 interface ChatCompletion {
   choices?: {
     finish_reason?: string;
-    message?: { content?: string | null; refusal?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] };
+    message?: { content?: string | null; refusal?: string | null; reasoning_content?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] };
   }[];
   error?: { message?: string };
 }
 
+const chatBase = (s: AssistantSettings) => (s.baseUrl || ASSISTANT_PROVIDER_INFO[s.provider].defaultBaseUrl).replace(/\/+$/, "");
+const chatHeaders = (s: AssistantSettings): Record<string, string> => ({
+  ...(s.apiKey ? { authorization: `Bearer ${s.apiKey}` } : {}),
+  // OpenRouter shows the app's name in its activity list.
+  ...(s.provider === "openrouter" ? { "x-title": "CraftPanel" } : {}),
+});
+
 function chatCompletionsClient(s: AssistantSettings, fetchImpl: typeof fetch): ModelClient {
-  const base = (s.baseUrl || ASSISTANT_PROVIDER_INFO[s.provider].defaultBaseUrl).replace(/\/+$/, "");
+  const base = chatBase(s);
   return async ({ system, messages, tools, signal }) => {
+    // OpenAI and others reject an empty tools array, so it is left out (the connection test has none).
     const body = {
       model: s.model,
       messages: [{ role: "system", content: system }, ...messages.flatMap(toChatCompletions)],
-      tools: tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })),
+      ...(tools.length ? { tools: tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })) } : {}),
     };
     let res: Response;
     try {
       res = await fetchImpl(`${base}/chat/completions`, {
         method: "POST",
-        headers: { "content-type": "application/json", ...(s.apiKey ? { authorization: `Bearer ${s.apiKey}` } : {}) },
+        headers: { "content-type": "application/json", ...chatHeaders(s) },
         body: JSON.stringify(body),
         signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]) : AbortSignal.timeout(TIMEOUT_MS),
       });
@@ -121,12 +131,13 @@ function chatCompletionsClient(s: AssistantSettings, fetchImpl: typeof fetch): M
     }
     const json = (await res.json().catch(() => ({}))) as ChatCompletion;
     if (!res.ok) throw providerError(res.status, new Error(json.error?.message ?? res.statusText));
+    if (!json.choices) throw providerError(res.status, new Error("The answer is not a Chat Completions response. Check the base URL."));
     const choice = json.choices?.[0];
     const msg = choice?.message ?? {};
     const toolCalls = (msg.tool_calls ?? []).map((c) => ({ id: c.id, name: c.function.name, input: parseArguments(c.function.arguments) }));
     if (msg.refusal) return { text: msg.refusal, toolCalls: [], stop: "refusal" };
     const stop = choice?.finish_reason === "length" ? "length" : toolCalls.length ? "tool" : "end";
-    return { text: (msg.content ?? "").trim(), toolCalls, stop };
+    return { text: (msg.content ?? "").trim(), toolCalls, stop, ...(msg.reasoning_content ? { reasoning: msg.reasoning_content } : {}) };
   };
 }
 
@@ -137,11 +148,43 @@ function toChatCompletions(m: ChatMessage): unknown[] {
     {
       role: "assistant",
       content: m.text || null,
+      // DeepSeek's thinking mode needs its reasoning back while it still calls tools; other providers send none.
+      ...(m.reasoning && m.toolCalls.length ? { reasoning_content: m.reasoning } : {}),
       ...(m.toolCalls.length
         ? { tool_calls: m.toolCalls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.input) } })) }
         : {}),
     },
   ];
+}
+
+// Model lists include embedding, speech and image models; those can't chat or call tools.
+const NOT_CHAT = /(embed|tts|whisper|dall-e|moderation|transcri|realtime|audio|image|rerank|guard|aqa|imagen|veo)/i;
+
+/** The models the provider offers with these settings, for the model picker. */
+export async function listModels(s: AssistantSettings, fetchImpl: typeof fetch = fetch): Promise<string[]> {
+  const signal = AbortSignal.timeout(20_000);
+  if (s.provider === "anthropic") {
+    const client = new Anthropic({ apiKey: s.apiKey, baseURL: s.baseUrl || undefined, fetch: fetchImpl, timeout: 20_000, maxRetries: 1 });
+    try {
+      const ids: string[] = [];
+      for await (const m of client.models.list({ limit: 100 }, { signal })) ids.push(m.id);
+      return ids;
+    } catch (err) {
+      throw providerError(err instanceof Anthropic.APIError ? err.status : undefined, err);
+    }
+  }
+  let res: Response;
+  try {
+    res = await fetchImpl(`${chatBase(s)}/models`, { headers: chatHeaders(s), signal });
+  } catch (err) {
+    throw providerError(undefined, err);
+  }
+  const json = (await res.json().catch(() => ({}))) as { data?: { id?: unknown }[]; error?: { message?: string } };
+  if (!res.ok) throw providerError(res.status, new Error(json.error?.message ?? res.statusText));
+  if (!Array.isArray(json.data)) throw providerError(res.status, new Error("The answer is not a model list. Check the base URL."));
+  // Gemini lists "models/gemini-…"; its chat endpoint takes the bare name.
+  const ids = json.data.flatMap((m) => (typeof m.id === "string" ? [m.id.replace(/^models\//, "")] : [])).filter((id) => !NOT_CHAT.test(id));
+  return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
 }
 
 function parseArguments(raw: string): Record<string, unknown> {
