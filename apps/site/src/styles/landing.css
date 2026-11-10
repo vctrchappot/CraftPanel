@@ -303,7 +303,7 @@ p {
   text-decoration: none;
   font-family: var(--font-display);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.012em;
   font-size: 19px;
 }
 .brand img {
@@ -384,7 +384,7 @@ p {
 .hero h1 {
   font-size: clamp(48px, 5vw, 72px);
   line-height: 1.02;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.025em;
 }
 .mark {
   position: relative;
@@ -1072,7 +1072,7 @@ p {
   gap: 6px 8px;
   font-family: var(--font-text);
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
   font-size: 18px;
   line-height: 1.2;
 }
@@ -2232,7 +2232,7 @@ p {
   margin: 4px 0 0;
   font-family: var(--font-mono);
   font-weight: 500;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   font-size: 28px;
   line-height: 1.1;
   color: var(--grass-text);
@@ -2266,7 +2266,7 @@ p {
   border-top: 0;
   font-family: var(--font-text);
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.012em;
   font-size: 18px;
   background: var(--surface-2);
 }

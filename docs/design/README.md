@@ -41,7 +41,7 @@ All fonts are self-hosted (SIL Open Font License). Never load them, or anything 
 
 Keep weights low: nothing above 600. Headers use **Mona Sans** at 500 with negative tracking; precision comes from size and spacing, not weight. Serif ships a single weight and `font-synthesis-weight: none` is set globally, so give it `font-normal` instead of inheriting a bold one. The wordmark is Mona Sans 600 next to the mark (the brand package's Archivo wordmark is not used).
 
-Sans tracking is negative: `--cp-tracking-body` −0.01 em for Inter body and UI text, `--cp-tracking-heading` −0.02 em for Mona Sans headings, and `--cp-tracking-display` −0.03 em (−0.035 em on the hero H1) for large display headers. Mona Sans already tightens at large sizes through its optical-size axis, so keep its tracking milder than Inter Display's used to be. Mono commands and console output retain normal tracking for legibility.
+Sans tracking is negative: `--cp-tracking-body` −0.005 em for Inter body and UI text, `--cp-tracking-heading` −0.012 em for Mona Sans headings, and `--cp-tracking-display` −0.02 em (−0.025 em on the hero H1) for large display headers. Mona Sans already tightens at large sizes through its optical-size axis, so keep its tracking milder than Inter Display's used to be. Mono commands and console output retain normal tracking for legibility.
 
 On the landing page, keep a clear size step between levels so headings do not compete: hero `clamp(48px, 5vw, 72px)`, section headings `clamp(32px, 3.5vw, 48px)`, feature card headings `22px`, body copy `16px` (`line-height: 1.55`), and technical labels `12–13px` Mona Sans Mono.
 

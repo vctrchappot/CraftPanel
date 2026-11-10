@@ -42,9 +42,9 @@
   --cp-font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --cp-font-mono: "Mona Sans Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --cp-font-serif: "Geist Serif", ui-serif, Georgia, serif;
-  --cp-tracking-body: -0.01em;
-  --cp-tracking-heading: -0.02em;
-  --cp-tracking-display: -0.03em;
+  --cp-tracking-body: -0.005em;
+  --cp-tracking-heading: -0.012em;
+  --cp-tracking-display: -0.02em;
 
   /* ---- shape: everything sits on a 4 px grid, corners stay small ---- */
   --cp-radius-sm: 2px;
