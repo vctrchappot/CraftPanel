@@ -13,6 +13,7 @@ import { api, setCsrfToken } from "@/lib/api";
 import { RealtimeProvider, useConnectionState } from "@/lib/realtime";
 import { useServers, useServersActiveFirst } from "@/lib/queries";
 import { StatusDot } from "./status";
+import { SidebarServer } from "./sidebar-servers";
 import { Logo, Wordmark } from "./logo";
 import { TwoFactorRequired } from "./auth-forms";
 import { UpdateNotice, UpdateOverlay, WhatsNew } from "./updates";
@@ -167,20 +168,9 @@ function Sidebar({ onSearch }: { onSearch: () => void }) {
         )}
       </div>
       <div className="scrollbar-thin flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
-        {servers.isLoading && [0, 1].map((i) => <Skeleton key={i} className="h-8" />)}
+        {servers.isLoading && [0, 1].map((i) => <Skeleton key={i} className="h-11" />)}
         {servers.data?.map((s) => (
-          <Link
-            key={s.id}
-            href={`/server/?id=${s.id}`}
-            className={cn(
-              "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              activeServer === s.id ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-            )}
-          >
-            <StatusDot status={s.status} />
-            <span className="truncate">{s.name}</span>
-            {s.status === "running" && <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">{s.playersOnline}</span>}
-          </Link>
+          <SidebarServer key={s.id} server={s} active={activeServer === s.id} />
         ))}
         {servers.data?.length === 0 && <p className="px-2.5 py-1 text-xs text-muted-foreground">No servers yet</p>}
       </div>
