@@ -55,6 +55,7 @@ Contrast (WCAG 2.x, on background / surface):
 | `warning` | #8a5a00 · 5.3 / 5.7 | #e8b04a · 9.2 / 8.2 |
 | `danger` | #b8321f · 5.3 / 5.7 | #ef5a4f · 5.4 / 4.8 |
 | `neutral` | #5c636a · 5.4 / 5.8 | #9aa1a8 · 6.9 / 6.1 |
+| `console-muted` on the console | #9a9488 · 5.8 | #9a9488 · 6.4 |
 
 Buttons: brand button 7.6 (light, white text) / 7.3 (dark, dark text). Any new pair must reach 4.5:1 for text and 3:1 for essential UI boundaries; recheck after changing a hex value. Status dots have adjacent text labels; their exact palette fills are not small-text colours on light surfaces.
 

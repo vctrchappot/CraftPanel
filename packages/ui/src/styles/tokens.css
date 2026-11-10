@@ -87,6 +87,7 @@
 
   --cp-console: #1a1917;
   --cp-console-fg: var(--cp-deepslate-100);
+  --cp-console-muted: #9a9488;
   --cp-shadow: #cfc8b8;
 }
 
@@ -116,5 +117,6 @@
 
   --cp-console: var(--cp-deepslate-950);
   --cp-console-fg: #e4e0d7;
+  --cp-console-muted: #9a9488;
   --cp-shadow: #0a0908;
 }

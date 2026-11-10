@@ -30,6 +30,7 @@
   --destructive: var(--cp-danger);
   --console: var(--cp-console);
   --console-foreground: var(--cp-console-fg);
+  --console-muted: var(--cp-console-muted);
   --status-running: var(--cp-status-running);
   --status-starting: var(--cp-status-starting);
   --status-stopped: var(--cp-status-stopped);
@@ -55,6 +56,7 @@
   --color-destructive: var(--destructive);
   --color-console: var(--console);
   --color-console-foreground: var(--console-foreground);
+  --color-console-muted: var(--console-muted);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-text: var(--brand-text);

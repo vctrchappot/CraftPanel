@@ -15,7 +15,7 @@ const LEVEL_CLASS: Record<string, string> = {
   ERROR: "text-status-crashed",
   FATAL: "text-status-crashed",
   WARN: "text-status-starting",
-  DEBUG: "text-neutral-500",
+  DEBUG: "text-console-muted",
 };
 
 /** Distance from the bottom (px) within which the view counts as "at the latest output". */
@@ -94,18 +94,18 @@ export function ConsoleLines({
         role="log"
         aria-live="off"
       >
-        {lines.length === 0 && <p className="text-neutral-500">No output yet.</p>}
+        {lines.length === 0 && <p className="text-console-muted">No output yet.</p>}
         {lines.map((l) => (
           <div
             key={l.seq}
             className={cn(
               "whitespace-pre-wrap break-all",
               LEVEL_CLASS[l.level],
-              l.stream === "command" && "text-sky-300",
-              l.stream === "system" && "text-violet-300",
+              l.stream === "command" && "text-brand",
+              l.stream === "system" && "text-console-muted",
             )}
           >
-            {showTime && <span className="mr-2 select-none text-neutral-500">{formatTime(l.ts)}</span>}
+            {showTime && <span className="mr-2 select-none text-console-muted">{formatTime(l.ts)}</span>}
             {l.text}
           </div>
         ))}
@@ -114,7 +114,7 @@ export function ConsoleLines({
         <button
           type="button"
           onClick={() => onAutoScrollChange(true)}
-          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/15 bg-neutral-800/95 px-3 py-1 text-xs text-neutral-100 shadow-lg hover:bg-neutral-700"
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-md border border-console-foreground/20 bg-console px-3 py-1 text-xs text-console-foreground shadow-lg outline-none transition-colors hover:border-console-foreground/40 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ArrowDownToLine className="size-3.5" />
           Jump to latest
@@ -228,8 +228,8 @@ export function ConsoleTab({ server: s, stream }: { server: ServerDetail; stream
         </Tooltip>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-console">
-        <div className="flex items-center gap-3 border-b border-white/10 px-4 py-2 text-xs text-neutral-400">
+      <div className="overflow-hidden rounded-lg border border-border bg-console">
+        <div className="flex items-center gap-3 border-b border-console-foreground/10 px-4 py-2 text-xs text-console-muted">
           <StatusBadge status={s.status} />
           <span className="flex items-center gap-1.5">
             <span className={cn("size-1.5 rounded-full", conn === "open" ? "bg-status-running" : conn === "connecting" ? "bg-status-starting animate-pulse" : "bg-status-crashed")} />
@@ -239,13 +239,13 @@ export function ConsoleTab({ server: s, stream }: { server: ServerDetail; stream
         </div>
         <ConsoleLines lines={filtered} autoScroll={autoScroll} onAutoScrollChange={setAutoScroll} showTime={showTime} className="h-[min(60vh,560px)]" />
         <form
-          className="flex items-center gap-2 border-t border-white/10 px-4 py-2"
+          className="flex items-center gap-2 border-t border-console-foreground/10 px-4 py-2"
           onSubmit={(e) => {
             e.preventDefault();
             send();
           }}
         >
-          <span className="select-none font-mono text-sm text-neutral-500">&gt;</span>
+          <span className="select-none font-mono text-sm text-console-muted" aria-hidden>&gt;</span>
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -264,13 +264,13 @@ export function ConsoleTab({ server: s, stream }: { server: ServerDetail; stream
             }}
             disabled={!running || !canCommand || conn !== "open"}
             placeholder={!canCommand ? "You have read-only access" : running ? "Type a Minecraft command (e.g. list, say Hello, time set day)" : "Start the server to send commands"}
-            className="h-8 flex-1 bg-transparent font-mono text-[13px] text-console-foreground outline-none placeholder:text-neutral-600 disabled:cursor-not-allowed"
+            className="h-8 flex-1 bg-transparent font-mono text-[13px] text-console-foreground outline-none placeholder:text-console-muted disabled:cursor-not-allowed"
             aria-label="Minecraft command"
             autoComplete="off"
             spellCheck={false}
             maxLength={1000}
           />
-          <Button type="submit" size="xs" variant="secondary" disabled={!running || !canCommand || !input.trim()} className="border-white/10 bg-white/5 text-neutral-200 hover:bg-white/10">
+          <Button type="submit" size="xs" variant="secondary" disabled={!running || !canCommand || !input.trim()} className="border-console-foreground/15 bg-console-foreground/5 text-console-foreground hover:bg-console-foreground/10">
             Send
           </Button>
         </form>
