@@ -6,6 +6,7 @@ import { CalendarClock, History, MoreHorizontal, Play, Plus, Trash2, Pencil } fr
 import {
   Badge,
   Button,
+  ChoiceCard,
   ConfirmDialog,
   Dialog,
   DialogContent,
@@ -227,11 +228,11 @@ function ScheduleEditor({ serverId, draft, onClose }: { serverId: string; draft:
           error={preview.data?.error}
         >
           <div className="space-y-2">
-            <div className="flex flex-wrap gap-1.5">
+            <div role="group" aria-label="Schedule presets" className="flex flex-wrap gap-1.5">
               {PRESETS.map((p) => (
-                <button key={p.cron} type="button" onClick={() => set("cron", p.cron)} className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${d.cron === p.cron ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}>
+                <ChoiceCard key={p.cron} selected={d.cron === p.cron} onClick={() => set("cron", p.cron)} className="px-2.5 py-1 text-xs">
                   {p.label}
-                </button>
+                </ChoiceCard>
               ))}
             </div>
             <Input id="scron" value={d.cron} onChange={(e) => set("cron", e.target.value)} className="font-mono" />

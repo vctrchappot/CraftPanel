@@ -73,7 +73,7 @@ export function SoftwareSettings({ server: s }: { server: ServerDetail }) {
 
       {!SOFTWARE_INFO[s.software].proxy && (
         <Section title="Server software" description="Switch in any direction. Worlds, settings and player lists are kept; CraftPanel backs up the server first.">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div role="group" aria-label="Server software" className="grid gap-3 sm:grid-cols-2">
             {SOFTWARE_CHOICES.map((c) => (
               <Choice key={c.id} selected={software === c.id} disabled={!canEdit} title={softwareLabel(c.id)} badge={c.id === s.software ? "Current" : undefined} description={c.description} icon={c.icon} onClick={() => pick(c.id)} />
             ))}

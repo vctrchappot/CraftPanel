@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, Boxes, Check, Network, Hammer, ChevronLeft, ChevronRight, Coffee, Feather, Globe, Home, Info, Package, Puzzle, ShieldCheck, Zap } from "lucide-react";
-import { Badge, Button, Callout, Field, Input, NativeSelect, PageHeader, Panel, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
+import { Badge, Button, Callout, ChoiceCard, Field, Input, NativeSelect, PageHeader, Panel, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
 import { assessHost, buildFieldLabel, buildName, PERFORMANCE_PRESETS, PRESET_INFO, presetViewDistance, recommendPreset, SOFTWARE_INFO, softwareLabel, type CreateServerInput, type ServerSoftware } from "@craftpanel/shared";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { useServers } from "@/lib/queries";
@@ -212,8 +212,9 @@ export function CreateServerWizard() {
                 type="button"
                 onClick={() => i < step && setStep(i)}
                 disabled={i > step}
+                aria-current={i === step ? "step" : undefined}
                 className={cn(
-                  "flex h-8 w-full items-center gap-2.5 whitespace-nowrap rounded-md px-2.5 text-[13px] transition-colors",
+                  "flex h-8 w-full items-center gap-2.5 whitespace-nowrap rounded-md px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                   i === step ? "bg-muted font-medium text-foreground" : i < step ? "text-foreground hover:bg-muted/60" : "text-muted-foreground",
                 )}
               >
@@ -233,7 +234,7 @@ export function CreateServerWizard() {
 
         <Panel className="flex min-h-[460px] flex-col">
           <div className="flex-1 space-y-6 p-6 sm:p-8">
-            <h2 className="text-lg font-semibold tracking-tight">{steps[step]}</h2>
+            <h2 className="text-lg font-medium">{steps[step]}</h2>
 
             {steps[step] === "Basics" && (
               <div className="max-w-lg space-y-5">
@@ -252,7 +253,7 @@ export function CreateServerWizard() {
             {steps[step] === "Software" && (
               <div className="space-y-5">
                 <Field label="Edition">
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div role="group" aria-label="Edition" className="grid gap-3 sm:grid-cols-2">
                     <Choice selected title="Java Edition" description="For Minecraft on Windows, macOS and Linux." icon={<Coffee />} onClick={() => undefined} />
                     <Choice
                       disabled
@@ -265,7 +266,7 @@ export function CreateServerWizard() {
                   </div>
                 </Field>
                 <Field label="Server software">
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div role="group" aria-label="Server software" className="grid gap-3 sm:grid-cols-2">
                     {SOFTWARE_CHOICES.map((c) => (
                       <Choice
                         key={c.id}
@@ -390,19 +391,11 @@ export function CreateServerWizard() {
             {steps[step] === "Gameplay" && (
               <div className="max-w-lg space-y-5">
                 <Field label="Game mode">
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div role="group" aria-label="Game mode" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {(["survival", "creative", "adventure", "hardcore"] as const).map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => set("mode", m)}
-                        className={cn(
-                          "h-9 rounded-md border text-[13px] font-medium capitalize transition-colors",
-                          f.mode === m ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted",
-                        )}
-                      >
+                      <ChoiceCard key={m} selected={f.mode === m} onClick={() => set("mode", m)} className="h-9 px-3 py-0 text-center text-[13px] font-medium capitalize">
                         {m}
-                      </button>
+                      </ChoiceCard>
                     ))}
                   </div>
                 </Field>
@@ -500,7 +493,7 @@ export function CreateServerWizard() {
             {steps[step] === "Network" && (
               <div className="max-w-xl space-y-5">
                 <Field label="Who should be able to join?">
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div role="group" aria-label="Who should be able to join?" className="grid gap-3 sm:grid-cols-2">
                     <Choice selected={f.networkMode === "lan"} title="Local network" description="Players on the same Wi-Fi or LAN." icon={<Home />} onClick={() => set("networkMode", "lan")} />
                     <Choice
                       selected={f.networkMode === "wan"}
@@ -617,16 +610,7 @@ export function Choice({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={selected}
-      className={cn(
-        "flex items-start gap-3 rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-        selected ? "border-foreground bg-muted/40" : "border-border hover:border-foreground/30",
-      )}
-    >
+    <ChoiceCard selected={selected} disabled={disabled} onClick={onClick} className="flex items-start gap-3">
       <span className="mt-0.5 text-muted-foreground [&_svg]:size-4">{icon}</span>
       <span className="min-w-0 space-y-1">
         <span className="flex items-center gap-2 text-sm font-medium">
@@ -635,7 +619,7 @@ export function Choice({
         </span>
         <span className="block text-[13px] text-muted-foreground">{description}</span>
       </span>
-    </button>
+    </ChoiceCard>
   );
 }
 

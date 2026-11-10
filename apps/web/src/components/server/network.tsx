@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Globe, Home, Info, Radar, ShieldCheck, XCircle } from "lucide-react";
-import { Button, Callout, Field, Input, NativeSelect, Panel, Section, Skeleton, cn } from "@craftpanel/ui";
+import { Button, Callout, ChoiceCard, Field, Input, NativeSelect, Panel, Section, Skeleton } from "@craftpanel/ui";
 import type { NetworkAddressKind, ServerDetail } from "@craftpanel/shared";
 import { api } from "@/lib/api";
 import { useCan } from "@/lib/auth";
@@ -62,16 +62,12 @@ export function NetworkTab({ server: s }: { server: ServerDetail }) {
 
         {canManage && (
           <Section title="Settings" description="Changes apply after a restart.">
-            <div className="grid grid-cols-2 gap-2">
+            <div role="group" aria-label="Who can join" className="grid grid-cols-2 gap-2">
               {(["lan", "wan"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setForm({ ...form, mode: m })}
-                  className={cn("flex items-center gap-2 rounded-lg border p-3 text-left text-[13px] font-medium transition-colors", form.mode === m ? "border-foreground bg-muted/40" : "border-border hover:border-foreground/30")}
-                >
+                <ChoiceCard key={m} selected={form.mode === m} onClick={() => setForm({ ...form, mode: m })} className="flex items-center gap-2 p-3 text-[13px] font-medium">
                   {m === "lan" ? <Home className="size-4" /> : <Globe className="size-4" />}
                   {m === "lan" ? "Local network" : "Internet"}
-                </button>
+                </ChoiceCard>
               ))}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">

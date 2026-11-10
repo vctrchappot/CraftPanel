@@ -169,3 +169,23 @@ export function Kbd({ className, ...props }: React.HTMLAttributes<HTMLElement>) 
 export function Separator({ className, vertical }: { className?: string; vertical?: boolean }) {
   return <div role="separator" className={cn("shrink-0 bg-border", vertical ? "h-full w-px" : "h-px w-full", className)} />;
 }
+
+/**
+ * One card of a single-choice group (software, preset, network mode). The selection is a border and a faint fill, not
+ * a jumping background; put the cards in a `role="group"` with an `aria-label`. For a few short options side by side use
+ * `SegmentedControl` instead.
+ */
+export const ChoiceCard = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }>(({ selected = false, className, type = "button", ...props }, ref) => (
+  <button
+    ref={ref}
+    type={type}
+    aria-pressed={selected}
+    className={cn(
+      "rounded-lg border p-4 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+      selected ? "border-foreground bg-muted/40" : "border-border enabled:hover:border-foreground/40",
+      className,
+    )}
+    {...props}
+  />
+));
+ChoiceCard.displayName = "ChoiceCard";
