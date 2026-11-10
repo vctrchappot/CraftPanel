@@ -34,6 +34,7 @@ export function MetricChart({
   format,
   empty,
   className,
+  stat,
 }: {
   title: string;
   points: Point[];
@@ -44,9 +45,11 @@ export function MetricChart({
   format: (v: number) => string;
   empty: string;
   className?: string;
+  stat?: { value: React.ReactNode; detail: string; hint: string; icon: React.ReactNode };
 }) {
   const box = React.useRef<HTMLDivElement>(null);
   const [hover, setHover] = React.useState<Point | null>(null);
+  React.useEffect(() => setHover(null), [from, to]);
   const visible = React.useMemo(() => points.filter((p) => p.ts >= from && p.ts <= to), [points, from, to]);
   const known = visible.filter((p): p is Point & { v: number } => p.v !== null);
   const span = Math.max(1, to - from);
@@ -87,20 +90,29 @@ export function MetricChart({
   const summary = known.length ? `${title}: latest ${format(latest.v)}, range ${format(Math.min(...known.map((p) => p.v)))} to ${format(Math.max(...known.map((p) => p.v)))}` : `${title}: no data`;
 
   return (
-    <Panel className={cn("p-4", className)}>
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-[13px] font-medium">{title}</h3>
-        <p className="truncate text-xs tabular-nums text-muted-foreground" aria-live="off">
-          {shown && shown.v !== null ? (
-            <>
-              <span className="font-medium text-foreground">{format(shown.v)}</span>
-              {hover && <> · {formatClock(hover.ts, true)}</>}
-            </>
-          ) : (
-            "—"
-          )}
-        </p>
+    <Panel className={cn("min-w-0 p-4", stat && "p-5", className)}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-[13px] font-medium text-muted-foreground">{title}</h3>
+        {stat && <span className="text-muted-foreground [&_svg]:size-4" aria-hidden>{stat.icon}</span>}
+        {!stat && (
+          <p className="truncate text-xs tabular-nums text-muted-foreground" aria-live="off">
+            {shown && shown.v !== null ? (
+              <>
+                <span className="font-medium text-foreground">{format(shown.v)}</span>
+                {hover && <> · {formatClock(hover.ts, true)}</>}
+              </>
+            ) : (
+              "—"
+            )}
+          </p>
+        )}
       </div>
+      {stat && (
+        <div className="mb-5 mt-2 space-y-1">
+          <div className="text-3xl font-medium tracking-tight tabular-nums">{stat.value}</div>
+          <p className="min-h-8 text-xs text-muted-foreground">{stat.hint}</p>
+        </div>
+      )}
       <div
         ref={box}
         role="img"
@@ -134,6 +146,17 @@ export function MetricChart({
           </>
         )}
       </div>
+      {stat && (
+        <>
+          <div className="mt-2 flex justify-between gap-2 font-mono text-[10px] text-muted-foreground">
+            <span>{formatClock(from)}</span>
+            <span>{formatClock(to)}</span>
+          </div>
+          <p className="mt-4 border-t border-border pt-3 text-xs tabular-nums text-muted-foreground" aria-live="off">
+            {hover?.v != null ? `${format(hover.v)} at ${formatClock(hover.ts, true)}` : stat.detail}
+          </p>
+        </>
+      )}
     </Panel>
   );
 }

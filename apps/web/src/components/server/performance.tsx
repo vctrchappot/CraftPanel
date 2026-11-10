@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Cpu, Gauge, Info, Map as MapIcon, Pause, Play, RotateCw, Save, Square, Zap } from "lucide-react";
-import { Badge, Button, Callout, Field, NativeSelect, Panel, Progress, Section, SegmentedControl, Skeleton, Stat, Textarea, cn } from "@craftpanel/ui";
+import { Activity, AlertTriangle, CheckCircle2, ChevronDown, Cpu, Gauge, Info, Map as MapIcon, MemoryStick, Pause, Play, RotateCw, Save, SlidersHorizontal, Square, Timer, Users, Zap } from "lucide-react";
+import { Badge, Button, Callout, ChoiceCard, Field, NativeSelect, Panel, Progress, Section, SegmentedControl, Skeleton, Textarea, cn } from "@craftpanel/ui";
 import {
   analyzePerformance,
   applyPresetFlags,
@@ -22,7 +22,6 @@ import { api, ApiError } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction, useServerLifecycle } from "@/lib/queries";
 import { formatBytes, formatNumber } from "@/lib/format";
-import { Choice } from "../wizard";
 import { MetricChart } from "../charts";
 import { Unavailable } from "../status";
 import { SettingRow, useProperties } from "./settings";
@@ -120,88 +119,112 @@ export function PerformanceTab({ server: s, stream }: { server: ServerDetail; st
   const avgLow = (x: typeof tps, f: (v: number) => string) => (x.avg === null ? undefined : `avg ${f(x.avg)} · low ${f(x.min!)}`);
   const avgPeak = (x: typeof tps, f: (v: number) => string) => (x.avg === null ? undefined : `avg ${f(x.avg)} · peak ${f(x.max!)}`);
 
+  const attention = insights?.filter((i) => i.level === "warning" || i.level === "danger").length ?? 0;
+  const metric = (value: React.ReactNode, detail: string | undefined, hint: string, icon: React.ReactNode) => ({ value, detail: detail ?? "Waiting for samples in this time range", hint, icon });
+
   return (
-    <div className="space-y-10">
-      <Section title="Insights" description={proxy ? "What the live numbers and settings say about this proxy." : "What the live numbers and the settings say, with a fix where there is one."}>
-        {insights ? <InsightList server={s} insights={insights} /> : <Skeleton className="h-24 rounded-lg" />}
-      </Section>
+    <div className="space-y-8">
+      <section aria-labelledby="performance-overview" className="space-y-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 id="performance-overview" className="text-base font-medium">Performance overview</h2>
+              <Badge variant={live ? "success" : "default"}>
+                {live ? <Activity /> : <Pause />}
+                {live ? "Live" : running ? "Waiting for data" : samples.length ? "Last run" : "Offline"}
+              </Badge>
+            </div>
+            <p className="text-[13px] text-muted-foreground">
+              {!running && samples.length ? "The server is offline. Charts show its last recorded run." : "Live readings with up to an hour of history. Hover or touch a chart to inspect."}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-3">
+            <span className="text-xs text-muted-foreground">Chart range</span>
+            <SegmentedControl aria-label="Time range" value={range} onValueChange={setRange} options={RANGES.map(([label, minutes]) => ({ value: minutes, label }))} />
+          </div>
+        </div>
 
-      <Section
-        title="Live"
-        description={!running && samples.length ? "The server isn't running; this is its last run." : "Sampled every few seconds while a dashboard is open, kept for about an hour."}
-        actions={
-          <SegmentedControl aria-label="Time range" value={range} onValueChange={setRange} options={RANGES.map(([label, minutes]) => ({ value: minutes, label }))} />
-        }
-      >
-        <Panel className={cn("grid grid-cols-2 gap-px overflow-hidden bg-border [&>*]:bg-surface", proxy ? "sm:grid-cols-3" : "sm:grid-cols-3 lg:grid-cols-5")}>
-          {!proxy && (
-            <>
-              <div className="p-5">
-                <Stat label="TPS" value={live?.tps != null ? live.tps.toFixed(1) : unavailable} sub={avgLow(tps, (v) => v.toFixed(1)) ?? "20 is the target"} />
-              </div>
-              <div className="p-5">
-                <Stat label="Tick time" value={live?.mspt != null ? `${ms(live.mspt)} ms` : unavailable} sub={avgPeak(mspt, ms) ?? "50 ms is the budget"} />
-              </div>
-            </>
-          )}
-          <div className="p-5">
-            <Stat label="CPU" value={live?.cpuPercent != null ? `${live.cpuPercent.toFixed(0)}%` : unavailable} sub={avgPeak(cpu, (v) => `${v.toFixed(0)}%`) ?? "100% = one core"} />
-          </div>
-          <div className="p-5">
-            <Stat label="Memory" value={live?.memoryBytes != null ? formatBytes(live.memoryBytes) : unavailable} sub={mem.max === null ? `of ${gb(s.memoryMb)} heap` : `peak ${formatBytes(mem.max)} of ${gb(s.memoryMb)} heap`} />
-          </div>
-          <div className="p-5">
-            <Stat label="Players" value={live ? `${live.playersOnline} / ${s.maxPlayers}` : unavailable} sub={players.max === null ? undefined : `peak ${players.max}`} />
-          </div>
-        </Panel>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          {!proxy && <MetricChart title="TPS" points={pts((m) => m.tps)} from={from} to={to} max={20} format={(v) => v.toFixed(1)} empty={empty} />}
-          {!proxy && (
+        {!proxy && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <MetricChart
+              title="TPS"
+              stat={metric(live?.tps != null ? live.tps.toFixed(1) : unavailable, avgLow(tps, (v) => v.toFixed(1)), "20 ticks per second is the target", <Gauge />)}
+              points={pts((m) => m.tps)} from={from} to={to} max={20} format={(v) => v.toFixed(1)} empty={empty}
+            />
             <MetricChart
               title="Tick time"
-              points={pts((m) => m.mspt)}
-              from={from}
-              to={to}
-              max={Math.max(60, Math.ceil((mspt.max ?? 0) / 10) * 10)}
-              reference={{ value: 50, label: "50 ms budget" }}
-              format={(v) => `${ms(v)} ms`}
-              empty={empty}
+              stat={metric(live?.mspt != null ? `${ms(live.mspt)} ms` : unavailable, avgPeak(mspt, (v) => `${ms(v)} ms`), "Stay below the 50 ms tick budget", <Timer />)}
+              points={pts((m) => m.mspt)} from={from} to={to}
+              max={Math.max(60, Math.ceil((mspt.max ?? 0) / 10) * 10)} reference={{ value: 50, label: "50 ms budget" }} format={(v) => `${ms(v)} ms`} empty={empty}
             />
-          )}
-          <MetricChart
-            title="CPU"
-            points={pts((m) => m.cpuPercent)}
-            from={from}
-            to={to}
-            max={Math.max(100, Math.ceil((cpu.max ?? 0) / 50) * 50)}
-            reference={{ value: 100, label: "one core" }}
-            format={(v) => `${v.toFixed(0)}%`}
-            empty={empty}
-          />
-          <MetricChart title="Memory" points={pts((m) => m.memoryBytes)} from={from} to={to} max={Math.max(heap, mem.max ?? 0)} reference={{ value: heap, label: "heap" }} format={(v) => formatBytes(v)} empty={empty} />
-          {!proxy && <MetricChart title="Players" points={pts((m) => m.playersOnline)} from={from} to={to} max={Math.max(4, players.max ?? 0)} format={(v) => v.toFixed(0)} empty={empty} />}
-        </div>
-      </Section>
-
-      <Section title="Tuning" description="Changes apply on the next start.">
-        {proxy ? (
-          <div className="max-w-2xl">{d && <MemoryAndJvm server={s} fit={d.fit} />}</div>
-        ) : (
-          <div className="grid items-start gap-10 lg:grid-cols-2">
-            <div className="space-y-10">
-              <Presets server={s} info={d} />
-              <div id="pregen" className="scroll-mt-6">
-                <Pregeneration server={s} />
-              </div>
-            </div>
-            <div className="space-y-10">
-              {d && <MemoryAndJvm server={s} fit={d.fit} />}
-              <PerformanceProperties server={s} />
-            </div>
           </div>
         )}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <MetricChart
+            title="CPU"
+            stat={metric(live?.cpuPercent != null ? `${live.cpuPercent.toFixed(0)}%` : unavailable, avgPeak(cpu, (v) => `${v.toFixed(0)}%`), "100% equals one fully used core", <Cpu />)}
+            points={pts((m) => m.cpuPercent)} from={from} to={to}
+            max={Math.max(100, Math.ceil((cpu.max ?? 0) / 50) * 50)} reference={{ value: 100, label: "one core" }} format={(v) => `${v.toFixed(0)}%`} empty={empty}
+          />
+          <MetricChart
+            title="Memory"
+            stat={metric(live?.memoryBytes != null ? formatBytes(live.memoryBytes) : unavailable, mem.max === null ? undefined : `peak ${formatBytes(mem.max)}`, `${gb(s.memoryMb)} configured Java heap · process memory shown`, <MemoryStick />)}
+            points={pts((m) => m.memoryBytes)} from={from} to={to} max={Math.max(heap, mem.max ?? 0)}
+            reference={{ value: heap, label: "configured heap" }} format={(v) => formatBytes(v)} empty={empty}
+          />
+          <MetricChart
+            title="Players"
+            className="md:col-span-2 xl:col-span-1"
+            stat={metric(live ? `${live.playersOnline} / ${s.maxPlayers}` : unavailable, players.max === null ? undefined : `peak ${players.max} online`, "Connected players over time", <Users />)}
+            points={pts((m) => m.playersOnline)} from={from} to={to} max={Math.max(4, players.max ?? 0)} format={(v) => v.toFixed(0)} empty={empty}
+          />
+        </div>
+        <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+          <Info className="mt-0.5 size-3.5 shrink-0" />
+          Values show the current reading; averages and peaks follow the selected chart range. Samples are collected every few seconds while a dashboard is open.
+        </p>
+      </section>
+
+      <Section
+        title={<span className="flex flex-wrap items-center gap-2">Insights {attention > 0 && <Badge variant="warning">{attention} to review</Badge>}</span>}
+        description="Based on the last 5 minutes and your current configuration."
+      >
+        {insights ? <InsightList server={s} insights={insights} /> : perf.isError ? <Callout icon={<Info />} title="Insights unavailable">Performance settings could not be loaded. Try reopening this page.</Callout> : <Skeleton className="h-24 rounded-lg" />}
       </Section>
+
+      <div className="space-y-5 border-t border-border pt-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h2 className="text-base font-medium">Tuning</h2>
+            <p className="text-[13px] text-muted-foreground">{proxy ? "Adjust the memory and Java settings for this proxy." : "Start with a preset, then fine-tune for your server."}</p>
+          </div>
+          <Badge variant="outline"><RotateCw /> Configuration applies on next start</Badge>
+        </div>
+        {!d && perf.isError ? (
+          <Callout icon={<Info />} title="Tuning unavailable">Performance settings could not be loaded. Try reopening this page.</Callout>
+        ) : (
+          <>
+            {!proxy && <Panel className="p-5 sm:p-6"><Presets server={s} info={d} /></Panel>}
+            <div className={cn("grid gap-5", !proxy && "xl:grid-cols-2")}>
+              <Panel className="min-w-0 p-5 sm:p-6">{d ? <MemoryAndJvm server={s} fit={d.fit} /> : <Skeleton className="h-64" />}</Panel>
+              {!proxy && <Panel id="pregen" className="min-w-0 scroll-mt-6 p-5 sm:p-6"><Pregeneration server={s} /></Panel>}
+            </div>
+          </>
+        )}
+        {!proxy && (
+          <details className="group rounded-lg border border-border bg-surface">
+            <summary className="flex cursor-pointer list-none items-center gap-3 rounded-lg p-5 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-6 [&::-webkit-details-marker]:hidden">
+              <SlidersHorizontal className="size-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 space-y-1">
+                <span className="block text-sm font-medium">Advanced server settings</span>
+                <span className="block text-xs leading-relaxed text-muted-foreground">View and simulation distances, watchdog and chunk saving</span>
+              </span>
+              <ChevronDown className="size-4 shrink-0 text-muted-foreground group-open:rotate-180" />
+            </summary>
+            <div className="border-t border-border p-5 sm:p-6"><PerformanceProperties server={s} /></div>
+          </details>
+        )}
+      </div>
     </div>
   );
 }
@@ -231,17 +254,17 @@ function InsightList({ server: s, insights }: { server: ServerDetail; insights: 
     <Panel className="divide-y divide-border">
       {insights.length === 0 && <p className="p-4 text-[13px] text-muted-foreground">Nothing to flag. Start the server and open this page while it runs to see how it performs.</p>}
       {insights.map((i) => (
-        <div key={i.id} className="flex items-start gap-3 p-4">
+        <div key={i.id} className="flex flex-wrap items-start gap-3 p-4 sm:p-5">
           <span className={cn("mt-0.5 shrink-0 [&_svg]:size-4", LEVEL[i.level].className)}>{LEVEL[i.level].icon}</span>
-          <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="min-w-0 flex-[1_1_200px] space-y-1">
             <p className="text-[13px] font-medium">{i.title}</p>
-            <p className="text-xs text-muted-foreground">{i.detail}</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">{i.detail}</p>
           </div>
           {i.fix && (i.fix.kind === "pregen" || canEdit) && (
             <Button
               size="sm"
               variant="secondary"
-              className="shrink-0"
+              className="ml-7 max-w-[calc(100%-1.75rem)] whitespace-normal text-left sm:ml-0"
               loading={apply.isPending && apply.variables === i.fix}
               onClick={() => (i.fix!.kind === "pregen" ? document.getElementById("pregen")?.scrollIntoView({ behavior: "smooth" }) : apply.mutate(i.fix!))}
             >
@@ -275,18 +298,28 @@ function Presets({ server: s, info: d }: { server: ServerDetail; info: Performan
         </>
       }
     >
-      <div className="grid gap-3">
+      <div role="group" aria-label="Performance preset" className="grid gap-3 lg:grid-cols-3">
         {d.presets.map((p) => (
-          <Choice
-            key={p.id}
-            selected={selected === p.id}
-            disabled={!canEdit}
-            title={p.label}
-            badge={p.id === d.current ? "Current" : p.id === d.recommended ? "Recommended for this machine" : undefined}
-            description={p.description}
-            icon={ICONS[p.id]}
-            onClick={() => setChosen(p.id)}
-          />
+          <ChoiceCard key={p.id} selected={selected === p.id} disabled={!canEdit} onClick={() => setChosen(p.id)} className="flex min-w-0 flex-col gap-4 disabled:opacity-100">
+            <span className="flex w-full flex-wrap items-center justify-between gap-2">
+              <span className="text-muted-foreground [&_svg]:size-5">{ICONS[p.id]}</span>
+              <span className="flex flex-wrap gap-1.5">
+                {p.id === d.recommended && <Badge variant="outline">Recommended</Badge>}
+                {p.id === d.current && <Badge>Current</Badge>}
+              </span>
+            </span>
+            <span className="flex-1 space-y-1.5">
+              <span className="flex items-start gap-2 text-sm font-medium">
+                <span className="flex-1">{p.label}</span>
+                {selected === p.id && <CheckCircle2 className="mt-0.5 size-4 shrink-0" />}
+              </span>
+              <span className="block text-xs leading-relaxed text-muted-foreground">{p.description}</span>
+            </span>
+            <span className="flex w-full flex-wrap gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+              <span>View <span className="font-mono text-foreground">{p.viewDistance}</span></span>
+              <span>Simulation <span className="font-mono text-foreground">{p.simulationDistance}</span></span>
+            </span>
+          </ChoiceCard>
         ))}
       </div>
       <details className="text-xs">
@@ -368,7 +401,7 @@ function MemoryAndJvm({ server: s, fit }: { server: ServerDetail; fit: HostFit }
   const sliderMax = Math.max(s.memoryMb, Math.min(32768, Math.ceil((fit.availableMemoryMb + 1024) / 512) * 512));
   const over = memoryMb > fit.availableMemoryMb;
   return (
-    <Section title="Memory & JVM">
+    <Section title="Memory & JVM" description="Allocate memory first. Edit Java arguments only when needed.">
       <Field label="Memory" htmlFor="pmem" aside={<span className="text-[13px] font-medium tabular-nums">{gb(memoryMb)}</span>}>
         <input id="pmem" type="range" min={512} max={sliderMax} step={512} value={memoryMb} onChange={(e) => setMemoryMb(Number(e.target.value))} disabled={!canEdit} className="w-full accent-[var(--foreground)]" />
         <p className={cn("text-xs", over ? "text-warning" : "text-muted-foreground")}>
@@ -382,9 +415,16 @@ function MemoryAndJvm({ server: s, fit }: { server: ServerDetail; fit: HostFit }
           )}
         </p>
       </Field>
-      <Field label="JVM arguments" htmlFor="pjvm" help="Each argument must start with '-'. Memory flags are managed by the slider. Presets replace earlier garbage collector flags.">
-        <Textarea id="pjvm" rows={4} value={jvmArgs} onChange={(e) => setJvmArgs(e.target.value)} disabled={!canEdit} className="font-mono text-xs" />
-      </Field>
+      <details className="group/jvm border-t border-border pt-4" open={jvmArgs !== s.jvmArgs || undefined}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+          JVM arguments <ChevronDown className="size-4 text-muted-foreground group-open/jvm:rotate-180" />
+        </summary>
+        <div className="mt-4">
+          <Field label="JVM arguments" htmlFor="pjvm" help="Each argument must start with '-'. Memory flags are managed by the slider. Presets replace earlier garbage collector flags.">
+            <Textarea id="pjvm" rows={4} value={jvmArgs} onChange={(e) => setJvmArgs(e.target.value)} disabled={!canEdit} className="font-mono text-xs" />
+          </Field>
+        </div>
+      </details>
       {canEdit && (
         <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!dirty}>
           <Save /> Save changes
