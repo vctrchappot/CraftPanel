@@ -54,11 +54,12 @@ test("create, run, configure, back up and restore a real server", async ({ page 
   await expect(page.getByRole("log").getByText(/\[Server\] hello from playwright/)).toBeVisible();
   await page.screenshot(shot("09-console"));
 
-  // Settings: change MOTD via the validated editor
+  // Settings open on Appearance: change the message of the day with the colour tools
   await tab(page, "Settings").click();
-  await page.getByLabel(/Message of the day/).fill("Edited by Playwright");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText(/Restart the server to apply/)).toBeVisible();
+  await page.getByLabel("Message", { exact: true }).fill("Edited by Playwright");
+  await page.getByRole("group", { name: "Effects" }).getByRole("button", { name: "Rainbow" }).click();
+  await page.getByRole("button", { name: "Save message" }).click();
+  await expect(page.getByText(/Restart the server to show the new message/)).toBeVisible();
   await page.screenshot(shot("10-settings"));
 
   // Players tab renders

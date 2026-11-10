@@ -14,6 +14,8 @@ export interface SoftwareInfo {
   modLoader: "fabric" | "neoforge" | null;
   /** Paper and its forks answer /tps and /mspt. */
   paperCommands: boolean;
+  /** The server list can show smooth (hex) colours in the message of the day; vanilla clients get garbled colours. */
+  hexMotd: boolean;
   /** Name of a provider build in the UI ("Build", "Loader"). */
   buildLabel: string | null;
   /** A proxy (Velocity): no world, players or server.properties; it forwards players to other servers. */
@@ -21,13 +23,13 @@ export interface SoftwareInfo {
 }
 
 export const SOFTWARE_INFO: Record<ServerSoftware, SoftwareInfo> = {
-  paper: { label: "Paper", addons: "plugins", modLoader: null, paperCommands: true, buildLabel: "Build", proxy: false },
-  purpur: { label: "Purpur", addons: "plugins", modLoader: null, paperCommands: true, buildLabel: "Build", proxy: false },
-  fabric: { label: "Fabric", addons: "mods", modLoader: "fabric", paperCommands: false, buildLabel: "Loader", proxy: false },
-  neoforge: { label: "NeoForge", addons: "mods", modLoader: "neoforge", paperCommands: false, buildLabel: "Version", proxy: false },
-  vanilla: { label: "Vanilla", addons: null, modLoader: null, paperCommands: false, buildLabel: null, proxy: false },
+  paper: { label: "Paper", addons: "plugins", modLoader: null, paperCommands: true, hexMotd: true, buildLabel: "Build", proxy: false },
+  purpur: { label: "Purpur", addons: "plugins", modLoader: null, paperCommands: true, hexMotd: true, buildLabel: "Build", proxy: false },
+  fabric: { label: "Fabric", addons: "mods", modLoader: "fabric", paperCommands: false, hexMotd: false, buildLabel: "Loader", proxy: false },
+  neoforge: { label: "NeoForge", addons: "mods", modLoader: "neoforge", paperCommands: false, hexMotd: false, buildLabel: "Version", proxy: false },
+  vanilla: { label: "Vanilla", addons: null, modLoader: null, paperCommands: false, hexMotd: false, buildLabel: null, proxy: false },
   // Velocity plugins, not Bukkit plugins; its "version" is the Velocity version, not a Minecraft version.
-  velocity: { label: "Velocity", addons: "plugins", modLoader: null, paperCommands: false, buildLabel: "Build", proxy: true },
+  velocity: { label: "Velocity", addons: "plugins", modLoader: null, paperCommands: false, hexMotd: false, buildLabel: "Build", proxy: true },
 };
 
 export function softwareLabel(software: string): string {

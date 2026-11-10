@@ -55,7 +55,7 @@ const opts = (...o: [string, string][]) => ({ kind: "enum", options: o.map(([val
 
 export const SETTINGS: SettingDefinition[] = [
   // General
-  { key: "motd", label: "Message of the day", group: "general", type: str(256), default: "A Minecraft Server", help: "Shown below the server name in the multiplayer list, two lines at most. Supports § colour codes; Appearance has buttons for them.", restart: true, multiline: true },
+  { key: "motd", label: "Message of the day", group: "general", type: str(2048), default: "A Minecraft Server", help: "Shown below the server name in the multiplayer list, two lines at most. Supports § colour codes; Appearance has buttons for them.", restart: true, multiline: true },
   { key: "enable-status", label: "Show in server list", group: "general", type: bool, default: "true", help: "When disabled the server appears offline in the multiplayer list but players can still join.", restart: true },
   { key: "hide-online-players", label: "Hide online players", group: "general", type: bool, default: "false", help: "Hide the player sample in the server list.", restart: true },
   { key: "server-name", label: "Server name (legacy)", group: "general", type: str(64), default: "", help: "Not used by modern clients; kept for compatibility with some tools.", restart: true },

@@ -2,11 +2,25 @@
 
 import * as React from "react";
 import { cn } from "@craftpanel/ui";
-import { motdColor, parseMotd } from "@craftpanel/shared";
+import { motdColorCss, parseMotd } from "@craftpanel/shared";
 import { ServerIcon } from "../server-icon";
 import type { ServerSummary } from "@craftpanel/shared";
 
-/** A message of the day as the game draws it: the sixteen legacy colours on the list's dark background. */
+const SCRAMBLE = "abcdefghijklmnopqrstuvwxyz0123456789";
+
+/** Obfuscated text: every letter keeps changing in the game. Static for people who asked for less motion. */
+function Scrambled({ text }: { text: string }) {
+  const [shown, setShown] = React.useState(text);
+  React.useEffect(() => {
+    setShown(text);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(() => setShown(Array.from(text, (ch) => (/\s/.test(ch) ? ch : SCRAMBLE[Math.floor(Math.random() * SCRAMBLE.length)])).join("")), 90);
+    return () => window.clearInterval(timer);
+  }, [text]);
+  return <>{shown}</>;
+}
+
+/** A message of the day as the game draws it: legacy and smooth colours on the list's dark background. */
 export function MotdText({ raw, className }: { raw: string; className?: string }) {
   const lines = parseMotd(raw);
   return (
@@ -16,11 +30,10 @@ export function MotdText({ raw, className }: { raw: string; className?: string }
           {segments.map((s, j) => (
             <span
               key={j}
-              title={s.obfuscated ? "Obfuscated text shuffles in the game" : undefined}
-              className={cn(s.bold && "font-bold", s.italic && "italic", s.obfuscated && "opacity-60 blur-[0.6px]")}
-              style={{ color: motdColor(s.color)?.hex ?? "#aaaaaa", textDecoration: [s.underline && "underline", s.strike && "line-through"].filter(Boolean).join(" ") || undefined }}
+              className={cn(s.bold && "font-bold", s.italic && "italic")}
+              style={{ color: motdColorCss(s.color), textDecoration: [s.underline && "underline", s.strike && "line-through"].filter(Boolean).join(" ") || undefined }}
             >
-              {s.text}
+              {s.obfuscated ? <Scrambled text={s.text} /> : s.text}
             </span>
           ))}
         </p>

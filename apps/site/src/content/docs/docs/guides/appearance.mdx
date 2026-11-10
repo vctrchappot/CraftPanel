@@ -22,11 +22,27 @@ The icon also appears in the dashboard: in the server's header, on its card on t
 
 ## The message of the day
 
-The message is the two lines under the server name in the game's list. Select some text and click a colour or a style (bold, italic, underline, strikethrough or obfuscated); the buttons write the `§` codes for you, and **Clear** removes them from the selection. **Start from an example…** fills in a template with your server's name.
+The message is the two lines under the server name in the game's list. Select some text and click a colour or a style (bold, italic, underline, strikethrough or obfuscated); the buttons write the `§` codes for you, and **Clear** removes them from the selection. **Start from an example…** fills in a template with your server's name: classic and golden ones, and banners in rainbow, sunset, frost, fire and forest colours.
 
-- A message has at most two lines and 256 characters; each colour or style costs two characters. Roughly 50 characters fit on a line before the game cuts them off.
+### Colour effects
+
+**Colour effects** spreads a gradient over the selected text, or over the whole message when nothing is selected: Rainbow, Sunset, Ocean, Forest, Fire, Candy, Gold and Frost, or **Your own** with a start and an end colour. Every letter gets its own colour from the gradient; bold, italic and the other styles you set are kept, and spaces cost no extra code.
+
+Two modes decide how the colours are written:
+
+- **Smooth colours** use any colour (the game's hex colours). Paper and Purpur servers show them in full. Vanilla, Fabric and NeoForge servers don't: the game shows them in wrong colours, so the panel warns you when you choose smooth colours for such a server. Each coloured letter takes 14 characters.
+- **16 classic colours** replace every colour of the gradient by the nearest of the game's sixteen, which every server and every player shows. Gradients come out coarser, but they work everywhere. The panel starts in the mode that fits your server's software.
+
+### Symbols
+
+**Symbols** puts stars, hearts, arrows, check marks, swords, skulls and divider lines into the message at the cursor (or in place of the selection). They are drawn with the game's own font, so every player sees them; a few of the rarer ones may show as boxes on very old versions.
+
+### Good to know
+
+- A message has at most two lines and 2048 characters; a colour or style costs two characters, a smooth colour fourteen. Roughly 50 characters fit on a line before the game cuts them off.
 - A colour clears the styles before it, as in the game; **Clear** or a second colour returns to the default.
-- Obfuscated text shuffles in the game; the preview only dims it.
+- Obfuscated text shuffles in the game and in the preview (it stands still if your system asks for reduced motion).
+- The game draws the message once and keeps it until the list is refreshed; it can't animate by itself.
 - Minecraft reads the message at start-up, so restart the server after saving.
 - A Velocity proxy takes its message from `velocity.toml` (Files tab); the icon and description work for it too.
 

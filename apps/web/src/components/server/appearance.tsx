@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Download, ImagePlus, RotateCcw, Save, Trash2, Wand2 } from "lucide-react";
 import { Button, Callout, ConfirmDialog, Field, Input, NativeSelect, Panel, SegmentedControl, Section, Skeleton, Switch, Textarea, cn } from "@craftpanel/ui";
-import { MOTD_COLORS, MOTD_FORMATS, MOTD_MAX_LENGTH, MOTD_MAX_LINES, SOFTWARE_INFO, motdPlainOffset, motdProblem, motdRawIndex, restyleMotd, stripMotd, type MotdChange, type MotdFormatKey, type ServerDetail } from "@craftpanel/shared";
+import { MOTD_COLORS, MOTD_EFFECTS, MOTD_FORMATS, MOTD_MAX_LENGTH, MOTD_MAX_LINES, SOFTWARE_INFO, motdPlainOffset, motdProblem, motdRawIndex, paintMotd, restyleMotd, stripMotd, type MotdChange, type MotdFormatKey, type ServerDetail } from "@craftpanel/shared";
 import { api, errorMessage } from "@/lib/api";
 import { useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
@@ -14,6 +14,7 @@ import { formatNumber } from "@/lib/format";
 import { StatusBadge } from "../status";
 import { ServerIcon, iconUrl } from "../server-icon";
 import { MotdText, ServerListEntry } from "./motd-preview";
+import { EffectTools, SymbolPicker } from "./motd-tools";
 
 const DEFAULT_MOTD = "A Minecraft Server";
 
@@ -442,10 +443,23 @@ function IconSection({ server: s, canEdit, onDraft }: { server: ServerDetail; ca
 
 // ---- message of the day ------------------------------------------------------------------------------------------
 
-const EXAMPLES: { id: string; label: string; make: (name: string) => string }[] = [
+const effectStops = (id: string) => MOTD_EFFECTS.find((e) => e.id === id)!.stops;
+
+/** A bold title between two symbols, painted with an effect, and a subtitle line under it. */
+const banner = (name: string, effect: string, mark: string, subtitle: string, smooth: boolean) => {
+  const title = `${mark} ${name} ${mark}`;
+  return `${paintMotd(`§l${title}`, 0, title.length, effectStops(effect), { smooth })}\n${subtitle}`;
+};
+
+const EXAMPLES: { id: string; label: string; make: (name: string, smooth: boolean) => string }[] = [
   { id: "classic", label: "Classic", make: (n) => `§a§l${n}§r\n§7A friendly survival server` },
   { id: "gold", label: "Golden welcome", make: (n) => `§6§l${n} §8» §eJoin the adventure!\n§7Survival, events and a friendly community` },
   { id: "cool", label: "Cool and calm", make: (n) => `§b§l${n}\n§fPlay together, build together` },
+  { id: "rainbow", label: "Rainbow banner", make: (n, smooth) => banner(n, "rainbow", "✦", "§7Come and play!", smooth) },
+  { id: "sunset", label: "Sunset", make: (n, smooth) => banner(n, "sunset", "★", "§eSurvival, events and friends", smooth) },
+  { id: "frost", label: "Frost", make: (n, smooth) => banner(n, "frost", "❄", "§bCool builds, warm community", smooth) },
+  { id: "fire", label: "Fire", make: (n, smooth) => banner(n, "fire", "⚔", "§6PvP, raids and glory", smooth) },
+  { id: "forest", label: "Forest", make: (n, smooth) => banner(n, "forest", "☘", "§aCosy survival in the woods", smooth) },
   { id: "plain", label: "Plain", make: (n) => n },
 ];
 
@@ -458,6 +472,8 @@ function MotdSection({ server: s, canEdit, saved, value, onChange }: { server: S
     invalidate: [["properties", s.id], ["server", s.id], ["servers"]],
   });
   const lines = value.split("\n").length;
+  const hexServer = SOFTWARE_INFO[s.software].hexMotd;
+  const [smooth, setSmooth] = React.useState(hexServer);
 
   // Put the cursor (or the selection) back after the buttons changed the text.
   const edit = (next: string, from: number, to: number) => {
@@ -485,9 +501,25 @@ function MotdSection({ server: s, canEdit, saved, value, onChange }: { server: S
   const insert = (code: string) => restyle({ color: code }, code);
   const toggle = (key: MotdFormatKey, code: string) => restyle({ toggle: key }, code);
   const clear = () => restyle({ clear: true });
+  // An effect colours the selection, or the whole message when nothing is selected.
+  const paint = (stops: readonly string[]) => {
+    const el = area.current;
+    const a = el?.selectionStart ?? 0;
+    const b = el?.selectionEnd ?? 0;
+    const ranged = a !== b;
+    const from = ranged ? motdPlainOffset(value, a) : 0;
+    const to = ranged ? motdPlainOffset(value, b) : motdPlainOffset(value, value.length);
+    const next = paintMotd(value, from, to, stops, { smooth });
+    edit(next, motdRawIndex(next, from), ranged && to > from ? motdRawIndex(next, to - 1) + 1 : motdRawIndex(next, from));
+  };
+  const insertSymbol = (symbol: string) => {
+    const a = area.current?.selectionStart ?? value.length;
+    const b = area.current?.selectionEnd ?? value.length;
+    edit(value.slice(0, a) + symbol + value.slice(b), a + symbol.length, a + symbol.length);
+  };
 
   return (
-    <Section title="Message of the day" description="The two lines under the server name in Minecraft's server list. Select some text, then pick a colour or style; the preview on the right shows the result.">
+    <Section title="Message of the day" description="The two lines under the server name in Minecraft's server list. Select some text, then pick a colour, a style or an effect; the preview on the right shows the result.">
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <div role="group" aria-label="Colours" className="flex flex-wrap gap-1">
@@ -521,6 +553,8 @@ function MotdSection({ server: s, canEdit, saved, value, onChange }: { server: S
             </Button>
           </div>
         </div>
+        <EffectTools canEdit={canEdit} smooth={smooth} onSmooth={setSmooth} hexServer={hexServer} onPaint={paint} />
+        <SymbolPicker canEdit={canEdit} onPick={insertSymbol} />
         <Field
           label="Message"
           htmlFor="motd"
@@ -530,12 +564,12 @@ function MotdSection({ server: s, canEdit, saved, value, onChange }: { server: S
               {formatNumber(value.length)}/{MOTD_MAX_LENGTH}
             </span>
           }
-          help={`${lines} of ${MOTD_MAX_LINES} lines. Each colour or style takes two characters (§ and a letter or digit). Roughly 50 characters fit on a line.`}
+          help={`${lines} of ${MOTD_MAX_LINES} lines. A colour or style takes two characters (§ and a letter or digit), a smooth colour fourteen. Roughly 50 characters fit on a line.`}
         >
           <Textarea
             id="motd"
             ref={area}
-            rows={2}
+            rows={3}
             value={value}
             disabled={!canEdit}
             spellCheck={false}
@@ -562,7 +596,7 @@ function MotdSection({ server: s, canEdit, saved, value, onChange }: { server: S
               value=""
               onChange={(e) => {
                 const ex = EXAMPLES.find((x) => x.id === e.target.value);
-                if (ex) onChange(ex.make(s.name));
+                if (ex) onChange(ex.make(s.name, smooth));
               }}
               className="ml-auto h-8 w-auto min-w-48 text-[13px]"
             >

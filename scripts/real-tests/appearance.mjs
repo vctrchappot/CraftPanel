@@ -63,7 +63,8 @@ ok(!first.favicon, "the game announces no icon yet");
 
 const file = png();
 await c.call("PUT", `/api/servers/${s.id}/icon`, { png: file.toString("base64") });
-const motd = "§6§lWelcome to Appearance\n§7a server with its own look";
+// A smooth colour (§x§r§r§g§g§b§b) is written by the colour effects; Paper-family servers show it as a hex colour.
+const motd = "§6§lWelcome to Appearance\n§7a server with its own look §x§f§f§8§0§0§0✦";
 await c.call("PUT", `/api/servers/${s.id}/properties`, { values: { motd } });
 const after = await summary();
 ok(typeof after.iconVersion === "number", `CraftPanel reports the icon (version ${after.iconVersion})`);
@@ -77,9 +78,15 @@ const favicon = second.favicon ? Buffer.from(second.favicon.replace(/^data:image
 ok(!!favicon && favicon.subarray(0, 8).equals(file.subarray(0, 8)), "after a restart the game announces a PNG icon");
 ok(!!favicon && favicon.readUInt32BE(16) === 64 && favicon.readUInt32BE(20) === 64, "…of 64×64 pixels");
 const text = flatten(second.description);
-ok(text === "Welcome to Appearance\na server with its own look", `the game announces both lines of the message: ${JSON.stringify(text)}`);
+const hexServer = software === "paper" || software === "purpur";
+if (hexServer) ok(text === "Welcome to Appearance\na server with its own look ✦", `the game announces both lines of the message: ${JSON.stringify(text)}`);
+else ok(text.startsWith("Welcome to Appearance\na server with its own look"), `the game announces both lines of the message: ${JSON.stringify(text)}`);
 const first1 = segments(second.description).find((x) => x.text.includes("Welcome"));
 ok(first1?.color === "gold" && first1?.bold === true, `colour and style arrive: ${JSON.stringify(first1)}`);
+
+const star = segments(second.description).find((x) => x.text.includes("✦"));
+if (hexServer) ok(star?.color === "#ff8000", `a smooth colour arrives as a hex colour: ${JSON.stringify(star)}`);
+else console.log(`INFO ${software} announces the smooth colour code as plain text: ${JSON.stringify(text)}`);
 
 await c.call("DELETE", `/api/servers/${s.id}/icon`);
 ok((await summary()).iconVersion === null, "removing the icon is reflected in the server list");
