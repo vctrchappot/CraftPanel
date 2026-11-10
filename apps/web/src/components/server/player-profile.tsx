@@ -3,17 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Ban, ChevronDown, Crown, LogOut, Save, ShieldOff, UserMinus, UserPlus } from "lucide-react";
+import { ArrowLeft, Ban, Crown, Save } from "lucide-react";
 import {
   Badge,
   Button,
   Callout,
-  ConfirmDialog,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
   EmptyState,
   Progress,
   Skeleton,
@@ -33,7 +27,8 @@ import { advancementName, mainKiller, playerInsights, travelDistances } from "@/
 import { eventStyle } from "@/lib/activity";
 import { CopyButton } from "./workspace";
 import { BarList, Card, DailyBars, Heatmap, Hearts, ItemIconsProvider, ItemSlot, KpiGrid, Pips, SlotGrid } from "./player-charts";
-import { PlayerAvatar, ReasonDialog, usePlayerActions } from "./player-parts";
+import { LiveTag, PlayerAvatar, Row } from "./player-parts";
+import { PlayerActions } from "./player-actions";
 
 const DIMENSIONS: Record<string, string> = { "minecraft:overworld": "Overworld", "minecraft:the_nether": "Nether", "minecraft:the_end": "The End" };
 const dimension = (d: string | null) => (d ? (DIMENSIONS[d] ?? prettyId(d)) : "Unknown");
@@ -42,8 +37,6 @@ const sum = (n: { cm: number }[]) => n.reduce((a, b) => a + b.cm, 0);
 
 export function PlayerProfileView({ server: s, name }: { server: ServerDetail; name: string }) {
   const canManage = useCan("players.manage");
-  const canOp = useCan("server.configure");
-  const act = usePlayerActions(s.id);
   const q = useQuery({
     queryKey: ["player", s.id, name],
     queryFn: () => api.get<PlayerProfile>(`/api/servers/${s.id}/players/${encodeURIComponent(name)}/profile?tz=${new Date().getTimezoneOffset()}`),
@@ -54,8 +47,6 @@ export function PlayerProfileView({ server: s, name }: { server: ServerDetail; n
   useRealtimeEvent((m) => m.type === "players" && m.serverId === s.id && void q.refetch());
   // "5 minutes ago" and "online for 49 min" keep moving between refreshes.
   useTick(30_000);
-  const [dialog, setDialog] = React.useState<{ action: "kick" | "ban"; name: string } | null>(null);
-  const [confirmOp, setConfirmOp] = React.useState(false);
 
   const back = (
     <Link href={`/server/?id=${s.id}&tab=players`} scroll={false} className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground">
@@ -86,71 +77,25 @@ export function PlayerProfileView({ server: s, name }: { server: ServerDetail; n
     <ItemIconsProvider value={s.id}>
     <div className="space-y-6">
       {back}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-center gap-4">
-          <PlayerAvatar name={p.name} uuid={p.uuid} size={64} className="shrink-0 rounded-lg border border-border" />
-          <div className="min-w-0 space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h2 className="truncate text-2xl font-medium tracking-tight">{p.name}</h2>
-              {p.online ? <Badge variant="success">Online</Badge> : <Badge>Offline</Badge>}
-              {p.opLevel !== null && (
-                <Badge variant="warning">
-                  <Crown /> Operator {p.opLevel}
-                </Badge>
-              )}
-              {p.whitelisted && <Badge variant="outline">Whitelisted</Badge>}
-              {p.ban && <Badge variant="danger">Banned</Badge>}
-            </div>
-            <p className="text-[13px] text-muted-foreground">
-              {p.online && p.onlineSince ? `Online for ${formatPlaytime(Date.now() - p.onlineSince)}` : p.lastSeen ? `Last seen ${timeAgo(p.lastSeen)}` : "Never joined while CraftPanel managed this server"}
-              {p.firstSeen ? ` · first seen ${formatDate(p.firstSeen)}` : ""}
-            </p>
+      <div className="flex min-w-0 items-center gap-4">
+        <PlayerAvatar name={p.name} uuid={p.uuid} size={64} className="shrink-0 rounded-lg border border-border" />
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h2 className="truncate text-2xl font-medium tracking-tight">{p.name}</h2>
+            {p.online ? <Badge variant="success">Online</Badge> : <Badge>Offline</Badge>}
+            {p.opLevel !== null && (
+              <Badge variant="warning">
+                <Crown /> Operator {p.opLevel}
+              </Badge>
+            )}
+            {p.whitelisted && <Badge variant="outline">Whitelisted</Badge>}
+            {p.ban && <Badge variant="danger">Banned</Badge>}
           </div>
+          <p className="text-[13px] text-muted-foreground">
+            {p.online && p.onlineSince ? `Online for ${formatPlaytime(Date.now() - p.onlineSince)}` : p.lastSeen ? `Last seen ${timeAgo(p.lastSeen)}` : "Never joined while CraftPanel managed this server"}
+            {p.firstSeen ? ` · first seen ${formatDate(p.firstSeen)}` : ""}
+          </p>
         </div>
-        {canManage && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {p.online && (
-              <Button variant="secondary" onClick={() => setDialog({ action: "kick", name: p.name })}>
-                <LogOut /> Kick
-              </Button>
-            )}
-            {p.ban ? (
-              <Button variant="secondary" onClick={() => act.mutate({ action: "pardon", name: p.name })} loading={act.isPending && act.variables?.action === "pardon"}>
-                <UserPlus /> Unban
-              </Button>
-            ) : (
-              <Button variant="secondary" onClick={() => setDialog({ action: "ban", name: p.name })}>
-                <Ban /> Ban
-              </Button>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="secondary" aria-label="More actions">
-                  More <ChevronDown />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => act.mutate({ action: p.whitelisted ? "whitelist-remove" : "whitelist-add", name: p.name })}>
-                  {p.whitelisted ? <UserMinus /> : <UserPlus />} {p.whitelisted ? "Remove from whitelist" : "Add to whitelist"}
-                </DropdownMenuItem>
-                {canOp && (
-                  <>
-                    <DropdownMenuSeparator />
-                    {p.opLevel !== null ? (
-                      <DropdownMenuItem onSelect={() => act.mutate({ action: "deop", name: p.name })}>
-                        <ShieldOff /> Revoke operator
-                      </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem onSelect={() => setConfirmOp(true)}>
-                        <Crown /> Make operator…
-                      </DropdownMenuItem>
-                    )}
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
       </div>
 
       {p.ban && (
@@ -162,14 +107,18 @@ export function PlayerProfileView({ server: s, name }: { server: ServerDetail; n
       )}
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
+        <TabsList className="scrollbar-thin max-w-full overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="actions">Actions</TabsTrigger>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
           <TabsTrigger value="statistics">Statistics</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <Overview p={p} />
+        </TabsContent>
+        <TabsContent value="actions">
+          <PlayerActions server={s} p={p} />
         </TabsContent>
         <TabsContent value="inventory">
           <Inventory p={p} live={live} serverId={s.id} />
@@ -182,15 +131,6 @@ export function PlayerProfileView({ server: s, name }: { server: ServerDetail; n
         </TabsContent>
       </Tabs>
 
-      <ReasonDialog state={dialog} onClose={() => setDialog(null)} onSubmit={async (reason) => void (await act.mutateAsync({ action: dialog!.action, name: dialog!.name, reason: reason || undefined }))} />
-      <ConfirmDialog
-        open={confirmOp}
-        onOpenChange={setConfirmOp}
-        title={`Make ${p.name} an operator?`}
-        description="Operators can use powerful in-game commands such as /gamemode, /give and /stop."
-        confirmLabel="Grant operator"
-        onConfirm={() => act.mutateAsync({ action: "op", name: p.name })}
-      />
     </div>
     </ItemIconsProvider>
   );
@@ -203,19 +143,6 @@ function useTick(ms: number) {
     const t = setInterval(() => set((n) => n + 1), ms);
     return () => clearInterval(t);
   }, [ms]);
-}
-
-/** A pulsing dot and the word "live": the numbers beside it come from the running game. */
-function LiveTag() {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="relative flex size-2">
-        <span className="absolute inline-flex size-full animate-ping rounded-full bg-status-running opacity-60 motion-reduce:animate-none" />
-        <span className="relative inline-flex size-2 rounded-full bg-status-running" />
-      </span>
-      live
-    </span>
-  );
 }
 
 /** Asks the server to write everything to disk now, so files-based figures catch up. */
@@ -342,15 +269,6 @@ function Vitals({ state, source, online }: { state: PlayerState; source: PlayerP
         )}
       </div>
     </Card>
-  );
-}
-
-function Row({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 py-2 text-[13px]">
-      <dt className="shrink-0 text-muted-foreground">{label}</dt>
-      <dd className={cn("min-w-0 text-right", wide && "flex-1")}>{children}</dd>
-    </div>
   );
 }
 
@@ -647,7 +565,7 @@ function Activity({ p, canManage }: { p: PlayerProfile; canManage: boolean }) {
               <p className="text-[13px] text-muted-foreground">No address recorded.</p>
             )}
           </Card>
-          <Card title="Moderation and actions" hint="Kicks, bans and list changes made through CraftPanel.">
+          <Card title="Moderation and actions" hint="Kicks, bans, list changes and actions made through CraftPanel.">
             {p.events.length ? (
               <ul className="-my-2 divide-y divide-border">
                 {p.events.map((e) => (

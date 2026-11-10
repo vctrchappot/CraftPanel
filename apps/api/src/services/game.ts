@@ -1,8 +1,8 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import { badRequest, conflict, findInstalledAddon, notFound, planWorldImport, SOFTWARE_INFO, softwareLabel, type AddonKind, type GameRuleInfo, type PlayerProfile, type PlayerRosterEntry, type PlayerState, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
-import { PropertiesDocument, SETTINGS, SETTINGS_BY_KEY, parseJsonList, parseNbtFile, parseSnbt, isCompound, validateSetting, type BanEntry, type OpEntry, type WhitelistEntry } from "@craftpanel/config";
+import { AppError, badRequest, conflict, findInstalledAddon, notFound, planPlayerAction, planWorldImport, SOFTWARE_INFO, softwareLabel, type AddonKind, type GameRuleInfo, type PlayerInspect, type PlayerProfile, type PlayerRosterEntry, type PlayerState, type PluginInfo, type WorldInfo } from "@craftpanel/shared";
+import { PropertiesDocument, SETTINGS, SETTINGS_BY_KEY, parseJsonList, parseNbtFile, parseSnbt, isCompound, validateSetting, type BanEntry, type NbtCompound, type OpEntry, type WhitelistEntry } from "@craftpanel/config";
 import { and, desc, asc, eq, events, playerSessions, servers as serversTable, sql, type Database } from "@craftpanel/database";
 import { createZip, extractZip, listZip, readZipEntry } from "@craftpanel/backup";
 import { directorySize } from "@craftpanel/server-runtime";
@@ -33,7 +33,7 @@ import type { AppConfig } from "../config";
 import type { ActivityService, Actor } from "./activity";
 import { INFO_PLUGIN_FILE, isInfoPlugin } from "./info-pack";
 import { cachedSkin } from "./skins";
-import { MAX_SESSION_MS, normalizeAdvancements, normalizeStats, readPlayerState, summarizeActivity } from "./player-profile";
+import { MAX_SESSION_MS, normalizeAdvancements, normalizeStats, readPlayerInspect, readPlayerState, summarizeActivity } from "./player-profile";
 import type { ServerRow, ServerService } from "./servers";
 
 /** UUID Minecraft assigns to players in offline mode (name-based v3). */
@@ -325,30 +325,104 @@ export class GameService {
     return findItemTexture(dir, name);
   }
 
-  private liveStates = new Map<string, { at: number; state: Promise<PlayerState | null> }>();
+  private liveEntities = new Map<string, { at: number; data: Promise<NbtCompound | null> }>();
 
   /**
-   * An online player's state as the running game has it right now (position, health, inventory, …), read with
-   * `data get entity`. Minecraft only writes the player's file on saves, so this is what keeps the profile current.
-   * Answers are shared for a couple of seconds so several open dashboards cost the server one query.
+   * An online player's data as the running game has it right now, read with `data get entity`. Minecraft only writes
+   * the player's file on saves, so this is what keeps the profile current. Answers are shared for a couple of seconds
+   * so several open dashboards cost the server one query.
    */
-  liveState(row: ServerRow, name: string): Promise<PlayerState | null> {
+  liveData(row: ServerRow, name: string): Promise<NbtCompound | null> {
     if (!this.running(row) || !/^[A-Za-z0-9_]{1,16}$/.test(name)) return Promise.resolve(null);
     const key = `${row.id}:${name.toLowerCase()}`;
-    const hit = this.liveStates.get(key);
-    if (hit && Date.now() - hit.at < 2500) return hit.state;
-    const state = (async () => {
+    const hit = this.liveEntities.get(key);
+    if (hit && Date.now() - hit.at < 2500) return hit.data;
+    const data = (async () => {
       const m = await this.servers.agent.query(row.id, `data get entity ${name}`, new RegExp(`^${name} has the following entity data: (.*)$`), { timeoutMs: 3000 });
       if (!m) return null;
       try {
         const nbt = parseSnbt(m[1]);
-        return isCompound(nbt) ? readPlayerState(nbt) : null;
+        return isCompound(nbt) ? nbt : null;
       } catch {
         return null;
       }
     })();
-    this.liveStates.set(key, { at: Date.now(), state });
-    return state;
+    this.liveEntities.set(key, { at: Date.now(), data });
+    return data;
+  }
+
+  /** Position, health, inventory and the like of an online player, as the running game has them right now. */
+  async liveState(row: ServerRow, name: string): Promise<PlayerState | null> {
+    const nbt = await this.liveData(row, name);
+    return nbt ? readPlayerState(nbt) : null;
+  }
+
+  /** Abilities, tags, effects and plugin data of a player: from the running game when they are online, else from their saved file. */
+  async inspectPlayer(row: ServerRow, name: string): Promise<PlayerInspect> {
+    this.requireGameServer(row);
+    if (!/^[A-Za-z0-9_]{1,16}$/.test(name)) throw badRequest("Not a valid Minecraft username");
+    const lower = name.toLowerCase();
+    if (this.running(row) && this.servers.agent.info(row.id).players.some((p) => p.name.toLowerCase() === lower)) {
+      const nbt = await this.liveData(row, name);
+      if (nbt) return readPlayerInspect(nbt, "game", null);
+    }
+    const file = await this.playerDataFile(row, name);
+    if (!file) throw notFound("Saved data for this player");
+    try {
+      return readPlayerInspect(parseNbtFile(await fsp.readFile(file.abs)), "file", file.mtime);
+    } catch {
+      throw conflict("The player's file could not be read", "Minecraft may be writing it right now. Try again in a moment.");
+    }
+  }
+
+  /** The saved player file (`playerdata/<uuid>.dat`, or `players/data` in newer versions) of a player this server knows. */
+  private async playerDataFile(row: ServerRow, name: string): Promise<{ abs: string; mtime: number } | null> {
+    const sb = this.servers.sandbox(row);
+    const lower = name.toLowerCase();
+    const same = (e: { name?: string }) => e.name?.toLowerCase() === lower;
+    const [whitelist, ops, bans, props, sessions, level] = await Promise.all([
+      sb.readTextIfExists("whitelist.json").then((t) => parseJsonList<WhitelistEntry>(t)),
+      sb.readTextIfExists("ops.json").then((t) => parseJsonList<OpEntry>(t)),
+      sb.readTextIfExists("banned-players.json").then((t) => parseJsonList<BanEntry>(t)),
+      sb.readTextIfExists("server.properties").then((t) => PropertiesDocument.parse(t ?? "")),
+      this.db.select().from(playerSessions).where(and(eq(playerSessions.serverId, row.id), sql`lower(${playerSessions.name}) = ${lower}`)).orderBy(asc(playerSessions.joinedAt)),
+      this.levelName(row),
+    ]);
+    const uuid = [...sessions].reverse().find((x) => x.uuid)?.uuid ?? whitelist.find(same)?.uuid ?? ops.find(same)?.uuid ?? bans.find(same)?.uuid ?? (props.get("online-mode") === "false" ? offlineUuid(name) : null);
+    if (!uuid || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(uuid)) return null;
+    for (const rel of [`${level}/playerdata/${uuid.toLowerCase()}.dat`, `${level}/players/data/${uuid.toLowerCase()}.dat`]) {
+      try {
+        const abs = await sb.resolve(rel);
+        const st = await fsp.stat(abs);
+        if (st.isFile() && st.size <= PLAYER_FILE_LIMIT) return { abs, mtime: st.mtimeMs };
+      } catch {
+        /* not there */
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Run one of the catalog's actions (teleport, effect, title, …) on an online player. The commands come from the
+   * catalog with checked values; a line the game answers with an error stops the action and is shown to the user.
+   */
+  async playerDo(row: ServerRow, name: string, actionId: string, params: unknown, actor: Actor): Promise<string> {
+    this.requireGameServer(row);
+    planPlayerAction(actionId, name, params);
+    if (!this.servers.agent.isRunning(row.id)) throw conflict("The server is not running", "Start it to act on players.");
+    const online = this.servers.agent.info(row.id).players.find((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (!online) throw conflict(`${name} is not online`, "These actions need the player in the game.");
+    // The server's spelling of the name, so the commands and the history match what Minecraft knows.
+    const plan = planPlayerAction(actionId, online.name, params);
+    for (const command of plan.commands) {
+      const refused = await this.servers.agent.query(row.id, command, COMMAND_REFUSED, { timeoutMs: 600 });
+      if (refused) throw new AppError(422, "command_failed", refused[0], "Minecraft refused the command. The console has the details; the game version may not support it.");
+    }
+    // The dashboard refetches right away; it must see what the action changed, not the answer cached a moment ago.
+    this.liveEntities.delete(`${row.id}:${online.name.toLowerCase()}`);
+    await this.activity.audit(actor, "player.action", row.id, { name: online.name, action: actionId, params });
+    await this.activity.event(row.id, "player.action", plan.summary, { actor });
+    return plan.summary;
   }
 
   skin(uuid: string) {
@@ -947,6 +1021,9 @@ function mcDate() {
   // Minecraft format: 2024-01-31 12:00:00 +0000
   return new Date().toISOString().replace("T", " ").slice(0, 19) + " +0000";
 }
+
+/** First lines of the game's answer that mean a command did not run. */
+const COMMAND_REFUSED = /^(?:Unknown |Incorrect argument|Expected |No (?:entity|player) was found|That player cannot be found|Invalid |Can't find element|Could not |Cannot |The sound is too far).*/i;
 
 function actionLabel(a: string) {
   return (

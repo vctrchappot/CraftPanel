@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NbtCompound } from "@craftpanel/config";
-import { normalizeAdvancements, normalizeStats, parseAdvancementTime, parseItem, readPlayerState, summarizeActivity } from "../src/services/player-profile";
+import { normalizeAdvancements, normalizeStats, parseAdvancementTime, parseItem, readPlayerInspect, readPlayerState, summarizeActivity } from "../src/services/player-profile";
 
 const H = 3_600_000;
 const D = 24 * H;
@@ -199,5 +199,60 @@ describe("items and player state", () => {
   it("tolerates an almost empty file", () => {
     const s = readPlayerState({});
     expect(s).toMatchObject({ health: null, gameMode: null, dimension: null, pos: null, spawn: null, inventory: [], armor: [null, null, null, null], offhand: null, enderChest: [] });
+  });
+});
+
+describe("readPlayerInspect", () => {
+  it("reads flags, tags, effects and values, from the namespaced and the numeric effect layouts", () => {
+    const i = readPlayerInspect(
+      {
+        abilities: { flying: 1, mayfly: 1, invulnerable: 0, instabuild: 1, mayBuild: 0, walkSpeed: 0.1, flySpeed: 0.05 },
+        Fire: 40,
+        FallFlying: 1,
+        Tags: ["builder", "vip", 5],
+        active_effects: [{ id: "minecraft:speed", amplifier: 1, duration: 200 }, { id: "minecraft:night_vision", amplifier: 0, duration: -1 }],
+        XpTotal: 1395,
+        Air: 300,
+        Rotation: [90, 12.4],
+        Inventory: [{ id: "minecraft:stone", count: 1, Slot: 0 }],
+      },
+      "game",
+      null,
+    );
+    const on = i.flags.filter((f) => f.on).map((f) => f.id);
+    expect(on).toEqual(["flying", "mayfly", "instabuild", "onFire", "gliding"]);
+    expect(i.flags.find((f) => f.id === "mayBuild")?.on).toBe(false);
+    expect(i.tags).toEqual(["builder", "vip"]);
+    expect(i.effects).toEqual([{ id: "minecraft:speed", level: 2, seconds: 10 }, { id: "minecraft:night_vision", level: 1, seconds: null }]);
+    expect(i.values).toEqual(expect.arrayContaining([{ label: "Fire", value: "2.0 s" }, { label: "Total experience", value: "1395" }, { label: "Air", value: "300 / 300" }, { label: "Rotation", value: "90° / 12°" }]));
+    expect(i.source).toBe("game");
+
+    const old = readPlayerInspect({ ActiveEffects: [{ Id: 1, Amplifier: 0, Duration: 100 }] }, "file", 5);
+    expect(old.effects).toEqual([{ id: "effect 1", level: 1, seconds: 5 }]);
+    expect(old.savedAt).toBe(5);
+  });
+
+  it("groups plugin data by namespace and keeps the inventory out of the raw view", () => {
+    const i = readPlayerInspect(
+      {
+        BukkitValues: { "luckperms:meta": "a", "luckperms:rank": 3, "essentials:afk": 1, nonamespace: "x", "long:value": "y".repeat(400) },
+        Inventory: [{ id: "minecraft:stone", count: 1, Slot: 0 }],
+        EnderItems: [],
+        recipeBook: { recipes: [] },
+        Health: 20,
+      },
+      "file",
+      null,
+    );
+    expect(i.plugins.map((g) => [g.namespace, g.entries.length])).toEqual([["essentials", 1], ["long", 1], ["luckperms", 2], ["other", 1]]);
+    expect(i.plugins[1].entries[0].value.length).toBeLessThan(200);
+    const raw = JSON.parse(i.raw) as Record<string, unknown>;
+    expect(Object.keys(raw)).toEqual(["BukkitValues", "Health"]);
+  });
+
+  it("is happy with an almost empty file", () => {
+    const i = readPlayerInspect({}, "file", null);
+    expect(i.flags.filter((f) => f.on)).toEqual([{ id: "mayBuild", label: "May build", on: true }]);
+    expect(i).toMatchObject({ tags: [], effects: [], plugins: [], values: [] });
   });
 });

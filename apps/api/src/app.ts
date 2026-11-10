@@ -20,6 +20,7 @@ import { systemRoutes } from "./routes/system";
 import { wsRoutes } from "./routes/ws";
 import { mapRoutes } from "./routes/maps";
 import { assistantRoutes } from "./routes/assistant";
+import { playerActionRoutes } from "./routes/player-actions";
 import { isHostPeer, isRequestOriginAllowed, isSecureRequest, isTrustedProxy } from "./deployment";
 
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -151,6 +152,7 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
     await wsRoutes(api, ctx);
     await mapRoutes(api, ctx);
     await assistantRoutes(api, ctx);
+    await playerActionRoutes(api, ctx);
     api.get("/api/health", async () => ({ ok: true }));
     api.get("/api/ready", async (_req, reply) => {
       let ready = opts.isReady?.() ?? true;

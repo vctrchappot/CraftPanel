@@ -1,5 +1,5 @@
 import { asList, asNumber, asString, isCompound, type NbtCompound, type NbtValue } from "@craftpanel/config";
-import type { CountEntry, ItemStack, PlayerActivity, PlayerAdvancements, PlayerSession, PlayerState, PlayerStats } from "@craftpanel/shared";
+import type { CountEntry, ItemStack, PlayerActivity, PlayerAdvancements, PlayerInspect, PlayerSession, PlayerState, PlayerStats } from "@craftpanel/shared";
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -308,4 +308,76 @@ export function readPlayerState(nbt: NbtCompound): PlayerState {
     offhand,
     enderChest: itemsOf(nbt.EnderItems).sort((a, b) => a.slot - b.slot),
   };
+}
+
+// ---- inspection -----------------------------------------------------------------------------------
+
+/** Big, rarely useful parts of a player's data; the inventory has its own tab. */
+const RAW_SKIP = new Set(["Inventory", "EnderItems", "recipeBook", "warden_spawn_tracker"]);
+const SHOWN_VALUE_MAX = 160;
+
+const flag = (nbt: NbtCompound, key: string) => asNumber(nbt[key]) === 1;
+const num = (n: number | null, digits = 2) => (n === null ? null : String(Number(n.toFixed(digits))));
+
+/** A plugin-stored value as short text. */
+function shortValue(v: NbtValue): string {
+  const s = typeof v === "string" ? v : JSON.stringify(v);
+  return s.length > SHOWN_VALUE_MAX ? `${s.slice(0, SHOWN_VALUE_MAX)}…` : s;
+}
+
+/** Abilities, scoreboard tags, active effects and plugin data from a player's data (live from the game or from the file). */
+export function readPlayerInspect(nbt: NbtCompound, source: PlayerInspect["source"], savedAt: number | null): PlayerInspect {
+  const abilities: NbtCompound = isCompound(nbt.abilities) ? nbt.abilities : {};
+  const fire = asNumber(nbt.Fire) ?? 0;
+  const flags: PlayerInspect["flags"] = [
+    { id: "flying", label: "Flying", on: flag(abilities, "flying") },
+    { id: "mayfly", label: "May fly", on: flag(abilities, "mayfly") },
+    { id: "invulnerable", label: "Invulnerable", on: flag(abilities, "invulnerable") || flag(nbt, "Invulnerable") },
+    { id: "instabuild", label: "Instant build", on: flag(abilities, "instabuild") },
+    { id: "mayBuild", label: "May build", on: abilities.mayBuild === undefined ? true : flag(abilities, "mayBuild") },
+    { id: "onFire", label: "On fire", on: fire > 0 },
+    { id: "gliding", label: "Gliding", on: flag(nbt, "FallFlying") },
+    { id: "glowing", label: "Glowing", on: flag(nbt, "Glowing") },
+    { id: "noGravity", label: "No gravity", on: flag(nbt, "NoGravity") },
+  ];
+
+  const values: PlayerInspect["values"] = [];
+  const add = (label: string, v: string | null) => v !== null && values.push({ label, value: v });
+  add("Walk speed", num(asNumber(abilities.walkSpeed), 3));
+  add("Fly speed", num(asNumber(abilities.flySpeed), 3));
+  add("Saturation", num(asNumber(nbt.foodSaturationLevel), 1));
+  add("Total experience", asNumber(nbt.XpTotal) === null ? null : String(asNumber(nbt.XpTotal)));
+  add("Air", asNumber(nbt.Air) === null ? null : `${asNumber(nbt.Air)} / 300`);
+  add("Fall distance", num(asNumber(nbt.fall_distance ?? nbt.FallDistance), 1));
+  add("Fire", fire > 0 ? `${(fire / 20).toFixed(1)} s` : null);
+  add("Rotation", Array.isArray(nbt.Rotation) && nbt.Rotation.length === 2 ? `${Math.round(Number(nbt.Rotation[0]))}° / ${Math.round(Number(nbt.Rotation[1]))}°` : null);
+
+  // Scoreboard tags (`/tag`) are the usual way to mark a player for datapacks and command blocks.
+  const tags = asList(nbt.Tags).filter((t): t is string => typeof t === "string");
+
+  // `active_effects` with namespaced ids since 1.20.5, `ActiveEffects` with numeric ids before.
+  const effects = asList(nbt.active_effects ?? nbt.ActiveEffects).flatMap((e) => {
+    if (!isCompound(e)) return [];
+    const raw = e.id ?? e.Id;
+    const id = typeof raw === "string" ? raw : raw !== undefined ? `effect ${raw}` : null;
+    if (!id) return [];
+    const ticks = asNumber(e.duration ?? e.Duration);
+    return [{ id, level: (asNumber(e.amplifier ?? e.Amplifier) ?? 0) + 1, seconds: ticks === null || ticks < 0 ? null : Math.ceil(ticks / 20) }];
+  });
+
+  // Paper keeps what plugins store on the player under BukkitValues, keyed `<plugin>:<key>`.
+  const groups = new Map<string, { key: string; value: string }[]>();
+  const stored: NbtCompound = isCompound(nbt.BukkitValues) ? nbt.BukkitValues : {};
+  for (const [full, value] of Object.entries(stored)) {
+    const at = full.indexOf(":");
+    const ns = at > 0 ? full.slice(0, at) : "other";
+    const list = groups.get(ns) ?? [];
+    list.push({ key: at > 0 ? full.slice(at + 1) : full, value: shortValue(value) });
+    groups.set(ns, list);
+  }
+  const plugins = [...groups].map(([namespace, entries]) => ({ namespace, entries: entries.sort((a, b) => a.key.localeCompare(b.key)) })).sort((a, b) => a.namespace.localeCompare(b.namespace));
+
+  const rest: NbtCompound = {};
+  for (const [k, v] of Object.entries(nbt)) if (!RAW_SKIP.has(k)) rest[k] = v;
+  return { source, savedAt, flags, values, tags, effects, plugins, raw: JSON.stringify(rest, null, 2) };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, Field, Input } from "@craftpanel/ui";
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, Field, Input, cn } from "@craftpanel/ui";
 import { api, API_BASE } from "@/lib/api";
 import { useAction } from "@/lib/queries";
 
@@ -19,6 +19,29 @@ export function usePlayerActions(serverId: string) {
     success: "Done",
     invalidate: [["players", serverId], ["player", serverId]],
   });
+}
+
+/** A pulsing dot and the word "live": the numbers beside it come from the running game. */
+export function LiveTag() {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="relative flex size-2">
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-status-running opacity-60 motion-reduce:animate-none" />
+        <span className="relative inline-flex size-2 rounded-full bg-status-running" />
+      </span>
+      live
+    </span>
+  );
+}
+
+/** One label and value of a `<dl>` list. */
+export function Row({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-2 text-[13px]">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className={cn("min-w-0 text-right", wide && "flex-1")}>{children}</dd>
+    </div>
+  );
 }
 
 export const playerHref = (serverId: string, name: string) => `/server/?id=${serverId}&tab=players&player=${encodeURIComponent(name)}`;
