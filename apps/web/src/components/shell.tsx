@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Command } from "cmdk";
-import { Activity, Archive, Boxes, ChevronsUpDown, LayoutGrid, LogOut, Menu, Monitor, Moon, Plus, Search, Settings, Sun, Server as ServerIcon, KeyRound, X } from "lucide-react";
+import { Activity, Archive, Boxes, ChevronsUpDown, ExternalLink, Globe, LayoutGrid, LogOut, Menu, Monitor, Moon, Plus, Search, Settings, Sun, Server as ServerIcon, KeyRound, X } from "lucide-react";
 import { Button, cn, Dialog, DialogContent, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Kbd, Skeleton } from "@craftpanel/ui";
-import { ROLE_LABELS } from "@craftpanel/shared";
+import { CRAFTPANEL_SITE_URL, ROLE_LABELS } from "@craftpanel/shared";
 import { useAuth, useCan } from "@/lib/auth";
 import { api, setCsrfToken } from "@/lib/api";
 import { RealtimeProvider, useConnectionState } from "@/lib/realtime";
@@ -233,6 +233,13 @@ function UserMenu() {
           <DropdownMenuItem onSelect={() => router.push("/settings/?tab=account")}>
             <KeyRound />
             Account & password
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <a href={CRAFTPANEL_SITE_URL} target="_blank" rel="noreferrer">
+              <Globe />
+              CraftPanel website
+              <ExternalLink className="ml-auto size-3 text-muted-foreground" />
+            </a>
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={async () => {

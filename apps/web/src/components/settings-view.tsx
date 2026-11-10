@@ -22,7 +22,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@craftpanel/ui";
-import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, ROLE_LABELS, type JavaRuntimeInfo } from "@craftpanel/shared";
+import { CRAFTPANEL_AUTHOR, CRAFTPANEL_REPO_URL, CRAFTPANEL_SITE_URL, ROLE_LABELS, type JavaRuntimeInfo } from "@craftpanel/shared";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth, useCan } from "@/lib/auth";
 import { useAction } from "@/lib/queries";
@@ -350,6 +350,13 @@ function About() {
               <a href={CRAFTPANEL_AUTHOR.website} target="_blank" rel="noreferrer" className="underline decoration-border underline-offset-2 hover:decoration-foreground">
                 {CRAFTPANEL_AUTHOR.website.replace(/^https:\/\//, "")}
               </a>
+            </dd>
+            <dt className="text-muted-foreground">Website</dt>
+            <dd>
+              <a href={CRAFTPANEL_SITE_URL} target="_blank" rel="noreferrer" className="underline decoration-border underline-offset-2 hover:decoration-foreground">
+                {CRAFTPANEL_SITE_URL.replace(/^https:\/\/|\/$/g, "")}
+              </a>{" "}
+              · guides and documentation
             </dd>
             <dt className="text-muted-foreground">Project</dt>
             <dd>

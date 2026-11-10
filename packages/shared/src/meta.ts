@@ -5,6 +5,8 @@ import { version } from "../../../package.json";
 export const CRAFTPANEL_VERSION: string = version;
 export const CRAFTPANEL_REPO = "vctrchappot/CraftPanel";
 export const CRAFTPANEL_REPO_URL = `https://github.com/${CRAFTPANEL_REPO}`;
+/** The project's landing page; the user documentation lives under `/docs/`. */
+export const CRAFTPANEL_SITE_URL = "https://craftpanel.vctr.site/";
 
 /** Original author, credited in the dashboard, the README and the in-game info card. */
 export const CRAFTPANEL_AUTHOR = {
