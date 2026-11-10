@@ -1,14 +1,14 @@
-// Rules against a real Paper server: a "freeze when empty" rule that thaws when a player joins, and a "sleep when empty"
+// Rules against a real server (Paper by default): a "freeze when empty" rule that thaws when a player joins, and a "sleep when empty"
 // rule that stops the server, answers the server list on its port and wakes the server when a player tries to join:
-//   node rules.mjs <base> <tools-dir> [mcVersion] [mcPort]
+//   node rules.mjs <base> <tools-dir> [mcVersion] [mcPort] [software]
 // <tools-dir> holds minecraft-protocol and mineflayer. The rules wait a minute and CraftPanel looks every 15 seconds, so
 // this takes about five minutes.
 import path from "node:path";
 import { createRequire } from "node:module";
 import { client } from "./client.mjs";
 
-const [base, toolsDir, mcVersion = "1.21.4", mcPort = "25865"] = process.argv.slice(2);
-if (!base || !toolsDir) throw new Error("usage: rules.mjs <base> <tools-dir> [mcVersion] [mcPort]");
+const [base, toolsDir, mcVersion = "1.21.4", mcPort = "25865", software = "paper"] = process.argv.slice(2);
+if (!base || !toolsDir) throw new Error("usage: rules.mjs <base> <tools-dir> [mcVersion] [mcPort] [software]");
 const req = createRequire(path.join(path.resolve(toolsDir), "package.json"));
 const mc = req("minecraft-protocol");
 const mineflayer = req("mineflayer");
@@ -27,7 +27,7 @@ async function until(what, fn, timeoutMs = 180_000) {
   return false;
 }
 
-const s = await c.create({ name: "rules", software: "paper", mcVersion, port: Number(mcPort) });
+const s = await c.create({ name: "rules", software, mcVersion, port: Number(mcPort) });
 await c.waitInstalled(s.id);
 const rules = `/api/servers/${s.id}/rules`;
 const list = () => c.call("GET", rules);
@@ -39,7 +39,7 @@ ok((await list()).length === 1, "the rule is stored");
 ok(await until("the freeze rule fires", async () => (await list())[0].active), "after a quiet minute the freeze rule is in effect");
 await c.sleep(1500);
 const frozen = await text(s.id);
-ok(/frozen/i.test(frozen), "Paper confirms that the game is frozen");
+ok(/frozen/i.test(frozen), "the game confirms that it is frozen");
 console.log("  " + (frozen.split("\n").filter((l) => /frozen|tick/i.test(l)).pop() ?? ""));
 
 const bot = mineflayer.createBot({ host: "127.0.0.1", port: Number(mcPort), username: "RuleBot", auth: "offline", version: mcVersion });
@@ -62,7 +62,7 @@ ok(await until("the server stops", async () => (await c.server(s.id)).status ===
 ok(await until("the server is asleep", async () => (await list())[0].sleeping, 30_000), "the rule reports the server as asleep");
 const asleep = await ping();
 ok(flatten(asleep.description).includes("Asleep"), `the server list shows it as asleep: ${JSON.stringify(flatten(asleep.description))}`);
-ok(asleep.version.name.includes("Paper") && asleep.players.max > 0, `the server list keeps the version and slots: ${asleep.version.name}, ${asleep.players.max} slots`);
+ok(asleep.version.name.includes(mcVersion) && asleep.players.max > 0, `the server list keeps the version and slots: ${asleep.version.name}, ${asleep.players.max} slots`);
 
 const kicked = await new Promise((resolve) => {
   const client = mc.createClient({ host: "127.0.0.1", port: Number(mcPort), username: "Sleeper", auth: "offline", version: mcVersion });
