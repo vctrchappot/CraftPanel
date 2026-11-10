@@ -497,6 +497,41 @@ if (backupEl) {
   });
 }
 
+// ---- assistant demo -----------------------------------------------------------
+// The conversation arrives row by row; Approve runs the change, Decline leaves things as they are.
+const aiEl = document.querySelector<HTMLElement>("[data-ai]");
+if (aiEl) {
+  const rows = [...aiEl.querySelectorAll<HTMLElement>(".ai-row")];
+  const card = aiEl.querySelector<HTMLElement>("[data-ai-card]")!;
+  const state = aiEl.querySelector<HTMLElement>("[data-ai-state]")!;
+  const out = aiEl.querySelector<HTMLElement>("[data-ai-out]")!;
+  const act = (name: string) => aiEl.querySelector<HTMLButtonElement>(`[data-ai-act="${name}"]`)!;
+  const settle = (next: "done" | "declined" | null) => {
+    card.dataset.state = next ?? "";
+    state.textContent = next === "done" ? "Done · approved by you" : next === "declined" ? "Declined · nothing changed" : "Waiting for your approval";
+    act("approve").hidden = act("decline").hidden = !!next;
+    act("reset").hidden = !next;
+    out.hidden = next !== "done";
+  };
+  act("approve").addEventListener("click", () => settle("done"));
+  act("decline").addEventListener("click", () => settle("declined"));
+  act("reset").addEventListener("click", () => {
+    settle(null);
+    act("approve").focus();
+  });
+  if (reduced) rows.forEach((r) => r.classList.add("is-in"));
+  else
+    onVisible(aiEl, async () => {
+      for (const r of rows) {
+        await wait(r.classList.contains("ai-user") ? 200 : 650);
+        r.classList.add("is-in");
+      }
+    });
+}
+
+const perfEl = document.querySelector<HTMLElement>("[data-perf]");
+if (perfEl) onVisible(perfEl, () => perfEl.classList.add("is-in"));
+
 // ---- closer look ---------------------------------------------------------------
 // Picking a legend number zooms the screenshot onto that spot; picking it again, the button, Esc or a click zooms out.
 const look = document.querySelector<HTMLElement>("[data-look]");

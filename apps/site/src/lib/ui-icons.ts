@@ -1,7 +1,8 @@
 // UI icons for the landing page: 24x24 viewBox, 2-unit pixels, one colour (currentColor).
 // Most are from pixelarticons 2.4.2 (https://github.com/halfmage/pixelarticons, MIT, (c) 2019 Gerrit Halfmann;
-// licence in src/assets/pixelarticons-LICENSE.txt). "seal", "cup" and "mod" are drawn on the same grid and
-// stroke weight because the set has no verified seal, no cup with steam and no puzzle piece.
+// licence in src/assets/pixelarticons-LICENSE.txt). "seal", "cup", "mod", "sparkle" and "chart" are drawn on the
+// same grid and stroke weight because the set has no verified seal, no cup with steam, no puzzle piece, no sparkle
+// and no line chart.
 export const uiIcons = {
   "terminal": "M4 2h16v2H4zm0 18h16v2H4zM2 4h2v16H2zm18 0h2v16h-2zM6 16h2v2H6zm2-2h2v2H8zm-2-2h2v2H6z",
   "archive": "M3 2h18v2H3zm0 5h18v2H3zM1 4h2v3H1zm20 0h2v3h-2zm-2 5h2v11h-2zM3 9h2v11H3zm2 11h14v2H5zm4-9h6v2H9z",
@@ -26,6 +27,8 @@ export const uiIcons = {
   "info": "M6 2h12v2H6zM2 6h2v12H2zm18 0h2v12h-2zM6 20h12v2H6zM4 4h2v2H4zm14 0h2v2h-2zM4 18h2v2H4zm14 0h2v2h-2zM11 6h2v2h-2zm-2 4h4v2H9zm2 2h2v4h-2zm-2 4h6v2H9z",
   "seal": "M6 0h2v2h-2zM8 0h2v2h-2zM10 0h2v2h-2zM12 0h2v2h-2zM14 0h2v2h-2zM16 0h2v2h-2zM2 2h2v2h-2zM4 2h2v2h-2zM18 2h2v2h-2zM20 2h2v2h-2zM2 4h2v2h-2zM20 4h2v2h-2zM0 6h2v2h-2zM22 6h2v2h-2zM0 8h2v2h-2zM22 8h2v2h-2zM0 10h2v2h-2zM16 10h2v2h-2zM22 10h2v2h-2zM0 12h2v2h-2zM6 12h2v2h-2zM14 12h2v2h-2zM22 12h2v2h-2zM0 14h2v2h-2zM8 14h2v2h-2zM12 14h2v2h-2zM22 14h2v2h-2zM0 16h2v2h-2zM10 16h2v2h-2zM22 16h2v2h-2zM2 18h2v2h-2zM20 18h2v2h-2zM2 20h2v2h-2zM4 20h2v2h-2zM18 20h2v2h-2zM20 20h2v2h-2zM6 22h2v2h-2zM8 22h2v2h-2zM10 22h2v2h-2zM12 22h2v2h-2zM14 22h2v2h-2zM16 22h2v2h-2z",
   "cup": "M6 2h2v2h-2zM14 2h2v2h-2zM8 4h2v2h-2zM16 4h2v2h-2zM6 6h2v2h-2zM14 6h2v2h-2zM2 8h2v2h-2zM4 8h2v2h-2zM6 8h2v2h-2zM8 8h2v2h-2zM10 8h2v2h-2zM12 8h2v2h-2zM14 8h2v2h-2zM16 8h2v2h-2zM2 10h2v2h-2zM16 10h2v2h-2zM18 10h2v2h-2zM20 10h2v2h-2zM2 12h2v2h-2zM16 12h2v2h-2zM20 12h2v2h-2zM2 14h2v2h-2zM16 14h2v2h-2zM20 14h2v2h-2zM2 16h2v2h-2zM16 16h2v2h-2zM18 16h2v2h-2zM20 16h2v2h-2zM4 18h2v2h-2zM6 18h2v2h-2zM8 18h2v2h-2zM10 18h2v2h-2zM12 18h2v2h-2zM14 18h2v2h-2zM2 20h2v2h-2zM4 20h2v2h-2zM6 20h2v2h-2zM8 20h2v2h-2zM10 20h2v2h-2zM12 20h2v2h-2zM14 20h2v2h-2zM16 20h2v2h-2zM18 20h2v2h-2zM20 20h2v2h-2z",
-  "mod": "M6 0h2v2h-2zM8 0h2v2h-2zM10 0h2v2h-2zM12 0h2v2h-2zM4 2h2v2h-2zM14 2h2v2h-2zM4 4h2v2h-2zM14 4h2v2h-2zM2 6h2v2h-2zM4 6h2v2h-2zM6 6h2v2h-2zM12 6h2v2h-2zM14 6h2v2h-2zM16 6h2v2h-2zM2 8h2v2h-2zM16 8h2v2h-2zM18 8h2v2h-2zM20 8h2v2h-2zM22 8h2v2h-2zM2 10h2v2h-2zM16 10h2v2h-2zM22 10h2v2h-2zM2 12h2v2h-2zM22 12h2v2h-2zM2 14h2v2h-2zM22 14h2v2h-2zM2 16h2v2h-2zM16 16h2v2h-2zM22 16h2v2h-2zM2 18h2v2h-2zM16 18h2v2h-2zM18 18h2v2h-2zM20 18h2v2h-2zM22 18h2v2h-2zM2 20h2v2h-2zM16 20h2v2h-2zM2 22h2v2h-2zM4 22h2v2h-2zM6 22h2v2h-2zM8 22h2v2h-2zM10 22h2v2h-2zM12 22h2v2h-2zM14 22h2v2h-2zM16 22h2v2h-2z"
+  "mod": "M6 0h2v2h-2zM8 0h2v2h-2zM10 0h2v2h-2zM12 0h2v2h-2zM4 2h2v2h-2zM14 2h2v2h-2zM4 4h2v2h-2zM14 4h2v2h-2zM2 6h2v2h-2zM4 6h2v2h-2zM6 6h2v2h-2zM12 6h2v2h-2zM14 6h2v2h-2zM16 6h2v2h-2zM2 8h2v2h-2zM16 8h2v2h-2zM18 8h2v2h-2zM20 8h2v2h-2zM22 8h2v2h-2zM2 10h2v2h-2zM16 10h2v2h-2zM22 10h2v2h-2zM2 12h2v2h-2zM22 12h2v2h-2zM2 14h2v2h-2zM22 14h2v2h-2zM2 16h2v2h-2zM16 16h2v2h-2zM22 16h2v2h-2zM2 18h2v2h-2zM16 18h2v2h-2zM18 18h2v2h-2zM20 18h2v2h-2zM22 18h2v2h-2zM2 20h2v2h-2zM16 20h2v2h-2zM2 22h2v2h-2zM4 22h2v2h-2zM6 22h2v2h-2zM8 22h2v2h-2zM10 22h2v2h-2zM12 22h2v2h-2zM14 22h2v2h-2zM16 22h2v2h-2z",
+  "sparkle": "M11 2h2v5h-2zM9 7h2v2H9zm4 0h2v2h-2zM7 9h2v2H7zm8 0h2v2h-2zM2 11h5v2H2zm15 0h5v2h-5zM7 13h2v2H7zm8 0h2v2h-2zM9 15h2v2H9zm4 0h2v2h-2zM11 17h2v5h-2zM19 1h2v2h-2zm-2 2h2v2h-2zm4 0h2v2h-2zm-2 2h2v2h-2z",
+  "chart": "M2 2h2v18H2zm0 18h20v2H2zM6 14h2v2H6zm2-2h2v2H8zm2-2h2v2h-2zm2 2h2v2h-2zm2-4h2v4h-2zm2-2h2v2h-2zm2-4h2v4h-2z"
 } as const;
 export type UiIconName = keyof typeof uiIcons;

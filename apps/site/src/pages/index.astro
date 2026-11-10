@@ -207,13 +207,13 @@ const softwareTrust: { icon: UiIconName; title: string; text: string }[] = [
   { icon: "cup", title: "Right Java, automatically", text: "CraftPanel installs the Java version your server needs." },
 ];
 
-const minor: { title: string; icon: UiIconName; text: string }[] = [
-  { title: "Teams and permissions", icon: "users", text: "Owner, Administrator, Operator or Viewer per server, with two-factor sign-in and an audit log." },
-  { title: "Java, handled", icon: "cup", text: "1.8.9 gets Java 8, 1.21.4 gets 21, 26.3 gets 25. Downloaded per server, nothing to install." },
-  { title: "Scheduled tasks", icon: "clock", text: "<code>0 4 * * *</code> restarts with a 60-second warning in chat. Backups, announcements and commands too." },
-  { title: "Crash alerts", icon: "bell", text: "Discord or e-mail when a server crashes, a backup fails or a new release is out." },
-  { title: "Network tools", icon: "signal", text: "Copyable LAN and VPN addresses, port checks, CGNAT detection and DuckDNS." },
-  { title: "Files and worlds", icon: "folder", text: "Edit configs in the browser. Upload a world as a zip, or download one for single player." },
+const minor: { title: string; icon: UiIconName; text: string; chips: string[] }[] = [
+  { title: "Teams and permissions", icon: "users", text: "Roles per server, with two-factor sign-in and an audit log of who did what.", chips: ["owner", "admin", "operator", "viewer"] },
+  { title: "Java, handled", icon: "cup", text: "Every Minecraft version gets the Java it needs, downloaded per server. Nothing to install.", chips: ["1.8.9 → 8", "1.21.4 → 21", "26.3 → 25"] },
+  { title: "Scheduled tasks", icon: "clock", text: "Restarts with a 60-second warning in chat. Backups, announcements and commands too.", chips: ["0 4 * * *", "restart", "backup"] },
+  { title: "Crash alerts", icon: "bell", text: "A message when a server crashes, a backup fails or a new release is out.", chips: ["Discord", "e-mail"] },
+  { title: "Network tools", icon: "signal", text: "Addresses to copy and port checks, so your friends can actually join.", chips: ["LAN", "VPN", "CGNAT check", "DuckDNS"] },
+  { title: "Files and worlds", icon: "folder", text: "Edit configs in the browser. Upload a world as a zip, or download one for single player.", chips: ["server.properties", "world.zip"] },
 ];
 
 const looks = [
@@ -684,13 +684,61 @@ const backups = [
               </div>
             </article>
 
+            <article class="tile tile-ai">
+              <div class="tile-copy">
+                <p class="tile-label mono"><UiIcon name="sparkle" size={24} />ai assistant · optional · your key</p>
+                <h3>Say what you want. Approve what it does.</h3>
+                <p>Ask in plain words. The assistant reads status, players and the console, and every change waits for your OK. Bring a key for Claude or OpenAI, or run a local model.</p>
+              </div>
+              <div class="demo-ai" data-ai>
+                <p class="ai-row ai-user">Whitelist Steve, he joins tonight</p>
+                <p class="ai-row ai-tool mono"><UiIcon name="check" size={12} />List players on survival</p>
+                <p class="ai-row ai-bot">Alex and Sam are online and the whitelist is on. I'll add Steve.</p>
+                <div class="ai-row ai-card" data-ai-card>
+                  <p class="ai-card-title">Add Steve to the whitelist</p>
+                  <div class="ai-card-foot">
+                    <span class="ai-state mono" aria-live="polite" data-ai-state>Waiting for your approval</span>
+                    <button type="button" class="btn btn-small btn-outline" data-ai-act="decline">Decline</button>
+                    <button type="button" class="btn btn-small btn-ink" data-ai-act="approve">Approve</button>
+                    <button type="button" class="btn btn-small btn-outline" data-ai-act="reset" hidden>Ask again</button>
+                  </div>
+                </div>
+                <p class="ai-console mono" data-ai-out hidden>[21:04:12 INFO]: Added Steve to the whitelist</p>
+              </div>
+            </article>
+
+            <article class="tile tile-perf">
+              <div class="tile-copy">
+                <p class="tile-label mono"><UiIcon name="chart" size={24} />performance · insights</p>
+                <h3>Lag, with a reason.</h3>
+                <p>TPS, tick time, CPU and memory over the last hour. When ticks run long, CraftPanel marks the moment and says what would help.</p>
+              </div>
+              <figure class="demo-perf" data-perf>
+                <div class="dpf-head mono"><span>Tick time</span><span><b>18.6</b> ms avg · peak <b class="dpf-bad">71.4</b></span></div>
+                <svg class="dpf-chart" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true">
+                  <line class="dpf-budget" x1="0" y1="40" x2="320" y2="40" />
+                  <path class="dpf-area" d="M0 96 L20 94 L40 95 L60 92 L80 93 L100 90 L120 88 L140 70 L150 30 L160 18 L170 34 L180 62 L200 84 L220 86 L240 72 L250 36 L260 46 L270 78 L290 88 L320 90 L320 120 L0 120 Z" />
+                  <path class="dpf-line" d="M0 96 L20 94 L40 95 L60 92 L80 93 L100 90 L120 88 L140 70 L150 30 L160 18 L170 34 L180 62 L200 84 L220 86 L240 72 L250 36 L260 46 L270 78 L290 88 L320 90" />
+                  <rect class="dpf-mark" x="140" y="0" width="40" height="120" />
+                  <rect class="dpf-mark" x="240" y="0" width="30" height="120" />
+                </svg>
+                <p class="dpf-axis mono" aria-hidden="true"><span>20:00</span><span>50 ms budget</span><span>21:00</span></p>
+                <figcaption class="dpf-insight">
+                  <b>Generating new terrain is likely a big part of the load</b>
+                  <span>Exploring players force the server to generate chunks while it ticks.</span>
+                  <span class="dpf-fix mono">Open pre-generation <UiIcon name="arrow-right" size={12} /></span>
+                </figcaption>
+              </figure>
+            </article>
+
             <article class="tile tile-list">
               <ul class="minor">
                 {
                   minor.map((m) => (
                     <li>
                       <h3 class="minor-title"><UiIcon name={m.icon} size={24} />{m.title}</h3>
-                      <p class="minor-text" set:html={m.text} />
+                      <p class="minor-text">{m.text}</p>
+                      <p class="minor-chips mono">{m.chips.map((c) => <span>{c}</span>)}</p>
                     </li>
                   ))
                 }
