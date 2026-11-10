@@ -36,6 +36,15 @@
   --font-serif: var(--cp-font-serif);
   --type-desc: #5a564d;
   --px: 4px;
+  /* Interface motion is smooth; the block world keeps its stepped motion (see "scroll motion"). */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-press: 120ms;
+  --dur-hover: 180ms;
+  --dur-state: 260ms;
+  --dur-panel: 400ms;
+  --dur-reveal: 600ms;
+  --stagger: 60ms;
   color-scheme: light;
 }
 
@@ -1605,20 +1614,6 @@ p {
 .tile::before {
   content: none;
 }
-/* Tiles and device cards settle in once when they scroll into view (landing.ts adds .motion and .is-in;
-   without JavaScript or with reduced motion they are simply there). */
-.motion .bento .tile,
-.motion .devices .device {
-  opacity: 0;
-  transform: translateY(12px);
-  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
-  transition-delay: calc(var(--i, 0) * 70ms);
-}
-.motion .bento .tile.is-in,
-.motion .devices .device.is-in {
-  opacity: 1;
-  transform: none;
-}
 .tile-console {
   grid-column: span 7;
   grid-row: span 2;
@@ -2683,6 +2678,276 @@ p {
   border-top: 1px solid var(--line);
   font-size: 13px;
   color: var(--muted);
+}
+
+/* ---- scroll motion ----
+   Interface motion (entrance, reveals) eases out smoothly; things made of blocks move in steps. Scroll-linked
+   effects use CSS scroll timelines, so they run without JavaScript in the scroll path; browsers without them
+   show the finished state. landing.ts adds .motion and .is-in for the reveals. Reduced motion stops all of it. */
+
+/* The hero arrives on load in reading order. The headline starts at once, so it is never late. */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-kicker,
+  .hero-lead,
+  .hero .term,
+  .install-help,
+  .hero-facts,
+  .hero-scene,
+  .hero-chip,
+  .hero-host {
+    animation: rise var(--dur-reveal) var(--ease-out) both;
+  }
+  .hero .h-line {
+    display: inline-block;
+    animation: rise-blur 700ms var(--ease-out) both;
+  }
+  .hero .h-line:nth-of-type(1) {
+    animation-delay: 40ms;
+  }
+  .hero .h-line:nth-of-type(2) {
+    animation-delay: 110ms;
+  }
+  .hero .h-line:nth-of-type(3) {
+    animation-delay: 180ms;
+  }
+  .hero-lead {
+    animation-delay: 260ms;
+  }
+  .hero .term {
+    animation-delay: 330ms;
+  }
+  .install-help {
+    animation-delay: 400ms;
+  }
+  .hero-facts {
+    animation-delay: 440ms;
+  }
+  .hero-scene {
+    animation-name: rise-far;
+    animation-duration: 900ms;
+    animation-delay: 120ms;
+  }
+  .hero-chip {
+    animation-delay: 620ms;
+  }
+  .hero-host {
+    animation-delay: 700ms;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes rise-far {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+}
+@keyframes rise-blur {
+  from {
+    opacity: 0;
+    transform: translateY(0.22em);
+    filter: blur(8px);
+  }
+}
+
+/* Hero exploded view: scrolling away pulls the scene apart into the hardware, the data CraftPanel moves and the
+   Minecraft world, and labels name each layer. Scrolling back puts it together again. Layer offsets are in the
+   drawing's own units (about 2 px on a wide screen), so the drawing and its labels scale together. */
+.hero-layers {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hero-layers li {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  white-space: nowrap;
+}
+.hero-layers li::after {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: var(--line-strong);
+}
+.hero-layers .hl-world {
+  top: 17%;
+  color: var(--grass-text);
+}
+.hero-layers .hl-data {
+  top: 57%;
+}
+.hero-layers .hl-board {
+  top: 89%;
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-art {
+      view-timeline: --hero-art block;
+    }
+    .hero-iso {
+      overflow: visible;
+    }
+    .hero-iso .layer,
+    .hero-layers li {
+      animation: explode-board linear both;
+      animation-timeline: --hero-art;
+      animation-range: contain 25% contain 90%;
+    }
+    .hero-iso .layer-data {
+      animation-name: explode-data;
+    }
+    .hero-iso .layer-world {
+      animation-name: explode-world;
+    }
+    .hero-layers li {
+      animation-name: label-in;
+      animation-timing-function: steps(4, end);
+    }
+    /* Stacked layout: the scene sits below the copy, so it comes apart while it crosses the screen. */
+    @media (max-width: 980px) {
+      .hero-iso .layer,
+      .hero-layers li {
+        animation-range: contain 5% contain 75%;
+      }
+    }
+  }
+}
+@media (max-width: 720px) {
+  .hero-layers li::after {
+    width: 14px;
+  }
+  .hero-layers .hl-world {
+    top: 9%;
+  }
+  .hero-layers .hl-board {
+    top: 93%;
+  }
+}
+@keyframes explode-board {
+  to {
+    transform: translateY(12px);
+  }
+}
+@keyframes explode-data {
+  to {
+    transform: translateY(-4px);
+  }
+}
+@keyframes explode-world {
+  to {
+    transform: translateY(-22px);
+  }
+}
+@keyframes label-in {
+  0%,
+  45% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Reveals: section heads, tiles and cards rise once when they come into view, in reading order. */
+.motion [data-reveal] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity var(--dur-reveal) var(--ease-out), transform var(--dur-reveal) var(--ease-out), filter var(--dur-reveal) var(--ease-out);
+  transition-delay: calc(var(--i, 0) * var(--stagger));
+}
+.motion .sec-head h2[data-reveal]:not(.is-in) {
+  filter: blur(6px);
+}
+.motion [data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+/* Rules between sections are laid like blocks: left to right, one step at a time. */
+.motion .px-rule[data-reveal] {
+  opacity: 1;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 720ms steps(16, end);
+}
+.motion .px-rule[data-reveal].is-in {
+  transform: none;
+}
+
+/* Experience bar: the nav's bottom edge fills with reading progress in pixel steps, segmented like Minecraft's.
+   The level chip names the section when you reach a new one. */
+.xp {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  pointer-events: none;
+}
+.xp-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--signal);
+  clip-path: inset(0 calc(100% - var(--xp, 0) * 100%) 0 0);
+  mask: linear-gradient(90deg, #000 calc(100% - 2px), transparent 0) 0 0 / calc(100% / 18) 100% repeat-x;
+  -webkit-mask: linear-gradient(90deg, #000 calc(100% - 2px), transparent 0) 0 0 / calc(100% / 18) 100% repeat-x;
+}
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .xp-fill {
+      animation: xp-fill steps(90, end) both;
+      animation-timeline: scroll(root block);
+    }
+  }
+}
+@keyframes xp-fill {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.xp-level {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: lowercase;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -6px);
+  transition: opacity var(--dur-state) var(--ease-out), transform var(--dur-state) var(--ease-out);
+}
+.xp-level b {
+  color: var(--grass-text);
+  font-weight: 600;
+}
+.xp-level.is-up {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 /* ---- responsive ---- */

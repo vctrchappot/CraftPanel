@@ -346,6 +346,11 @@ const backups = [
           </button>
         </div>
       </div>
+      <!-- Scroll progress as a Minecraft experience bar; the level is the section you are reading. -->
+      <div class="xp" aria-hidden="true">
+        <span class="xp-fill"></span>
+        <span class="xp-level mono" data-xp-level><b></b><span></span></span>
+      </div>
     </header>
 
     <main id="main">
@@ -354,7 +359,7 @@ const backups = [
         <div class="wrap hero-grid">
           <div class="hero-copy">
             <p class="hero-kicker mono"><span class="px-dot" aria-hidden="true"></span><a href={release.url}>{release.tag}</a> · self-hosted Minecraft panel</p>
-            <h1 id="hero-title" class="display">Your server.<br />Your hardware.<br /><span class="mark">No panel fee.</span></h1>
+            <h1 id="hero-title" class="display"><span class="h-line">Your server.</span><br /><span class="h-line">Your hardware.</span><br /><span class="h-line"><span class="mark">No panel fee.</span></span></h1>
             <p class="hero-lead">
               Run Minecraft Java servers on your PC, Raspberry Pi or VPS. Manage them from your browser.
             </p>
@@ -372,6 +377,12 @@ const backups = [
           <div class="hero-art" aria-hidden="false">
             <div class="hero-scene">
               <Iso boxes={heroScene()} label="A Raspberry Pi with a small Minecraft world floating above it" class="iso hero-iso" />
+              <!-- Shown when scrolling pulls the scene apart into its three layers. -->
+              <ul class="hero-layers mono" aria-hidden="true">
+                <li class="hl-world">Minecraft</li>
+                <li class="hl-data">CraftPanel</li>
+                <li class="hl-board">your hardware</li>
+              </ul>
               <div class="hero-chip mono" aria-hidden="true">
                 <span class="chip-row"><span class="dot-run"></span>survival</span>
                 <span class="chip-row muted">Paper 1.21.4</span>

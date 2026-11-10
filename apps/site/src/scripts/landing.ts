@@ -241,6 +241,7 @@ const sceneIo = new IntersectionObserver((entries) => {
 });
 document.querySelectorAll(".iso, .runtime-figure, .pb").forEach((el) => sceneIo.observe(el));
 
+// Section heads, tiles, cards and rules rise once in reading order (styled under "scroll motion" in landing.css).
 if (!reduced) {
   root.classList.add("motion");
   const reveal = new IntersectionObserver((entries) => {
@@ -249,13 +250,63 @@ if (!reduced) {
       e.target.classList.add("is-in");
       reveal.unobserve(e.target);
     }
-  }, { threshold: 0.15 });
-  for (const group of document.querySelectorAll(".bento, .devices")) {
-    [...group.children].forEach((el, i) => {
+  }, { threshold: 0.15, rootMargin: "0px 0px -6% 0px" });
+  const groups: Element[][] = [
+    ...[...document.querySelectorAll(".sec-head")].map((h) => [...h.querySelectorAll(".sec-no, h2, .sec-lead, [role=tablist]")]),
+    ...[...document.querySelectorAll(".bento, .devices")].map((g) => [...g.children]),
+    ...[...document.querySelectorAll(".px-rule")].map((r) => [r]),
+  ];
+  for (const group of groups)
+    group.forEach((el, i) => {
+      (el as HTMLElement).dataset.reveal = "";
       (el as HTMLElement).style.setProperty("--i", String(i));
       reveal.observe(el);
     });
-  }
+}
+
+// ---- experience bar ---------------------------------------------------------------
+// CSS fills the bar from a scroll timeline; without one (or with reduced motion) this sets it in the same steps.
+const xpFill = document.querySelector<HTMLElement>(".xp-fill");
+if (xpFill && (reduced || !CSS.supports("animation-timeline: scroll()"))) {
+  let queued = false;
+  const update = () => {
+    queued = false;
+    const max = root.scrollHeight - innerHeight;
+    xpFill.style.setProperty("--xp", String(max > 0 ? Math.round((scrollY / max) * 90) / 90 : 0));
+  };
+  addEventListener("scroll", () => {
+    if (!queued) (queued = true), requestAnimationFrame(update);
+  }, { passive: true });
+  update();
+}
+// The level is the numbered section crossing the upper half of the screen; reaching a new one shows its name.
+const xpLevel = document.querySelector<HTMLElement>("[data-xp-level]");
+const levels = [...document.querySelectorAll<HTMLElement>(".sec-no")].map((no) => ({
+  section: no.closest("section")!,
+  n: no.querySelector("span")?.textContent ?? "",
+  name: [...no.childNodes].filter((c) => c.nodeType === Node.TEXT_NODE).map((c) => c.textContent).join("").trim(),
+}));
+if (xpLevel && levels.length) {
+  let current: number | null = null; // null until the first check, which only records where the page opened
+  let hide = 0;
+  const pick = () => {
+    const line = innerHeight * 0.45;
+    let next = -1;
+    levels.forEach((l, i) => {
+      if (l.section.getBoundingClientRect().top <= line) next = i;
+    });
+    if (next === current) return;
+    const first = current === null;
+    current = next;
+    if (next < 0 || first) return xpLevel.classList.remove("is-up");
+    xpLevel.querySelector("b")!.textContent = `lvl ${levels[next].n}`;
+    xpLevel.querySelector("span")!.textContent = levels[next].name;
+    xpLevel.classList.add("is-up");
+    clearTimeout(hide);
+    hide = window.setTimeout(() => xpLevel.classList.remove("is-up"), 1600);
+  };
+  const levelIo = new IntersectionObserver(pick, { rootMargin: "-45% 0px -55% 0px" });
+  levels.forEach((l) => levelIo.observe(l.section));
 }
 
 // ---- process band ------------------------------------------------------------------

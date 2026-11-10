@@ -11,6 +11,8 @@ export interface Box {
   /** top, left (+y side) and right (+x side) face colours */
   c: [string, string, string];
   class?: string;
+  /** Consecutive boxes with the same layer share a <g class="layer layer-{name}">, so a whole part of the scene can move. */
+  layer?: string;
 }
 
 interface Props {
@@ -36,6 +38,13 @@ const faces = boxes.map((b) => {
 });
 
 const all = faces.flatMap((f) => [...f.top, ...f.left, ...f.right]);
+// "ghost" boxes only reserve space, so differently tall drawings share one scale and baseline.
+const groups: { layer?: string; faces: typeof faces }[] = [];
+for (const f of faces.filter(({ b }) => !b.class?.split(" ").includes("ghost"))) {
+  const last = groups.at(-1);
+  if (last && last.layer === f.b.layer) last.faces.push(f);
+  else groups.push({ layer: f.b.layer, faces: [f] });
+}
 const minX = Math.min(...all.map((q) => q[0])) - pad;
 const maxX = Math.max(...all.map((q) => q[0])) + pad;
 const minY = Math.min(...all.map((q) => q[1])) - pad;
@@ -50,16 +59,16 @@ const maxY = Math.max(...all.map((q) => q[1])) + pad;
   shape-rendering={outline ? "auto" : "crispEdges"}
 >
   {
-    faces
-      // "ghost" boxes only reserve space, so differently tall drawings share one scale and baseline.
-      .filter(({ b }) => !b.class?.split(" ").includes("ghost"))
-      .map(({ b, top, left, right }) => (
+    groups.map((g) => {
+      const boxes = g.faces.map(({ b, top, left, right }) => (
         <g class={b.class}>
           <polygon points={poly(left)} fill={outline ? undefined : b.c[1]} />
           <polygon points={poly(right)} fill={outline ? undefined : b.c[2]} />
           <polygon points={poly(top)} fill={outline ? undefined : b.c[0]} />
         </g>
-      ))
+      ));
+      return g.layer ? <g class={`layer layer-${g.layer}`}>{boxes}</g> : boxes;
+    })
   }
   <slot />
 </svg>

@@ -28,6 +28,7 @@ const C = {
 // Motion hooks: a box's class names are picked up by landing.css. Classes only describe what moves
 // (a floating island, smoke, a walking player); the scene stays complete and still without CSS.
 const tag = (boxes: Box[], cls: string): Box[] => boxes.map((b) => ({ ...b, class: b.class ? `${cls} ${b.class}` : cls }));
+const inLayer = (boxes: Box[], layer: string): Box[] => boxes.map((b) => ({ ...b, layer }));
 
 /** Three puffs rising from a chimney top at (x, y, z), staggered by the n-th chimney. */
 function smoke(x: number, y: number, z: number, n = 0): Box[] {
@@ -121,7 +122,12 @@ export function heroScene(): Box[] {
   const packets = [0, 1, 2].map((i) => box(1.75 + i * 0.25, 1.8 - i * 0.2, 0.5, 0.16, 0.16, 0.16, C.led, `packet packet-${i}`));
   // The cottage (scale 0.65) has its chimney top at x 2.78–2.96, y 0.88–1.08, z + 2.63.
   const island = tag([...under, ...world.sort(byDepth), ...tree, ...details], "float");
-  return [...piBoard(0, 0), ...packets, ...island, ...tag(smoke(2.77, 0.88, z + 2.63), "float")];
+  // Layers let the hero pull the scene apart on scroll: the hardware, the data CraftPanel moves, the world.
+  return [
+    ...inLayer(piBoard(0, 0), "board"),
+    ...inLayer(packets, "data"),
+    ...inLayer([...island, ...tag(smoke(2.77, 0.88, z + 2.63), "float")], "world"),
+  ];
 }
 
 /** Original voxel shelter: stepped slate roof, timber walls and one warm window. */
