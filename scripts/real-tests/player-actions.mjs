@@ -90,6 +90,9 @@ try {
   await c.sleep(1500);
   let pos = (await profile()).state.pos;
   ok(Math.abs(pos.x - 120.5) < 1.5 && Math.abs(pos.z + 80) < 1.5, `teleported to coordinates: ${pos.x.toFixed(1)} ${pos.y.toFixed(1)} ${pos.z.toFixed(1)}`);
+  // Mid-air in the Nether the bot falls, and a teleport keeps the fall: without this it dies on arriving at the other
+  // player and respawns somewhere else (seen on Vanilla).
+  await c.command(s.id, `effect give ${NAME} minecraft:slow_falling 120`);
   await act("teleport-coords", { x: 0, y: 100, z: 0, dimension: "minecraft:the_nether" });
   await c.sleep(1500);
   // The server's own confirmation is the hard check. Whether the bot stays in a freshly generated Nether is up to
