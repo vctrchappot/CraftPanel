@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, AlertTriangle, CheckCircle2, ChevronDown, Cpu, Gauge, Info, Map as MapIcon, MemoryStick, Pause, Play, RotateCw, Save, SlidersHorizontal, Square, Timer, Users, Zap } from "lucide-react";
-import { Badge, Button, Callout, ChoiceCard, Field, NativeSelect, Panel, Progress, Section, SegmentedControl, Skeleton, Textarea, cn } from "@craftpanel/ui";
+import { Activity, AlertTriangle, Check, CheckCircle2, ChevronDown, Cpu, Download, Gauge, Info, Map as MapIcon, MemoryStick, Pause, Play, RotateCw, Save, SlidersHorizontal, Square, Timer, Users, Zap } from "lucide-react";
+import { Badge, Button, Callout, ChoiceCard, Field, Panel, Progress, Section, SegmentedControl, Skeleton, Textarea, cn } from "@craftpanel/ui";
 import {
   analyzePerformance,
   applyPresetFlags,
@@ -442,6 +442,58 @@ const estimate = (r: number) => {
   return { chunks, size: mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB` };
 };
 
+type StepState = "done" | "current" | "todo";
+
+/** Where pre-generation stands: install Chunky, let the server load it, then generate. */
+function Steps({ steps }: { steps: { label: string; state: StepState }[] }) {
+  return (
+    <ol className="flex items-center gap-2 text-xs" aria-label="Steps to pre-generate the world">
+      {steps.map((st, i) => (
+        <React.Fragment key={st.label}>
+          {i > 0 && <li aria-hidden className={cn("h-px min-w-3 flex-1", steps[i - 1].state === "done" ? "bg-foreground/50" : "bg-border")} />}
+          <li className="flex items-center gap-1.5" aria-current={st.state === "current" ? "step" : undefined}>
+            <span
+              className={cn(
+                "grid size-5 shrink-0 place-items-center rounded-full border text-[11px] font-medium tabular-nums",
+                st.state === "done" && "border-foreground bg-foreground text-background",
+                st.state === "current" && "border-foreground text-foreground",
+                st.state === "todo" && "border-border text-muted-foreground",
+              )}
+            >
+              {st.state === "done" ? <Check className="size-3" aria-label="done" /> : i + 1}
+            </span>
+            <span className={cn(st.state === "todo" ? "text-muted-foreground" : "font-medium text-foreground")}>{st.label}</span>
+          </li>
+        </React.Fragment>
+      ))}
+    </ol>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border bg-background px-3 py-2.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-[15px] font-medium tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+/** "40 s", "6 min" or "1.5 h": rough on purpose, the estimate is only a ballpark. */
+function roughTime(seconds: number): string {
+  if (seconds < 90) return `${Math.max(1, Math.round(seconds))} s`;
+  if (seconds < 5400) return `${Math.round(seconds / 60)} min`;
+  return `${(seconds / 3600).toFixed(1)} h`;
+}
+
+/** "4–13 min": the unit is said once when both ends share it, so the range fits a narrow card. */
+function roughRange(from: number, to: number): string {
+  const a = roughTime(from);
+  const b = roughTime(to);
+  const unit = (t: string) => t.slice(t.indexOf(" "));
+  return unit(a) === unit(b) ? `${a.slice(0, a.indexOf(" "))}–${b}` : `${a}–${b}`;
+}
+
 function Pregeneration({ server: s }: { server: ServerDetail }) {
   const canInstall = useCan("plugins.manage");
   const canControl = useCan("console.command");
@@ -462,52 +514,85 @@ function Pregeneration({ server: s }: { server: ServerDetail }) {
   const d = q.data;
   const est = estimate(radius);
   const task = d?.task;
+  const mods = SOFTWARE_INFO[s.software].addons === "mods";
+  const kind = mods ? "mod" : "plugin";
+  const loaded = !!d?.installed && !!d.running && !d.restartNeeded;
+  const steps: { label: string; state: StepState }[] = [
+    { label: "Install Chunky", state: d?.installed ? "done" : "current" },
+    { label: "Load it", state: loaded ? "done" : d?.installed ? "current" : "todo" },
+    { label: "Generate", state: loaded ? "current" : "todo" },
+  ];
   return (
     <Section title="Pre-generate the world" description="Generate terrain around spawn ahead of time, so exploring players don't cause lag spikes. Takes a while; the server stays playable.">
       {!d ? (
-        <Skeleton className="h-28 rounded-lg" />
+        <Skeleton className="h-40 rounded-lg" />
       ) : !d.supported ? (
         <Callout icon={<Info />} title={`${SOFTWARE_INFO[s.software].label} can't pre-generate`}>
           Pre-generation uses Chunky, which needs Paper, Purpur, Fabric or NeoForge. You can switch in Settings → Software &amp; version; your world is kept.
         </Callout>
-      ) : !d.installed ? (
-        <Panel className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div className="min-w-0 flex-1 text-[13px]">
-            <p className="font-medium">Chunky {SOFTWARE_INFO[s.software].addons === "mods" ? "mod" : "plugin"}</p>
-            <p className="text-muted-foreground">A widely used pre-generator from Modrinth{s.software === "fabric" ? " (with Fabric API)" : ""}. It can be removed in the {SOFTWARE_INFO[s.software].addons === "mods" ? "Mods" : "Plugins"} tab later.</p>
-          </div>
-          {canInstall && (
-            <Button onClick={() => install.mutate()} loading={install.isPending}>
-              Install Chunky
-            </Button>
-          )}
-        </Panel>
-      ) : !d.running ? (
-        <Callout icon={<Info />}>Chunky is installed. Start the server to pre-generate.</Callout>
-      ) : d.restartNeeded ? (
-        <Callout variant="warning" icon={<RotateCw />} title="Restart to load Chunky">
-          <div className="mt-2">
-            <Button size="sm" variant="secondary" onClick={() => life.restart.mutate()} loading={life.restart.isPending}>
-              <RotateCw /> Restart server
-            </Button>
-          </div>
-        </Callout>
       ) : (
-        <Panel className="space-y-4 p-5">
-          {task && (task.state === "running" || task.state === "paused") ? (
-            <div className="space-y-2 text-[13px]">
-              <div className="flex flex-wrap items-center gap-2">
-                <MapIcon className="size-4 text-muted-foreground" />
-                <span className="font-medium">
+        <div className="space-y-5">
+          <Steps steps={steps} />
+          {!d.installed ? (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-background text-muted-foreground">
+                  <MapIcon className="size-5" />
+                </span>
+                <div className="min-w-0 space-y-1 text-[13px]">
+                  <p className="flex flex-wrap items-center gap-2 font-medium">
+                    Chunky <Badge>{kind}</Badge>
+                    <span className="text-xs font-normal text-muted-foreground">from Modrinth</span>
+                  </p>
+                  <p className="text-muted-foreground">A widely used pre-generator{s.software === "fabric" ? ", installed together with Fabric API" : ""}. CraftPanel installs it for you.</p>
+                </div>
+              </div>
+              <ul className="space-y-1.5 text-[13px] text-muted-foreground">
+                {["Terrain around spawn is ready before players arrive", "Pause, resume or cancel at any time", `Remove it later in the ${mods ? "Mods" : "Plugins"} tab`].map((line) => (
+                  <li key={line} className="flex items-start gap-2">
+                    <Check className="mt-0.5 size-3.5 shrink-0 text-foreground" aria-hidden /> {line}
+                  </li>
+                ))}
+              </ul>
+              {canInstall ? (
+                <Button onClick={() => install.mutate()} loading={install.isPending} className="w-full sm:w-auto">
+                  <Download /> Install Chunky
+                </Button>
+              ) : (
+                <p className="text-xs text-muted-foreground">Installing needs the permission to manage {mods ? "mods" : "plugins"}.</p>
+              )}
+            </div>
+          ) : !d.running ? (
+            <div className="space-y-3 text-[13px]">
+              <p className="text-muted-foreground">Chunky is installed. It loads when the server starts, then you can pick how far to generate.</p>
+              {canControl && s.status === "stopped" && (
+                <Button variant="secondary" onClick={() => life.start.mutate()} loading={life.start.isPending}>
+                  <Play /> Start the server
+                </Button>
+              )}
+            </div>
+          ) : d.restartNeeded ? (
+            <Callout variant="warning" icon={<RotateCw />} title="Restart to load Chunky">
+              <div className="mt-2">
+                <Button size="sm" variant="secondary" onClick={() => life.restart.mutate()} loading={life.restart.isPending}>
+                  <RotateCw /> Restart server
+                </Button>
+              </div>
+            </Callout>
+          ) : task && (task.state === "running" || task.state === "paused") ? (
+            <div className="space-y-4 text-[13px]">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-2xl font-medium tabular-nums">{task.percent.toFixed(1)}%</span>
+                <span className="text-muted-foreground">
                   {task.state === "running" ? "Generating" : "Paused"} · {task.world}
                 </span>
-                <span className="ml-auto tabular-nums">{task.percent.toFixed(1)}%</span>
               </div>
               <Progress value={task.percent} />
-              <p className="text-xs text-muted-foreground tabular-nums">
-                {formatNumber(task.chunks)} chunks{task.rate !== null && <> · {task.rate} chunks/s</>}
-                {task.eta && <> · about {task.eta} left</>}
-              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <Stat label="Chunks" value={formatNumber(task.chunks)} />
+                <Stat label="Speed" value={task.rate !== null ? `${task.rate}/s` : "—"} />
+                <Stat label="Left" value={task.eta ? `about ${task.eta}` : "—"} />
+              </div>
               {canControl && (
                 <div className="flex gap-2">
                   {task.state === "running" ? (
@@ -526,29 +611,33 @@ function Pregeneration({ server: s }: { server: ServerDetail }) {
               )}
             </div>
           ) : (
-            <>
+            <div className="space-y-4">
               {task?.state === "finished" && (
                 <p className="flex items-center gap-2 text-[13px]">
                   <Badge variant="success">Done</Badge> {formatNumber(task.chunks)} chunks generated in {task.world}.
                 </p>
               )}
-              <Field label="Radius around spawn" htmlFor="pgr" help={`About ${formatNumber(est.chunks)} chunks and ${est.size} on disk. A Raspberry Pi manages roughly 20–60 chunks per second.`}>
-                <NativeSelect id="pgr" value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="max-w-xs" disabled={!canControl}>
-                  {RADII.map((r) => (
-                    <option key={r} value={r}>
-                      {formatNumber(r)} blocks
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
+              <div className="space-y-2">
+                <p className="text-[13px] font-medium">How far from spawn?</p>
+                <div className="-mx-1 overflow-x-auto px-1 pb-1">
+                  <SegmentedControl aria-label="Radius around spawn in blocks" value={radius} onValueChange={setRadius} options={RADII.map((r) => ({ value: r, label: formatNumber(r), disabled: !canControl }))} />
+                </div>
+                <p className="text-xs text-muted-foreground">Blocks in every direction from the world spawn.</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Stat label="Chunks" value={formatNumber(est.chunks)} />
+                <Stat label="On disk" value={est.size} />
+                <Stat label="Raspberry Pi" value={roughRange(est.chunks / 60, est.chunks / 20)} />
+              </div>
+              <p className="text-xs text-muted-foreground">A Raspberry Pi manages roughly 20–60 chunks per second; a PC is usually faster.</p>
               {canControl && (
-                <Button onClick={() => control.mutate("start")} loading={control.isPending}>
+                <Button onClick={() => control.mutate("start")} loading={control.isPending} className="w-full sm:w-auto">
                   <Play /> Start pre-generation
                 </Button>
               )}
-            </>
+            </div>
           )}
-        </Panel>
+        </div>
       )}
     </Section>
   );
