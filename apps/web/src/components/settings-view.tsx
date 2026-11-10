@@ -51,12 +51,15 @@ export function SettingsView() {
       {/* Nine sections do not fit one row: a side list on wide screens (like a server's Settings tab),
           a swipeable row without a scrollbar on narrow ones. Only the active section is mounted. */}
       <Tabs key={params.get("tab") ?? "account"} defaultValue={params.get("tab") ?? "account"} className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)] lg:gap-8">
-        <TabsList className="flex h-auto min-w-0 justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-0 [scrollbar-width:none] lg:sticky lg:top-6 lg:flex-col lg:items-stretch lg:self-start lg:overflow-visible [&::-webkit-scrollbar]:hidden">
+        <TabsList
+          indicatorClassName="bg-muted shadow-none"
+          className="flex h-auto min-w-0 justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-0 [scrollbar-width:none] lg:sticky lg:top-6 lg:flex-col lg:items-stretch lg:self-start lg:overflow-visible [&::-webkit-scrollbar]:hidden"
+        >
           {sections.map(([value, label]) => (
             <TabsTrigger
               key={value}
               value={value}
-              className="h-auto shrink-0 justify-start px-2.5 py-1.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-muted data-[state=active]:font-medium data-[state=active]:shadow-none"
+              className="h-auto shrink-0 justify-start px-2.5 py-1.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:font-medium data-[state=active]:hover:bg-transparent"
             >
               {label}
             </TabsTrigger>

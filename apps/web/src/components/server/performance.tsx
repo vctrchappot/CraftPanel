@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Cpu, Gauge, Info, Map as MapIcon, Pause, Play, RotateCw, Save, Square, Zap } from "lucide-react";
-import { Badge, Button, Callout, Field, NativeSelect, Panel, Progress, Section, Skeleton, Stat, Textarea, cn } from "@craftpanel/ui";
+import { Badge, Button, Callout, Field, NativeSelect, Panel, Progress, Section, SegmentedControl, Skeleton, Stat, Textarea, cn } from "@craftpanel/ui";
 import {
   analyzePerformance,
   applyPresetFlags,
@@ -130,19 +130,7 @@ export function PerformanceTab({ server: s, stream }: { server: ServerDetail; st
         title="Live"
         description={!running && samples.length ? "The server isn't running; this is its last run." : "Sampled every few seconds while a dashboard is open, kept for about an hour."}
         actions={
-          <div role="group" aria-label="Time range" className="inline-flex rounded-md border border-border p-0.5">
-            {RANGES.map(([label, minutes]) => (
-              <button
-                key={minutes}
-                type="button"
-                aria-pressed={range === minutes}
-                onClick={() => setRange(minutes)}
-                className={cn("whitespace-nowrap rounded px-2.5 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", range === minutes ? "bg-muted font-medium" : "text-muted-foreground hover:text-foreground")}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl aria-label="Time range" value={range} onValueChange={setRange} options={RANGES.map(([label, minutes]) => ({ value: minutes, label }))} />
         }
       >
         <Panel className={cn("grid grid-cols-2 gap-px overflow-hidden bg-border [&>*]:bg-surface", proxy ? "sm:grid-cols-3" : "sm:grid-cols-3 lg:grid-cols-5")}>

@@ -99,4 +99,5 @@ Use semantic tokens for frames, controls and text in both themes. Materials insi
 
 - Use semantic tokens (`--cp-fg`, `bg-surface`, `text-brand-text`), not palette steps, in components.
 - A new colour starts in `tokens.css` with a light and a dark value, then gets a name in `globals.css` / `landing.css` / `docs.css` as needed, then a row in the contrast table here and on the website page.
+- A switch between a few options always glides: use `SegmentedControl` (options side by side) or `Tabs` (swaps a panel) from `@craftpanel/ui`, never a hand-made row of `aria-pressed` buttons with a background that jumps. Both share `SlidingIndicator` (`packages/ui/src/segmented.tsx`), which follows whichever item is marked selected (`data-state="active"`, `aria-pressed`, `aria-checked` or `aria-selected`), skips the first placement and honours reduced motion. Anything new that behaves like a switch uses it too.
 - After visual changes, refresh the website screenshots (`node scripts/site-screenshots.mjs`, see `CLAUDE.md`) and the OG image.

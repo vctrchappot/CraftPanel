@@ -17,13 +17,13 @@ import {
   Input,
   Panel,
   Section,
+  SegmentedControl,
   Skeleton,
   Switch,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-  cn,
 } from "@craftpanel/ui";
 import { findInstalledAddon, SOFTWARE_INFO, softwareLabel, type PluginInfo, type ServerDetail } from "@craftpanel/shared";
 import { api, errorMessage, upload } from "@/lib/api";
@@ -254,19 +254,7 @@ function Browse({ server: s, plugins }: { server: ServerDetail; plugins: PluginI
     >
       <div className="flex flex-wrap items-center gap-3">
         {sources.length > 1 && (
-          <div className="flex rounded-md border border-border p-0.5" role="group" aria-label="Source">
-            {sources.map((id) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={source === id}
-                onClick={() => setSource(id)}
-                className={cn("h-7 rounded px-3 text-[13px] font-medium transition-colors", source === id ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
-              >
-                {SOURCES[id].label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl aria-label="Source" value={source} onValueChange={setSource} options={sources.map((id) => ({ value: id, label: SOURCES[id].label }))} />
         )}
         <div className="relative min-w-0 max-w-md flex-1">
           <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />

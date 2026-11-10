@@ -5,6 +5,7 @@ import { Dialog as DialogPrimitive, DropdownMenu as DM, Tabs as TabsPrimitive } 
 import { X } from "lucide-react";
 import { cn } from "./cn";
 import { Button } from "./primitives";
+import { SlidingIndicator, switchItemClass } from "./segmented";
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
@@ -156,14 +157,21 @@ export function DropdownMenuLabel({ className, ...props }: React.ComponentPropsW
 }
 
 export const Tabs = TabsPrimitive.Root;
-export function TabsList({ className, ...props }: React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>) {
-  return <TabsPrimitive.List className={cn("inline-flex h-9 items-center gap-1 rounded-lg bg-muted p-1 text-muted-foreground", className)} {...props} />;
+/** The selected tab's background is a `SlidingIndicator` that glides between tabs; restyle it with `indicatorClassName`. */
+export function TabsList({ className, children, indicatorClassName, ...props }: React.ComponentPropsWithoutRef<typeof TabsPrimitive.List> & { indicatorClassName?: string }) {
+  return (
+    <TabsPrimitive.List className={cn("relative inline-flex h-9 items-center gap-1 rounded-lg bg-muted p-1 text-muted-foreground", className)} {...props}>
+      <SlidingIndicator className={cn("bg-surface shadow-sm", indicatorClassName)} />
+      {children}
+    </TabsPrimitive.List>
+  );
 }
 export function TabsTrigger({ className, ...props }: React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "inline-flex h-7 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 data-[state=active]:bg-surface data-[state=active]:text-foreground data-[state=active]:shadow-sm [&_svg]:size-3.5",
+        switchItemClass,
+        "inline-flex h-7 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium data-[state=active]:text-foreground [&_svg]:size-3.5",
         className,
       )}
       {...props}
