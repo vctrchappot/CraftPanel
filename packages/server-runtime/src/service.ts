@@ -5,11 +5,13 @@ import { SOFTWARE_INFO, type ServerSoftware } from "@craftpanel/shared";
 import { LocalAgent, type AgentEvents } from "./agent";
 import type { LaunchSpec } from "./managed-server";
 import { runtimeReporter, type RuntimeDiagnosticSink } from "./diagnostics";
+import { asGameAccount, detectIsolation, isolationStatus, killLeftovers, prepareServerDirectory, probeAsGame, protectDataDirectory, shareJavaRuntime, shareServerPath, type GameSlot, type Isolation } from "./isolation";
 import { channel, COMMAND_TTL_MS, RUNTIME_PROTOCOL, runtimePaths, prepareRuntimeEndpoint, type RuntimeSnapshot } from "./protocol";
 
 const EVENTS = ["status", "lines", "players", "metrics", "signal", "exit"] as const;
 type Spec = LaunchSpec & { software: ServerSoftware; autoStart?: boolean };
-interface RecordEntry { spec: Spec; pid: number | null }
+/** `slot` is the game account index on isolated hosts; it stays with the server until it is forgotten. */
+interface RecordEntry { spec: Spec; pid: number | null; slot?: number }
 
 /** Owns processes without opening a TCP listener or accessing the dashboard DB. */
 export class RuntimeService {
@@ -26,8 +28,10 @@ export class RuntimeService {
   private broadcasts = new Set<(event: keyof AgentEvents, args: unknown[]) => void>();
   private report: ReturnType<typeof runtimeReporter>;
   private closePromise: Promise<void> | null = null;
+  private isolation: Isolation = { mode: "shared", reason: "Not detected yet" };
+  private starting = new Set<string>();
 
-  constructor(private dataDir: string, private build = "development", diagnostics?: RuntimeDiagnosticSink) {
+  constructor(private dataDir: string, private build = "development", diagnostics?: RuntimeDiagnosticSink, private detect: () => Promise<Isolation> = detectIsolation) {
     this.paths = runtimePaths(dataDir);
     this.report = runtimeReporter("service", diagnostics);
     // Subscribe before serving; state is sent along with every event, before its consumers run.
@@ -37,7 +41,48 @@ export class RuntimeService {
         this.report("registry-write-failed", error);
         void this.close().catch((shutdownError) => this.report("shutdown-failed", shutdownError));
       });
+      // Anything a plugin forked off must not outlive its server.
+      if (event === "exit" && this.isolation.mode === "isolated") {
+        const slot = this.slotOf(String(args[0]));
+        if (slot) void killLeftovers(slot.uid).catch((error) => this.report("leftover-kill-failed", error));
+      }
     });
+  }
+
+  private slotOf(id: string): GameSlot | null {
+    const index = this.records[id]?.slot;
+    return this.isolation.mode === "isolated" && index !== undefined ? this.isolation.slots.find((s) => s.index === index) ?? null : null;
+  }
+
+  /** Keeps a server on its game account; a new server takes the lowest free one. */
+  private assignSlot(id: string): GameSlot {
+    if (this.isolation.mode !== "isolated") throw new Error("Isolation is not active");
+    const current = this.slotOf(id);
+    if (current) return current;
+    const used = new Set(Object.entries(this.records).filter(([other]) => other !== id).map(([, e]) => e.slot));
+    const free = this.isolation.slots.find((s) => !used.has(s.index));
+    if (!free) throw new Error(`All ${this.isolation.slots.length} game accounts are in use; re-run the installer with more accounts (CRAFTPANEL_GAME_ACCOUNTS)`);
+    this.records[id].slot = free.index;
+    return free;
+  }
+
+  /** Spawns a server, on isolated hosts under its own account with a prepared directory. */
+  private async launch(id: string, spec: Spec) {
+    const isolation = this.isolation;
+    if (isolation.mode !== "isolated") return this.agent.start(id, spec);
+    const slot = this.assignSlot(id);
+    await this.persist();
+    await killLeftovers(slot.uid);
+    // The dashboard may have created servers/ or runtimes/ since boot, or an installer reset the root.
+    await protectDataDirectory(this.dataDir);
+    await prepareServerDirectory(spec.directory, slot, this.dataDir);
+    if (!spec.command) await shareJavaRuntime(spec.javaPath, this.dataDir);
+    const problem = await probeAsGame(isolation.setpriv, slot, spec.directory, spec.command?.file ?? spec.javaPath);
+    if (problem) throw new Error(problem);
+    // Preparation awaited; re-check right before spawning.
+    if (this.closing) throw new Error("The runtime is shutting down");
+    if (this.agent.isRunning(id)) throw new Error("The server is already running");
+    await this.agent.start(id, spec, (file, args) => ({ ...asGameAccount(isolation.setpriv, slot, file, args), label: `as ${slot.name}` }));
   }
 
   snapshot(id: string, history = false): RuntimeSnapshot {
@@ -85,6 +130,12 @@ export class RuntimeService {
       this.server.listen({ path: this.paths.endpoint, readableAll: process.platform === "win32", writableAll: process.platform === "win32" }, () => { this.server.off("error", reject); resolve(); });
     });
     if (process.platform !== "win32") await fs.chmod(this.paths.endpoint, 0o600);
+    this.isolation = await this.detect();
+    if (this.isolation.mode === "isolated") {
+      // Game accounts share files with the dashboard through their group, never through "other".
+      process.umask(0o007);
+      await protectDataDirectory(this.dataDir);
+    }
     try {
       const saved = JSON.parse(await fs.readFile(this.paths.registry, "utf8")) as { protocol: number; servers: Record<string, RecordEntry> };
       if (saved.protocol !== RUNTIME_PROTOCOL || !saved.servers) throw new Error("Incompatible runtime registry; refusing to start servers");
@@ -96,7 +147,10 @@ export class RuntimeService {
           this.agent.setStatus(id, "orphaned", `Runtime lost ownership of PID ${entry.pid}; stop the process before starting again`);
           continue;
         }
-        if (entry.spec.autoStart) await this.agent.start(id, entry.spec);
+        if (entry.spec.autoStart) await this.launch(id, entry.spec).catch((error) => {
+          this.agent.setStatus(id, "error", (error as Error).message);
+          this.report("autostart-failed", error);
+        });
       }
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "ENOENT") { await this.close(); throw err; }
@@ -126,7 +180,7 @@ export class RuntimeService {
         session = crypto.randomUUID();
         for (const id of Object.keys(this.records)) send({ type: "snapshot", snapshot: this.snapshot(id, true) });
         this.broadcasts.add(broadcast);
-        send({ type: "ready", protocol: RUNTIME_PROTOCOL, epoch: this.epoch, session, build: this.build });
+        send({ type: "ready", protocol: RUNTIME_PROTOCOL, epoch: this.epoch, session, build: this.build, isolation: isolationStatus(this.isolation) });
         return;
       }
       // No replay window: a command belongs to exactly this connection and runtime generation.
@@ -150,7 +204,7 @@ export class RuntimeService {
               break;
             case "configure": {
               const spec = validateSpec(m.spec);
-              this.records[id] = { spec, pid: entry?.pid ?? null };
+              this.records[id] = { spec, pid: entry?.pid ?? null, slot: entry?.slot };
               await this.persist();
               break;
             }
@@ -163,9 +217,18 @@ export class RuntimeService {
               // No awaits between the authoritative alive check and spawn.
               if (this.closing || socket.destroyed || (m.deadline as number) < Date.now()) throw new Error("Connection or command expired");
               if (this.agent.isRunning(id)) throw new Error("The server is already running");
-              this.records[id] = { spec, pid: null };
-              await this.agent.start(id, spec);
+              if (this.starting.has(id)) throw new Error("The server is already starting");
+              this.records[id] = { spec, pid: null, slot: entry?.slot };
+              this.starting.add(id);
+              try { await this.launch(id, spec); } finally { this.starting.delete(id); }
               await this.persist();
+              break;
+            }
+            case "share": {
+              if (m.path !== undefined && (typeof m.path !== "string" || m.path.length > 4096)) throw new Error("Invalid path");
+              const slot = this.slotOf(id);
+              // Without an account the dashboard owns every file already.
+              if (entry && slot) await shareServerPath(entry.spec.directory, (m.path as string | undefined) ?? "", slot, this.dataDir);
               break;
             }
             case "stop": result = await this.agent.stop(id, timeout(m.timeoutMs)); break;

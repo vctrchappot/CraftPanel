@@ -38,6 +38,8 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
+# Server files are shared with each server's game account through its group.
+UMask=0007
 
 [Install]
 WantedBy=multi-user.target

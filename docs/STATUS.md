@@ -1,5 +1,12 @@
 # Implementation status
 
+## Per-server accounts on Linux (2026-11-12)
+
+- Every Minecraft server on a Linux service install runs under its own game account (`<service>-game-NN`, created by the installer, 32 by default). The runtime starts Java through `setpriv` without capabilities or supplementary groups, prepares the server directory (game group, setgid `2770`, nothing for others) before each start, keeps "other" access in the data directory to traversal of the paths games need, shares Java's private `0600` files with the dashboard on request (backups, world exports, folder downloads, `EACCES` retries) and kills leftover processes of an account when its server exits. Design: [architecture/runtime.md](architecture/runtime.md#per-server-accounts-linux).
+- ✅ `scripts/real-tests/isolation.mjs` against an isolated installed Ubuntu 24.04/systemd 255 service (WSL 2, util-linux 2.39) with two real Paper 1.21.4 servers: the installer creates the accounts and group memberships; the servers run as two different game accounts with `CapInh/Prm/Eff/Amb = 0`, `NoNewPrivs = 1` and no supplementary groups; the server directory is `2770` with the game group and `latest.log` `660`; as server A's account, reading the database, runtime token, setup token and server B's files, listing the data root, `servers/`, `backups/` and B, and writing into B are all denied; the dashboard reads the log, writes a file A can read, makes a live backup, downloads `level.dat` (written `600` by Minecraft) and exports the world; a background process started as A's account dies when A stops; a restored backup starts under the same account; accounts stay with their servers across a runtime restart. 🧪 5 unit tests (`packages/server-runtime/test/isolation.test.ts`) and an archive test for unreadable files, run on Linux as a normal user.
+- Fixed on the way: an unreadable file during a backup, world export or folder download crashed the dashboard (unhandled stream error in `createZip`); world exports of a running server now pause autosave.
+- 🟡 Not yet run: an upgrade from 1.0.0 with existing servers on a real install (old files are fixed on each server's next start), a server directory outside the data directory, Debian/Raspberry Pi OS. Windows and macOS still run servers under the runtime's account; resource limits are next.
+
 ## Optional AI assistant (2026-11-10)
 
 - Bring-your-own-key assistant in the dashboard (sidebar entry, Ctrl+I) with an owner settings page. Providers: Anthropic through the official SDK (thinking blocks passed back unchanged, server-side refusal fallback on current Claude models), OpenAI and OpenAI-compatible Chat Completions APIs. 19 tools in eight switchable groups (servers, console, players, plugins, backups, automation, server settings, files) call the same services as the routes; each call re-resolves the user's session and checks their per-server permission, and changes wait for approval (all or only risky ones). Conversations are in memory only.
@@ -171,7 +178,7 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 
 ## Known limitations
 
-- No container or user isolation per server (see [security](security/README.md)).
+- Per-server accounts only on Linux service installs; no containers, and no resource limits yet (see [security](security/README.md)).
 - Dashboard over plain HTTP unless you add a reverse proxy or set `CRAFTPANEL_TLS_*`.
 - Orphaned servers (CraftPanel killed hard) can be stopped but not commanded; on Windows that stop is a hard terminate.
 - Game rule detection needs Minecraft 1.13+ and takes up to a minute per version on first use (cached).

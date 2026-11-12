@@ -32,6 +32,16 @@ The dashboard talks to it over a private Unix socket (Linux, macOS) or a Windows
 
 On a host shutdown, the runtime saves and stops every server gracefully. At boot it starts the servers with **Start with CraftPanel** enabled.
 
+## Every server under its own account (Linux)
+
+On a Linux service install, each Minecraft server runs under its own system account (`craftpanel-game-00`, `craftpanel-game-01`, …). A plugin or mod therefore can't read CraftPanel's database (passwords, sessions, API keys), its runtime token, your backups or the files of your other servers, and anything it starts in the background is stopped together with its server. You don't need to do anything: the installer creates 32 accounts, and each server keeps the one it got on its first start.
+
+- Need more than 32 servers? Run the installer again with `CRAFTPANEL_GAME_ACCOUNTS=64` (or more).
+- A server directory outside `/var/lib/craftpanel` needs execute permission for others on every parent folder (`chmod o+x`); the start message says which folder is missing it.
+- To turn it off, add `CRAFTPANEL_ISOLATION=off` to `/etc/craftpanel/craftpanel.env` and restart `craftpanel-runtime`.
+
+On Windows, macOS and when you run CraftPanel by hand, servers still run under CraftPanel's own account.
+
 ## Data directory
 
 Everything CraftPanel manages lives in one folder:

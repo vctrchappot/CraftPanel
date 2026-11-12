@@ -61,6 +61,7 @@ export async function fileRoutes(app: FastifyInstance, ctx: AppContext) {
     if (st.isDirectory()) {
       // Directories are zipped on the fly into a temp file.
       const tmp = path.join(ctx.config.layout.tmp, `dl-${crypto.randomUUID()}.zip`);
+      await ctx.servers.shareFiles(await ctx.servers.row(req.params.id), rel);
       await createZip({ sourceDir: abs, destination: tmp, exclude: (r) => /(^|\/)session\.lock$/.test(r) || PROTECTED.has(r) });
       const size = (await fsp.stat(tmp)).size;
       const stream = fs.createReadStream(tmp);

@@ -107,6 +107,8 @@ export class BackupService {
         const saved = await this.servers.agent.query(serverId, "save-all flush", /^Saved the (game|world)/i, { timeoutMs: 120000, swallow: /^Saving the game|^Saving\.\.\.|^ThreadedAnvilChunkStorage/i });
         if (!saved) throw new Error("The server did not confirm the world save in time");
       }
+      // Saving is off now, so nothing writes new private files while the archive runs.
+      await this.servers.shareFiles(server);
       const result = await createZip({
         sourceDir: server.directory,
         destination: dest,

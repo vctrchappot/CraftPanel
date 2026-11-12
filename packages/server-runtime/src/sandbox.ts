@@ -14,7 +14,17 @@ const MAX_TEXT_BYTES = 5 * 1024 * 1024;
 export class ServerSandbox {
   private rootReal: string | null = null;
 
-  constructor(public readonly root: string) {}
+  /**
+   * `onDenied` asks the runtime to share a file the game account created privately
+   * (Java writes temp files as 0600); reads are retried once afterwards.
+   */
+  constructor(public readonly root: string, private onDenied?: (rel: string) => Promise<void>) {}
+
+  private async readable(rel: string, abs: string) {
+    if (!this.onDenied) return;
+    try { await fsp.access(abs, fs.constants.R_OK); }
+    catch (err) { if ((err as NodeJS.ErrnoException).code === "EACCES") await this.onDenied(rel); }
+  }
 
   private async realRoot(): Promise<string> {
     if (!this.rootReal) this.rootReal = await fsp.realpath(this.root);
@@ -80,6 +90,7 @@ export class ServerSandbox {
     const st = await fsp.stat(abs);
     if (!st.isFile()) throw new PathError("Not a file");
     if (st.size > MAX_TEXT_BYTES) throw new PathError("File is too large to edit in the browser (limit 5 MB). Download it instead.");
+    await this.readable(rel, abs);
     const buf = await fsp.readFile(abs);
     if (buf.subarray(0, 8000).includes(0)) throw new PathError("This looks like a binary file. Download it instead.");
     return buf.toString("utf8");
@@ -107,6 +118,7 @@ export class ServerSandbox {
     const abs = await this.resolve(rel);
     const st = await fsp.stat(abs);
     if (!st.isFile()) throw new PathError("Not a file");
+    await this.readable(rel, abs);
     return { stream: fs.createReadStream(abs), size: st.size, name: path.basename(abs) };
   }
 

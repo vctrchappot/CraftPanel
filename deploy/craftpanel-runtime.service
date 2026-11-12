@@ -13,6 +13,11 @@ ExecStart=/usr/bin/node apps/api/dist/runtime.js
 Environment=NODE_ENV=production
 Environment=CRAFTPANEL_DATA_DIR=/var/lib/craftpanel
 EnvironmentFile=-/etc/craftpanel/craftpanel.env
+# Every server runs under its own craftpanel-game-NN account (see deploy/install.sh).
+# Switch accounts via setpriv, which clears these before Java runs; give the game group
+# access to server files; stop processes a server left behind.
+AmbientCapabilities=CAP_SETUID CAP_SETGID CAP_CHOWN CAP_FOWNER CAP_KILL
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_CHOWN CAP_FOWNER CAP_KILL
 KillSignal=SIGTERM
 TimeoutStopSec=120
 KillMode=mixed
@@ -26,9 +31,9 @@ ReadWritePaths=/var/lib/craftpanel
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-RestrictSUIDSGID=true
 LockPersonality=true
-UMask=0077
+# Files are shared with the game account through its group, never with others.
+UMask=0007
 
 [Install]
 WantedBy=multi-user.target

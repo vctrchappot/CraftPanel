@@ -249,7 +249,23 @@ export class ServerService {
   }
 
   sandbox(row: ServerRow) {
-    return new ServerSandbox(row.directory);
+    return new ServerSandbox(row.directory, (rel) => this.shareFiles(row, rel));
+  }
+
+  /** On isolated hosts, has the runtime share files the server's game account wrote privately (Java temp files are 0600). */
+  async shareFiles(row: ServerRow, rel = "") {
+    if (this.agent.connected && this.agent.identity?.isolation?.mode === "isolated") await this.agent.share(row.id, rel);
+  }
+
+  /** Reads a file inside the server directory, sharing it first if the game account wrote it privately. */
+  async readServerFile(row: ServerRow, abs: string): Promise<Buffer> {
+    try {
+      return await fsp.readFile(abs);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EACCES") throw err;
+      await this.shareFiles(row, path.relative(await fsp.realpath(row.directory), abs));
+      return fsp.readFile(abs);
+    }
   }
 
   // ---- creation & installation -------------------------------------------

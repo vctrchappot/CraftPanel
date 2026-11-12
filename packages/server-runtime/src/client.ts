@@ -7,12 +7,13 @@ import type { LaunchSpec } from "./managed-server";
 import { isJavaProcess, isPidAlive } from "./process-info";
 import { runtimeReporter, type RuntimeDiagnosticSink } from "./diagnostics";
 import type { RuntimePathAccess } from "./access";
+import type { IsolationStatus } from "./isolation";
 import { channel, COMMAND_TTL_MS, emptyRuntimeInfo, RUNTIME_PROTOCOL, prepareRuntimeEndpoint, type RuntimeSnapshot } from "./protocol";
 
 /** A dashboard connection, never an owner of Minecraft processes. No command retries. */
 export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeAgent {
   connected = false;
-  identity: { protocol: number; build: string } | null = null;
+  identity: { protocol: number; build: string; isolation?: IsolationStatus } | null = null;
   private socket: Socket | null = null;
   private sendFrame: ((m: object) => boolean) | null = null;
   private epoch = "";
@@ -52,7 +53,7 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
           } else if (m.type === "ready") {
             if (m.protocol !== RUNTIME_PROTOCOL || typeof m.epoch !== "string" || typeof m.session !== "string") { this.report("invalid-handshake"); socket.destroy(); return; }
             this.epoch = m.epoch;
-            this.identity = { protocol: RUNTIME_PROTOCOL, build: typeof m.build === "string" ? m.build : "unknown" };
+            this.identity = { protocol: RUNTIME_PROTOCOL, build: typeof m.build === "string" ? m.build : "unknown", isolation: parseIsolation(m.isolation) };
             this.session = m.session;
             this.sequence = 0;
             this.connected = true;
@@ -134,11 +135,13 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
     });
   }
 
-  async start(id: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }) { await this.call("start", id, { spec }); }
+  // Isolated hosts prepare the server directory first; large modpacks take a while.
+  async start(id: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }) { await this.call("start", id, { spec }, 120_000); }
   async checkPaths(directory: string, javaPath: string) { return await this.call("checkPaths", "", { directory, javaPath }, 15_000) as RuntimePathAccess; }
   async configure(id: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }) { await this.call("configure", id, { spec }); }
   async stop(id: string, timeoutMs = 90_000) { return await this.call("stop", id, { timeoutMs }, timeoutMs + 5000) as boolean; }
   async kill(id: string) { await this.call("kill", id); }
+  async share(id: string, path?: string) { await this.call("share", id, { path }, 120_000); }
   async send(id: string, command: string) { await this.call("send", id, { command }); }
   async query(id: string, command: string, pattern: RegExp, opts: { timeoutMs?: number; swallow?: RegExp } = {}) {
     const result = await this.call("query", id, { command, pattern: { source: pattern.source, flags: pattern.flags }, timeoutMs: opts.timeoutMs,
@@ -181,4 +184,10 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
     this.socket?.destroy();
     this.lost();
   }
+}
+
+function parseIsolation(v: unknown): IsolationStatus | undefined {
+  const i = v as IsolationStatus | null;
+  if (!i || (i.mode !== "isolated" && i.mode !== "shared")) return undefined;
+  return { mode: i.mode, ...(typeof i.reason === "string" ? { reason: i.reason.slice(0, 300) } : {}), ...(Number.isInteger(i.accounts) ? { accounts: i.accounts } : {}) };
 }

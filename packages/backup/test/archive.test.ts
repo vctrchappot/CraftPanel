@@ -74,6 +74,18 @@ describe("createZip / verifyZip / extractZip", () => {
     expect((await fs.stat(path.join(out, "world/region/r.0.0.mca"))).size).toBe(100_000);
   });
 
+  // Isolated game accounts write some files as 0600; an unreadable file must fail the archive, not crash the process.
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)("rejects instead of crashing on an unreadable file", async () => {
+    const src = path.join(tmp, "private");
+    await fs.mkdir(src);
+    await fs.writeFile(path.join(src, "a.txt"), "x".repeat(1000));
+    await fs.writeFile(path.join(src, "level.dat"), "secret", { mode: 0o000 });
+    const dest = path.join(tmp, "private.zip");
+    await expect(createZip({ sourceDir: src, destination: dest })).rejects.toThrow(/EACCES/);
+    await expect(fs.access(dest)).rejects.toThrow();
+    await expect(fs.access(`${dest}.partial`)).rejects.toThrow();
+  });
+
   it("detects tampering via checksum and CRC", async () => {
     const src = path.join(tmp, "src2");
     await fs.mkdir(src);

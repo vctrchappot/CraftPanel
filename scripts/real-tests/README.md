@@ -47,6 +47,16 @@ OpenSSL must be available (`openssl` on Linux/macOS; Git for Windows' `C:/Progra
 
 The test checks setup-token enforcement, Secure cookies, a reverse proxy that rewrites `Host`, public-client access rules, a real authenticated WebSocket upgrade and foreign-origin rejection, built-in TLS, local readiness, `doctor --json`, and rejection of an HTTP browser connection even when the proxy uses TLS to the backend. Instances are stopped through their local control tokens and their temporary data and certificates are removed. With `--browser`, the screenshot remains at `test-results/screens/deployment-proxy.png`.
 
+## Per-server accounts (Linux)
+
+`isolation.mjs` installs a release fixture as an isolated service (root, systemd, a `craftpanel-ops-*` instance with four game accounts), creates two Paper 1.21.4 servers and checks that they run under separate game accounts without capabilities, that a game account cannot read the database, tokens, backups or the other server, that the dashboard still reads, writes, backs up, downloads and exports, that leftover processes die with their server, and that a restored server and a runtime restart keep the accounts. It uninstalls the instance and removes its accounts afterwards; an existing `craftpanel` service is left alone.
+
+```bash
+pnpm build
+node scripts/real-tests/installer-fixtures.mjs test-results/isolation craftpanel-ops-iso   # on Windows from PowerShell (Windows tar)
+sudo node scripts/real-tests/isolation.mjs test-results/isolation craftpanel-ops-iso 19686 [JAVA_PATH]
+```
+
 ## Installer recovery tests
 
 After `pnpm build`, generate controlled release archives. The fixtures deliberately change the SQLite schema and then crash or hang; another has an invalid systemd unit/Windows launcher and one lacks the recovery protocol.

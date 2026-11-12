@@ -266,7 +266,7 @@ export class GameService {
     const json = async (f: { abs: string } | null) => {
       if (!f) return null;
       try {
-        return JSON.parse(await fsp.readFile(f.abs, "utf8")) as unknown;
+        return JSON.parse((await this.servers.readServerFile(row, f.abs)).toString("utf8")) as unknown;
       } catch {
         return null;
       }
@@ -275,7 +275,7 @@ export class GameService {
     let stateSource: PlayerProfile["stateSource"] = null;
     if (dataFile) {
       try {
-        state = readPlayerState(parseNbtFile(await fsp.readFile(dataFile.abs)));
+        state = readPlayerState(parseNbtFile(await this.servers.readServerFile(row, dataFile.abs)));
         stateSource = "file";
       } catch {
         /* a file written mid-save or in a format we don't know: show the rest */
@@ -369,7 +369,7 @@ export class GameService {
     const file = await this.playerDataFile(row, name);
     if (!file) throw notFound("Saved data for this player");
     try {
-      return readPlayerInspect(parseNbtFile(await fsp.readFile(file.abs)), "file", file.mtime);
+      return readPlayerInspect(parseNbtFile(await this.servers.readServerFile(row, file.abs)), "file", file.mtime);
     } catch {
       throw conflict("The player's file could not be read", "Minecraft may be writing it right now. Try again in a moment.");
     }
@@ -591,17 +591,25 @@ export class GameService {
     this.requireGameServer(row);
     const sb = this.servers.sandbox(row);
     if (!(await sb.exists(path.posix.join(name, "level.dat")))) throw notFound("World");
-    if (this.running(row)) {
-      await this.servers.agent.query(row.id, "save-all flush", /^Saved the (game|world)/i, { timeoutMs: 60000, swallow: /^Saving/i });
+    const live = this.running(row);
+    try {
+      if (live) {
+        // Like backups: no autosave while the archive is written, so files stay consistent and readable.
+        await this.servers.agent.query(row.id, "save-off", /Automatic saving is now disabled|Saving is already turned off/i, { timeoutMs: 10000 });
+        await this.servers.agent.query(row.id, "save-all flush", /^Saved the (game|world)/i, { timeoutMs: 60000, swallow: /^Saving/i });
+      }
+      const folders = new Set(this.worldFolders(name));
+      for (const folder of folders) await this.servers.shareFiles(row, folder);
+      const out = path.join(this.config.layout.tmp, `world-${crypto.randomUUID()}.zip`);
+      await createZip({
+        sourceDir: row.directory,
+        destination: out,
+        exclude: (rel) => !folders.has(rel.split("/")[0]) || /(^|\/)session\.lock$/.test(rel),
+      });
+      return out;
+    } finally {
+      if (live && this.servers.agent.isRunning(row.id)) await this.servers.agent.send(row.id, "save-on").catch(() => undefined);
     }
-    const folders = new Set(this.worldFolders(name));
-    const out = path.join(this.config.layout.tmp, `world-${crypto.randomUUID()}.zip`);
-    await createZip({
-      sourceDir: row.directory,
-      destination: out,
-      exclude: (rel) => !folders.has(rel.split("/")[0]) || /(^|\/)session\.lock$/.test(rel),
-    });
-    return out;
   }
 
   /**

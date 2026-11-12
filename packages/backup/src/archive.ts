@@ -67,6 +67,9 @@ export async function createZip(opts: CreateZipOptions): Promise<{ sha256: strin
   const totalBytes = entries.reduce((n, e) => n + e.size, 0);
   const prefix = opts.prefix ? opts.prefix.replace(/\/+$/, "") + "/" : "";
   const zip = new yazl.ZipFile();
+  // yazl does not listen for errors on lazy streams; an unreadable file must fail the archive, not the process.
+  const fail = (err: Error) => (zip.outputStream as unknown as NodeJS.ReadableStream & { destroy(e: Error): void }).destroy(err);
+  zip.on("error", fail);
   let processed = 0;
   let lastEmit = 0;
   const emit = (file?: string, force = false) => {
@@ -94,6 +97,7 @@ export async function createZip(opts: CreateZipOptions): Promise<{ sha256: strin
         },
       });
       rs.on("error", (err) => counter.destroy(err));
+      counter.on("error", fail);
       cb(null, rs.pipe(counter));
     });
   }

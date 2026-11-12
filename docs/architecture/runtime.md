@@ -52,3 +52,44 @@ tokens, command contents or raw exception messages.
 This foundation is tested with actual child processes. Installer integration and
 real Minecraft/player, host-shutdown and failed-update acceptance evidence are tracked
 separately; these tests alone do not complete the phase.
+
+## Per-server accounts (Linux)
+
+On Linux service installs every Minecraft server runs under its own account, so a plugin cannot
+read the panel database, secrets, the runtime token or another server's files. Code:
+`packages/server-runtime/src/isolation.ts`.
+
+- **Accounts.** The installer creates `<service user>-game-00` … `-NN` (default 32,
+  `CRAFTPANEL_GAME_ACCOUNTS`), each with its own group, and adds the service user to every game
+  group. Accounts are never removed: they own files in the server directories. The runtime finds
+  them in `/etc/passwd`, keeps only those whose group it is a member of, and assigns the lowest free
+  one to a server on its first start (`slot` in `servers.json`; it stays until the server is forgotten).
+- **Privileges.** The runtime unit grants `CAP_SETUID CAP_SETGID CAP_CHOWN CAP_FOWNER CAP_KILL` as
+  ambient capabilities and bounding set; `NoNewPrivileges` stays on. Java is started through
+  util-linux `setpriv --reuid --regid --clear-groups --inh-caps=-all`: clearing the inheritable set
+  clears the ambient set, so Java starts with no capabilities and no supplementary groups. The PID
+  stays Java's (setpriv execs). Without accounts, capabilities or `setpriv`, or with
+  `CRAFTPANEL_ISOLATION=off`, the runtime runs servers as itself and says why in its handshake
+  (`isolation` in the `ready` message).
+- **Files.** Before every start the runtime stops leftover processes of the account, then walks the
+  server directory: group = game group, directories `2770` (setgid, so new entries keep the group),
+  files gain group read/write, nothing for others; owners stay, links are never followed.
+  `.craftpanel-map.json` (a password hash) stays private. Both services run with `UMask=0007`, so
+  files either side creates later are shared through the group. The directory must carry the
+  `.craftpanel` marker and must not contain the data or runtime directory.
+- **Private files.** Java writes temp files as `0600` (Minecraft saves `level.dat` and player data
+  that way). The dashboard cannot read those, so it asks the runtime (`share`, a server id and an
+  optional relative path) to add group access: before backups and world exports (with autosave
+  off), before folder downloads, and once after `EACCES` in `ServerSandbox` reads and player
+  profiles. A game could race `share` by swapping an entry for a link (group changes never follow
+  links): `chmod` would then add group bits for a group the game is not in, or remove "other"
+  bits, on a file the runtime can write to, which `ProtectSystem=strict` limits to the data
+  directory. That can break access until the next start re-protects it, but grants nothing.
+- **Data directory.** Game accounts may traverse the data root, `servers/`, `runtimes/` and
+  `runtimes/java/` (`o=x`, no listing); every other top-level entry and every server directory lose
+  all "other" access. Java runtimes CraftPanel downloaded become world-readable. A server directory
+  elsewhere needs `o+x` on its parents; a probe under the game account reports what is missing
+  before Java starts.
+- **Leftovers.** When a server exits, every remaining process of its account is killed.
+
+Resource limits (cgroups) and Windows isolation are tracked in ROADMAP.md.

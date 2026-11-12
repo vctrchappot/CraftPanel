@@ -12,6 +12,7 @@
 #   --archive FILE    CRAFTPANEL_ARCHIVE          install a downloaded craftpanel-vX.Y.Z.tar.gz
 #   --port N          CRAFTPANEL_PORT             dashboard port (default 8080)
 #   --uninstall                                   remove the service and app, keep all data
+#                     CRAFTPANEL_GAME_ACCOUNTS    game accounts to provide, one per server (default 32)
 #
 # Updates can also be started from the dashboard (Settings → Updates): CraftPanel then creates
 # /var/lib/craftpanel/update/requested and the root unit craftpanel-update.path runs this script
@@ -219,9 +220,11 @@ NODE
   step "Installing CraftPanel v$version to $INSTALL_DIR…"
   validate_data_location
   id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --home "$DATA_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
+  ensure_game_accounts
   mkdir -p "$INSTALL_DIR" "$DATA_DIR" "$CONFIG_DIR"
   chown "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
-  chmod 750 "$DATA_DIR"
+  # Keep "other" traversal if the runtime granted it: game accounts reach their servers through it.
+  chmod u=rwx,g=rx,o-rw "$DATA_DIR"
 
   rm -rf "$INSTALL_DIR/apps.new"
   cp -r "$src/apps" "$INSTALL_DIR/apps.new"
@@ -350,6 +353,30 @@ NODE
   prune_recovery_points
 
   print_summary "$version" "$previous"
+}
+
+# Every Minecraft server runs under its own account and group. The runtime service is a
+# member of every game group and switches accounts with setpriv; accounts are never removed,
+# because they own files in the servers' directories.
+ensure_game_accounts() {
+  local count=${CRAFTPANEL_GAME_ACCOUNTS:-32} i name missing=()
+  [[ $count =~ ^[0-9]+$ ]] && ((count >= 1 && count <= 999)) || die "CRAFTPANEL_GAME_ACCOUNTS must be a number from 1 to 999."
+  command -v setpriv >/dev/null || warn "setpriv (util-linux) is missing; game servers will share the CraftPanel account."
+  local groups=" $(id -nG "$SERVICE_USER") "
+  for ((i = 0; i < count; i++)); do
+    printf -v name '%s-game-%02d' "$SERVICE_USER" "$i"
+    if ! id -u "$name" >/dev/null 2>&1; then
+      # A group can outlive its account (userdel keeps groups that still have members).
+      getent group "$name" >/dev/null || groupadd --system "$name" || die "Could not create the game group $name."
+      useradd --system --gid "$name" --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin "$name" ||
+        die "Could not create the game account $name."
+    fi
+    [[ $groups == *" $name "* ]] || missing+=("$name")
+  done
+  if ((${#missing[@]})); then
+    local IFS=,
+    usermod -aG "${missing[*]}" "$SERVICE_USER" || die "Could not add $SERVICE_USER to the game groups."
+  fi
 }
 
 stop_confirmed() {

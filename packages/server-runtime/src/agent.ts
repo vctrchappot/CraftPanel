@@ -1,9 +1,10 @@
 import { EventEmitter } from "node:events";
 import { SOFTWARE_INFO, type ConsoleLine, type OnlinePlayer, type ServerMetrics, type ServerSoftware, type ServerStatus } from "@craftpanel/shared";
-import { ManagedServer, type LaunchSpec } from "./managed-server";
+import { ManagedServer, type LaunchSpec, type LaunchWrapper } from "./managed-server";
 import { createProcessProbe, isJavaProcess, isPidAlive, type ProcessProbe } from "./process-info";
 import { parseMspt, parseTps, type LogSignal } from "./log-parser";
 import { checkRuntimePaths, type RuntimePathAccess } from "./access";
+import type { IsolationStatus } from "./isolation";
 
 export interface AgentEvents {
   connection: [connected: boolean];
@@ -22,13 +23,15 @@ export interface AgentEvents {
  */
 export interface RuntimeAgent extends EventEmitter<AgentEvents> {
   readonly connected: boolean;
-  readonly identity: { protocol: number; build: string } | null;
+  readonly identity: { protocol: number; build: string; isolation?: IsolationStatus } | null;
   owns(serverId: string): boolean;
   checkPaths(directory: string, javaPath: string): Promise<RuntimePathAccess>;
   start(serverId: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }): Promise<void>;
   configure(serverId: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }): Promise<void>;
   stop(serverId: string, timeoutMs?: number): Promise<boolean>;
   kill(serverId: string): Promise<void>;
+  /** Makes files the server's game account wrote privately readable for the dashboard (isolated hosts). */
+  share(serverId: string, path?: string): Promise<void>;
   send(serverId: string, command: string): Promise<void>;
   query(serverId: string, command: string, pattern: RegExp, opts?: { timeoutMs?: number; swallow?: RegExp }): Promise<RegExpExecArray | null>;
   status(serverId: string): ServerStatus;
@@ -82,10 +85,10 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
   owns(id: string) { return this.servers.has(id); }
   checkPaths(directory: string, javaPath: string) { return checkRuntimePaths(directory, javaPath); }
 
-  async start(id: string, spec: LaunchSpec & { software: ServerSoftware }) {
+  async start(id: string, spec: LaunchSpec & { software: ServerSoftware }, wrap?: LaunchWrapper) {
     this.software.set(id, spec.software);
     this.tickSupport.delete(id);
-    this.get(id).start(spec);
+    this.get(id).start(spec, wrap);
   }
   stop(id: string, timeoutMs?: number) {
     return this.get(id).stop(timeoutMs);
@@ -93,6 +96,8 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
   async kill(id: string) {
     this.get(id).kill();
   }
+  /** Embedded servers run as the dashboard's own account. */
+  async share(_id: string, _path?: string) {}
   async send(id: string, command: string) {
     this.get(id).send(command);
   }

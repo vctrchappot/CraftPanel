@@ -20,6 +20,9 @@ export interface LaunchSpec {
   command?: { file: string; args: string[] };
 }
 
+/** Rewrites the final command line, e.g. to run it under a game account. */
+export type LaunchWrapper = (file: string, args: string[]) => { file: string; args: string[]; label?: string };
+
 export interface ManagedServerEvents {
   status: [status: ServerStatus, detail?: string];
   lines: [lines: ConsoleLine[]];
@@ -95,7 +98,7 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
     this.emit("status", status, detail);
   }
 
-  start(spec: LaunchSpec): void {
+  start(spec: LaunchSpec, wrap?: LaunchWrapper): void {
     if (this.isAlive) throw new Error("Server process is already running");
     this.stopRequested = false;
     this.restartRequested = false;
@@ -122,9 +125,10 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
     ];
 
     this.setStatus("starting");
-    this.system(`Starting: ${file} ${args.join(" ")}`);
+    const launch = wrap ? wrap(file, args) : { file, args };
+    this.system(`Starting: ${file} ${args.join(" ")}${launch.label ? ` (${launch.label})` : ""}`);
     // Spawned directly (no shell) so nothing in the arguments is interpreted.
-    const child = spawn(file, args, {
+    const child = spawn(launch.file, launch.args, {
       cwd: spec.directory,
       stdio: "pipe",
       windowsHide: true,
