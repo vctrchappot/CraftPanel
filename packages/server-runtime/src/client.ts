@@ -8,7 +8,7 @@ import { isJavaProcess, isPidAlive } from "./process-info";
 import { runtimeReporter, type RuntimeDiagnosticSink } from "./diagnostics";
 import type { RuntimePathAccess } from "./access";
 import type { IsolationStatus } from "./isolation";
-import type { LimitSupport } from "./cgroups";
+import type { LimitSupport } from "./limiter";
 import { channel, COMMAND_TTL_MS, emptyRuntimeInfo, RUNTIME_PROTOCOL, prepareRuntimeEndpoint, type RuntimeSnapshot } from "./protocol";
 
 /** A dashboard connection, never an owner of Minecraft processes. No command retries. */

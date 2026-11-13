@@ -92,13 +92,17 @@ read the panel database, secrets, the runtime token or another server's files. C
   before Java starts.
 - **Leftovers.** When a server exits, every remaining process of its account is killed.
 
-## Resource limits (Linux)
+## Resource limits
 
 Each server has a memory cap, a CPU limit and a process/thread limit (`servers.limit_*`; `null` is
 the default, `0` off; defaults in `packages/shared/src/limits.ts`: heap + max(1 GB, half the heap),
 no CPU limit, 4,096 tasks). The dashboard sends the effective values with the launch spec and as a
-`limits` call when they change; the runtime applies them through cgroup v2. Code:
-`packages/server-runtime/src/cgroups.ts`.
+`limits` call when they change; the runtime applies them through cgroup v2 on Linux and job objects
+on Windows (`packages/server-runtime/src/limiter.ts` picks one).
+
+### Linux: cgroup v2
+
+Code: `packages/server-runtime/src/cgroups.ts`.
 
 - The runtime unit has `Delegate=memory cpu pids` (and no `ProtectControlGroups`). On start the
   runtime moves itself into `runtime/` in its unit's cgroup and enables the controllers for the
@@ -113,4 +117,27 @@ no CPU limit, 4,096 tasks). The dashboard sends the effective values with the la
   why in its handshake (`limits`); settings are kept and shown as not enforced. A missing
   controller (memory on some Raspberry Pi kernels) is reported and skipped.
 
-Windows limits (job objects) and Windows isolation are tracked in ROADMAP.md.
+### Windows: job objects
+
+Code: `packages/server-runtime/src/windows-jobs.ts`, helper source in `windows-job-helper.ts`.
+
+- Node cannot hold a job handle without a native add-on, so a small C# helper does: the runtime
+  compiles it on the first limited start with the .NET Framework compiler that ships with Windows
+  (`csc.exe`) into `runtime/job-helper-<hash>.exe`, and starts one per running server with the
+  server's PID right after spawning it. The helper creates an unnamed job, sets the limits and
+  assigns the process. The job nests inside the jobs the process is already in (Node's own and the
+  runtime service's), so stopping the runtime still stops everything; it has no kill-on-close, so a
+  dying helper leaves the server running with its limits.
+- Memory is `JobMemoryLimit` (committed memory of all processes in the job): allocations above it
+  fail. Java usually stops with an out-of-memory error, but can also only slow down, so the first
+  hit is written to the console at once (from the job's completion port) and an exit after it is
+  reported as "Memory limit reached". CPU is a hard `CpuRateControl` cap; the process limit is
+  `ActiveProcessLimit` and counts processes only, not threads (the card says "Processes").
+- Changes go to the helper on stdin and apply at once. On exit the runtime sends `kill`
+  (`TerminateJobObject`: leftovers a plugin started die with the server) and closes stdin.
+- Gap: the process runs for a moment (well under a second once the helper is compiled, about two
+  seconds on the very first start) before it is in its job; anything it starts in that moment
+  escapes the limits. Java starts no processes that early.
+- Without `csc.exe` or with `CRAFTPANEL_LIMITS=off` the runtime reports why; settings are kept.
+
+Windows isolation is tracked in ROADMAP.md.

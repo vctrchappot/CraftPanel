@@ -461,6 +461,8 @@ function ResourceLimits({ server: s }: { server: ServerDetail }) {
   const lock = <T extends string>(options: readonly { value: T; label: string }[]) => options.map((o) => ({ ...o, disabled: !canEdit }));
   const running = !["stopped", "crashed", "error"].includes(s.status);
   const support = s.resourceLimits;
+  // Windows job objects count processes; Linux cgroups count threads too.
+  const processesOnly = support.controllers?.includes("processes") ?? false;
   const save = useAction(() => api.patch(`/api/servers/${s.id}`, { limitMemoryMb: memory, limitCpuPercent: cpu, limitProcesses: tasks }), {
     success: running && support.available ? "Limits applied to the running server" : "Limits saved",
     invalidate: [["server", s.id]],
@@ -491,7 +493,7 @@ function ResourceLimits({ server: s }: { server: ServerDetail }) {
             </div>
           ) : null}
           <p className="text-xs leading-relaxed text-muted-foreground">
-            {memory === null ? `${gb(autoMemory)}: the heap plus room for Java itself. Follows the memory setting.` : memory === 0 ? "No cap. Java can take all the machine's memory." : "Above it, the system stops the server; it then shows as crashed with “Memory limit reached”."}
+            {memory === null ? `${gb(autoMemory)}: the heap plus room for Java itself. Follows the memory setting.` : memory === 0 ? "No cap. Java can take all the machine's memory." : "Above it, the server is stopped; it then shows as crashed with “Memory limit reached”."}
           </p>
         </Field>
         <Field label="CPU" htmlFor="lim-cpu" aside={cpu ? <span className="text-[13px] font-medium tabular-nums">{cores(cpu)}</span> : null}>
@@ -502,12 +504,12 @@ function ResourceLimits({ server: s }: { server: ServerDetail }) {
             {cpu ? `At most ${cores(cpu)} of ${hostCores}. Minecraft's main thread uses one core; less than that makes it lag.` : `It may use all ${hostCores} cores when nothing else needs them.`}
           </p>
         </Field>
-        <Field label="Processes and threads" htmlFor="lim-tasks">
+        <Field label={processesOnly ? "Processes" : "Processes and threads"} htmlFor="lim-tasks">
           <SegmentedControl aria-label="Process limit" value={capMode(tasks)} options={lock(CAP_OPTIONS)}
             onValueChange={(m) => setTasks(m === "auto" ? null : m === "off" ? 0 : s.limitProcesses || 4096)} />
           {tasks !== null && tasks > 0 ? <Input id="lim-tasks" type="number" min={128} step={128} value={tasks} disabled={!canEdit} onChange={(e) => setTasks(Number(e.target.value) || 0)} className="w-32 tabular-nums" /> : null}
           <p className="text-xs leading-relaxed text-muted-foreground">
-            {tasks === null ? "4,096: plenty for large modpacks and still stops a plugin that spawns processes without end." : tasks === 0 ? "No limit." : "Java needs a few hundred threads; far fewer and the server fails to start."}
+            {tasks === null ? "4,096: plenty for large modpacks and still stops a plugin that spawns processes without end." : tasks === 0 ? "No limit." : processesOnly ? "Java itself is one process; this host counts processes, not threads." : "Java needs a few hundred threads; far fewer and the server fails to start."}
           </p>
         </Field>
       </div>

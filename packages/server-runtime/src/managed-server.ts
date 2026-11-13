@@ -18,7 +18,7 @@ export interface LaunchSpec {
    * is not a JVM jar (e.g. a future Bedrock adapter) and by tests.
    */
   command?: { file: string; args: string[] };
-  /** OS limits for the whole server (Linux cgroups); absent fields are unlimited. */
+  /** OS limits for the whole server (Linux cgroups, Windows job objects); absent fields are unlimited. */
   limits?: ResourceLimits;
 }
 
@@ -27,7 +27,7 @@ export interface ResourceLimits {
   memoryMb?: number;
   /** CPU time, 100 = one core. */
   cpuPercent?: number;
-  /** Processes and threads together. */
+  /** Processes and threads together on Linux; processes only on Windows. */
   tasks?: number;
 }
 

@@ -6,7 +6,7 @@ import { LocalAgent, type AgentEvents } from "./agent";
 import type { LaunchHooks, LaunchSpec, ResourceLimits } from "./managed-server";
 import { runtimeReporter, type RuntimeDiagnosticSink } from "./diagnostics";
 import { asGameAccount, detectIsolation, isolationStatus, killLeftovers, prepareServerDirectory, probeAsGame, protectDataDirectory, shareJavaRuntime, shareServerPath, type GameSlot, type Isolation } from "./isolation";
-import { Cgroups } from "./cgroups";
+import { detectLimiter, unavailableLimiter, type Limiter } from "./limiter";
 import { channel, COMMAND_TTL_MS, RUNTIME_PROTOCOL, runtimePaths, prepareRuntimeEndpoint, type RuntimeSnapshot } from "./protocol";
 
 const EVENTS = ["status", "lines", "players", "metrics", "signal", "exit"] as const;
@@ -31,10 +31,10 @@ export class RuntimeService {
   private closePromise: Promise<void> | null = null;
   private isolation: Isolation = { mode: "shared", reason: "Not detected yet" };
   private starting = new Set<string>();
-  private cgroups = Cgroups.unavailable("Not detected yet");
+  private limiter = unavailableLimiter("Not detected yet");
 
   constructor(private dataDir: string, private build = "development", diagnostics?: RuntimeDiagnosticSink, private detect: () => Promise<Isolation> = detectIsolation,
-    private detectLimits: () => Promise<Cgroups> = () => Cgroups.detect()) {
+    private detectLimits: () => Promise<Limiter> = () => detectLimiter(runtimePaths(dataDir).directory)) {
     this.paths = runtimePaths(dataDir);
     this.report = runtimeReporter("service", diagnostics);
     // Subscribe before serving; state is sent along with every event, before its consumers run.
@@ -73,14 +73,14 @@ export class RuntimeService {
   private limitHooks(id: string, spec: Spec): LaunchHooks | undefined {
     const limits = spec.limits;
     if (!limits || !(limits.memoryMb || limits.cpuPercent || limits.tasks)) return undefined;
-    if (!this.cgroups.support.available) {
-      this.agent.systemLine(id, `Resource limits are not applied: ${this.cgroups.support.reason}`, "WARN");
+    if (!this.limiter.support.available) {
+      this.agent.systemLine(id, `Resource limits are not applied: ${this.limiter.support.reason}`, "WARN");
       return undefined;
     }
-    return this.cgroups.hooks(id, () => this.records[id]?.spec.limits ?? limits, (error) => {
+    return this.limiter.hooks(id, () => this.records[id]?.spec.limits ?? limits, (error) => {
       this.report("limits-failed", error);
       this.agent.systemLine(id, `Resource limits could not be applied: ${error.message}`, "WARN");
-    });
+    }, (message) => this.agent.systemLine(id, message, "WARN"));
   }
 
   private async launch(id: string, spec: Spec) {
@@ -147,7 +147,7 @@ export class RuntimeService {
     });
     if (process.platform !== "win32") await fs.chmod(this.paths.endpoint, 0o600);
     this.isolation = await this.detect();
-    this.cgroups = await this.detectLimits();
+    this.limiter = await this.detectLimits();
     if (this.isolation.mode === "isolated") {
       // Game accounts share files with the dashboard through their group, never through "other".
       process.umask(0o007);
@@ -197,7 +197,7 @@ export class RuntimeService {
         session = crypto.randomUUID();
         for (const id of Object.keys(this.records)) send({ type: "snapshot", snapshot: this.snapshot(id, true) });
         this.broadcasts.add(broadcast);
-        send({ type: "ready", protocol: RUNTIME_PROTOCOL, epoch: this.epoch, session, build: this.build, isolation: isolationStatus(this.isolation), limits: this.cgroups.support });
+        send({ type: "ready", protocol: RUNTIME_PROTOCOL, epoch: this.epoch, session, build: this.build, isolation: isolationStatus(this.isolation), limits: this.limiter.support });
         return;
       }
       // No replay window: a command belongs to exactly this connection and runtime generation.
@@ -253,7 +253,7 @@ export class RuntimeService {
               if (!entry) throw new Error("Unknown server");
               entry.spec.limits = limits;
               await this.persist();
-              if (this.agent.isRunning(id)) this.cgroups.update(id, limits);
+              if (this.agent.isRunning(id)) this.limiter.update(id, limits);
               break;
             }
             case "stop": result = await this.agent.stop(id, timeout(m.timeoutMs)); break;

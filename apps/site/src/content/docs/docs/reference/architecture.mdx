@@ -42,15 +42,15 @@ On a Linux service install, each Minecraft server runs under its own system acco
 
 On Windows, macOS and when you run CraftPanel by hand, servers still run under CraftPanel's own account.
 
-## Resource limits (Linux)
+## Resource limits
 
-Under **Performance → Resource limits** each server has a memory cap, a CPU limit and a limit on processes and threads, enforced by Linux itself:
+Under **Performance → Resource limits** each server has a memory cap, a CPU limit and a limit on processes and threads, enforced by the system (Linux service installs and Windows):
 
-- **Memory cap** (Automatic by default): the server's memory plus at least 1 GB for Java itself. If the server goes beyond it, Linux stops it and the server shows as crashed with "Memory limit reached". The cap never spills into swap, which would only make the game crawl.
+- **Memory cap** (Automatic by default): the server's memory plus at least 1 GB for Java itself. If the server goes beyond it, it is stopped and shows as crashed with "Memory limit reached". On Linux the cap never spills into swap, which would only make the game crawl. On Windows, Java can also keep running but slow down; the console says when the server reached its cap.
 - **CPU** (Unlimited by default): at most this many cores. Minecraft's main thread needs a whole core; much less makes it lag.
-- **Processes and threads** (4,096 by default): enough for large modpacks, and it stops a plugin that starts processes without end.
+- **Processes and threads** (4,096 by default): enough for large modpacks, and it stops a plugin that starts processes without end. Windows counts processes only.
 
-Changes apply to a running server at once. On a Raspberry Pi whose kernel has no memory controller, add `cgroup_enable=memory` to `/boot/firmware/cmdline.txt` and reboot; the card tells you when this is the case. `CRAFTPANEL_LIMITS=off` in `/etc/craftpanel/craftpanel.env` turns limits off.
+Changes apply to a running server at once. On a Raspberry Pi whose kernel has no memory controller, add `cgroup_enable=memory` to `/boot/firmware/cmdline.txt` and reboot; the card tells you when this is the case. `CRAFTPANEL_LIMITS=off` in `/etc/craftpanel/craftpanel.env` (Linux) or `config.env` in the install folder (Windows) turns limits off. On Windows, CraftPanel builds a small helper for this with the C# compiler that is part of Windows the first time a limited server starts.
 
 ## Data directory
 

@@ -10,3 +10,5 @@ export * from "./client";
 export * from "./service";
 export * from "./isolation";
 export * from "./cgroups";
+export * from "./limiter";
+export * from "./windows-jobs";

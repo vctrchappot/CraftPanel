@@ -5,7 +5,7 @@ import { createProcessProbe, isJavaProcess, isPidAlive, type ProcessProbe } from
 import { parseMspt, parseTps, type LogSignal } from "./log-parser";
 import { checkRuntimePaths, type RuntimePathAccess } from "./access";
 import type { IsolationStatus } from "./isolation";
-import type { LimitSupport } from "./cgroups";
+import type { LimitSupport } from "./limiter";
 import type { ResourceLimits } from "./managed-server";
 
 export interface AgentEvents {

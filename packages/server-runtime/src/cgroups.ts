@@ -2,6 +2,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { LaunchHooks, ResourceLimits } from "./managed-server";
+import { memoryLimitReason, type LimitSupport, type Limiter } from "./limiter";
 
 /**
  * Per-server resource limits through a delegated cgroup v2 subtree (`Delegate=yes` on the
@@ -9,18 +10,17 @@ import type { LaunchHooks, ResourceLimits } from "./managed-server";
  * children and puts every server into `server-<id>/` right after spawning it. Limits can be
  * changed while the server runs. https://docs.kernel.org/admin-guide/cgroup-v2.html
  */
-export interface LimitSupport { available: boolean; reason?: string; controllers?: string[] }
 type Controller = "memory" | "cpu" | "pids";
 const WANTED: Controller[] = ["memory", "cpu", "pids"];
 const PERIOD_US = 100_000;
 
-export class Cgroups {
+export class Cgroups implements Limiter {
   private constructor(private root: string | null, readonly support: LimitSupport) {}
 
   static unavailable(reason: string) { return new Cgroups(null, { available: false, reason }); }
 
   static async detect(env: NodeJS.ProcessEnv = process.env): Promise<Cgroups> {
-    if (process.platform !== "linux") return Cgroups.unavailable("Resource limits use Linux cgroups; Windows support is planned");
+    if (process.platform !== "linux") return Cgroups.unavailable("Resource limits need Linux cgroups or Windows job objects");
     if (env.CRAFTPANEL_LIMITS === "off") return Cgroups.unavailable("Disabled by CRAFTPANEL_LIMITS=off");
     const own = /^0::(\/.*)$/m.exec(await fsp.readFile("/proc/self/cgroup", "utf8").catch(() => ""))?.[1];
     if (!own) return Cgroups.unavailable("This host does not use cgroup v2");
@@ -79,7 +79,7 @@ export class Cgroups {
       exitReason: () => {
         try {
           const oom = /^oom_kill (\d+)$/m.exec(fs.readFileSync(path.join(dir, "memory.events"), "utf8"))?.[1];
-          if (oom && Number(oom) > 0) return `Memory limit reached (${current().memoryMb} MB): the system stopped the server. Raise the limit or lower the memory in the Performance tab.`;
+          if (oom && Number(oom) > 0) return memoryLimitReason(current().memoryMb, "the system stopped the server");
         } catch { /* no memory controller */ }
         return null;
       },
