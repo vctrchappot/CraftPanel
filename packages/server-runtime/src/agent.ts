@@ -1,10 +1,12 @@
 import { EventEmitter } from "node:events";
 import { SOFTWARE_INFO, type ConsoleLine, type OnlinePlayer, type ServerMetrics, type ServerSoftware, type ServerStatus } from "@craftpanel/shared";
-import { ManagedServer, type LaunchSpec, type LaunchWrapper } from "./managed-server";
+import { ManagedServer, type LaunchHooks, type LaunchSpec, type LaunchWrapper } from "./managed-server";
 import { createProcessProbe, isJavaProcess, isPidAlive, type ProcessProbe } from "./process-info";
 import { parseMspt, parseTps, type LogSignal } from "./log-parser";
 import { checkRuntimePaths, type RuntimePathAccess } from "./access";
 import type { IsolationStatus } from "./isolation";
+import type { LimitSupport } from "./cgroups";
+import type { ResourceLimits } from "./managed-server";
 
 export interface AgentEvents {
   connection: [connected: boolean];
@@ -23,7 +25,7 @@ export interface AgentEvents {
  */
 export interface RuntimeAgent extends EventEmitter<AgentEvents> {
   readonly connected: boolean;
-  readonly identity: { protocol: number; build: string; isolation?: IsolationStatus } | null;
+  readonly identity: { protocol: number; build: string; isolation?: IsolationStatus; limits?: LimitSupport } | null;
   owns(serverId: string): boolean;
   checkPaths(directory: string, javaPath: string): Promise<RuntimePathAccess>;
   start(serverId: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }): Promise<void>;
@@ -32,6 +34,8 @@ export interface RuntimeAgent extends EventEmitter<AgentEvents> {
   kill(serverId: string): Promise<void>;
   /** Makes files the server's game account wrote privately readable for the dashboard (isolated hosts). */
   share(serverId: string, path?: string): Promise<void>;
+  /** Stores new resource limits and applies them to the running server where the host supports it. */
+  setLimits(serverId: string, limits: ResourceLimits): Promise<void>;
   send(serverId: string, command: string): Promise<void>;
   query(serverId: string, command: string, pattern: RegExp, opts?: { timeoutMs?: number; swallow?: RegExp }): Promise<RegExpExecArray | null>;
   status(serverId: string): ServerStatus;
@@ -85,10 +89,10 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
   owns(id: string) { return this.servers.has(id); }
   checkPaths(directory: string, javaPath: string) { return checkRuntimePaths(directory, javaPath); }
 
-  async start(id: string, spec: LaunchSpec & { software: ServerSoftware }, wrap?: LaunchWrapper) {
+  async start(id: string, spec: LaunchSpec & { software: ServerSoftware }, wrap?: LaunchWrapper, hooks?: LaunchHooks) {
     this.software.set(id, spec.software);
     this.tickSupport.delete(id);
-    this.get(id).start(spec, wrap);
+    this.get(id).start(spec, wrap, hooks);
   }
   stop(id: string, timeoutMs?: number) {
     return this.get(id).stop(timeoutMs);
@@ -98,6 +102,8 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
   }
   /** Embedded servers run as the dashboard's own account. */
   async share(_id: string, _path?: string) {}
+  /** Embedded servers have no resource limits. */
+  async setLimits(_id: string, _limits: ResourceLimits) {}
   async send(id: string, command: string) {
     this.get(id).send(command);
   }

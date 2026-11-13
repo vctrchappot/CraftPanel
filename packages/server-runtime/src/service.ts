@@ -3,9 +3,10 @@ import fs from "node:fs/promises";
 import net, { type Socket } from "node:net";
 import { SOFTWARE_INFO, type ServerSoftware } from "@craftpanel/shared";
 import { LocalAgent, type AgentEvents } from "./agent";
-import type { LaunchSpec } from "./managed-server";
+import type { LaunchHooks, LaunchSpec, ResourceLimits } from "./managed-server";
 import { runtimeReporter, type RuntimeDiagnosticSink } from "./diagnostics";
 import { asGameAccount, detectIsolation, isolationStatus, killLeftovers, prepareServerDirectory, probeAsGame, protectDataDirectory, shareJavaRuntime, shareServerPath, type GameSlot, type Isolation } from "./isolation";
+import { Cgroups } from "./cgroups";
 import { channel, COMMAND_TTL_MS, RUNTIME_PROTOCOL, runtimePaths, prepareRuntimeEndpoint, type RuntimeSnapshot } from "./protocol";
 
 const EVENTS = ["status", "lines", "players", "metrics", "signal", "exit"] as const;
@@ -30,8 +31,10 @@ export class RuntimeService {
   private closePromise: Promise<void> | null = null;
   private isolation: Isolation = { mode: "shared", reason: "Not detected yet" };
   private starting = new Set<string>();
+  private cgroups = Cgroups.unavailable("Not detected yet");
 
-  constructor(private dataDir: string, private build = "development", diagnostics?: RuntimeDiagnosticSink, private detect: () => Promise<Isolation> = detectIsolation) {
+  constructor(private dataDir: string, private build = "development", diagnostics?: RuntimeDiagnosticSink, private detect: () => Promise<Isolation> = detectIsolation,
+    private detectLimits: () => Promise<Cgroups> = () => Cgroups.detect()) {
     this.paths = runtimePaths(dataDir);
     this.report = runtimeReporter("service", diagnostics);
     // Subscribe before serving; state is sent along with every event, before its consumers run.
@@ -67,9 +70,22 @@ export class RuntimeService {
   }
 
   /** Spawns a server, on isolated hosts under its own account with a prepared directory. */
+  private limitHooks(id: string, spec: Spec): LaunchHooks | undefined {
+    const limits = spec.limits;
+    if (!limits || !(limits.memoryMb || limits.cpuPercent || limits.tasks)) return undefined;
+    if (!this.cgroups.support.available) {
+      this.agent.systemLine(id, `Resource limits are not applied: ${this.cgroups.support.reason}`, "WARN");
+      return undefined;
+    }
+    return this.cgroups.hooks(id, () => this.records[id]?.spec.limits ?? limits, (error) => {
+      this.report("limits-failed", error);
+      this.agent.systemLine(id, `Resource limits could not be applied: ${error.message}`, "WARN");
+    });
+  }
+
   private async launch(id: string, spec: Spec) {
     const isolation = this.isolation;
-    if (isolation.mode !== "isolated") return this.agent.start(id, spec);
+    if (isolation.mode !== "isolated") return this.agent.start(id, spec, undefined, this.limitHooks(id, spec));
     const slot = this.assignSlot(id);
     await this.persist();
     await killLeftovers(slot.uid);
@@ -82,7 +98,7 @@ export class RuntimeService {
     // Preparation awaited; re-check right before spawning.
     if (this.closing) throw new Error("The runtime is shutting down");
     if (this.agent.isRunning(id)) throw new Error("The server is already running");
-    await this.agent.start(id, spec, (file, args) => ({ ...asGameAccount(isolation.setpriv, slot, file, args), label: `as ${slot.name}` }));
+    await this.agent.start(id, spec, (file, args) => ({ ...asGameAccount(isolation.setpriv, slot, file, args), label: `as ${slot.name}` }), this.limitHooks(id, spec));
   }
 
   snapshot(id: string, history = false): RuntimeSnapshot {
@@ -131,6 +147,7 @@ export class RuntimeService {
     });
     if (process.platform !== "win32") await fs.chmod(this.paths.endpoint, 0o600);
     this.isolation = await this.detect();
+    this.cgroups = await this.detectLimits();
     if (this.isolation.mode === "isolated") {
       // Game accounts share files with the dashboard through their group, never through "other".
       process.umask(0o007);
@@ -180,7 +197,7 @@ export class RuntimeService {
         session = crypto.randomUUID();
         for (const id of Object.keys(this.records)) send({ type: "snapshot", snapshot: this.snapshot(id, true) });
         this.broadcasts.add(broadcast);
-        send({ type: "ready", protocol: RUNTIME_PROTOCOL, epoch: this.epoch, session, build: this.build, isolation: isolationStatus(this.isolation) });
+        send({ type: "ready", protocol: RUNTIME_PROTOCOL, epoch: this.epoch, session, build: this.build, isolation: isolationStatus(this.isolation), limits: this.cgroups.support });
         return;
       }
       // No replay window: a command belongs to exactly this connection and runtime generation.
@@ -229,6 +246,14 @@ export class RuntimeService {
               const slot = this.slotOf(id);
               // Without an account the dashboard owns every file already.
               if (entry && slot) await shareServerPath(entry.spec.directory, (m.path as string | undefined) ?? "", slot, this.dataDir);
+              break;
+            }
+            case "limits": {
+              const limits = validateLimits(m.limits);
+              if (!entry) throw new Error("Unknown server");
+              entry.spec.limits = limits;
+              await this.persist();
+              if (this.agent.isRunning(id)) this.cgroups.update(id, limits);
               break;
             }
             case "stop": result = await this.agent.stop(id, timeout(m.timeoutMs)); break;
@@ -319,5 +344,12 @@ function validateSpec(v: unknown): Spec {
       (s.programArgs !== undefined && (!Array.isArray(s.programArgs) || !s.programArgs.every((a) => typeof a === "string"))) ||
       (s.command !== undefined && (typeof s.command.file !== "string" || !Array.isArray(s.command.args) || !s.command.args.every((a) => typeof a === "string"))) ||
       (s.autoStart !== undefined && typeof s.autoStart !== "boolean")) throw new Error("Invalid launch specification");
+  if (s.limits !== undefined) s.limits = validateLimits(s.limits);
   return s;
+}
+function validateLimits(v: unknown): ResourceLimits {
+  const l = v as ResourceLimits | null;
+  const ok = (n: unknown, max: number) => n === undefined || (Number.isInteger(n) && (n as number) >= 1 && (n as number) <= max);
+  if (!l || typeof l !== "object" || !ok(l.memoryMb, 4_194_304) || !ok(l.cpuPercent, 102_400) || !ok(l.tasks, 4_194_304)) throw new Error("Invalid resource limits");
+  return { ...(l.memoryMb ? { memoryMb: l.memoryMb } : {}), ...(l.cpuPercent ? { cpuPercent: l.cpuPercent } : {}), ...(l.tasks ? { tasks: l.tasks } : {}) };
 }

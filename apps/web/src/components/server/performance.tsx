@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, AlertTriangle, Check, CheckCircle2, ChevronDown, Cpu, Download, Gauge, Info, Map as MapIcon, MemoryStick, Pause, Play, RotateCw, Save, SlidersHorizontal, Square, Timer, Users, Zap } from "lucide-react";
-import { Badge, Button, Callout, ChoiceCard, Field, Panel, Progress, Section, SegmentedControl, Skeleton, Textarea, cn } from "@craftpanel/ui";
+import { Badge, Button, Callout, ChoiceCard, Field, Input, Panel, Progress, Section, SegmentedControl, Skeleton, Textarea, cn } from "@craftpanel/ui";
 import {
   analyzePerformance,
   applyPresetFlags,
@@ -212,6 +212,7 @@ export function PerformanceTab({ server: s, stream }: { server: ServerDetail; st
               <Panel className="min-w-0 p-5 sm:p-6">{d ? <MemoryAndJvm server={s} fit={d.fit} /> : <Skeleton className="h-64" />}</Panel>
               {!proxy && <Panel id="pregen" className="min-w-0 scroll-mt-6 p-5 sm:p-6"><Pregeneration server={s} /></Panel>}
             </div>
+            <Panel id="limits" className="scroll-mt-6 p-5 sm:p-6"><ResourceLimits server={s} /></Panel>
           </>
         )}
         {!proxy && (
@@ -432,6 +433,91 @@ function MemoryAndJvm({ server: s, fit }: { server: ServerDetail; fit: HostFit }
         <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!dirty}>
           <Save /> Save changes
         </Button>
+      )}
+    </Section>
+  );
+}
+
+type CapMode = "auto" | "custom" | "off";
+const capMode = (v: number | null): CapMode => (v === null ? "auto" : v === 0 ? "off" : "custom");
+const CAP_OPTIONS = [
+  { value: "auto", label: "Automatic" },
+  { value: "custom", label: "Custom" },
+  { value: "off", label: "Off" },
+] as const;
+const cores = (percent: number) => `${(percent / 100).toFixed(percent % 100 === 0 ? 0 : 1)} ${percent === 100 ? "core" : "cores"}`;
+
+/** Caps the system enforces; they apply to a running server at once. */
+function ResourceLimits({ server: s }: { server: ServerDetail }) {
+  const canEdit = useCan("server.configure");
+  const system = useQuery({ queryKey: ["system"], queryFn: () => api.get<{ cpus: number }>("/api/system"), staleTime: 60_000 });
+  const hostCores = system.data?.cpus ?? 4;
+  const [memory, setMemory] = React.useState(s.limitMemoryMb);
+  const [cpu, setCpu] = React.useState(s.limitCpuPercent);
+  const [tasks, setTasks] = React.useState(s.limitProcesses);
+  React.useEffect(() => setMemory(s.limitMemoryMb), [s.limitMemoryMb]);
+  React.useEffect(() => setCpu(s.limitCpuPercent), [s.limitCpuPercent]);
+  React.useEffect(() => setTasks(s.limitProcesses), [s.limitProcesses]);
+  const lock = <T extends string>(options: readonly { value: T; label: string }[]) => options.map((o) => ({ ...o, disabled: !canEdit }));
+  const running = !["stopped", "crashed", "error"].includes(s.status);
+  const support = s.resourceLimits;
+  const save = useAction(() => api.patch(`/api/servers/${s.id}`, { limitMemoryMb: memory, limitCpuPercent: cpu, limitProcesses: tasks }), {
+    success: running && support.available ? "Limits applied to the running server" : "Limits saved",
+    invalidate: [["server", s.id]],
+  });
+  const dirty = memory !== s.limitMemoryMb || cpu !== s.limitCpuPercent || tasks !== s.limitProcesses;
+  const autoMemory = s.memoryMb + Math.max(1024, Math.ceil(s.memoryMb / 2));
+  const minMemory = s.memoryMb + 256;
+  const memoryTooLow = memory !== null && memory > 0 && memory < minMemory;
+  return (
+    <Section
+      title={<span className="flex flex-wrap items-center gap-2">Resource limits {support.available && <Badge variant="outline"><Zap /> Applies at once</Badge>}</span>}
+      description="Caps the system enforces, so one server cannot take memory, CPU or processes from the others or from the machine."
+    >
+      {!support.available && (
+        <Callout icon={<Info />} title="Not enforced on this host">
+          {(support.reason ?? "The runtime cannot apply limits here").replace(/\.?$/, ".")} Settings are kept and apply once the host supports them.
+        </Callout>
+      )}
+      {support.available && support.reason && <Callout icon={<AlertTriangle />} variant="warning">{support.reason}</Callout>}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Field label="Memory cap" htmlFor="lim-mem" error={memoryTooLow ? `At least ${gb(minMemory)}: the ${gb(s.memoryMb)} heap plus room for Java itself.` : null}>
+          <SegmentedControl aria-label="Memory cap" value={capMode(memory)} options={lock(CAP_OPTIONS)}
+            onValueChange={(m) => setMemory(m === "auto" ? null : m === "off" ? 0 : Math.max(minMemory, s.limitMemoryMb || autoMemory))} />
+          {memory !== null && memory > 0 ? (
+            <div className="flex items-center gap-2">
+              <Input id="lim-mem" type="number" min={minMemory} step={256} value={memory} disabled={!canEdit} onChange={(e) => setMemory(Number(e.target.value) || 0)} className="w-32 tabular-nums" />
+              <span className="text-xs text-muted-foreground">MB</span>
+            </div>
+          ) : null}
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {memory === null ? `${gb(autoMemory)}: the heap plus room for Java itself. Follows the memory setting.` : memory === 0 ? "No cap. Java can take all the machine's memory." : "Above it, the system stops the server; it then shows as crashed with “Memory limit reached”."}
+          </p>
+        </Field>
+        <Field label="CPU" htmlFor="lim-cpu" aside={cpu ? <span className="text-[13px] font-medium tabular-nums">{cores(cpu)}</span> : null}>
+          <SegmentedControl aria-label="CPU limit" value={cpu ? "limit" : "none"} options={lock([{ value: "none", label: "Unlimited" }, { value: "limit", label: "Limit" }] as const)}
+            onValueChange={(m) => setCpu(m === "none" ? null : Math.min(hostCores * 100, Math.max(100, Math.round(hostCores / 2) * 100)))} />
+          {cpu ? <input id="lim-cpu" type="range" min={50} max={hostCores * 100} step={50} value={Math.min(cpu, hostCores * 100)} disabled={!canEdit} onChange={(e) => setCpu(Number(e.target.value))} className="w-full accent-[var(--foreground)]" /> : null}
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {cpu ? `At most ${cores(cpu)} of ${hostCores}. Minecraft's main thread uses one core; less than that makes it lag.` : `It may use all ${hostCores} cores when nothing else needs them.`}
+          </p>
+        </Field>
+        <Field label="Processes and threads" htmlFor="lim-tasks">
+          <SegmentedControl aria-label="Process limit" value={capMode(tasks)} options={lock(CAP_OPTIONS)}
+            onValueChange={(m) => setTasks(m === "auto" ? null : m === "off" ? 0 : s.limitProcesses || 4096)} />
+          {tasks !== null && tasks > 0 ? <Input id="lim-tasks" type="number" min={128} step={128} value={tasks} disabled={!canEdit} onChange={(e) => setTasks(Number(e.target.value) || 0)} className="w-32 tabular-nums" /> : null}
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {tasks === null ? "4,096: plenty for large modpacks and still stops a plugin that spawns processes without end." : tasks === 0 ? "No limit." : "Java needs a few hundred threads; far fewer and the server fails to start."}
+          </p>
+        </Field>
+      </div>
+      {canEdit && (
+        <div className="flex items-center gap-3">
+          <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!dirty || memoryTooLow}>
+            <Save /> Save limits
+          </Button>
+          {dirty && <Button variant="ghost" onClick={() => (setMemory(s.limitMemoryMb), setCpu(s.limitCpuPercent), setTasks(s.limitProcesses))}>Discard</Button>}
+        </div>
       )}
     </Section>
   );

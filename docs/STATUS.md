@@ -1,5 +1,11 @@
 # Implementation status
 
+## Resource limits per server on Linux (2026-11-13)
+
+- Memory cap, CPU limit and process/thread limit per server (Performance tab → Resource limits), stored in the database (`limit_*`, `null` = default, `0` = off) and enforced by the runtime through a delegated cgroup v2 subtree (`Delegate=memory cpu pids`): one `server-<id>` cgroup per run with `memory.max` plus `memory.swap.max=0`, `cpu.max` and `pids.max`; changes reach a running server at once; an OOM kill is reported as "Memory limit reached (N MB)"; on exit `cgroup.kill` and removal. Defaults: heap + max(1 GB, half the heap), 4,096 tasks, no CPU limit. Design: [architecture/runtime.md](architecture/runtime.md#resource-limits-linux).
+- ✅ `scripts/real-tests/limits.mjs` against an isolated installed Ubuntu 24.04/systemd 255 service (WSL 2) with a real Paper 1.21.4 server: the runtime reports the memory, cpu and pids controllers and sits in `runtime/`; the server's Java process is in `server-<id>` with `memory.max` 2 GB, `memory.swap.max` 0, `pids.max` 4096 and no CPU limit (1.46 GB and 83 tasks in use); half a core set live throttles chunk generation (`nr_throttled` 43); new memory, CPU and process limits reach the running process without a restart or "restart needed"; a cap below heap + 256 MB is refused; squeezing the cgroup (fault injection as root) stops the server, which shows as crashed with "Memory limit reached (3072 MB)", and the cgroup is removed; the next start gets the stored limits again and stopping removes the cgroup. 🧪 API test for storing, validating and the effective defaults; shared unit test for the defaults. ✅ Chromium: the card in dark 1440 px and light 390 px, the "not enforced" note on Windows, the custom-cap validation; no browser errors.
+- 🟡 Not yet: Windows (job objects), a Raspberry Pi kernel without the memory controller (the card should name `cgroup_enable=memory`), an OOM caused by the game itself rather than by injection.
+
 ## Per-server accounts on Linux (2026-11-12)
 
 - Every Minecraft server on a Linux service install runs under its own game account (`<service>-game-NN`, created by the installer, 32 by default). The runtime starts Java through `setpriv` without capabilities or supplementary groups, prepares the server directory (game group, setgid `2770`, nothing for others) before each start, keeps "other" access in the data directory to traversal of the paths games need, shares Java's private `0600` files with the dashboard on request (backups, world exports, folder downloads, `EACCES` retries) and kills leftover processes of an account when its server exits. Design: [architecture/runtime.md](architecture/runtime.md#per-server-accounts-linux).
@@ -178,7 +184,7 @@ Linux run (WSL 2): `deploy/install-linux.sh` + systemd service, update by re-run
 
 ## Known limitations
 
-- Per-server accounts only on Linux service installs; no containers, and no resource limits yet (see [security](security/README.md)).
+- Per-server accounts and resource limits only on Linux service installs; no containers (see [security](security/README.md)).
 - Dashboard over plain HTTP unless you add a reverse proxy or set `CRAFTPANEL_TLS_*`.
 - Orphaned servers (CraftPanel killed hard) can be stopped but not commanded; on Windows that stop is a hard terminate.
 - Game rule detection needs Minecraft 1.13+ and takes up to a minute per version on first use (cached).

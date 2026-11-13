@@ -65,6 +65,10 @@ export const servers = sqliteTable("servers", {
   javaPath: text("java_path"),
   memoryMb: integer("memory_mb").notNull(),
   jvmArgs: text("jvm_args").notNull().default(""),
+  /** Resource limits (see @craftpanel/shared limits.ts): null = default, 0 = off. */
+  limitMemoryMb: integer("limit_memory_mb"),
+  limitCpuPercent: integer("limit_cpu_percent"),
+  limitProcesses: integer("limit_processes"),
   directory: text("directory").notNull(),
   port: integer("port").notNull(),
   networkMode: text("network_mode", { enum: ["lan", "wan"] }).notNull().default("lan"),

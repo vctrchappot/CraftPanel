@@ -144,6 +144,10 @@ export const updateServerSchema = z.object({
   autoStart: z.boolean().optional(),
   networkMode: z.enum(["lan", "wan"]).optional(),
   infoCommand: z.boolean().nullable().optional(),
+  // null = default (protective caps), 0 = off.
+  limitMemoryMb: z.number().int().refine((n) => n === 0 || (n >= 768 && n <= 4_194_304), "Memory limit: 0 (off) or 768 MB and more").nullable().optional(),
+  limitCpuPercent: z.number().int().min(10).max(102_400).nullable().optional(),
+  limitProcesses: z.number().int().refine((n) => n === 0 || (n >= 128 && n <= 4_194_304), "Process limit: 0 (off) or at least 128").nullable().optional(),
 });
 
 export const commandSchema = z.object({

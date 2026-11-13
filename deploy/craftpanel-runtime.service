@@ -30,7 +30,9 @@ ProtectHome=true
 ReadWritePaths=/var/lib/craftpanel
 ProtectKernelTunables=true
 ProtectKernelModules=true
-ProtectControlGroups=true
+# Per-server resource limits: the runtime manages its own cgroup subtree (runtime/, server-<id>/),
+# so the cgroup filesystem must stay writable for it (no ProtectControlGroups).
+Delegate=memory cpu pids
 LockPersonality=true
 # Files are shared with the game account through its group, never with others.
 UMask=0007

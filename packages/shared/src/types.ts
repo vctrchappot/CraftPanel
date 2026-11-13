@@ -1,3 +1,4 @@
+import type { EffectiveLimits } from "./limits";
 import type { Access, Role, ServerRole, ServerScope } from "./roles";
 import type { ServerSoftware } from "./software";
 import type { AssistantConversationView } from "./assistant";
@@ -96,6 +97,12 @@ export interface ServerDetail extends ServerSummary {
   exitCode: number | null;
   lastError: string | null;
   players: OnlinePlayer[];
+  /** Resource limit settings: null = default, 0 = off (see limits.ts). */
+  limitMemoryMb: number | null;
+  limitCpuPercent: number | null;
+  limitProcesses: number | null;
+  /** What the runtime enforces, and whether this host can. */
+  resourceLimits: { effective: EffectiveLimits; available: boolean; reason?: string; controllers?: string[] };
 }
 
 export interface OnlinePlayer {

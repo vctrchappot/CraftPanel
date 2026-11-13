@@ -8,6 +8,8 @@ import {
   badRequest,
   conflict,
   createServerSchema,
+  effectiveLimits,
+  memoryCapProblem,
   notFound,
   parseRotation,
   PRESET_INFO,
@@ -239,6 +241,10 @@ export class ServerService {
       exitCode: info.lastExitCode ?? row.lastExitCode,
       lastError: info.lastError ?? row.lastError,
       players: info.players,
+      limitMemoryMb: row.limitMemoryMb,
+      limitCpuPercent: row.limitCpuPercent,
+      limitProcesses: row.limitProcesses,
+      resourceLimits: { effective: effectiveLimits(row), ...(this.agent.identity?.limits ?? { available: false, reason: "The runtime did not report resource limit support" }) },
     };
   }
 
@@ -494,7 +500,7 @@ export class ServerService {
     await this.prepareRuntimeAccess(row.directory, javaPath);
     const log4j = this.log4shell(row);
     await this.agent.configure(row.id, { javaPath, directory: row.directory, jarFile: row.jarFile ?? "server.jar", memoryMb: row.memoryMb,
-      jvmArgs: [...(log4j?.jvmArgs ?? []), ...splitArgs(row.jvmArgs)], software: row.software, autoStart: row.autoStart });
+      jvmArgs: [...(log4j?.jvmArgs ?? []), ...splitArgs(row.jvmArgs)], software: row.software, autoStart: row.autoStart, limits: effectiveLimits(row) });
   }
 
   async start(id: string, actor: Actor): Promise<void> {
@@ -551,6 +557,7 @@ export class ServerService {
         jvmArgs: [...(log4j?.jvmArgs ?? []), ...splitArgs(row.jvmArgs)],
         software: row.software,
         autoStart: row.autoStart,
+        limits: effectiveLimits(row),
       });
       await this.activity.event(id, "server.start", `Server starting`, { actor });
       await this.activity.audit(actor, "server.start", id);
@@ -654,8 +661,12 @@ export class ServerService {
     if (this.agent.status(row.id) === "running") await this.agent.send(row.id, infoStorageCommand(details));
   }
 
-  async update(id: string, patch: Partial<Pick<ServerRow, "name" | "description" | "memoryMb" | "jvmArgs" | "javaPath" | "autoStart" | "networkMode" | "bindAddress" | "port" | "infoCommand">>, actor: Actor) {
+  async update(id: string, patch: Partial<Pick<ServerRow, "name" | "description" | "memoryMb" | "jvmArgs" | "javaPath" | "autoStart" | "networkMode" | "bindAddress" | "port" | "infoCommand" | "limitMemoryMb" | "limitCpuPercent" | "limitProcesses">>, actor: Actor) {
     const row = await this.row(id);
+    const merged = { ...row, ...patch };
+    // A default cap follows the heap; only a fixed one can end up too small.
+    const capProblem = memoryCapProblem(merged.memoryMb, merged.limitMemoryMb);
+    if (capProblem) throw badRequest(capProblem, "Raise the memory limit, choose Automatic, or lower the server's memory.");
     if (patch.port !== undefined && patch.port !== row.port) {
       const others = (await this.rows()).filter((s) => s.id !== id);
       if (others.some((s) => s.port === patch.port)) throw conflict(`Port ${patch.port} is used by another CraftPanel server`);
@@ -674,6 +685,11 @@ export class ServerService {
     await this.db.update(servers).set({ ...patch, updatedAt: Date.now() }).where(eq(servers.id, id));
     const runtimeKeys: (keyof typeof patch)[] = ["memoryMb", "jvmArgs", "javaPath", "port", "bindAddress"];
     if (this.agent.isRunning(id) && runtimeKeys.some((k) => patch[k] !== undefined && patch[k] !== row[k])) this.restartRequired.add(id);
+    // Limits apply to a running server at once (the heap only on restart, but a default cap follows it then).
+    const limitKeys: (keyof typeof patch)[] = ["limitMemoryMb", "limitCpuPercent", "limitProcesses"];
+    if (this.agent.isRunning(id) && limitKeys.some((k) => patch[k] !== undefined && patch[k] !== row[k])) {
+      await this.agent.setLimits(id, effectiveLimits({ ...merged, memoryMb: row.memoryMb }));
+    }
     if (patch.port !== undefined || patch.bindAddress !== undefined) await this.syncManagedProperties(await this.row(id));
     await this.activity.audit(actor, "server.update", id, patch as Record<string, unknown>);
     return this.row(id);

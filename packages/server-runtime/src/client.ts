@@ -3,17 +3,18 @@ import fs from "node:fs/promises";
 import net, { type Socket } from "node:net";
 import { AppError, type ConsoleLine, type ServerSoftware, type ServerStatus } from "@craftpanel/shared";
 import type { AgentEvents, RuntimeAgent } from "./agent";
-import type { LaunchSpec } from "./managed-server";
+import type { LaunchSpec, ResourceLimits } from "./managed-server";
 import { isJavaProcess, isPidAlive } from "./process-info";
 import { runtimeReporter, type RuntimeDiagnosticSink } from "./diagnostics";
 import type { RuntimePathAccess } from "./access";
 import type { IsolationStatus } from "./isolation";
+import type { LimitSupport } from "./cgroups";
 import { channel, COMMAND_TTL_MS, emptyRuntimeInfo, RUNTIME_PROTOCOL, prepareRuntimeEndpoint, type RuntimeSnapshot } from "./protocol";
 
 /** A dashboard connection, never an owner of Minecraft processes. No command retries. */
 export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeAgent {
   connected = false;
-  identity: { protocol: number; build: string; isolation?: IsolationStatus } | null = null;
+  identity: { protocol: number; build: string; isolation?: IsolationStatus; limits?: LimitSupport } | null = null;
   private socket: Socket | null = null;
   private sendFrame: ((m: object) => boolean) | null = null;
   private epoch = "";
@@ -53,7 +54,7 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
           } else if (m.type === "ready") {
             if (m.protocol !== RUNTIME_PROTOCOL || typeof m.epoch !== "string" || typeof m.session !== "string") { this.report("invalid-handshake"); socket.destroy(); return; }
             this.epoch = m.epoch;
-            this.identity = { protocol: RUNTIME_PROTOCOL, build: typeof m.build === "string" ? m.build : "unknown", isolation: parseIsolation(m.isolation) };
+            this.identity = { protocol: RUNTIME_PROTOCOL, build: typeof m.build === "string" ? m.build : "unknown", isolation: parseIsolation(m.isolation), limits: parseLimitSupport(m.limits) };
             this.session = m.session;
             this.sequence = 0;
             this.connected = true;
@@ -142,6 +143,7 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
   async stop(id: string, timeoutMs = 90_000) { return await this.call("stop", id, { timeoutMs }, timeoutMs + 5000) as boolean; }
   async kill(id: string) { await this.call("kill", id); }
   async share(id: string, path?: string) { await this.call("share", id, { path }, 120_000); }
+  async setLimits(id: string, limits: ResourceLimits) { await this.call("limits", id, { limits }); }
   async send(id: string, command: string) { await this.call("send", id, { command }); }
   async query(id: string, command: string, pattern: RegExp, opts: { timeoutMs?: number; swallow?: RegExp } = {}) {
     const result = await this.call("query", id, { command, pattern: { source: pattern.source, flags: pattern.flags }, timeoutMs: opts.timeoutMs,
@@ -190,4 +192,11 @@ function parseIsolation(v: unknown): IsolationStatus | undefined {
   const i = v as IsolationStatus | null;
   if (!i || (i.mode !== "isolated" && i.mode !== "shared")) return undefined;
   return { mode: i.mode, ...(typeof i.reason === "string" ? { reason: i.reason.slice(0, 300) } : {}), ...(Number.isInteger(i.accounts) ? { accounts: i.accounts } : {}) };
+}
+
+function parseLimitSupport(v: unknown): LimitSupport | undefined {
+  const l = v as LimitSupport | null;
+  if (!l || typeof l.available !== "boolean") return undefined;
+  return { available: l.available, ...(typeof l.reason === "string" ? { reason: l.reason.slice(0, 300) } : {}),
+    ...(Array.isArray(l.controllers) ? { controllers: l.controllers.filter((c): c is string => typeof c === "string").slice(0, 8) } : {}) };
 }

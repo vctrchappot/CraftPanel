@@ -42,6 +42,16 @@ On a Linux service install, each Minecraft server runs under its own system acco
 
 On Windows, macOS and when you run CraftPanel by hand, servers still run under CraftPanel's own account.
 
+## Resource limits (Linux)
+
+Under **Performance → Resource limits** each server has a memory cap, a CPU limit and a limit on processes and threads, enforced by Linux itself:
+
+- **Memory cap** (Automatic by default): the server's memory plus at least 1 GB for Java itself. If the server goes beyond it, Linux stops it and the server shows as crashed with "Memory limit reached". The cap never spills into swap, which would only make the game crawl.
+- **CPU** (Unlimited by default): at most this many cores. Minecraft's main thread needs a whole core; much less makes it lag.
+- **Processes and threads** (4,096 by default): enough for large modpacks, and it stops a plugin that starts processes without end.
+
+Changes apply to a running server at once. On a Raspberry Pi whose kernel has no memory controller, add `cgroup_enable=memory` to `/boot/firmware/cmdline.txt` and reboot; the card tells you when this is the case. `CRAFTPANEL_LIMITS=off` in `/etc/craftpanel/craftpanel.env` turns limits off.
+
 ## Data directory
 
 Everything CraftPanel manages lives in one folder:

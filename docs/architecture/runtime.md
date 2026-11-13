@@ -92,4 +92,25 @@ read the panel database, secrets, the runtime token or another server's files. C
   before Java starts.
 - **Leftovers.** When a server exits, every remaining process of its account is killed.
 
-Resource limits (cgroups) and Windows isolation are tracked in ROADMAP.md.
+## Resource limits (Linux)
+
+Each server has a memory cap, a CPU limit and a process/thread limit (`servers.limit_*`; `null` is
+the default, `0` off; defaults in `packages/shared/src/limits.ts`: heap + max(1 GB, half the heap),
+no CPU limit, 4,096 tasks). The dashboard sends the effective values with the launch spec and as a
+`limits` call when they change; the runtime applies them through cgroup v2. Code:
+`packages/server-runtime/src/cgroups.ts`.
+
+- The runtime unit has `Delegate=memory cpu pids` (and no `ProtectControlGroups`). On start the
+  runtime moves itself into `runtime/` in its unit's cgroup and enables the controllers for the
+  children. Each server gets `server-<id>/` with `memory.max` (and `memory.swap.max=0`, so the cap
+  is real), `cpu.max` (quota per 100 ms) and `pids.max`. The process joins it right after spawn,
+  before the JVM forks anything; cgroup v2 only checks write access to the cgroup files, so a
+  process of a game account can be moved.
+- Changes are written into a running server's cgroup at once. An OOM kill (`memory.events`) is
+  reported as "Memory limit reached". On exit the runtime writes `cgroup.kill` (kills leftovers,
+  Linux 5.14+) and removes the directory.
+- Without a delegated cgroup v2 (dev mode, cgroup v1, `CRAFTPANEL_LIMITS=off`) the runtime reports
+  why in its handshake (`limits`); settings are kept and shown as not enforced. A missing
+  controller (memory on some Raspberry Pi kernels) is reported and skipped.
+
+Windows limits (job objects) and Windows isolation are tracked in ROADMAP.md.

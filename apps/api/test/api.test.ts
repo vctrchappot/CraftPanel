@@ -156,6 +156,22 @@ describe("server configuration and files", () => {
     const managed = await call(sessions.admin, "PUT", `/api/servers/${serverId}/properties`, { values: { "server-port": "1" } });
     expect(managed.statusCode).toBe(400);
   });
+  it("stores resource limits and refuses a memory cap below the heap", async () => {
+    const put = (body: object) => call(sessions.admin, "PATCH", `/api/servers/${serverId}`, body);
+    const tooSmall = await put({ limitMemoryMb: 1100 });
+    expect(tooSmall.statusCode).toBe(400);
+    expect(tooSmall.json().error.message).toMatch(/at least 1280 MB/);
+    expect((await put({ limitCpuPercent: 5 })).statusCode).toBe(400);
+    expect((await put({ limitProcesses: 10 })).statusCode).toBe(400);
+    const set = await put({ limitMemoryMb: 2048, limitCpuPercent: 150, limitProcesses: 0 });
+    expect(set.statusCode).toBe(200);
+    expect(set.json()).toMatchObject({ limitMemoryMb: 2048, limitCpuPercent: 150, limitProcesses: 0, resourceLimits: { effective: { memoryMb: 2048, cpuPercent: 150 }, available: false } });
+    expect(set.json().resourceLimits.effective.tasks).toBeUndefined();
+    // A fixed cap must keep fitting when the heap grows.
+    expect((await put({ memoryMb: 2048 })).statusCode).toBe(400);
+    const defaults = await put({ limitMemoryMb: null, limitCpuPercent: null, limitProcesses: null });
+    expect(defaults.json().resourceLimits.effective).toEqual({ memoryMb: 2048, tasks: 4096 });
+  });
   it("rejects newline injection in values and commands", async () => {
     expect((await call(sessions.admin, "PUT", `/api/servers/${serverId}/properties`, { values: { "level-seed": "a\nenable-rcon=true" } })).statusCode).toBe(400);
     expect((await call(sessions.operator, "POST", `/api/servers/${serverId}/command`, { command: "say a\nstop" })).statusCode).toBe(400);

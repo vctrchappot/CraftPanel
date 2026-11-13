@@ -18,6 +18,24 @@ export interface LaunchSpec {
    * is not a JVM jar (e.g. a future Bedrock adapter) and by tests.
    */
   command?: { file: string; args: string[] };
+  /** OS limits for the whole server (Linux cgroups); absent fields are unlimited. */
+  limits?: ResourceLimits;
+}
+
+export interface ResourceLimits {
+  /** Hard memory cap for the process tree, swap excluded. */
+  memoryMb?: number;
+  /** CPU time, 100 = one core. */
+  cpuPercent?: number;
+  /** Processes and threads together. */
+  tasks?: number;
+}
+
+/** Runs around the process: `spawned` right after spawn (sync), `exitReason` explains an unexpected exit. */
+export interface LaunchHooks {
+  spawned?(pid: number): void;
+  exitReason?(): string | null;
+  exited?(): void;
 }
 
 /** Rewrites the final command line, e.g. to run it under a game account. */
@@ -98,7 +116,7 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
     this.emit("status", status, detail);
   }
 
-  start(spec: LaunchSpec, wrap?: LaunchWrapper): void {
+  start(spec: LaunchSpec, wrap?: LaunchWrapper, hooks: LaunchHooks = {}): void {
     if (this.isAlive) throw new Error("Server process is already running");
     this.stopRequested = false;
     this.restartRequested = false;
@@ -136,6 +154,7 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
       env: { ...process.env, JAVA_TOOL_OPTIONS: undefined } as NodeJS.ProcessEnv,
     });
     this.child = child;
+    if (child.pid) hooks.spawned?.(child.pid);
     this.startedAt = Date.now();
     this.readyAt = null;
 
@@ -148,6 +167,7 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
       this.system(msg, "ERROR");
       this.child = null;
       this.startedAt = null;
+      hooks.exited?.();
       this.setStatus("error", msg);
     });
 
@@ -174,11 +194,12 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
       } else {
         const exit = `Process exited unexpectedly (${code !== null ? `exit code ${code}` : `signal ${signal}`})`;
         const lastLogError = this.recentErrors.slice(-1)[0];
-        const reason = this.lastError ?? this.modFailure() ?? (lastLogError ? `${exit}. Last error: ${lastLogError}` : exit);
+        const reason = this.lastError ?? hooks.exitReason?.() ?? this.modFailure() ?? (lastLogError ? `${exit}. Last error: ${lastLogError}` : exit);
         this.lastError = reason;
         this.system(`Server crashed: ${reason}`, "ERROR");
         this.setStatus("crashed", reason);
       }
+      hooks.exited?.();
       this.emit("exit", { code, signal, expected, restart });
     });
   }

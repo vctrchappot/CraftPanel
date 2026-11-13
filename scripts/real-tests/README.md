@@ -57,6 +57,8 @@ node scripts/real-tests/installer-fixtures.mjs test-results/isolation craftpanel
 sudo node scripts/real-tests/isolation.mjs test-results/isolation craftpanel-ops-iso 19686 [JAVA_PATH]
 ```
 
+`limits.mjs` (same fixtures with `craftpanel-ops-lim`, port 19687) checks per-server resource limits on such an install: the server's cgroup and its memory, swap, CPU and process limits, CPU throttling under chunk generation, live changes without a restart, refusal of a cap below the heap, an out-of-memory stop (injected by squeezing the cgroup as root) reported as "Memory limit reached", and cleanup after stop.
+
 ## Installer recovery tests
 
 After `pnpm build`, generate controlled release archives. The fixtures deliberately change the SQLite schema and then crash or hang; another has an invalid systemd unit/Windows launcher and one lacks the recovery protocol.

@@ -35,3 +35,15 @@ describe("schemas", () => {
     expect(r).toMatchObject({ port: 25565, memoryMb: 2048, acceptEula: false, networkMode: "lan", onlineMode: true });
   });
 });
+
+describe("resource limits", () => {
+  it("defaults to a protective memory cap and process limit without a CPU limit", async () => {
+    const { effectiveLimits, defaultMemoryCap, memoryCapProblem } = await import("../src/limits");
+    expect(defaultMemoryCap(1024)).toBe(2048);
+    expect(defaultMemoryCap(8192)).toBe(12288);
+    expect(effectiveLimits({ memoryMb: 4096, limitMemoryMb: null, limitCpuPercent: null, limitProcesses: null })).toEqual({ memoryMb: 6144, tasks: 4096 });
+    expect(effectiveLimits({ memoryMb: 4096, limitMemoryMb: 0, limitCpuPercent: 200, limitProcesses: 0 })).toEqual({ cpuPercent: 200 });
+    expect(memoryCapProblem(4096, 4200)).toMatch(/4352 MB/);
+    expect(memoryCapProblem(4096, 0)).toBeNull();
+  });
+});
