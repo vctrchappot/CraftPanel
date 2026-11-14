@@ -2235,6 +2235,79 @@ p {
   color: var(--muted);
 }
 
+/* ---- guide pages ---- */
+.page-hero {
+  padding: 64px 0;
+  border-bottom: 1px solid var(--line);
+}
+.page-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: 48px;
+  align-items: center;
+}
+.page-title {
+  font-size: clamp(40px, 4.4vw, 60px);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+}
+.page-art {
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+}
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+.steps li {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 8px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--line);
+}
+.steps li:first-child {
+  border-top: 0;
+}
+.step-no {
+  padding-top: 2px;
+  font-size: 13px;
+  color: var(--grass-text);
+}
+.steps h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: var(--cp-tracking-heading);
+}
+.steps p {
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.safe.safe-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.safe.safe-2 li:nth-child(n) {
+  border-left: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+}
+.safe.safe-2 li:nth-child(2n + 1) {
+  border-left: 0;
+}
+.safe.safe-2 li:nth-child(-n + 2) {
+  border-top: 0;
+}
+.way-when {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--grass-text);
+}
+
 /* ---- who it's for ---- */
 .sec-audience {
   padding-top: 64px;
@@ -3236,6 +3309,9 @@ p {
   color: var(--fg);
   text-decoration: underline;
 }
+.foot-cols a[aria-current="page"] {
+  color: var(--fg);
+}
 .foot-console {
   margin-top: 48px;
   background: var(--term-bg);
@@ -3799,7 +3875,22 @@ p {
     border-left: 0;
     border-top: 1px solid var(--line);
   }
-  .safe li:first-child {
+  .page-hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .steps li {
+    grid-template-columns: 36px minmax(0, 1fr);
+    padding: 18px 20px;
+  }
+  .safe.safe-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .safe.safe-2 li:nth-child(n) {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .safe li:first-child,
+  .safe.safe-2 li:first-child {
     border-top: 0;
   }
   .look-legend .legend {

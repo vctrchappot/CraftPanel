@@ -1,0 +1,104 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import FaqSection from "../components/FaqSection.astro";
+import Terminal from "../components/Terminal.astro";
+import Iso from "../components/Iso.astro";
+import UiIcon from "../components/UiIcon.astro";
+import type { UiIconName } from "../lib/ui-icons";
+import { piScene } from "../lib/scenes";
+import { faqJsonLd, type Faq } from "../lib/faq";
+import pkg from "../../package.json";
+
+const title = "Minecraft server on a Raspberry Pi – CraftPanel";
+const description =
+  "Run a Minecraft Java server on a Raspberry Pi 4 or 5: one install command, Java handled, a Pi preset and world pre-generation, managed from your browser.";
+
+const steps: { title: string; text: string }[] = [
+  { title: "Install a 64-bit Raspberry Pi OS", text: "Java builds for Minecraft are 64-bit. Put the system, or at least your worlds and backups, on an SSD rather than the SD card." },
+  { title: "Run the install command", text: "It downloads the latest release, checks its checksum and sets up two background services. Node.js comes along if the Pi has none." },
+  { title: "Open the dashboard", text: "The installer prints the address and a one-time setup token. Create your account there." },
+  { title: "Create a Paper server", text: "The wizard detects the Pi and preselects the Raspberry Pi preset. Give the server 1.5 to 3 GB of memory." },
+  { title: "Pre-generate the world", text: "Generating chunks while players explore is the heaviest work a server does. Let the Pi pre-generate about 1,000 blocks overnight." },
+  { title: "Invite your friends", text: "At home they use the address on the Connect card. Over the internet, the Network tab checks port forwarding for you." },
+];
+
+const tips: { icon: UiIconName; title: string; text: string }[] = [
+  { icon: "blocks", title: "A preset made for the Pi", text: "Garbage-collector flags sized to the memory, with a short view and simulation distance. Change it any time in the Performance tab." },
+  { icon: "cup", title: "Java, handled", text: "CraftPanel downloads the Java version each Minecraft version needs, for ARM64. Nothing to install by hand." },
+  { icon: "archive", title: "Backups on a schedule", text: "Nightly backups, keep the newest few. On a Pi, store them on the SSD, not the SD card." },
+  { icon: "chart", title: "Lag, with a reason", text: "Live TPS and tick time show when the Pi is at its limit, and insights suggest what to change." },
+];
+
+const faqs: Faq[] = [
+  { id: "which-pi", q: "Which Raspberry Pi do I need?", a: "A Pi 4 or 5 with 4 to 8 GB of memory runs a small Paper server well. Plan for about 2 to 8 players; mods, mob farms and view distance change that." },
+  { id: "32-bit", q: "Does a 32-bit Raspberry Pi OS work?", a: "Use the 64-bit Raspberry Pi OS. CraftPanel itself also runs on ARMv7, but the Java builds Minecraft servers need are 64-bit." },
+  { id: "software", q: "Paper, Fabric or Vanilla?", a: "Paper is the best start on a Pi: it is faster than Vanilla and takes plugins. Fabric with performance mods works too. Modpacks usually want 4 GB or more for Minecraft alone.", more: { href: "/docs/guides/server-software/", label: "Server software" } },
+  { id: "limits", q: "Can one server take the whole Pi?", a: "Each server gets a memory cap, and you can add a CPU and process limit in its Performance tab. Some Pi kernels have the memory controller turned off; the card then tells you to add cgroup_enable=memory to /boot/firmware/cmdline.txt and reboot.", more: { href: "/docs/reference/architecture/#resource-limits", label: "Resource limits" } },
+  { id: "power", q: "How much power does it use?", a: "A Pi draws a few watts, so it can stay on around the clock, which is what a server for friends needs." },
+];
+---
+
+<SiteLayout title={title} description={description} path="/raspberry-pi/" jsonLd={[faqJsonLd(faqs)]}>
+  <section class="page-hero" id="install" aria-labelledby="page-title">
+    <div class="wrap page-hero-grid">
+      <div>
+        <p class="hero-kicker mono"><a href="/">CraftPanel</a> · guide</p>
+        <h1 id="page-title" class="display page-title">A Minecraft server on your <span class="mark">Raspberry Pi.</span></h1>
+        <p class="hero-lead">Run Paper on a Pi 4 or 5 for a handful of friends. CraftPanel installs Java, picks settings that suit the board and lets you manage everything from a browser.</p>
+        <Terminal version={pkg.version} id="pi-term" os="linux" compact />
+        <ul class="hero-facts mono" aria-label="At a glance">
+          <li>Pi 4 / 5 · 4–8 GB</li>
+          <li>2–3 GB for Minecraft</li>
+          <li>2–8 players, estimate</li>
+        </ul>
+      </div>
+      <div class="page-art">
+        <Iso boxes={piScene()} label="A Raspberry Pi" class="iso" />
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="steps-title">
+    <div class="wrap wrap-mid">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>01</span>Steps</p>
+        <h2 id="steps-title" class="display">From a bare Pi to friends online.</h2>
+        <p class="sec-lead">Most of the time goes into downloads and pre-generating the world; the rest is a few clicks.</p>
+      </header>
+      <ol class="steps">
+        {steps.map((s, i) => (
+          <li>
+            <span class="step-no mono" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+            <div>
+              <h3>{s.title}</h3>
+              <p>{s.text}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p class="safe-more">
+        <a href="/docs/getting-started/installation/#raspberry-pi">Raspberry Pi in the installation guide <UiIcon name="arrow-right" size={12} /></a>
+        <a href="/docs/guides/performance/">Performance guide <UiIcon name="arrow-right" size={12} /></a>
+      </p>
+    </div>
+  </section>
+
+  <section class="sec sec-dense" aria-labelledby="tips-title">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>02</span>Made for small boards</p>
+        <h2 id="tips-title" class="display">What CraftPanel does for a Pi.</h2>
+      </header>
+      <ul class="safe safe-2">
+        {tips.map((t) => (
+          <li>
+            <h3 class="minor-title"><UiIcon name={t.icon} size={24} />{t.title}</h3>
+            <p class="minor-text">{t.text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <FaqSection items={faqs} no="03" title="Pi questions." lead="What people ask before putting a Minecraft server on a Raspberry Pi." />
+</SiteLayout>

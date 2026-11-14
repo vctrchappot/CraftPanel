@@ -1,0 +1,53 @@
+---
+// Questions and answers as a page section. Pages pass the same list to faqJsonLd for search engines.
+import UiIcon from "./UiIcon.astro";
+import type { Faq } from "../lib/faq";
+
+interface Props {
+  items: Faq[];
+  /** Section number shown above the title, e.g. "08". */
+  no: string;
+  title?: string;
+  lead?: string;
+}
+const { items, no, title = "Asked before.", lead = "Short answers to what people ask before installing. The docs have the long ones." } = Astro.props;
+const github = "https://github.com/vctrchappot/CraftPanel";
+---
+
+<section class="sec" aria-labelledby="faq-title">
+  <div class="wrap wrap-mid faq-layout">
+    <div class="faq-side">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>{no}</span>Questions</p>
+        <h2 id="faq-title" class="display">{title}</h2>
+        <p class="sec-lead">{lead}</p>
+      </header>
+      <aside class="faq-help" aria-label="More help">
+        <p class="faq-help-title">Not on the list?</p>
+        <a href="/docs/reference/troubleshooting/">Troubleshooting guide <UiIcon name="arrow-right" size={12} /></a>
+        <a href={`${github}/issues`} rel="noopener">Ask on GitHub <UiIcon name="arrow-right" size={12} /></a>
+      </aside>
+    </div>
+    <div class="faq">
+      {
+        items.map((f, i) => (
+          <details id={`faq-${f.id}`}>
+            <summary>
+              <span class="faq-no mono" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+              <span class="faq-q">{f.q}</span>
+              <span class="faq-icon" aria-hidden="true" />
+            </summary>
+            <div class="faq-a">
+              <p>{f.a}</p>
+              {f.more && (
+                <a class="faq-more" href={f.more.href}>
+                  {f.more.label} <UiIcon name="arrow-right" size={12} />
+                </a>
+              )}
+            </div>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>

@@ -91,9 +91,9 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
   };
   roving(tabs, select);
 
-  // Start with the visitor's own system.
+  // Start with the page's platform, or else the visitor's own system.
   const ua = navigator.userAgent;
-  const preferredOs = /Windows/i.test(ua) ? "windows" : /Macintosh|Mac OS X/i.test(ua) ? "macos" : null;
+  const preferredOs = term.dataset.os ?? (/Windows/i.test(ua) ? "windows" : /Macintosh|Mac OS X/i.test(ua) ? "macos" : null);
   const preferred = preferredOs ? tabs.find((t) => t.dataset.os === preferredOs) : undefined;
   const first = preferred ?? tabs[0];
   if (full) {

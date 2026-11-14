@@ -1,0 +1,158 @@
+---
+// Frame of the landing page and the guide pages next to it: head, navigation, footer and the page script.
+import "../styles/fonts.css";
+import "../styles/landing.css";
+import UiIcon from "../components/UiIcon.astro";
+import Wordmark from "../components/Wordmark.astro";
+import { repoFacts } from "../lib/github";
+
+interface Props {
+  title: string;
+  description: string;
+  /** Path of the page, with leading and trailing slash. */
+  path: string;
+  /** Structured data (schema.org) for search engines. */
+  jsonLd?: object[];
+  /** Where the Install button leads; pages without an install command send it home. */
+  installHref?: string;
+}
+const { title, description, path, jsonLd = [], installHref = "#install" } = Astro.props;
+const site = "https://craftpanel.vctr.site";
+const github = "https://github.com/vctrchappot/CraftPanel";
+const facts = await repoFacts();
+// Section links stay on the page on the home page and lead back to it from the others.
+const home = path === "/" ? "" : "/";
+const sections = [
+  { href: `${home}#features`, label: "Features" },
+  { href: `${home}#dashboard`, label: "Dashboard" },
+  { href: `${home}#security`, label: "Security" },
+  { href: `${home}#compare`, label: "Compare" },
+  { href: "/docs/", label: "Docs" },
+];
+const guides = [
+  { href: "/raspberry-pi/", label: "On a Raspberry Pi" },
+  { href: "/windows/", label: "On Windows" },
+  { href: "/play-with-friends/", label: "Play with friends" },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href={`${site}${path}`} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={`${site}${path}`} />
+    <meta property="og:image" content={`${site}/og.png`} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#171614" />
+    {jsonLd.map((data) => <script type="application/ld+json" set:html={JSON.stringify(data)} />)}
+    <script is:inline>
+      // Same storage key as Starlight, so the docs and this page share the theme choice.
+      (() => {
+        let stored = "";
+        try { stored = localStorage.getItem("starlight-theme") || ""; } catch {}
+        const theme = stored === "light" || stored === "dark" ? stored : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="nav">
+      <div class="wrap nav-in">
+        <a href="/" class="brand"><Wordmark /></a>
+        <nav aria-label="Main" class="nav-links">
+          {sections.map((s) => <a href={s.href}>{s.label}</a>)}
+        </nav>
+        <div class="nav-end">
+          <a class="nav-gh" href={github}>
+            <UiIcon name="github" size={24} />
+            <span class="hide-sm">GitHub</span>
+            {facts.stars !== null && facts.stars >= 10 && <span class="nav-stars"><UiIcon name="star" size={12} />{facts.stars}</span>}
+          </a>
+          <button class="nav-theme" id="theme-toggle" type="button" aria-label="Switch between dark and light mode">
+            <UiIcon name="sun" size={24} class="if-dark" />
+            <UiIcon name="moon" size={24} class="if-light" />
+          </button>
+          <a class="nav-install" href={installHref}>Install</a>
+          <!-- The links of the bar, for screens too narrow to show them. -->
+          <details class="nav-menu">
+            <summary aria-label="Menu"><UiIcon name="menu" size={24} /></summary>
+            <nav aria-label="Main, compact" class="nav-menu-list">
+              {sections.map((s) => <a href={s.href}>{s.label}</a>)}
+              <a href={github} rel="noopener">GitHub</a>
+            </nav>
+          </details>
+        </div>
+      </div>
+      <!-- Scroll progress as a Minecraft experience bar; the level is the section you are reading. -->
+      <div class="xp" aria-hidden="true">
+        <span class="xp-fill"></span>
+        <span class="xp-level mono" data-xp-level><b></b><span></span></span>
+      </div>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot-in">
+        <div class="foot-brand">
+          <a href="/" class="brand"><Wordmark /></a>
+          <p>Built for people who'd rather play than configure. Made by <a href="https://www.vctr.site">Victor</a>.</p>
+        </div>
+        <nav class="foot-cols" aria-label="Footer">
+          <div>
+            <h4 class="mono">product</h4>
+            <a href={`${home}#features`}>Features</a>
+            <a href="/docs/getting-started/installation/">Install</a>
+            <a href={`${github}/releases`}>Releases</a>
+            <a href={`${github}/blob/main/CHANGELOG.md`}>Changelog</a>
+          </div>
+          <div>
+            <h4 class="mono">guides</h4>
+            {guides.map((g) => <a href={g.href} aria-current={g.href === path ? "page" : undefined}>{g.label}</a>)}
+          </div>
+          <div>
+            <h4 class="mono">docs</h4>
+            <a href="/docs/">Introduction</a>
+            <a href="/docs/getting-started/first-server/">First server</a>
+            <a href="/docs/administration/remote-access/">Remote access</a>
+            <a href="/docs/reference/troubleshooting/">Troubleshooting</a>
+          </div>
+          <div>
+            <h4 class="mono">project</h4>
+            <a href={github}>GitHub</a>
+            <a href={`${github}/issues`}>Issues</a>
+            <a href="/docs/reference/security/">Security</a>
+            <a href={`${github}/blob/main/LICENSE`}>License</a>
+          </div>
+        </nav>
+      </div>
+      <div class="wrap">
+        <form class="foot-console mono" data-foot-console autocomplete="off">
+          <ol class="fc-out" aria-live="polite" data-fc-out>
+            <li class="fc-dim">[Server] This footer has a console. Type help.</li>
+          </ol>
+          <label class="fc-in">
+            <span aria-hidden="true">&gt;</span>
+            <span class="sr-only">Footer console command</span>
+            <input name="cmd" type="text" spellcheck="false" placeholder="help" maxlength="60" />
+          </label>
+        </form>
+        <p class="foot-legal">Minecraft is a trademark of Mojang AB. CraftPanel is not affiliated with Mojang or Microsoft and never redistributes server software.</p>
+      </div>
+    </footer>
+
+    <script src="../scripts/landing.ts"></script>
+  </body>
+</html>

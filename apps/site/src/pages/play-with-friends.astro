@@ -1,0 +1,82 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import FaqSection from "../components/FaqSection.astro";
+import Iso from "../components/Iso.astro";
+import UiIcon from "../components/UiIcon.astro";
+import type { UiIconName } from "../lib/ui-icons";
+import { heroScene } from "../lib/scenes";
+import { faqJsonLd, type Faq } from "../lib/faq";
+
+const title = "Let friends join your Minecraft server – CraftPanel";
+const description =
+  "How friends join a Minecraft Java server you host at home: the local address, port forwarding with dynamic DNS, a VPN behind CGNAT, or a small VPS. CraftPanel checks which one works.";
+
+const ways: { icon: UiIconName; title: string; when: string; text: string }[] = [
+  { icon: "signal", title: "Same network", when: "Friends on your Wi-Fi or LAN", text: "They join with the local address from the server's Connect card, for example 192.168.1.20:25565. On Windows, allow Java through the firewall for private networks." },
+  { icon: "plug", title: "Port forwarding", when: "Friends anywhere, your router allows it", text: "Forward the game port (TCP) to the CraftPanel machine and give it a fixed local IP. Friends use your public address; a free DuckDNS name follows it when it changes." },
+  { icon: "lock", title: "A VPN", when: "Behind CGNAT, or nothing public", text: "With Tailscale or WireGuard, friends join your private network and use the server's VPN address, shown on the Connect card. Nothing is exposed to the internet." },
+  { icon: "box", title: "A small VPS", when: "Always on, a public IP included", text: "Install CraftPanel on a rented Linux server and open the game port in the provider's firewall. Keep its dashboard private." },
+];
+
+const faqs: Faq[] = [
+  { id: "address", q: "Which address do I send my friends?", a: "The server's Connect card lists them: the local address for your network, the VPN address if you use one, and your public address or DuckDNS name for port forwarding. Add the port if it isn't 25565." },
+  { id: "safe", q: "Is opening the game port safe?", a: "Open only the Minecraft port, never the dashboard's. Turn on the whitelist in the Players tab so only your friends get in, and keep the server software up to date.", more: { href: "/docs/guides/players/", label: "Players and whitelist" } },
+  { id: "cgnat", q: "What is CGNAT, and how do I know?", a: "Many internet providers share one public IP between customers. Port forwarding can't work then, and the Network tab says so. Ask your provider for a public IPv4 address, use a VPN, or host on a VPS." },
+  { id: "install", q: "Do my friends need to install anything?", a: "Only Minecraft Java Edition for the local address or port forwarding. With a VPN they also install its app and join your network." },
+  { id: "bedrock", q: "Can friends on Bedrock (consoles, phones) join?", a: "Not yet. CraftPanel runs Minecraft Java Edition servers; a Bedrock adapter is on the roadmap." },
+];
+---
+
+<SiteLayout title={title} description={description} path="/play-with-friends/" installHref="/#install" jsonLd={[faqJsonLd(faqs)]}>
+  <section class="page-hero" aria-labelledby="page-title">
+    <div class="wrap page-hero-grid">
+      <div>
+        <p class="hero-kicker mono"><a href="/">CraftPanel</a> · guide</p>
+        <h1 id="page-title" class="display page-title">Let your friends <span class="mark">join.</span></h1>
+        <p class="hero-lead">Same Wi-Fi, over the internet or behind your provider's CGNAT: there are four ways in, and CraftPanel's Network tab checks which one works for you.</p>
+        <div class="hero-next">
+          <a class="hero-link" href="#ways">The four ways <span aria-hidden="true">↓</span></a>
+          <a class="hero-link" href="/docs/guides/networking/">Networking guide <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+      <div class="page-art">
+        <Iso boxes={heroScene()} label="A small Minecraft world above a Raspberry Pi" class="iso" />
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="ways" aria-labelledby="ways-title">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>01</span>Four ways in</p>
+        <h2 id="ways-title" class="display">Pick the one that fits your network.</h2>
+        <p class="sec-lead">Start at the top. If friends can't reach the server, the checks in the Network tab tell you why.</p>
+      </header>
+      <ul class="safe safe-2">
+        {ways.map((w) => (
+          <li>
+            <h3 class="minor-title"><UiIcon name={w.icon} size={24} />{w.title}</h3>
+            <p class="way-when mono">{w.when}</p>
+            <p class="minor-text">{w.text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <section class="sec sec-dense" aria-labelledby="private-title">
+    <div class="wrap wrap-mid">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>02</span>Keep the dashboard private</p>
+        <h2 id="private-title" class="display">The game port is public. The dashboard is not.</h2>
+        <p class="sec-lead">Players only ever need the Minecraft port. Never forward the dashboard's port: reach it through a VPN, an SSH tunnel or an HTTPS reverse proxy. By default CraftPanel only lets in private networks and refuses public clients without HTTPS.</p>
+      </header>
+      <p class="safe-more">
+        <a href="/docs/administration/remote-access/">Remote access <UiIcon name="arrow-right" size={12} /></a>
+        <a href="/#security">How CraftPanel is secured <UiIcon name="arrow-right" size={12} /></a>
+      </p>
+    </div>
+  </section>
+
+  <FaqSection items={faqs} no="03" title="Joining questions." lead="What people ask when their friends can't get in yet." />
+</SiteLayout>

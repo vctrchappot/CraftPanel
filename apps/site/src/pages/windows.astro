@@ -1,0 +1,105 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import FaqSection from "../components/FaqSection.astro";
+import Terminal from "../components/Terminal.astro";
+import Iso from "../components/Iso.astro";
+import UiIcon from "../components/UiIcon.astro";
+import type { UiIconName } from "../lib/ui-icons";
+import { pcScene } from "../lib/scenes";
+import { faqJsonLd, type Faq } from "../lib/faq";
+import pkg from "../../package.json";
+
+const title = "Minecraft server on Windows, without Docker – CraftPanel";
+const description =
+  "Host a Minecraft Java server on your Windows 10 or 11 PC: one PowerShell command, a background service that starts with Windows, Java handled, managed from your browser.";
+
+const steps: { title: string; text: string }[] = [
+  { title: "Open PowerShell as administrator", text: "Signed in with the Windows account that should own CraftPanel. Administrator rights are needed once, to register the service." },
+  { title: "Run the install command", text: "It downloads the latest release, checks its checksum and installs CraftPanel for your account. Nothing is built on your PC." },
+  { title: "Open the dashboard", text: "From the Start menu, or the address the installer prints. Create your account with the one-time setup token." },
+  { title: "Create a server", text: "Pick Paper, Purpur, Fabric, NeoForge, Vanilla or Velocity, a version and the memory. CraftPanel downloads the right Java for it." },
+  { title: "Allow Java through the firewall", text: "On the first start Windows asks. Allow it for private networks, so players on your network can join." },
+  { title: "Invite your friends", text: "At home they use the address on the Connect card. Over the internet, the Network tab checks port forwarding for you." },
+];
+
+const installed: { icon: UiIconName; title: string; text: string }[] = [
+  { icon: "box", title: "A service for Minecraft", text: "The CraftPanel Runtime service runs your servers and starts at boot. Closing or updating the dashboard doesn't stop them." },
+  { icon: "terminal", title: "The dashboard at sign-in", text: "A CraftPanel task starts the dashboard when you sign in, and a Start-menu entry opens it." },
+  { icon: "folder", title: "Everything in your profile", text: "The app in %LOCALAPPDATA%\\Programs\\CraftPanel, your servers and worlds in %LOCALAPPDATA%\\CraftPanel." },
+  { icon: "chart", title: "Limits per server", text: "Each server gets a memory cap, and optionally a CPU and process limit, enforced by Windows job objects." },
+];
+
+const faqs: Faq[] = [
+  { id: "versions", q: "Which Windows versions work?", a: "Windows 10 and 11, on x64 and ARM64. Minecraft servers don't use the graphics card, so a gaming PC works as well as an office one; memory matters most.", more: { href: "/docs/getting-started/installation/", label: "Installation guide" } },
+  { id: "play", q: "Can I play on the same PC?", a: "Yes. Start Minecraft and join localhost. Plan the memory for both: what you give the server comes on top of what the game itself uses, and the wizard shows whether this PC carries the server." },
+  { id: "on", q: "Does the PC have to stay on?", a: "While friends play, yes. The service starts with Windows and brings back the servers set to start with CraftPanel. For a server that is always on, a Raspberry Pi or a small VPS is the better home." },
+  { id: "docker", q: "Do I need Docker, WSL or Java?", a: "No. The installer brings what CraftPanel needs, and CraftPanel downloads the Java version each Minecraft version needs." },
+  { id: "isolation", q: "Is each server isolated?", a: "Each server is confined to its own folder in the dashboard, and resource limits apply on Windows. Running every server under its own system account is available on Linux service installs so far.", more: { href: "/docs/reference/security/", label: "Security" } },
+  { id: "uninstall", q: "How do I remove it?", a: "Set $env:CRAFTPANEL_UNINSTALL = \"1\" in PowerShell and run the install command again. Your servers and worlds are kept." },
+];
+---
+
+<SiteLayout title={title} description={description} path="/windows/" jsonLd={[faqJsonLd(faqs)]}>
+  <section class="page-hero" id="install" aria-labelledby="page-title">
+    <div class="wrap page-hero-grid">
+      <div>
+        <p class="hero-kicker mono"><a href="/">CraftPanel</a> · guide</p>
+        <h1 id="page-title" class="display page-title">A Minecraft server on your <span class="mark">Windows PC.</span></h1>
+        <p class="hero-lead">One PowerShell command installs CraftPanel on Windows 10 or 11. Minecraft runs as a background service that starts with the PC. No Docker, no Java to install.</p>
+        <Terminal version={pkg.version} id="win-term" os="windows" compact />
+        <ul class="hero-facts mono" aria-label="At a glance">
+          <li>Windows 10 · 11</li>
+          <li>x64 · ARM64</li>
+          <li>4–8 GB for Minecraft</li>
+        </ul>
+      </div>
+      <div class="page-art">
+        <Iso boxes={pcScene()} label="A desktop PC" class="iso" />
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="steps-title">
+    <div class="wrap wrap-mid">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>01</span>Steps</p>
+        <h2 id="steps-title" class="display">From PowerShell to friends online.</h2>
+        <p class="sec-lead">Later updates install from the dashboard and run as your normal account.</p>
+      </header>
+      <ol class="steps">
+        {steps.map((s, i) => (
+          <li>
+            <span class="step-no mono" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+            <div>
+              <h3>{s.title}</h3>
+              <p>{s.text}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p class="safe-more">
+        <a href="/docs/getting-started/installation/">Installation guide <UiIcon name="arrow-right" size={12} /></a>
+        <a href="/docs/administration/maintenance/">Services and logs <UiIcon name="arrow-right" size={12} /></a>
+      </p>
+    </div>
+  </section>
+
+  <section class="sec sec-dense" aria-labelledby="installed-title">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>02</span>What gets installed</p>
+        <h2 id="installed-title" class="display">Small, and out of the way.</h2>
+      </header>
+      <ul class="safe safe-2">
+        {installed.map((t) => (
+          <li>
+            <h3 class="minor-title"><UiIcon name={t.icon} size={24} />{t.title}</h3>
+            <p class="minor-text">{t.text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <FaqSection items={faqs} no="03" title="Windows questions." lead="What people ask before hosting Minecraft on their Windows PC." />
+</SiteLayout>

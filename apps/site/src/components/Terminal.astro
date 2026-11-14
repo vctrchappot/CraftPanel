@@ -7,8 +7,10 @@ interface Props {
   version: string;
   compact?: boolean;
   id: string;
+  /** Start on this tab instead of the visitor's own system (pages about one platform). */
+  os?: "linux" | "windows";
 }
-const { version, compact = false, id } = Astro.props;
+const { version, compact = false, id, os } = Astro.props;
 const tabs = [
   {
     os: "linux",
@@ -50,7 +52,7 @@ const mac = { os: "macos", label: "macOS", guide: "/docs/getting-started/install
 const allTabs = [...tabs, mac];
 ---
 
-<div class:list={["term", { "term-compact": compact, "term-full": !compact }]} data-term={compact ? "compact" : "full"}>
+<div class:list={["term", { "term-compact": compact, "term-full": !compact }]} data-term={compact ? "compact" : "full"} data-os={os}>
   <div class="term-bar">
     <span class="term-dots" aria-hidden="true"><i></i><i></i><i></i></span>
     <div class="term-tabs" role="tablist" aria-label="Operating system">

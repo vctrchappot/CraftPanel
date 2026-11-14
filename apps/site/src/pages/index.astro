@@ -1,7 +1,5 @@
 ---
 import { Image } from "astro:assets";
-import "../styles/fonts.css";
-import "../styles/landing.css";
 import Pixel from "../components/Pixel.astro";
 import UiIcon from "../components/UiIcon.astro";
 import type { PixelName } from "../lib/pixel-icons";
@@ -16,6 +14,9 @@ import { repoFacts, shownRelease } from "../lib/github";
 // release.mjs bumps every workspace package, so this matches the latest release.
 import pkg from "../../package.json";
 import Wordmark from "../components/Wordmark.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+import FaqSection from "../components/FaqSection.astro";
+import { faqJsonLd, type Faq } from "../lib/faq";
 import avatar from "../assets/victor.jpg";
 
 const facts = await repoFacts();
@@ -222,13 +223,13 @@ const audiences: { title: string; question: string; text: string; link: { href: 
     title: "Friends and family",
     question: "Can I do this without knowing Linux?",
     text: "The wizard picks the Java and memory, the network check tells you whether friends can join, and backups run on a schedule.",
-    link: { href: "/docs/getting-started/first-server/", label: "Your first server" },
+    link: { href: "/play-with-friends/", label: "Let your friends join" },
   },
   {
     title: "A Pi or a home server",
     question: "Does it run cleanly on my hardware?",
     text: "No Docker, no Java to install. Memory, CPU and process limits per server keep one server from starving the others.",
-    link: { href: "#hardware", label: "Hardware estimates" },
+    link: { href: "/raspberry-pi/", label: "Minecraft on a Raspberry Pi" },
   },
   {
     title: "Small communities",
@@ -344,10 +345,10 @@ const choices: { title: string; text: string; link?: { href: string; label: stri
   { title: "Pick another panel if…", text: "you run many machines or games: Pterodactyl spreads servers across nodes in Docker, Crafty Controller also runs Bedrock. CraftPanel manages one host today; more are planned." },
 ];
 
-const faqs: { id: string; q: string; a: string; more?: { href: string; label: string } }[] = [
+const faqs: Faq[] = [
   { id: "cost", q: "What does it cost?", a: "The CraftPanel software is free. You pay for hardware, electricity and any VPS or connectivity you use. It is source-available under FSL-1.1-ALv2, which restricts competing commercial uses. Each version becomes Apache-2.0 after two years.", more: { href: `${github}/blob/main/LICENSE`, label: "Read the license" } },
   { id: "hardware", q: "What hardware do I need?", a: "Anything that runs Node.js 22.13 or newer: a Windows or Linux PC, a Mac, a Raspberry Pi 4/5 with a 64-bit OS, or a small VPS. Minecraft needs most of the memory: about 2 GB for a small Paper server, 4 GB or more for modpacks.", more: { href: "/docs/getting-started/installation/", label: "Installation guide" } },
-  { id: "join", q: "How do my friends join?", a: "At home they use the LAN address on the server's overview. Over the internet, forward the game port in your router, let friends join a VPN such as Tailscale, or run CraftPanel on a VPS. The Network tab checks whether the port is reachable and tells you when your provider's CGNAT rules out port forwarding.", more: { href: "/docs/guides/networking/", label: "Networking" } },
+  { id: "join", q: "How do my friends join?", a: "At home they use the LAN address on the server's overview. Over the internet, forward the game port in your router, let friends join a VPN such as Tailscale, or run CraftPanel on a VPS. The Network tab checks whether the port is reachable and tells you when your provider's CGNAT rules out port forwarding.", more: { href: "/play-with-friends/", label: "Four ways to let friends join" } },
   { id: "offline", q: "What happens when my computer is off?", a: "Your servers are offline too; that is the trade-off of running them yourself. When the machine starts again, CraftPanel starts with it and brings back the servers set to start with CraftPanel. For a server that is always on, use a Raspberry Pi or a small VPS.", more: { href: "/docs/administration/maintenance/", label: "Maintenance" } },
   { id: "backups", q: "How do backups and updates work?", a: "Schedule backups per server and keep the newest few. A restore checks the archive and saves the current state first. Most updates install from the browser while Minecraft keeps running; the rare runtime update asks first and restarts the servers once.", more: { href: "/docs/getting-started/updating/", label: "Updating" } },
   { id: "bedrock", q: "Bedrock?", a: "Not yet. CraftPanel runs Minecraft Java Edition servers. A Bedrock adapter is on the roadmap." },
@@ -357,6 +358,21 @@ const faqs: { id: string; q: string; a: string; more?: { href: string; label: st
   { id: "privacy", q: "Does it phone home?", a: "No telemetry and no CraftPanel cloud account. You create local users on your installation. CraftPanel goes online for official downloads, Modrinth and Hangar when you browse add-ons, and an optional update check against GitHub.", more: { href: "/docs/reference/security/", label: "Security and privacy" } },
 ];
 
+const app = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "CraftPanel",
+  description,
+  url: "https://craftpanel.vctr.site/",
+  downloadUrl: `${github}/releases/latest`,
+  softwareVersion: version,
+  applicationCategory: "UtilitiesApplication",
+  operatingSystem: "Windows, Linux, macOS",
+  license: `${github}/blob/main/LICENSE`,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  author: { "@type": "Person", name: "Victor Chappot", url: "https://github.com/vctrchappot" },
+};
+
 const backups = [
   { when: "Today 04:00", size: "1.24 GB", tag: "nightly" },
   { when: "Yesterday 04:00", size: "1.23 GB", tag: "nightly" },
@@ -365,777 +381,620 @@ const backups = [
 ];
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title}</title>
-    <meta name="description" content={description} />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="canonical" href="https://craftpanel.vctr.site/" />
-    <meta property="og:title" content={title} />
-    <meta property="og:description" content={description} />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://craftpanel.vctr.site/" />
-    <meta property="og:image" content="https://craftpanel.vctr.site/og.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="theme-color" content="#171614" />
-    <script is:inline>
-      // Same storage key as Starlight, so the docs and this page share the theme choice.
-      (() => {
-        let stored = "";
-        try { stored = localStorage.getItem("starlight-theme") || ""; } catch {}
-        const theme = stored === "light" || stored === "dark" ? stored : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-        document.documentElement.dataset.theme = theme;
-      })();
-    </script>
-  </head>
-  <body>
-    <a class="skip" href="#main">Skip to content</a>
-
-    <header class="nav">
-      <div class="wrap nav-in">
-        <a href="/" class="brand"><Wordmark /></a>
-        <nav aria-label="Main" class="nav-links">
-          <a href="#features">Features</a>
-          <a href="#dashboard">Dashboard</a>
-          <a href="#security">Security</a>
-          <a href="#compare">Compare</a>
-          <a href="/docs/">Docs</a>
-        </nav>
-        <div class="nav-end">
-          <a class="nav-gh" href={github}>
-            <UiIcon name="github" size={24} />
-            <span class="hide-sm">GitHub</span>
-            {facts.stars !== null && facts.stars >= 10 && <span class="nav-stars"><UiIcon name="star" size={12} />{facts.stars}</span>}
-          </a>
-          <button class="nav-theme" id="theme-toggle" type="button" aria-label="Switch between dark and light mode">
-            <UiIcon name="sun" size={24} class="if-dark" />
-            <UiIcon name="moon" size={24} class="if-light" />
-          </button>
-          <a class="nav-install" href="#install">Install</a>
-          <!-- The links of the bar, for screens too narrow to show them. -->
-          <details class="nav-menu">
-            <summary aria-label="Menu"><UiIcon name="menu" size={24} /></summary>
-            <nav aria-label="Main, compact" class="nav-menu-list">
-              <a href="#features">Features</a>
-              <a href="#dashboard">Dashboard</a>
-              <a href="#security">Security</a>
-              <a href="#compare">Compare</a>
-              <a href="/docs/">Docs</a>
-              <a href={github} rel="noopener">GitHub</a>
-            </nav>
-          </details>
+<SiteLayout title={title} description={description} path="/" jsonLd={[app, faqJsonLd(faqs)]}>
+  <!-- Hero -->
+  <section class="hero" id="install" aria-labelledby="hero-title">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="hero-kicker mono"><span class="px-dot" aria-hidden="true"></span><a href={release.url}>{release.tag}</a> · self-hosted Minecraft panel</p>
+        <h1 id="hero-title" class="display"><span class="h-line">Your server.</span><br /><span class="h-line">Your hardware.</span><br /><span class="h-line"><span class="mark">No panel fee.</span></span></h1>
+        <p class="hero-lead">
+          A Minecraft Java server for you and your friends, on your own PC, Raspberry Pi or VPS. Create it, update it and back it up from your browser.
+        </p>
+        <Terminal version={version} id="hero-term" />
+        <div class="hero-next">
+          <a class="hero-link" href="#dashboard">See the dashboard <span aria-hidden="true">↓</span></a>
+          <a class="hero-link" href="/docs/getting-started/installation/">Installation guide <span aria-hidden="true">↗</span></a>
         </div>
+        <ul class="hero-facts mono" aria-label="Supported platforms">
+          <li>Windows · Linux · macOS</li>
+          <li>x64 · ARM64 · Raspberry Pi</li>
+          <li>No Docker, no Java setup</li>
+        </ul>
       </div>
-      <!-- Scroll progress as a Minecraft experience bar; the level is the section you are reading. -->
-      <div class="xp" aria-hidden="true">
-        <span class="xp-fill"></span>
-        <span class="xp-level mono" data-xp-level><b></b><span></span></span>
-      </div>
-    </header>
-
-    <main id="main">
-      <!-- Hero -->
-      <section class="hero" id="install" aria-labelledby="hero-title">
-        <div class="wrap hero-grid">
-          <div class="hero-copy">
-            <p class="hero-kicker mono"><span class="px-dot" aria-hidden="true"></span><a href={release.url}>{release.tag}</a> · self-hosted Minecraft panel</p>
-            <h1 id="hero-title" class="display"><span class="h-line">Your server.</span><br /><span class="h-line">Your hardware.</span><br /><span class="h-line"><span class="mark">No panel fee.</span></span></h1>
-            <p class="hero-lead">
-              A Minecraft Java server for you and your friends, on your own PC, Raspberry Pi or VPS. Create it, update it and back it up from your browser.
-            </p>
-            <Terminal version={version} id="hero-term" />
-            <div class="hero-next">
-              <a class="hero-link" href="#dashboard">See the dashboard <span aria-hidden="true">↓</span></a>
-              <a class="hero-link" href="/docs/getting-started/installation/">Installation guide <span aria-hidden="true">↗</span></a>
-            </div>
-            <ul class="hero-facts mono" aria-label="Supported platforms">
-              <li>Windows · Linux · macOS</li>
-              <li>x64 · ARM64 · Raspberry Pi</li>
-              <li>No Docker, no Java setup</li>
-            </ul>
-          </div>
-          <div class="hero-art" aria-hidden="false">
-            <div class="hero-scene">
-              <Iso boxes={heroScene()} label="A Raspberry Pi with a small Minecraft world floating above it" class="iso hero-iso" />
-              <!-- Shown when scrolling pulls the scene apart into its three layers. -->
-              <ul class="hero-layers mono" aria-hidden="true">
-                <li class="hl-world">Minecraft</li>
-                <li class="hl-data">CraftPanel</li>
-                <li class="hl-board">your hardware</li>
-              </ul>
-              <div class="hero-chip mono" aria-hidden="true">
-                <span class="chip-row"><span class="dot-run"></span>survival</span>
-                <span class="chip-row muted">Paper 1.21.4</span>
-                <span class="chip-row"><b>6</b>/20 online · TPS <b>20.0</b></span>
-              </div>
-            </div>
-            <p class="hero-host mono" aria-hidden="true">raspberrypi.local · 4 GB</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- From install to update -->
-      <section class="sec-band" aria-labelledby="band-title">
-        <div class="wrap">
-          <h2 id="band-title" class="sr-only">From install to update</h2>
-          <ProcessBand />
-        </div>
-      </section>
-
-      <!-- Who it's for -->
-      <section class="sec sec-audience" aria-labelledby="audience-title">
-        <div class="wrap">
-          <h2 id="audience-title" class="display">Who runs CraftPanel?</h2>
-          <ul class="choices audiences">
-            {audiences.map((a) => (
-              <li class="choice">
-                <h3>{a.title}</h3>
-                <p class="aud-q">“{a.question}”</p>
-                <p>{a.text}</p>
-                <a class="choice-link" href={a.link.href}>{a.link.label} <UiIcon name="arrow-right" size={12} /></a>
-              </li>
-            ))}
+      <div class="hero-art" aria-hidden="false">
+        <div class="hero-scene">
+          <Iso boxes={heroScene()} label="A Raspberry Pi with a small Minecraft world floating above it" class="iso hero-iso" />
+          <!-- Shown when scrolling pulls the scene apart into its three layers. -->
+          <ul class="hero-layers mono" aria-hidden="true">
+            <li class="hl-world">Minecraft</li>
+            <li class="hl-data">CraftPanel</li>
+            <li class="hl-board">your hardware</li>
           </ul>
+          <div class="hero-chip mono" aria-hidden="true">
+            <span class="chip-row"><span class="dot-run"></span>survival</span>
+            <span class="chip-row muted">Paper 1.21.4</span>
+            <span class="chip-row"><b>6</b>/20 online · TPS <b>20.0</b></span>
+          </div>
         </div>
-      </section>
+        <p class="hero-host mono" aria-hidden="true">raspberrypi.local · 4 GB</p>
+      </div>
+    </div>
+  </section>
 
-      <hr class="px-rule" />
+  <!-- From install to update -->
+  <section class="sec-band" aria-labelledby="band-title">
+    <div class="wrap">
+      <h2 id="band-title" class="sr-only">From install to update</h2>
+      <ProcessBand />
+    </div>
+  </section>
 
-      <!-- 01 Server software -->
-      <section class="sec" aria-labelledby="types-title" data-types data-software={JSON.stringify(software)}>
-        <div class="wrap">
-          <header class="sec-head">
-            <p class="sec-no mono"><span>01</span>Server software</p>
-            <h2 id="types-title" class="display">Six kinds of server. One wizard.</h2>
-            <p class="sec-lead">Pick the software, the version and the memory. CraftPanel does the rest and shows you what you'll get.</p>
-          </header>
+  <!-- Who it's for -->
+  <section class="sec sec-audience" aria-labelledby="audience-title">
+    <div class="wrap">
+      <h2 id="audience-title" class="display">Who runs CraftPanel?</h2>
+      <ul class="choices audiences">
+        {audiences.map((a) => (
+          <li class="choice">
+            <h3>{a.title}</h3>
+            <p class="aud-q">“{a.question}”</p>
+            <p>{a.text}</p>
+            <a class="choice-link" href={a.link.href}>{a.link.label} <UiIcon name="arrow-right" size={12} /></a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
 
-          <div class="types">
-            <div class="type-groups" role="radiogroup" aria-label="Server software">
-              {
-                softwareGroups.map((group) => (
-                  <div class:list={["type-group", { "is-wide": group.wide }]}>
-                    <p class="type-group-label">{group.label}</p>
-                    <div class="type-cards">
-                      {group.items.map((key) => {
-                        const t = software[key];
-                        return (
-                          <label class:list={["type", { "has-badge": t.rec }]} style={`--type:${t.color}`}>
-                            <input type="radio" name="sw" value={t.key} checked={t.key === "paper"} />
-                            <span class="type-body">
-                              <span class="type-icon"><Pixel name={t.icon} size={32} /></span>
-                              <span class="type-text">
-                                <span class="type-name">
-                                  {t.name}
-                                  {t.rec && <span class="type-rec mono">Recommended</span>}
-                                </span>
-                                <span class="type-note">{t.note}</span>
-                              </span>
+  <hr class="px-rule" />
+
+  <!-- 01 Server software -->
+  <section class="sec" aria-labelledby="types-title" data-types data-software={JSON.stringify(software)}>
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>01</span>Server software</p>
+        <h2 id="types-title" class="display">Six kinds of server. One wizard.</h2>
+        <p class="sec-lead">Pick the software, the version and the memory. CraftPanel does the rest and shows you what you'll get.</p>
+      </header>
+
+      <div class="types">
+        <div class="type-groups" role="radiogroup" aria-label="Server software">
+          {
+            softwareGroups.map((group) => (
+              <div class:list={["type-group", { "is-wide": group.wide }]}>
+                <p class="type-group-label">{group.label}</p>
+                <div class="type-cards">
+                  {group.items.map((key) => {
+                    const t = software[key];
+                    return (
+                      <label class:list={["type", { "has-badge": t.rec }]} style={`--type:${t.color}`}>
+                        <input type="radio" name="sw" value={t.key} checked={t.key === "paper"} />
+                        <span class="type-body">
+                          <span class="type-icon"><Pixel name={t.icon} size={32} /></span>
+                          <span class="type-text">
+                            <span class="type-name">
+                              {t.name}
+                              {t.rec && <span class="type-rec mono">Recommended</span>}
                             </span>
-                            <span class="type-check" aria-hidden="true"><UiIcon name="check" size={12} /></span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-
-            <div class="preview-col">
-              <div class="pv-cap mono">
-                <span>Your panel</span>
-                <span data-pv="cap">{defaultSw.name} {defaultVer[0]} selected</span>
-              </div>
-              <div class="preview" style={`--type:${defaultSw.color}`}>
-                <div class="pv-bar">
-                  <span class="pv-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <span class="mono">localhost:8080/server</span>
-                </div>
-                <div class="pv-body">
-                  <aside class="pv-side" aria-hidden="true">
-                    <span class="pv-brand"><Wordmark /></span>
-                    <span class="pv-side-label mono">Servers</span>
-                    <div class="pv-side-list" data-pv="servers">
-                      {
-                        defaultSw.servers.map((srv) => (
-                          <span class:list={["pv-side-item", `is-${srv.status}`]}>
-                            <span class="pv-srv-dot"></span>
-                            <span>{srv.name}</span>
+                            <span class="type-note">{t.note}</span>
                           </span>
-                        ))
-                      }
-                    </div>
-                  </aside>
-                  <div class="pv-main" aria-live="polite">
-                    <div class="pv-head">
-                      <span class="pv-name" data-pv="title">{defaultSw.title}</span>
-                      <span class="pv-status"><span class="dot-run"></span>Running</span>
-                      <span class="pv-badge" data-pv="name">{defaultSw.name}</span>
-                    </div>
-                    <p class="pv-meta mono" data-pv="meta">{defaultMeta}</p>
-                    <div class="pv-tabs" aria-hidden="true" data-pv="tabs">
-                      {
-                        defaultSw.tabs.map((tab, idx) => (
-                          <span class:list={["pv-tab", { "is-on": idx === 0, "is-new": tab === defaultSw.highlightTab }]}>{tab}</span>
-                        ))
-                      }
-                    </div>
-                    <dl class="pv-stats" data-pv="stats">
-                      <div><dt>Players</dt><dd class="mono" data-pv="players">{defaultSw.players}</dd></div>
-                      <div><dt data-pv="mid-label">{defaultSw.middleStat[0]}</dt><dd class="mono" data-pv="mid-val">{defaultSw.middleStat[1]}</dd></div>
-                      <div><dt>Memory</dt><dd class="mono" data-pv="mem"><span>{defaultMemText}</span><small>GB</small></dd></div>
-                    </dl>
-                    <div class="pv-addons" data-pv="source-wrap">
-                      <span class="pv-source-icon" data-source-icon="plug"><UiIcon name="plug" size={24} /></span>
-                      <span class="pv-source-icon" data-source-icon="mod" hidden><UiIcon name="mod" size={24} /></span>
-                      <span class="pv-source-icon" data-source-icon="cube" hidden><UiIcon name="box" size={24} /></span>
-                      <span data-pv="addons">{defaultSw.source}</span>
-                    </div>
-                  </div>
+                        </span>
+                        <span class="type-check" aria-hidden="true"><UiIcon name="check" size={12} /></span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
-            </div>
-          </div>
+            ))
+          }
+        </div>
 
-          <div class="wizard" aria-label="Your server setup">
-            <div class="wz-step">
-              <div class="wz-step-head"><b class="mono">1</b><span>Software</span></div>
-              <div class="wz-step-val">
-                {
-                  Object.values(software).map((s) => (
-                    <span class="type-icon wz-sw-icon" data-wz-icon={s.key} style={`--type:${s.color}`} hidden={s.key !== "paper"}>
-                      <Pixel name={s.icon} size={32} />
-                    </span>
-                  ))
-                }
-                <span data-wz="sw-name">{defaultSw.name}</span>
-              </div>
+        <div class="preview-col">
+          <div class="pv-cap mono">
+            <span>Your panel</span>
+            <span data-pv="cap">{defaultSw.name} {defaultVer[0]} selected</span>
+          </div>
+          <div class="preview" style={`--type:${defaultSw.color}`}>
+            <div class="pv-bar">
+              <span class="pv-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="mono">localhost:8080/server</span>
             </div>
-            <div class="wz-step">
-              <div class="wz-step-head"><b class="mono">2</b><label for="wz-ver">Version</label></div>
-              <div class="wz-select">
-                <select id="wz-ver" data-wz-ver>
-                  {defaultSw.versions.map((v, idx) => <option value={String(idx)} selected={idx === 0}>{v[0]}</option>)}
-                </select>
-              </div>
-            </div>
-            <div class="wz-step">
-              <div class="wz-step-head"><b class="mono">3</b><span>Memory</span></div>
-              <div class="wz-step-val">
-                <div class="wz-seg" role="radiogroup" aria-label="Memory in gigabytes" data-wz-mem>
+            <div class="pv-body">
+              <aside class="pv-side" aria-hidden="true">
+                <span class="pv-brand"><Wordmark /></span>
+                <span class="pv-side-label mono">Servers</span>
+                <div class="pv-side-list" data-pv="servers">
                   {
-                    memoryOptions.map((m) => (
-                      <label>
-                        <input type="radio" name="wz-mem" value={String(m)} checked={m === defaultMem} aria-label={`${m} gigabytes`} />
-                        <span class="mono">{m}</span>
-                      </label>
+                    defaultSw.servers.map((srv) => (
+                      <span class:list={["pv-side-item", `is-${srv.status}`]}>
+                        <span class="pv-srv-dot"></span>
+                        <span>{srv.name}</span>
+                      </span>
                     ))
                   }
                 </div>
-                <span class="wz-unit">GB</span>
-              </div>
-            </div>
-            <div class="wz-cta-wrap">
-              <button class="wz-btn" type="button" data-wz-cta>Create a {defaultSw.name} server</button>
-              <a class="wz-link" href="/docs/guides/server-software/">See all supported versions</a>
-            </div>
-          </div>
-
-          <div class="sw-trust">
-            {
-              softwareTrust.map((item) => (
-                <div class="sw-trust-item">
-                  <span class="sw-trust-icon"><UiIcon name={item.icon} size={24} /></span>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <p>{item.text}</p>
-                  </div>
+              </aside>
+              <div class="pv-main" aria-live="polite">
+                <div class="pv-head">
+                  <span class="pv-name" data-pv="title">{defaultSw.title}</span>
+                  <span class="pv-status"><span class="dot-run"></span>Running</span>
+                  <span class="pv-badge" data-pv="name">{defaultSw.name}</span>
                 </div>
-              ))
-            }
-          </div>
-        </div>
-      </section>
-
-      <!-- 02 Features -->
-      <section class="sec sec-dense" id="features" aria-labelledby="features-title">
-        <div class="wrap">
-          <header class="sec-head">
-            <p class="sec-no mono"><span>02</span>What it does</p>
-            <h2 id="features-title" class="display">The stuff you'd otherwise do over SSH at 23:00.</h2>
-          </header>
-
-          <div class="bento">
-            <article class="tile tile-console">
-              <div class="tile-copy">
-                <p class="tile-label mono"><UiIcon name="terminal" size={24} />live console · metrics</p>
-                <h3>See what your server is doing. Right now.</h3>
-                <p>The real console over WebSockets, with history, filters and command input. Players, CPU, memory and TPS update every few seconds.</p>
-              </div>
-              <div class="demo-console" data-console>
-                <div class="dc-metrics mono" aria-hidden="true">
-                  <span>players <b data-m="players">2</b>/20</span>
-                  <span>tps <b data-m="tps">20.0</b></span>
-                  <span>cpu <b data-m="cpu">12</b>%</span>
-                  <span class="dc-spark" data-spark>{Array.from({ length: 24 }, (_, i) => <i style={`--v:${(30 + ((i * 37) % 50))}%`}></i>)}</span>
-                </div>
-                <ol class="dc-log mono" aria-label="Example console output">
-                  <li>[19:57:51 INFO]: Starting minecraft server version 1.21.4</li>
-                  <li>[19:57:52 INFO]: Loading properties</li>
-                  <li>[19:57:55 INFO]: Preparing level "world"</li>
-                  <li>[19:57:58 INFO]: Preparing start region for dimension minecraft:overworld</li>
-                  <li>[19:58:02 INFO]: Done (8.412s)! For help, type "help"</li>
-                  <li>[19:58:41 INFO]: UUID of player Alex is 8667ba71-b85a-4004-af54-457a9734eed7</li>
-                  <li>[19:58:41 INFO]: Alex joined the game</li>
-                  <li>[19:59:07 INFO]: &lt;Alex&gt; anyone up for the nether?</li>
-                  <li>[20:00:12 INFO]: UUID of player Sam is 0ba1d6e5-61c4-4f7f-9b2c-3f2a6d1c88a0</li>
-                  <li>[20:00:12 INFO]: Sam joined the game</li>
-                  <li class="dc-warn">[20:00:30 WARN]: Can't keep up! Is the server overloaded? Running 2154ms behind, skipping 43 ticks</li>
-                  <li>[20:02:18 INFO]: UUID of player Mia is c4f8a2b0-9d3e-4c71-8a65-1e7b0d2f4a93</li>
-                  <li>[20:02:18 INFO]: Mia joined the game</li>
-                  <li>[20:02:55 INFO]: &lt;Sam&gt; yes, after the cave</li>
-                  <li>[20:03:41 INFO]: Mia left the game</li>
-                  <li class="dc-cmd">&gt; say Nether trip at 9. Bring food.</li>
-                  <li>[20:04:02 INFO]: [Server] Nether trip at 9. Bring food.</li>
-                  <li>[20:15:00 INFO]: Saving the game (this may take a moment!)</li>
-                  <li>[20:15:00 INFO]: Saved the game</li>
-                  <li>[20:21:37 INFO]: Sam has made the advancement [Hot Stuff]</li>
-                  <li>[20:24:09 INFO]: &lt;Alex&gt; see you at 9</li>
-                </ol>
-                <div class="dc-input mono" aria-hidden="true"><span>&gt;</span><span class="dc-typed">say hello</span></div>
-              </div>
-            </article>
-
-            <article class="tile tile-update">
-              <div class="tile-copy">
-                <p class="tile-label mono"><UiIcon name="upload" size={24} />independent runtime</p>
-                <h3>Update the panel. Keep playing.</h3>
-                <p>Minecraft runs in its own service. Watch the dashboard update and reconnect while your worlds keep ticking.</p>
-              </div>
-              <RuntimeDiagram />
-            </article>
-
-            <article class="tile tile-backup">
-              <div class="tile-copy">
-                <p class="tile-label mono"><UiIcon name="archive" size={24} />backups</p>
-                <h3>23:04. Someone TNT'd the base.</h3>
-                <p>Pick last night's backup and press Restore. CraftPanel verifies the archive and saves the current mess first, just in case.</p>
-              </div>
-              <div class="demo-backup" data-backup>
-                <fieldset class="db-list">
-                  <legend class="sr-only">Backups of survival</legend>
+                <p class="pv-meta mono" data-pv="meta">{defaultMeta}</p>
+                <div class="pv-tabs" aria-hidden="true" data-pv="tabs">
                   {
-                    backups.map((b, i) => (
-                      <label class="db-item">
-                        <input type="radio" name="backup" value={b.when} checked={i === 1} />
-                        <span class="db-when">{b.when}</span>
-                        <span class="db-size mono">{b.size}</span>
-                        <span class="db-tag mono">{b.tag} · verified</span>
-                      </label>
+                    defaultSw.tabs.map((tab, idx) => (
+                      <span class:list={["pv-tab", { "is-on": idx === 0, "is-new": tab === defaultSw.highlightTab }]}>{tab}</span>
                     ))
                   }
-                </fieldset>
-                <div class="db-foot">
-                  <button type="button" class="btn btn-small btn-ink" data-restore>Restore</button>
-                  <ol class="db-steps mono" aria-live="polite" data-steps></ol>
+                </div>
+                <dl class="pv-stats" data-pv="stats">
+                  <div><dt>Players</dt><dd class="mono" data-pv="players">{defaultSw.players}</dd></div>
+                  <div><dt data-pv="mid-label">{defaultSw.middleStat[0]}</dt><dd class="mono" data-pv="mid-val">{defaultSw.middleStat[1]}</dd></div>
+                  <div><dt>Memory</dt><dd class="mono" data-pv="mem"><span>{defaultMemText}</span><small>GB</small></dd></div>
+                </dl>
+                <div class="pv-addons" data-pv="source-wrap">
+                  <span class="pv-source-icon" data-source-icon="plug"><UiIcon name="plug" size={24} /></span>
+                  <span class="pv-source-icon" data-source-icon="mod" hidden><UiIcon name="mod" size={24} /></span>
+                  <span class="pv-source-icon" data-source-icon="cube" hidden><UiIcon name="box" size={24} /></span>
+                  <span data-pv="addons">{defaultSw.source}</span>
                 </div>
               </div>
-            </article>
-
-            <article class="tile tile-plugins">
-              <div class="tile-copy">
-                <p class="tile-label mono"><UiIcon name="blocks" size={24} />plugins · mods · modpacks</p>
-                <h3>Modrinth and Hangar, built in.</h3>
-                <p>Search, install with checksum checks and get update suggestions. Or start from a Modrinth modpack: the Minecraft and loader version come from the pack.</p>
-              </div>
-              <div class="demo-search">
-                <p class="dp-field mono" aria-label="Example search for luck"><UiIcon name="search" size={12} /><span class="dp-query">luck</span><span class="dp-count">3 results · Paper 1.21.4</span></p>
-                <ul class="demo-plugins" aria-label="Example search results">
-                  <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">Modrinth</span></li>
-                  <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">Hangar</span></li>
-                  <li><span class="dp-name">Lucky Block</span><span class="dp-warn mono">needs Fabric</span><span class="dp-src mono">Modrinth</span></li>
-                </ul>
-                <p class="dp-note">Same plugin, two sources. CraftPanel picks the one that fits your version.</p>
-              </div>
-            </article>
-
-            <article class="tile tile-ai">
-              <div class="tile-copy">
-                <p class="tile-label mono"><UiIcon name="sparkle" size={24} />ai assistant · optional · your key</p>
-                <h3>Say what you want. Approve what it does.</h3>
-                <p>Ask in plain words. The assistant reads status, players and the console, and every change waits for your OK. Bring a key for Claude or OpenAI, or run a local model.</p>
-              </div>
-              <div class="demo-ai" data-ai>
-                <p class="ai-row ai-user">Whitelist Steve, he joins tonight</p>
-                <p class="ai-row ai-tool mono"><UiIcon name="check" size={12} />List players on survival</p>
-                <p class="ai-row ai-bot">Alex and Sam are online and the whitelist is on. I'll add Steve.</p>
-                <div class="ai-row ai-card" data-ai-card>
-                  <p class="ai-card-title">Add Steve to the whitelist</p>
-                  <div class="ai-card-foot">
-                    <span class="ai-state mono" aria-live="polite" data-ai-state>Waiting for your approval</span>
-                    <button type="button" class="btn btn-small btn-outline" data-ai-act="decline">Decline</button>
-                    <button type="button" class="btn btn-small btn-ink" data-ai-act="approve">Approve</button>
-                    <button type="button" class="btn btn-small btn-outline" data-ai-act="reset" hidden>Ask again</button>
-                  </div>
-                </div>
-                <p class="ai-console mono" data-ai-out hidden>[21:04:12 INFO]: Added Steve to the whitelist</p>
-              </div>
-            </article>
-
-            <article class="tile tile-perf">
-              <div class="tile-copy">
-                <p class="tile-label mono"><UiIcon name="chart" size={24} />performance · insights</p>
-                <h3>Lag, with a reason.</h3>
-                <p>TPS, tick time, CPU and memory over the last hour. When ticks run long, CraftPanel marks the moment and says what would help.</p>
-              </div>
-              <figure class="demo-perf" data-perf>
-                <div class="dpf-head mono"><span>Tick time</span><span><b>18.6</b> ms avg · peak <b class="dpf-bad">71.4</b></span></div>
-                <svg class="dpf-chart" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true">
-                  <line class="dpf-budget" x1="0" y1="40" x2="320" y2="40" />
-                  <path class="dpf-area" d="M0 96 L20 94 L40 95 L60 92 L80 93 L100 90 L120 88 L140 70 L150 30 L160 18 L170 34 L180 62 L200 84 L220 86 L240 72 L250 36 L260 46 L270 78 L290 88 L320 90 L320 120 L0 120 Z" />
-                  <path class="dpf-line" d="M0 96 L20 94 L40 95 L60 92 L80 93 L100 90 L120 88 L140 70 L150 30 L160 18 L170 34 L180 62 L200 84 L220 86 L240 72 L250 36 L260 46 L270 78 L290 88 L320 90" />
-                  <rect class="dpf-mark" x="140" y="0" width="40" height="120" />
-                  <rect class="dpf-mark" x="240" y="0" width="30" height="120" />
-                </svg>
-                <p class="dpf-axis mono" aria-hidden="true"><span>20:00</span><span>50 ms budget</span><span>21:00</span></p>
-                <figcaption class="dpf-insight">
-                  <b>Generating new terrain is likely a big part of the load</b>
-                  <span>Exploring players force the server to generate chunks while it ticks.</span>
-                  <span class="dpf-fix mono">Open pre-generation <UiIcon name="arrow-right" size={12} /></span>
-                </figcaption>
-              </figure>
-            </article>
-
-            <article class="tile tile-list">
-              <ul class="minor">
-                {
-                  minor.map((m) => (
-                    <li>
-                      <h3 class="minor-title"><UiIcon name={m.icon} size={24} />{m.title}</h3>
-                      <p class="minor-text">{m.text}</p>
-                      <p class="minor-chips mono">{m.chips.map((c) => <span>{c}</span>)}</p>
-                    </li>
-                  ))
-                }
-              </ul>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <!-- 03 Closer look -->
-      <section class="sec" id="dashboard" aria-labelledby="look-title">
-        <div class="wrap">
-          <header class="sec-head sec-head-row">
-            <div>
-              <p class="sec-no mono"><span>03</span>Inside the dashboard</p>
-              <h2 id="look-title" class="display">Inside CraftPanel.</h2>
-            </div>
-            <div class="look-tabs" role="tablist" aria-label="Dashboard screens" data-look-tabs>
-              {
-                looks.map((l, i) => (
-                  <button role="tab" type="button" id={`look-tab-${l.key}`} aria-controls={`look-${l.key}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
-                    {l.label}
-                  </button>
-                ))
-              }
-            </div>
-          </header>
-          <div class="look" data-look>
-            <div class="window">
-              <div class="window-bar" aria-hidden="true"><span class="pv-dots"><i></i><i></i><i></i></span><span class="mono">craftpanel · localhost:8080</span></div>
-              <div class="look-stage">
-                {
-                  looks.map((l, i) => (
-                    <div class="look-panel" role="tabpanel" id={`look-${l.key}`} aria-labelledby={`look-tab-${l.key}`} data-active={i === 0 ? "true" : "false"} inert={i !== 0}>
-                      <div class="look-zoom">
-                        <Shot name={l.key} alt={l.alt} eager={i === 0} />
-                        {l.spots.map((s, n) => (
-                          <button
-                            type="button"
-                            class="spot"
-                            style={`left:${s.x}%;top:${s.y}%`}
-                            aria-describedby={`spot-${l.key}-${n}`}
-                            data-spot={`${l.key}-${n}`}
-                            data-x={s.x}
-                            data-y={s.y}
-                            data-v={s.y < 18 ? "below" : undefined}
-                            data-h={s.x > 74 ? "end" : s.x < 22 ? "start" : undefined}
-                          >
-                            <span class="spot-n mono">{n + 1}</span>
-                            <span class="spot-tip" role="tooltip" id={`spot-${l.key}-${n}`}>{s.text}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))
-                }
-                <button type="button" class="look-out mono" data-look-out hidden>
-                  <UiIcon name="search" size={12} /> Whole screen
-                </button>
-              </div>
-            </div>
-            <div class="look-legend">
-              <p class="look-hint mono">Pick a number to zoom in.</p>
-              {
-                looks.map((l, i) => (
-                  <ol class="legend" data-legend={l.key} hidden={i !== 0}>
-                    {l.spots.map((s, n) => (
-                      <li>
-                        <button type="button" data-spot-ref={`${l.key}-${n}`} aria-pressed="false">
-                          <span class="legend-n mono">{n + 1}</span>
-                          <span>{s.text}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ol>
-                ))
-              }
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <!-- 04 Hardware -->
-      <section class="sec sec-stone" id="hardware" aria-labelledby="hw-title">
-        <div class="wrap">
-          <header class="sec-head">
-            <p class="sec-no mono"><span>04</span>Hardware</p>
-            <h2 id="hw-title" class="display">Runs on what you have.</h2>
-            <p class="sec-lead">Planning estimates for Paper with a pre-generated world, not measured hardware benchmarks. Mods, mob farms and view distance change the load.</p>
-          </header>
-          <div class="devices">
+      <div class="wizard" aria-label="Your server setup">
+        <div class="wz-step">
+          <div class="wz-step-head"><b class="mono">1</b><span>Software</span></div>
+          <div class="wz-step-val">
             {
-              devices.map((d) => (
-                <article class="device">
-                  <div class="device-art">
-                    <Iso boxes={d.scene} label={d.name} class="iso" />
-                  </div>
-                  <h3>{d.name}</h3>
-                  <p class="device-os mono">{d.os}</p>
-                  <dl class="device-stats">
-                    <div><dt class="mono">RAM for Minecraft</dt><dd class="display">{d.ram}</dd></div>
-                    <div><dt class="mono">Players, estimate</dt><dd class="display">{d.players}</dd></div>
-                  </dl>
-                  <p class="device-note">{d.note}</p>
-                </article>
+              Object.values(software).map((s) => (
+                <span class="type-icon wz-sw-icon" data-wz-icon={s.key} style={`--type:${s.color}`} hidden={s.key !== "paper"}>
+                  <Pixel name={s.icon} size={32} />
+                </span>
               ))
             }
+            <span data-wz="sw-name">{defaultSw.name}</span>
           </div>
         </div>
-      </section>
-
-      <!-- 05 Security -->
-      <section class="sec sec-dense" id="security" aria-labelledby="security-title">
-        <div class="wrap">
-          <header class="sec-head">
-            <p class="sec-no mono"><span>05</span>Security</p>
-            <h2 id="security-title" class="display">Safe by default. Honest about the rest.</h2>
-            <p class="sec-lead">Your server runs on your machine, so CraftPanel treats every server, plugin and download as something to contain.</p>
-          </header>
-          <ul class="safe">
-            {safety.map((s) => (
-              <li>
-                <h3 class="minor-title"><UiIcon name={s.icon} size={24} />{s.title}</h3>
-                <p class="minor-text">{s.text}</p>
-              </li>
-            ))}
-          </ul>
-          <p class="safe-more">
-            <a href="/docs/reference/security/">What CraftPanel protects, and its limits <UiIcon name="arrow-right" size={12} /></a>
-            <a href={`${github}/blob/main/docs/STATUS.md`} rel="noopener">How each feature was tested <UiIcon name="arrow-right" size={12} /></a>
-          </p>
-        </div>
-      </section>
-
-      <!-- 06 Comparison -->
-      <section class="sec" id="compare" aria-labelledby="compare-title">
-        <div class="wrap wrap-mid">
-          <header class="sec-head">
-            <p class="sec-no mono"><span>06</span>Hosting choices</p>
-            <h2 id="compare-title" class="display">Run it yourself, or rent a managed server?</h2>
-            <p class="sec-lead">Both are good answers. The real question is who looks after the machine.</p>
-          </header>
-          <div class="table-scroll" tabindex="0" role="region" aria-label="Self-hosting and managed Minecraft hosting comparison">
-            <table class="compare">
-              <thead>
-                <tr><th scope="col"><span class="sr-only">Aspect</span></th>{compare.cols.map((c, i) => <th scope="col" class={i === 0 ? "is-us" : undefined}>{c}</th>)}</tr>
-              </thead>
-              <tbody>
-                {compare.rows.map((r) => (
-                  <tr>
-                    <th scope="row" class="mono">{r.aspect}</th>
-                    {r.cells.map(([m, text], i) => (
-                      <td class={i === 0 ? "is-us" : undefined} data-mark={m}>
-                        <span class="cmp-col mono" aria-hidden="true">{i === 0 ? "CraftPanel" : "Managed"}</span>
-                        <span class="cmp-cell"><span class="cmp-mark"><UiIcon name={marks[m].icon} size={12} label={marks[m].label} /></span>{text}</span>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div class="wz-step">
+          <div class="wz-step-head"><b class="mono">2</b><label for="wz-ver">Version</label></div>
+          <div class="wz-select">
+            <select id="wz-ver" data-wz-ver>
+              {defaultSw.versions.map((v, idx) => <option value={String(idx)} selected={idx === 0}>{v[0]}</option>)}
+            </select>
           </div>
-          <p class="cmp-key mono" aria-hidden="true">
-            {(Object.keys(marks) as Mark[]).map((m) => <span data-mark={m}><span class="cmp-mark"><UiIcon name={marks[m].icon} size={12} /></span>{marks[m].label.toLowerCase()}</span>)}
-          </p>
-          <ul class="choices">
-            {choices.map((c, i) => (
-              <li class:list={["choice", { "is-us": i === 0 }]}>
-                <h3>{c.title}</h3>
-                <p>{c.text}</p>
-                {c.link && <a class="choice-link" href={c.link.href}>{c.link.label} <UiIcon name="arrow-right" size={12} /></a>}
-              </li>
-            ))}
-          </ul>
         </div>
-      </section>
+        <div class="wz-step">
+          <div class="wz-step-head"><b class="mono">3</b><span>Memory</span></div>
+          <div class="wz-step-val">
+            <div class="wz-seg" role="radiogroup" aria-label="Memory in gigabytes" data-wz-mem>
+              {
+                memoryOptions.map((m) => (
+                  <label>
+                    <input type="radio" name="wz-mem" value={String(m)} checked={m === defaultMem} aria-label={`${m} gigabytes`} />
+                    <span class="mono">{m}</span>
+                  </label>
+                ))
+              }
+            </div>
+            <span class="wz-unit">GB</span>
+          </div>
+        </div>
+        <div class="wz-cta-wrap">
+          <button class="wz-btn" type="button" data-wz-cta>Create a {defaultSw.name} server</button>
+          <a class="wz-link" href="/docs/guides/server-software/">See all supported versions</a>
+        </div>
+      </div>
 
-      <!-- 07 Trust -->
-      <section class="sec sec-trust" aria-labelledby="trust-title">
-        <div class="wrap trust">
-          <div class="trust-project">
-            <p class="sec-no mono"><span>07</span>Project & source</p>
-            <h2 id="trust-title" class="display">Built by Victor.</h2>
-            <p>CraftPanel is built for people running their own Minecraft server. The source, issues and release notes are public.</p>
-            <a class="trust-cta" href={github} rel="noopener">
-              <UiIcon name="github" size={24} /> View on GitHub
-              {facts.stars !== null && facts.stars >= 10 && <span class="trust-cta-count">{facts.stars} stars</span>}
-            </a>
-            <div class="project-author">
-              <a class="avatar-link" href="https://github.com/vctrchappot" rel="noopener">
-                <Image src={avatar} alt="Victor Chappot, author of CraftPanel (GitHub profile)" width={48} height={48} class="avatar" />
-              </a>
+      <div class="sw-trust">
+        {
+          softwareTrust.map((item) => (
+            <div class="sw-trust-item">
+              <span class="sw-trust-icon"><UiIcon name={item.icon} size={24} /></span>
               <div>
-                <p class="author-name">Victor</p>
-                <a class="author-handle" href="https://github.com/vctrchappot" rel="noopener">@vctrchappot</a>
+                <strong>{item.title}</strong>
+                <p>{item.text}</p>
               </div>
             </div>
-          </div>
-          <dl class="trust-facts">
-            <div>
-              <dt class="mono">latest release</dt>
-              <dd>
-                <span class="fact-badge mono">{release.tag}</span>{releaseDate && <span class="muted"> {releaseDate}</span>} · <a href={release.url}>Release notes</a>
-              </dd>
-            </div>
-            <div><dt class="mono">tests</dt><dd>400+ automated tests, plus real-server scenarios with a bot that joins and chats</dd></div>
-            <div><dt class="mono">ci</dt><dd>Every push: Linux, Windows, macOS and ARM64</dd></div>
-            <div><dt class="mono">license</dt><dd><a href={`${github}/blob/main/LICENSE`}>FSL-1.1-ALv2</a>, Apache-2.0 after two years</dd></div>
-            <div><dt class="mono">telemetry</dt><dd><span class="fact-none"><UiIcon name="check" size={12} /><strong>None.</strong></span> Not even a counter.</dd></div>
-            <div><dt class="mono">github</dt><dd><a href={github} rel="noopener">Source</a>, <a href={`${github}/issues`} rel="noopener">issues</a> and <a href={`${github}/blob/main/docs/ROADMAP.md`} rel="noopener">roadmap</a>. A star helps.</dd></div>
-          </dl>
-        </div>
-      </section>
+          ))
+        }
+      </div>
+    </div>
+  </section>
 
-      <!-- 08 FAQ -->
-      <section class="sec" aria-labelledby="faq-title">
-        <div class="wrap wrap-mid faq-layout">
-          <div class="faq-side">
-            <header class="sec-head">
-              <p class="sec-no mono"><span>08</span>Questions</p>
-              <h2 id="faq-title" class="display">Asked before.</h2>
-              <p class="sec-lead">Short answers to what people ask before installing. The docs have the long ones.</p>
-            </header>
-            <aside class="faq-help" aria-label="More help">
-              <p class="faq-help-title">Not on the list?</p>
-              <a href="/docs/reference/troubleshooting/">Troubleshooting guide <UiIcon name="arrow-right" size={12} /></a>
-              <a href={`${github}/issues`} rel="noopener">Ask on GitHub <UiIcon name="arrow-right" size={12} /></a>
-            </aside>
+  <!-- 02 Features -->
+  <section class="sec sec-dense" id="features" aria-labelledby="features-title">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>02</span>What it does</p>
+        <h2 id="features-title" class="display">The stuff you'd otherwise do over SSH at 23:00.</h2>
+      </header>
+
+      <div class="bento">
+        <article class="tile tile-console">
+          <div class="tile-copy">
+            <p class="tile-label mono"><UiIcon name="terminal" size={24} />live console · metrics</p>
+            <h3>See what your server is doing. Right now.</h3>
+            <p>The real console over WebSockets, with history, filters and command input. Players, CPU, memory and TPS update every few seconds.</p>
           </div>
-          <div class="faq">
+          <div class="demo-console" data-console>
+            <div class="dc-metrics mono" aria-hidden="true">
+              <span>players <b data-m="players">2</b>/20</span>
+              <span>tps <b data-m="tps">20.0</b></span>
+              <span>cpu <b data-m="cpu">12</b>%</span>
+              <span class="dc-spark" data-spark>{Array.from({ length: 24 }, (_, i) => <i style={`--v:${(30 + ((i * 37) % 50))}%`}></i>)}</span>
+            </div>
+            <ol class="dc-log mono" aria-label="Example console output">
+              <li>[19:57:51 INFO]: Starting minecraft server version 1.21.4</li>
+              <li>[19:57:52 INFO]: Loading properties</li>
+              <li>[19:57:55 INFO]: Preparing level "world"</li>
+              <li>[19:57:58 INFO]: Preparing start region for dimension minecraft:overworld</li>
+              <li>[19:58:02 INFO]: Done (8.412s)! For help, type "help"</li>
+              <li>[19:58:41 INFO]: UUID of player Alex is 8667ba71-b85a-4004-af54-457a9734eed7</li>
+              <li>[19:58:41 INFO]: Alex joined the game</li>
+              <li>[19:59:07 INFO]: &lt;Alex&gt; anyone up for the nether?</li>
+              <li>[20:00:12 INFO]: UUID of player Sam is 0ba1d6e5-61c4-4f7f-9b2c-3f2a6d1c88a0</li>
+              <li>[20:00:12 INFO]: Sam joined the game</li>
+              <li class="dc-warn">[20:00:30 WARN]: Can't keep up! Is the server overloaded? Running 2154ms behind, skipping 43 ticks</li>
+              <li>[20:02:18 INFO]: UUID of player Mia is c4f8a2b0-9d3e-4c71-8a65-1e7b0d2f4a93</li>
+              <li>[20:02:18 INFO]: Mia joined the game</li>
+              <li>[20:02:55 INFO]: &lt;Sam&gt; yes, after the cave</li>
+              <li>[20:03:41 INFO]: Mia left the game</li>
+              <li class="dc-cmd">&gt; say Nether trip at 9. Bring food.</li>
+              <li>[20:04:02 INFO]: [Server] Nether trip at 9. Bring food.</li>
+              <li>[20:15:00 INFO]: Saving the game (this may take a moment!)</li>
+              <li>[20:15:00 INFO]: Saved the game</li>
+              <li>[20:21:37 INFO]: Sam has made the advancement [Hot Stuff]</li>
+              <li>[20:24:09 INFO]: &lt;Alex&gt; see you at 9</li>
+            </ol>
+            <div class="dc-input mono" aria-hidden="true"><span>&gt;</span><span class="dc-typed">say hello</span></div>
+          </div>
+        </article>
+
+        <article class="tile tile-update">
+          <div class="tile-copy">
+            <p class="tile-label mono"><UiIcon name="upload" size={24} />independent runtime</p>
+            <h3>Update the panel. Keep playing.</h3>
+            <p>Minecraft runs in its own service. Watch the dashboard update and reconnect while your worlds keep ticking.</p>
+          </div>
+          <RuntimeDiagram />
+        </article>
+
+        <article class="tile tile-backup">
+          <div class="tile-copy">
+            <p class="tile-label mono"><UiIcon name="archive" size={24} />backups</p>
+            <h3>23:04. Someone TNT'd the base.</h3>
+            <p>Pick last night's backup and press Restore. CraftPanel verifies the archive and saves the current mess first, just in case.</p>
+          </div>
+          <div class="demo-backup" data-backup>
+            <fieldset class="db-list">
+              <legend class="sr-only">Backups of survival</legend>
+              {
+                backups.map((b, i) => (
+                  <label class="db-item">
+                    <input type="radio" name="backup" value={b.when} checked={i === 1} />
+                    <span class="db-when">{b.when}</span>
+                    <span class="db-size mono">{b.size}</span>
+                    <span class="db-tag mono">{b.tag} · verified</span>
+                  </label>
+                ))
+              }
+            </fieldset>
+            <div class="db-foot">
+              <button type="button" class="btn btn-small btn-ink" data-restore>Restore</button>
+              <ol class="db-steps mono" aria-live="polite" data-steps></ol>
+            </div>
+          </div>
+        </article>
+
+        <article class="tile tile-plugins">
+          <div class="tile-copy">
+            <p class="tile-label mono"><UiIcon name="blocks" size={24} />plugins · mods · modpacks</p>
+            <h3>Modrinth and Hangar, built in.</h3>
+            <p>Search, install with checksum checks and get update suggestions. Or start from a Modrinth modpack: the Minecraft and loader version come from the pack.</p>
+          </div>
+          <div class="demo-search">
+            <p class="dp-field mono" aria-label="Example search for luck"><UiIcon name="search" size={12} /><span class="dp-query">luck</span><span class="dp-count">3 results · Paper 1.21.4</span></p>
+            <ul class="demo-plugins" aria-label="Example search results">
+              <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">Modrinth</span></li>
+              <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">Hangar</span></li>
+              <li><span class="dp-name">Lucky Block</span><span class="dp-warn mono">needs Fabric</span><span class="dp-src mono">Modrinth</span></li>
+            </ul>
+            <p class="dp-note">Same plugin, two sources. CraftPanel picks the one that fits your version.</p>
+          </div>
+        </article>
+
+        <article class="tile tile-ai">
+          <div class="tile-copy">
+            <p class="tile-label mono"><UiIcon name="sparkle" size={24} />ai assistant · optional · your key</p>
+            <h3>Say what you want. Approve what it does.</h3>
+            <p>Ask in plain words. The assistant reads status, players and the console, and every change waits for your OK. Bring a key for Claude or OpenAI, or run a local model.</p>
+          </div>
+          <div class="demo-ai" data-ai>
+            <p class="ai-row ai-user">Whitelist Steve, he joins tonight</p>
+            <p class="ai-row ai-tool mono"><UiIcon name="check" size={12} />List players on survival</p>
+            <p class="ai-row ai-bot">Alex and Sam are online and the whitelist is on. I'll add Steve.</p>
+            <div class="ai-row ai-card" data-ai-card>
+              <p class="ai-card-title">Add Steve to the whitelist</p>
+              <div class="ai-card-foot">
+                <span class="ai-state mono" aria-live="polite" data-ai-state>Waiting for your approval</span>
+                <button type="button" class="btn btn-small btn-outline" data-ai-act="decline">Decline</button>
+                <button type="button" class="btn btn-small btn-ink" data-ai-act="approve">Approve</button>
+                <button type="button" class="btn btn-small btn-outline" data-ai-act="reset" hidden>Ask again</button>
+              </div>
+            </div>
+            <p class="ai-console mono" data-ai-out hidden>[21:04:12 INFO]: Added Steve to the whitelist</p>
+          </div>
+        </article>
+
+        <article class="tile tile-perf">
+          <div class="tile-copy">
+            <p class="tile-label mono"><UiIcon name="chart" size={24} />performance · insights</p>
+            <h3>Lag, with a reason.</h3>
+            <p>TPS, tick time, CPU and memory over the last hour. When ticks run long, CraftPanel marks the moment and says what would help.</p>
+          </div>
+          <figure class="demo-perf" data-perf>
+            <div class="dpf-head mono"><span>Tick time</span><span><b>18.6</b> ms avg · peak <b class="dpf-bad">71.4</b></span></div>
+            <svg class="dpf-chart" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true">
+              <line class="dpf-budget" x1="0" y1="40" x2="320" y2="40" />
+              <path class="dpf-area" d="M0 96 L20 94 L40 95 L60 92 L80 93 L100 90 L120 88 L140 70 L150 30 L160 18 L170 34 L180 62 L200 84 L220 86 L240 72 L250 36 L260 46 L270 78 L290 88 L320 90 L320 120 L0 120 Z" />
+              <path class="dpf-line" d="M0 96 L20 94 L40 95 L60 92 L80 93 L100 90 L120 88 L140 70 L150 30 L160 18 L170 34 L180 62 L200 84 L220 86 L240 72 L250 36 L260 46 L270 78 L290 88 L320 90" />
+              <rect class="dpf-mark" x="140" y="0" width="40" height="120" />
+              <rect class="dpf-mark" x="240" y="0" width="30" height="120" />
+            </svg>
+            <p class="dpf-axis mono" aria-hidden="true"><span>20:00</span><span>50 ms budget</span><span>21:00</span></p>
+            <figcaption class="dpf-insight">
+              <b>Generating new terrain is likely a big part of the load</b>
+              <span>Exploring players force the server to generate chunks while it ticks.</span>
+              <span class="dpf-fix mono">Open pre-generation <UiIcon name="arrow-right" size={12} /></span>
+            </figcaption>
+          </figure>
+        </article>
+
+        <article class="tile tile-list">
+          <ul class="minor">
             {
-              faqs.map((f, i) => (
-                <details id={`faq-${f.id}`}>
-                  <summary>
-                    <span class="faq-no mono" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
-                    <span class="faq-q">{f.q}</span>
-                    <span class="faq-icon" aria-hidden="true" />
-                  </summary>
-                  <div class="faq-a">
-                    <p>{f.a}</p>
-                    {f.more && (
-                      <a class="faq-more" href={f.more.href}>
-                        {f.more.label} <UiIcon name="arrow-right" size={12} />
-                      </a>
-                    )}
-                  </div>
-                </details>
+              minor.map((m) => (
+                <li>
+                  <h3 class="minor-title"><UiIcon name={m.icon} size={24} />{m.title}</h3>
+                  <p class="minor-text">{m.text}</p>
+                  <p class="minor-chips mono">{m.chips.map((c) => <span>{c}</span>)}</p>
+                </li>
               ))
             }
-          </div>
-        </div>
-      </section>
-
-      <!-- CTA -->
-      <section class="cta" aria-labelledby="cta-title">
-        <div class="wrap cta-in">
-          <div>
-            <h2 id="cta-title" class="display">Install CraftPanel.</h2>
-            <ol class="cta-steps">
-              <li><span class="cta-step-no mono" aria-hidden="true">1</span>Run the command</li>
-              <li><span class="cta-step-no mono" aria-hidden="true">2</span>Open <span class="mono">localhost:8080</span></li>
-              <li><span class="cta-step-no mono" aria-hidden="true">3</span>Create your first server</li>
-            </ol>
-            <div class="cta-links">
-              <a class="cta-btn cta-btn-primary" href="/docs/getting-started/installation/">Installation guide <UiIcon name="arrow-right" size={12} /></a>
-              <a class="cta-btn cta-btn-secondary" href={github} rel="noopener"><UiIcon name="github" size={24} /> View on GitHub</a>
-            </div>
-          </div>
-          <Terminal version={version} id="cta-term" compact />
-        </div>
-      </section>
-    </main>
-
-    <footer class="foot">
-      <div class="wrap foot-in">
-        <div class="foot-brand">
-          <a href="/" class="brand"><Wordmark /></a>
-          <p>Built for people who'd rather play than configure. Made by <a href="https://www.vctr.site">Victor</a>.</p>
-        </div>
-        <nav class="foot-cols" aria-label="Footer">
-          <div>
-            <h4 class="mono">product</h4>
-            <a href="#features">Features</a>
-            <a href="/docs/getting-started/installation/">Install</a>
-            <a href={`${github}/releases`}>Releases</a>
-            <a href={`${github}/blob/main/CHANGELOG.md`}>Changelog</a>
-          </div>
-          <div>
-            <h4 class="mono">docs</h4>
-            <a href="/docs/">Introduction</a>
-            <a href="/docs/getting-started/first-server/">First server</a>
-            <a href="/docs/administration/remote-access/">Remote access</a>
-            <a href="/docs/reference/troubleshooting/">Troubleshooting</a>
-          </div>
-          <div>
-            <h4 class="mono">project</h4>
-            <a href={github}>GitHub</a>
-            <a href={`${github}/issues`}>Issues</a>
-            <a href="/docs/reference/security/">Security</a>
-            <a href={`${github}/blob/main/LICENSE`}>License</a>
-          </div>
-        </nav>
+          </ul>
+        </article>
       </div>
-      <div class="wrap">
-        <form class="foot-console mono" data-foot-console autocomplete="off">
-          <ol class="fc-out" aria-live="polite" data-fc-out>
-            <li class="fc-dim">[Server] This footer has a console. Type help.</li>
-          </ol>
-          <label class="fc-in">
-            <span aria-hidden="true">&gt;</span>
-            <span class="sr-only">Footer console command</span>
-            <input name="cmd" type="text" spellcheck="false" placeholder="help" maxlength="60" />
-          </label>
-        </form>
-        <p class="foot-legal">Minecraft is a trademark of Mojang AB. CraftPanel is not affiliated with Mojang or Microsoft and never redistributes server software.</p>
-      </div>
-    </footer>
+    </div>
+  </section>
 
-    <script src="../scripts/landing.ts"></script>
-  </body>
-</html>
+  <!-- 03 Closer look -->
+  <section class="sec" id="dashboard" aria-labelledby="look-title">
+    <div class="wrap">
+      <header class="sec-head sec-head-row">
+        <div>
+          <p class="sec-no mono"><span>03</span>Inside the dashboard</p>
+          <h2 id="look-title" class="display">Inside CraftPanel.</h2>
+        </div>
+        <div class="look-tabs" role="tablist" aria-label="Dashboard screens" data-look-tabs>
+          {
+            looks.map((l, i) => (
+              <button role="tab" type="button" id={`look-tab-${l.key}`} aria-controls={`look-${l.key}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
+                {l.label}
+              </button>
+            ))
+          }
+        </div>
+      </header>
+      <div class="look" data-look>
+        <div class="window">
+          <div class="window-bar" aria-hidden="true"><span class="pv-dots"><i></i><i></i><i></i></span><span class="mono">craftpanel · localhost:8080</span></div>
+          <div class="look-stage">
+            {
+              looks.map((l, i) => (
+                <div class="look-panel" role="tabpanel" id={`look-${l.key}`} aria-labelledby={`look-tab-${l.key}`} data-active={i === 0 ? "true" : "false"} inert={i !== 0}>
+                  <div class="look-zoom">
+                    <Shot name={l.key} alt={l.alt} eager={i === 0} />
+                    {l.spots.map((s, n) => (
+                      <button
+                        type="button"
+                        class="spot"
+                        style={`left:${s.x}%;top:${s.y}%`}
+                        aria-describedby={`spot-${l.key}-${n}`}
+                        data-spot={`${l.key}-${n}`}
+                        data-x={s.x}
+                        data-y={s.y}
+                        data-v={s.y < 18 ? "below" : undefined}
+                        data-h={s.x > 74 ? "end" : s.x < 22 ? "start" : undefined}
+                      >
+                        <span class="spot-n mono">{n + 1}</span>
+                        <span class="spot-tip" role="tooltip" id={`spot-${l.key}-${n}`}>{s.text}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))
+            }
+            <button type="button" class="look-out mono" data-look-out hidden>
+              <UiIcon name="search" size={12} /> Whole screen
+            </button>
+          </div>
+        </div>
+        <div class="look-legend">
+          <p class="look-hint mono">Pick a number to zoom in.</p>
+          {
+            looks.map((l, i) => (
+              <ol class="legend" data-legend={l.key} hidden={i !== 0}>
+                {l.spots.map((s, n) => (
+                  <li>
+                    <button type="button" data-spot-ref={`${l.key}-${n}`} aria-pressed="false">
+                      <span class="legend-n mono">{n + 1}</span>
+                      <span>{s.text}</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 Hardware -->
+  <section class="sec sec-stone" id="hardware" aria-labelledby="hw-title">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>04</span>Hardware</p>
+        <h2 id="hw-title" class="display">Runs on what you have.</h2>
+        <p class="sec-lead">Planning estimates for Paper with a pre-generated world, not measured hardware benchmarks. Mods, mob farms and view distance change the load.</p>
+      </header>
+      <div class="devices">
+        {
+          devices.map((d) => (
+            <article class="device">
+              <div class="device-art">
+                <Iso boxes={d.scene} label={d.name} class="iso" />
+              </div>
+              <h3>{d.name}</h3>
+              <p class="device-os mono">{d.os}</p>
+              <dl class="device-stats">
+                <div><dt class="mono">RAM for Minecraft</dt><dd class="display">{d.ram}</dd></div>
+                <div><dt class="mono">Players, estimate</dt><dd class="display">{d.players}</dd></div>
+              </dl>
+              <p class="device-note">{d.note}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 Security -->
+  <section class="sec sec-dense" id="security" aria-labelledby="security-title">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>05</span>Security</p>
+        <h2 id="security-title" class="display">Safe by default. Honest about the rest.</h2>
+        <p class="sec-lead">Your server runs on your machine, so CraftPanel treats every server, plugin and download as something to contain.</p>
+      </header>
+      <ul class="safe">
+        {safety.map((s) => (
+          <li>
+            <h3 class="minor-title"><UiIcon name={s.icon} size={24} />{s.title}</h3>
+            <p class="minor-text">{s.text}</p>
+          </li>
+        ))}
+      </ul>
+      <p class="safe-more">
+        <a href="/docs/reference/security/">What CraftPanel protects, and its limits <UiIcon name="arrow-right" size={12} /></a>
+        <a href={`${github}/blob/main/docs/STATUS.md`} rel="noopener">How each feature was tested <UiIcon name="arrow-right" size={12} /></a>
+      </p>
+    </div>
+  </section>
+
+  <!-- 06 Comparison -->
+  <section class="sec" id="compare" aria-labelledby="compare-title">
+    <div class="wrap wrap-mid">
+      <header class="sec-head">
+        <p class="sec-no mono"><span>06</span>Hosting choices</p>
+        <h2 id="compare-title" class="display">Run it yourself, or rent a managed server?</h2>
+        <p class="sec-lead">Both are good answers. The real question is who looks after the machine.</p>
+      </header>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Self-hosting and managed Minecraft hosting comparison">
+        <table class="compare">
+          <thead>
+            <tr><th scope="col"><span class="sr-only">Aspect</span></th>{compare.cols.map((c, i) => <th scope="col" class={i === 0 ? "is-us" : undefined}>{c}</th>)}</tr>
+          </thead>
+          <tbody>
+            {compare.rows.map((r) => (
+              <tr>
+                <th scope="row" class="mono">{r.aspect}</th>
+                {r.cells.map(([m, text], i) => (
+                  <td class={i === 0 ? "is-us" : undefined} data-mark={m}>
+                    <span class="cmp-col mono" aria-hidden="true">{i === 0 ? "CraftPanel" : "Managed"}</span>
+                    <span class="cmp-cell"><span class="cmp-mark"><UiIcon name={marks[m].icon} size={12} label={marks[m].label} /></span>{text}</span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="cmp-key mono" aria-hidden="true">
+        {(Object.keys(marks) as Mark[]).map((m) => <span data-mark={m}><span class="cmp-mark"><UiIcon name={marks[m].icon} size={12} /></span>{marks[m].label.toLowerCase()}</span>)}
+      </p>
+      <ul class="choices">
+        {choices.map((c, i) => (
+          <li class:list={["choice", { "is-us": i === 0 }]}>
+            <h3>{c.title}</h3>
+            <p>{c.text}</p>
+            {c.link && <a class="choice-link" href={c.link.href}>{c.link.label} <UiIcon name="arrow-right" size={12} /></a>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <!-- 07 Trust -->
+  <section class="sec sec-trust" aria-labelledby="trust-title">
+    <div class="wrap trust">
+      <div class="trust-project">
+        <p class="sec-no mono"><span>07</span>Project & source</p>
+        <h2 id="trust-title" class="display">Built by Victor.</h2>
+        <p>CraftPanel is built for people running their own Minecraft server. The source, issues and release notes are public.</p>
+        <a class="trust-cta" href={github} rel="noopener">
+          <UiIcon name="github" size={24} /> View on GitHub
+          {facts.stars !== null && facts.stars >= 10 && <span class="trust-cta-count">{facts.stars} stars</span>}
+        </a>
+        <div class="project-author">
+          <a class="avatar-link" href="https://github.com/vctrchappot" rel="noopener">
+            <Image src={avatar} alt="Victor Chappot, author of CraftPanel (GitHub profile)" width={48} height={48} class="avatar" />
+          </a>
+          <div>
+            <p class="author-name">Victor</p>
+            <a class="author-handle" href="https://github.com/vctrchappot" rel="noopener">@vctrchappot</a>
+          </div>
+        </div>
+      </div>
+      <dl class="trust-facts">
+        <div>
+          <dt class="mono">latest release</dt>
+          <dd>
+            <span class="fact-badge mono">{release.tag}</span>{releaseDate && <span class="muted"> {releaseDate}</span>} · <a href={release.url}>Release notes</a>
+          </dd>
+        </div>
+        <div><dt class="mono">tests</dt><dd>400+ automated tests, plus real-server scenarios with a bot that joins and chats</dd></div>
+        <div><dt class="mono">ci</dt><dd>Every push: Linux, Windows, macOS and ARM64</dd></div>
+        <div><dt class="mono">license</dt><dd><a href={`${github}/blob/main/LICENSE`}>FSL-1.1-ALv2</a>, Apache-2.0 after two years</dd></div>
+        <div><dt class="mono">telemetry</dt><dd><span class="fact-none"><UiIcon name="check" size={12} /><strong>None.</strong></span> Not even a counter.</dd></div>
+        <div><dt class="mono">github</dt><dd><a href={github} rel="noopener">Source</a>, <a href={`${github}/issues`} rel="noopener">issues</a> and <a href={`${github}/blob/main/docs/ROADMAP.md`} rel="noopener">roadmap</a>. A star helps.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <FaqSection items={faqs} no="08" />
+
+  <!-- CTA -->
+  <section class="cta" aria-labelledby="cta-title">
+    <div class="wrap cta-in">
+      <div>
+        <h2 id="cta-title" class="display">Install CraftPanel.</h2>
+        <ol class="cta-steps">
+          <li><span class="cta-step-no mono" aria-hidden="true">1</span>Run the command</li>
+          <li><span class="cta-step-no mono" aria-hidden="true">2</span>Open <span class="mono">localhost:8080</span></li>
+          <li><span class="cta-step-no mono" aria-hidden="true">3</span>Create your first server</li>
+        </ol>
+        <div class="cta-links">
+          <a class="cta-btn cta-btn-primary" href="/docs/getting-started/installation/">Installation guide <UiIcon name="arrow-right" size={12} /></a>
+          <a class="cta-btn cta-btn-secondary" href={github} rel="noopener"><UiIcon name="github" size={24} /> View on GitHub</a>
+        </div>
+      </div>
+      <Terminal version={version} id="cta-term" compact />
+    </div>
+  </section>
+</SiteLayout>
