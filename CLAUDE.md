@@ -47,7 +47,7 @@ node scripts/site-screenshots.mjs <base> <user> <password> <serverId>   # refres
 - Prefer verifying against real Minecraft servers over mocks: create, install, start via the API or the dashboard, and read the server log.
 - `scripts/real-tests/` has the API client and scenarios used for STATUS.md's ✅ entries; `run.sh <port> <data-dir> <scenario>` runs one against a throwaway instance of the current build. Add new scenarios there.
 - Player-side checks: a headless [mineflayer](https://github.com/PrismarineJS/mineflayer) bot (offline mode) can join, chat, run commands and print received chat components. It lags the newest Minecraft versions; use a Paper version it supports.
-- Linux on Windows: a WSL 2 distro with systemd works well for installer/service tests. Keep it alive with a background `wsl -d <distro> -- sleep infinity`, otherwise WSL stops it (and the service) between commands.
+- Run real tests in throwaway sandboxes, not on the host: Linux scenarios in a fresh WSL 2 distro per run (`node scripts/real-tests/wsl-sandbox.mjs -- <bash command>`: Ubuntu 24.04 with systemd and Node, root, deleted afterwards), Windows scenarios that need administrator rights (service installs, ACLs, firewall, network isolation) in Windows Sandbox. Only scenarios that need neither may run on the host, with their own ports and data dir.
 - Enter test credentials only on `localhost`; run browser tests inside the machine that hosts CraftPanel.
 - Windows: very deep paths (> 260 chars) break pnpm/Next builds; test copies belong in a short path.
 - Don't touch other CraftPanel instances or Minecraft servers already running on the machine (e.g. on ports 8080/25565); use other ports and a temporary `CRAFTPANEL_DATA_DIR`.

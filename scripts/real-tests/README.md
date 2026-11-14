@@ -7,6 +7,14 @@ pnpm build
 scripts/real-tests/run.sh <api-port> <data-dir> <scenario.mjs> [args…]
 ```
 
+Linux scenarios that need root, systemd or an installed service run in a throwaway WSL distro (from Windows):
+
+```bash
+node scripts/real-tests/wsl-sandbox.mjs [--keep] -- "cd /mnt/c/…/CraftPanel && node scripts/real-tests/limits.mjs test-results/limits craftpanel-ops-lim 19687"
+```
+
+It imports a fresh Ubuntu 24.04 (systemd, Node 22, root) from a cached base image, runs the command in one `wsl` call and unregisters the distro afterwards (`--keep` leaves it for a look).
+
 `run.sh` copies `apps/api/dist`, starts it on `127.0.0.1:<api-port>` with its own data dir, runs the scenario and stops the API (servers are stopped gracefully). The first sign-in creates a throwaway owner account (`client.mjs`, overridable with `CP_USER`/`CP_PASSWORD`). Use local test instances only.
 
 | Scenario | Args | What it checks |
