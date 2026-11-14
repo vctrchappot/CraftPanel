@@ -29,7 +29,6 @@ node scripts/release.mjs pack                   # release/ archive + installers 
 node scripts/measure.mjs [--idle 60] [--json]   # startup, idle CPU/RAM, API latency, bundle sizes of the build (own port, temp data)
 node scripts/release.mjs bump X.Y.Z && git push --follow-tags   # release: GitHub Actions publishes it
 pnpm --filter @craftpanel/site dev              # website + user docs (Astro/Starlight) on :4321; Vercel deploys main
-node scripts/site-screenshots.mjs <base> <user> <password> <serverId>   # refresh website screenshots from a throwaway instance
 ```
 
 ## Conventions

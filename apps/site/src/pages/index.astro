@@ -1,5 +1,5 @@
 ---
-import "../styles/home.css";
+import "../styles/frame.css";
 import { Image } from "astro:assets";
 import Pixel from "../components/Pixel.astro";
 import UiIcon from "../components/UiIcon.astro";
@@ -226,7 +226,7 @@ const no = (i: number) => String(i).padStart(2, "0");
 
     <!-- What it is, in one sentence -->
     <section class="row" aria-label="Who CraftPanel is for">
-      <p class="cell statement">A free panel for people who run their own Minecraft server: friends on a Raspberry Pi, a family on the PC under the desk, a small community on a VPS.</p>
+      <p class="cell statement">A free panel for people who run their own Minecraft server: <span>friends on a Raspberry Pi, a family on the PC under the desk, a small community on a VPS.</span></p>
     </section>
 
     <!-- Server software -->

@@ -1,4 +1,5 @@
 ---
+import "../styles/frame.css";
 import SiteLayout from "../layouts/SiteLayout.astro";
 import FaqSection from "../components/FaqSection.astro";
 import Terminal from "../components/Terminal.astro";
@@ -40,66 +41,61 @@ const faqs: Faq[] = [
 ---
 
 <SiteLayout title={title} description={description} path="/windows/" jsonLd={[faqJsonLd(faqs)]}>
-  <section class="page-hero" id="install" aria-labelledby="page-title">
-    <div class="wrap page-hero-grid">
-      <div>
-        <p class="hero-kicker mono"><a href="/">CraftPanel</a> · guide</p>
-        <h1 id="page-title" class="display page-title">A Minecraft server on your <span class="mark">Windows PC.</span></h1>
-        <p class="hero-lead">One PowerShell command installs CraftPanel on Windows 10 or 11. Minecraft runs as a background service that starts with the PC. No Docker, no Java to install.</p>
-        <Terminal version={pkg.version} id="win-term" os="windows" compact />
-        <ul class="hero-facts mono" aria-label="At a glance">
-          <li>Windows 10 · 11</li>
-          <li>x64 · ARM64</li>
-          <li>4–8 GB for Minecraft</li>
-        </ul>
+  <div class="frame">
+    <section class="row" id="install" aria-labelledby="page-title">
+      <div class="cells hero2">
+        <div class="cell hero2-copy guide-copy">
+          <p class="kicker mono"><a href="/">CraftPanel</a><span>guide</span></p>
+          <h1 id="page-title" class="display hero2-title guide-title">A Minecraft server <span class="dim">on your Windows PC.</span></h1>
+          <p class="hero2-lead">One PowerShell command installs CraftPanel on Windows 10 or 11. Minecraft runs as a background service that starts with the PC. No Docker, no Java to install.</p>
+          <div class="guide-term"><Terminal version={pkg.version} id="win-term" os="windows" compact /></div>
+          <ul class="hero2-facts mono" aria-label="At a glance">
+            <li>Windows 10 · 11</li>
+            <li>x64 · ARM64</li>
+            <li>4–8 GB for Minecraft</li>
+          </ul>
+        </div>
+        <div class="cell cell-vis hero2-art">
+          <Iso boxes={pcScene()} label="A desktop PC" class="iso night guide-iso" />
+        </div>
       </div>
-      <div class="page-art">
-        <Iso boxes={pcScene()} label="A desktop PC" class="iso" />
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="sec" aria-labelledby="steps-title">
-    <div class="wrap wrap-mid">
-      <header class="sec-head">
+    <section class="row" aria-labelledby="steps-title">
+      <div class="cell row-head">
         <p class="sec-no mono"><span>01</span>Steps</p>
-        <h2 id="steps-title" class="display">From PowerShell to friends online.</h2>
-        <p class="sec-lead">Later updates install from the dashboard and run as your normal account.</p>
-      </header>
-      <ol class="steps">
+        <h2 id="steps-title" class="display">From PowerShell <span class="dim">to friends online.</span></h2>
+        <p class="row-lead">Later updates install from the dashboard and run as your normal account.</p>
+      </div>
+      <ol class="cells steps2">
         {steps.map((s, i) => (
-          <li>
-            <span class="step-no mono" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
-            <div>
-              <h3>{s.title}</h3>
-              <p>{s.text}</p>
-            </div>
+          <li class="cell">
+            <span class="step2-no mono" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+            <h3>{s.title}</h3>
+            <p>{s.text}</p>
           </li>
         ))}
       </ol>
-      <p class="safe-more">
-        <a href="/docs/getting-started/installation/">Installation guide <UiIcon name="arrow-right" size={12} /></a>
-        <a href="/docs/administration/maintenance/">Services and logs <UiIcon name="arrow-right" size={12} /></a>
-      </p>
-    </div>
-  </section>
+      <p class="cell row-foot mono"><span>Windows 10 or 11 · administrator once, for the service</span><a href="/docs/getting-started/installation/">Installation guide <UiIcon name="arrow-right" size={12} /></a><a href="/docs/administration/maintenance/">Services and logs <UiIcon name="arrow-right" size={12} /></a></p>
+    </section>
 
-  <section class="sec sec-dense" aria-labelledby="installed-title">
-    <div class="wrap">
-      <header class="sec-head">
+    <section class="row" aria-labelledby="cards-title">
+      <div class="cell row-head">
         <p class="sec-no mono"><span>02</span>What gets installed</p>
-        <h2 id="installed-title" class="display">Small, and out of the way.</h2>
-      </header>
-      <ul class="safe safe-2">
+        <h2 id="cards-title" class="display">Small, <span class="dim">and out of the way.</span></h2>
+      </div>
+      <ul class="cells extras extras-2">
         {installed.map((t) => (
-          <li>
-            <h3 class="minor-title"><UiIcon name={t.icon} size={24} />{t.title}</h3>
-            <p class="minor-text">{t.text}</p>
+          <li class="cell">
+            <h3 class="extra-title"><UiIcon name={t.icon} size={24} />{t.title}</h3>
+            <p class="extra-text">{t.text}</p>
           </li>
         ))}
       </ul>
-    </div>
-  </section>
+    </section>
 
-  <FaqSection items={faqs} no="03" title="Windows questions." lead="What people ask before hosting Minecraft on their Windows PC." />
+    <div class="row row-faq">
+      <FaqSection items={faqs} no="03" title="Windows questions." lead="What people ask before hosting Minecraft on their Windows PC." />
+    </div>
+  </div>
 </SiteLayout>
