@@ -138,7 +138,8 @@ beforeAll(async () => {
   }
   serverDir = path.join(root, "servers", "survival");
   await fs.mkdir(serverDir, { recursive: true });
-  await fs.writeFile(path.join(serverDir, "server.properties"), "motd=Hello\nmax-players=20\nrcon.password=hunter2\n");
+  // Offline mode, so player actions derive UUIDs locally instead of asking Mojang (tests stay off the network).
+  await fs.writeFile(path.join(serverDir, "server.properties"), "motd=Hello\nmax-players=20\nonline-mode=false\nrcon.password=hunter2\n");
   const now = Date.now();
   await ctx.database.db.insert(servers).values({
     id: serverId, name: "survival", software: "vanilla", mcVersion: "1.21.11", javaMajor: 21, memoryMb: 1024, directory: serverDir, port: 25598,
