@@ -418,10 +418,13 @@ const consoleEl = document.querySelector<HTMLElement>("[data-console]");
 if (consoleEl) {
   const lines = [...consoleEl.querySelectorAll<HTMLElement>(".dc-log li")];
   const bars = [...consoleEl.querySelectorAll<HTMLElement>("[data-spark] i")];
-  const m = (k: string) => consoleEl.querySelector<HTMLElement>(`[data-m="${k}"]`)!;
+  // A number can appear more than once (the sidebar and the stats both count players).
+  const set = (k: string, v: string) => consoleEl.querySelectorAll<HTMLElement>(`[data-m="${k}"]`).forEach((el) => (el.textContent = v));
   const playerDelta = (l: HTMLElement) => (/joined the game/.test(l.textContent ?? "") ? 1 : /left the game/.test(l.textContent ?? "") ? -1 : 0);
-  if (reduced) lines.forEach((l) => l.classList.add("is-in"));
-  else
+  if (reduced) {
+    lines.forEach((l) => l.classList.add("is-in"));
+    set("players", String(lines.reduce((n, l) => n + playerDelta(l), 0)));
+  } else
     onVisible(consoleEl, async () => {
       // The first lines are the history that is already there; the rest arrive live.
       const history = lines.length - 4;
@@ -431,12 +434,12 @@ if (consoleEl) {
           l.classList.toggle("is-in", i < history);
           if (i < history) players += playerDelta(l);
         });
-        m("players").textContent = String(players);
+        set("players", String(players));
         for (const l of lines.slice(history)) {
           await wait(1400);
           l.classList.add("is-in");
           players += playerDelta(l);
-          m("players").textContent = String(players);
+          set("players", String(players));
         }
         await wait(4000);
       }
@@ -444,8 +447,8 @@ if (consoleEl) {
   if (!reduced)
     setInterval(() => {
       bars.forEach((b, i) => b.style.setProperty("--v", bars[i + 1]?.style.getPropertyValue("--v") || `${22 + Math.round(Math.random() * 30)}%`));
-      m("cpu").textContent = String(9 + Math.round(Math.random() * 9));
-      m("tps").textContent = Math.random() > 0.85 ? "19.9" : "20.0";
+      set("cpu", String(9 + Math.round(Math.random() * 9)));
+      set("tps", Math.random() > 0.85 ? "19.9" : "20.0");
     }, 1400);
 }
 

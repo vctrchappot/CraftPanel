@@ -1,4 +1,5 @@
 ---
+import "../styles/home.css";
 import { Image } from "astro:assets";
 import Pixel from "../components/Pixel.astro";
 import UiIcon from "../components/UiIcon.astro";
@@ -7,16 +8,14 @@ import type { UiIconName } from "../lib/ui-icons";
 import Iso from "../components/Iso.astro";
 import Terminal from "../components/Terminal.astro";
 import RuntimeDiagram from "../components/RuntimeDiagram.astro";
-import ProcessBand from "../components/ProcessBand.astro";
-import Shot from "../components/Shot.astro";
-import { heroScene, isolationScene, pcScene, piScene, vpsScene } from "../lib/scenes";
-import { repoFacts, shownRelease } from "../lib/github";
-// release.mjs bumps every workspace package, so this matches the latest release.
-import pkg from "../../package.json";
-import Wordmark from "../components/Wordmark.astro";
+import DashboardMock from "../components/home/DashboardMock.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 import FaqSection from "../components/FaqSection.astro";
+import { heroScene, isolationScene, pcScene, piScene, vpsScene } from "../lib/scenes";
+import { repoFacts, shownRelease } from "../lib/github";
 import { faqJsonLd, type Faq } from "../lib/faq";
+// release.mjs bumps every workspace package, so this matches the latest release.
+import pkg from "../../package.json";
 import avatar from "../assets/victor.jpg";
 
 const facts = await repoFacts();
@@ -28,310 +27,124 @@ const title = "CraftPanel – Your Minecraft server, on your hardware";
 const description =
   "Self-hosted panel for Minecraft Java servers on a PC, a Raspberry Pi or a VPS. Paper, Purpur, Fabric, NeoForge, Vanilla and Velocity. No panel fee, no telemetry.";
 
-const software = {
-  paper: {
-    key: "paper",
-    name: "Paper",
-    icon: "paper" as PixelName,
-    color: "#e8e2d4",
-    note: "Plugins, fast and Vanilla-like.",
-    rec: true,
-    title: "survival",
-    versions: [
-      ["1.21.4", "build 232"],
-      ["1.21.3", "build 81"],
-      ["1.20.6", "build 151"],
-    ],
-    java: "Java 21",
-    tabs: ["Overview", "Console", "Players", "Plugins", "Backups", "Settings"],
-    highlightTab: "Plugins",
-    servers: [
-      { name: "survival", status: "on" },
-      { name: "lobby", status: "off" },
-    ],
-    players: "6 / 20",
-    middleStat: ["TPS", "20.0"],
-    memRatio: 0.7,
-    sourceIcon: "plug" as const,
-    source: "Plugins from Modrinth & Hangar",
-  },
-  purpur: {
-    key: "purpur",
-    name: "Purpur",
-    icon: "purpur" as PixelName,
-    color: "#b98ad0",
-    note: "Paper with more settings.",
-    rec: false,
-    title: "survival",
-    versions: [
-      ["1.21.4", "build 2417"],
-      ["1.21.3", "build 2385"],
-      ["1.20.6", "build 2250"],
-    ],
-    java: "Java 21",
-    tabs: ["Overview", "Console", "Players", "Plugins", "Backups", "Settings"],
-    highlightTab: "Plugins",
-    servers: [
-      { name: "survival", status: "on" },
-      { name: "lobby", status: "off" },
-    ],
-    players: "8 / 30",
-    middleStat: ["TPS", "20.0"],
-    memRatio: 0.7,
-    sourceIcon: "plug" as const,
-    source: "Plugins from Modrinth & Hangar",
-  },
-  fabric: {
-    key: "fabric",
-    name: "Fabric",
-    icon: "fabric" as PixelName,
-    color: "#d9b77e",
-    note: "Light mods like Lithium.",
-    rec: false,
-    title: "survival",
-    versions: [
-      ["1.21.4", "loader 0.16.10"],
-      ["1.21.3", "loader 0.16.9"],
-      ["1.20.6", "loader 0.16.5"],
-    ],
-    java: "Java 21",
-    tabs: ["Overview", "Console", "Players", "Mods", "Backups", "Settings"],
-    highlightTab: "Mods",
-    servers: [
-      { name: "survival", status: "on" },
-      { name: "lobby", status: "off" },
-    ],
-    players: "4 / 20",
-    middleStat: ["TPS", "20.0"],
-    memRatio: 0.7,
-    sourceIcon: "mod" as const,
-    source: "Mods from Modrinth",
-  },
-  neoforge: {
-    key: "neoforge",
-    name: "NeoForge",
-    icon: "neoforge" as PixelName,
-    color: "#f08a24",
-    note: "Big mods and modpacks.",
-    rec: false,
-    title: "modpack",
-    versions: [
-      ["1.21.4", "21.4.80"],
-      ["1.21.3", "21.3.60"],
-      ["1.20.6", "20.6.119"],
-    ],
-    java: "Java 21",
-    tabs: ["Overview", "Console", "Players", "Mods", "Backups", "Settings"],
-    highlightTab: "Mods",
-    servers: [
-      { name: "modpack", status: "on" },
-      { name: "lobby", status: "off" },
-    ],
-    players: "3 / 10",
-    middleStat: ["TPS", "20.0"],
-    memRatio: 0.7,
-    sourceIcon: "mod" as const,
-    source: "Mods and modpacks from Modrinth",
-  },
-  vanilla: {
-    key: "vanilla",
-    name: "Vanilla",
-    icon: "vanilla" as PixelName,
-    color: "var(--cp-signal)",
-    note: "Mojang's server, untouched.",
-    rec: false,
-    title: "survival",
-    versions: [
-      ["1.21.4", ""],
-      ["1.21.3", ""],
-      ["1.20.6", ""],
-    ],
-    java: "Java 21",
-    tabs: ["Overview", "Console", "Players", "Backups", "Settings"],
-    highlightTab: null,
-    servers: [
-      { name: "survival", status: "on" },
-      { name: "lobby", status: "off" },
-    ],
-    players: "5 / 20",
-    middleStat: ["TPS", "20.0"],
-    memRatio: 0.7,
-    sourceIcon: "cube" as const,
-    source: "No add-ons. Straight from Mojang.",
-  },
-  velocity: {
-    key: "velocity",
-    name: "Velocity",
-    icon: "velocity" as PixelName,
-    color: "#3fb8e8",
-    note: "Several servers, one address.",
-    rec: false,
-    title: "network",
-    versions: [
-      ["3.4.0", "build 4"],
-      ["3.3.0", "build 410"],
-      ["3.2.0", "build 296"],
-    ],
-    java: "Java 21",
-    tabs: ["Overview", "Console", "Servers", "Plugins", "Settings"],
-    highlightTab: "Plugins",
-    servers: [
-      { name: "network", status: "on" },
-      { name: "survival", status: "up" },
-      { name: "lobby", status: "up" },
-    ],
-    players: "14 / 100",
-    middleStat: ["Servers", "3 / 3"],
-    memRatio: 0.25,
-    sourceIcon: "plug" as const,
-    source: "Plugins from Hangar",
-  },
-} as const;
-
-const softwareGroups: { label: string; wide: boolean; items: (keyof typeof software)[] }[] = [
-  { label: "Plugin servers", wide: true, items: ["paper", "purpur"] },
-  { label: "Mod loaders", wide: true, items: ["fabric", "neoforge"] },
-  { label: "Unmodified", wide: false, items: ["vanilla"] },
-  { label: "Proxy", wide: false, items: ["velocity"] },
+const software: { name: string; icon: PixelName; note: string; kind: string }[] = [
+  { name: "Paper", icon: "paper", note: "Plugins, fast and Vanilla-like.", kind: "plugins" },
+  { name: "Purpur", icon: "purpur", note: "Paper with more settings.", kind: "plugins" },
+  { name: "Fabric", icon: "fabric", note: "Light mods like Lithium.", kind: "mods" },
+  { name: "NeoForge", icon: "neoforge", note: "Big mods and modpacks.", kind: "mods" },
+  { name: "Vanilla", icon: "vanilla", note: "Mojang's server, untouched.", kind: "unmodified" },
+  { name: "Velocity", icon: "velocity", note: "Several servers, one address.", kind: "proxy" },
 ];
 
-const memoryOptions = [1, 2, 4, 8] as const;
-const defaultSw = software.paper;
-const defaultVer = defaultSw.versions[0];
-const defaultMem = 2;
-const defaultMeta = [`${defaultSw.name} ${defaultVer[0]}`, defaultVer[1], defaultSw.java].filter(Boolean).join(" · ");
-const defaultMemText = `${(defaultMem * defaultSw.memRatio).toFixed(1)} / ${defaultMem.toFixed(1)}`;
-
-const softwareTrust: { icon: UiIconName; title: string; text: string }[] = [
-  { icon: "seal", title: "Official source", text: "Every server comes straight from the project that makes it." },
-  { icon: "hash", title: "Checksum checked", text: "The download is verified before anything starts." },
-  { icon: "cup", title: "Right Java, automatically", text: "CraftPanel installs the Java version your server needs." },
-];
-
-const minor: { title: string; icon: UiIconName; text: string; chips: string[] }[] = [
-  { title: "Teams and permissions", icon: "users", text: "Roles per server, with two-factor sign-in and an audit log of who did what.", chips: ["owner", "admin", "operator", "viewer"] },
-  { title: "Java, handled", icon: "cup", text: "Every Minecraft version gets the Java it needs, downloaded per server. Nothing to install.", chips: ["1.8.9 → 8", "1.21.4 → 21", "26.3 → 25"] },
-  { title: "Scheduled tasks", icon: "clock", text: "Restarts with a 60-second warning in chat. Backups, announcements and commands too.", chips: ["0 4 * * *", "restart", "backup"] },
-  { title: "Crash alerts", icon: "bell", text: "A message when a server crashes, a backup fails or a new release is out.", chips: ["Discord", "e-mail"] },
-  { title: "Network tools", icon: "signal", text: "Addresses to copy and port checks, so your friends can actually join.", chips: ["LAN", "VPN", "CGNAT check", "DuckDNS"] },
-  { title: "Files and worlds", icon: "folder", text: "Edit configs in the browser. Upload a world as a zip, or download one for single player.", chips: ["server.properties", "world.zip"] },
-];
-
-// Who the page speaks to; each card points at the part of the page that answers that group's first question.
-const audiences: { title: string; question: string; text: string; link: { href: string; label: string } }[] = [
+type Spec = [key: string, value: string];
+// Each chapter: a short text, one large visual (rendered below by id) and a strip of facts. Facts say where they hold.
+const chapters: { id: string; label: string; title: string; dim: string; text: string[]; specs: Spec[] }[] = [
   {
-    title: "Friends and family",
-    question: "Can I do this without knowing Linux?",
-    text: "The wizard picks the Java and memory, the network check tells you whether friends can join, and backups run on a schedule.",
-    link: { href: "/play-with-friends/", label: "Let your friends join" },
+    id: "isolation",
+    label: "Isolation",
+    title: "Limits per server,",
+    dim: "set by the operating system.",
+    text: [
+      "On Linux service installs and on Windows every server gets a memory cap, a process limit and, if you want one, a CPU limit. A modpack that wants every gigabyte stays inside its share, and the rest of the host stays responsive.",
+      "On Linux service installs each server also runs under its own system account, so a plugin can't read the panel's database or another server's files.",
+    ],
+    specs: [["memory cap", "on by default"], ["processes", "4,096 by default"], ["changes", "apply to a running server"], ["own account", "Linux service installs"]],
   },
   {
-    title: "A Pi or a home server",
-    question: "Does it run cleanly on my hardware?",
-    text: "No Docker, no Java to install. Memory, CPU and process limits per server keep one server from starving the others.",
-    link: { href: "/raspberry-pi/", label: "Minecraft on a Raspberry Pi" },
+    id: "updates",
+    label: "Updates",
+    title: "Update the dashboard",
+    dim: "while players stay online.",
+    text: [
+      "Minecraft runs in its own service. The dashboard can restart, crash or update, and finds its running servers again afterwards.",
+      "A release that fails to start is rolled back together with its database. Try both outcomes in the drawing.",
+    ],
+    specs: [["dashboard update", "Minecraft keeps running"], ["failed start", "rolled back"], ["runtime update", "asks first"]],
   },
   {
-    title: "Small communities",
-    question: "Will it hold up with a team and several servers?",
-    text: "Velocity in front of your servers, roles per server, two-factor sign-in, an audit log, scheduled restarts and crash alerts.",
-    link: { href: "#features", label: "Features" },
+    id: "backups",
+    label: "Backups",
+    title: "Backups on a schedule,",
+    dim: "restored from the list.",
+    text: [
+      "Schedule backups per server and keep the newest few. A restore checks the archive first and saves the current state, in case you need it after all.",
+    ],
+    specs: [["schedule", "presets or cron"], ["restore", "verified, safety copy first"], ["retention", "newest n per server"]],
+  },
+  {
+    id: "plugins",
+    label: "Plugins",
+    title: "Plugins and mods",
+    dim: "from Modrinth and Hangar.",
+    text: [
+      "Search both sources from the server, see which results fit your exact Minecraft version and loader, and install with a checksum check.",
+      "Modpacks start from a Modrinth pack; the Minecraft and loader versions come from the pack.",
+    ],
+    specs: [["sources", "Modrinth, Hangar"], ["fit", "checked per version"], ["downloads", "checksum verified"]],
+  },
+  {
+    id: "performance",
+    label: "Performance",
+    title: "Lag, measured",
+    dim: "and explained.",
+    text: [
+      "TPS, tick time, CPU and memory over the last hour. Slow ticks are marked, and insights say what would help: a view distance that suits the machine, tuned garbage-collector flags, or pre-generating the world.",
+    ],
+    specs: [["range", "5 min to 1 h"], ["tick budget", "50 ms"], ["pre-generation", "Chunky, one click"]],
+  },
+  {
+    id: "assistant",
+    label: "Assistant",
+    title: "An assistant,",
+    dim: "if you want one.",
+    text: [
+      "Off until the owner adds a key for Claude, OpenAI or another provider, or points it at a local model in Ollama or LM Studio. It reads status, players and the console, acts with the asking user's permissions, and every change waits for an approval.",
+    ],
+    specs: [["default", "off"], ["providers", "Claude, OpenAI, Gemini, local, more"], ["changes", "wait for approval"]],
+  },
+  {
+    id: "security",
+    label: "Security",
+    title: "What a request passes",
+    dim: "on its way to Minecraft.",
+    text: [
+      "The dashboard only lets in private networks by default and refuses public clients without HTTPS. Every route checks the user's role, and the runtime only listens to its private token.",
+      "Downloads come from official hosts and are checked against their checksums. Nothing phones home.",
+    ],
+    specs: [["telemetry", "none"], ["sign-in", "two-factor, rate-limited"], ["audit log", "who did what"]],
   },
 ];
 
-// Isolation chapter: what the limits do, and three example servers for the meters under the drawing.
-const lanePoints: { icon: UiIconName; title: string; text: string }[] = [
-  { icon: "chart", title: "A memory cap, on by default", text: "The server's memory plus headroom for Java. A server at its cap can't take memory from the others, and its console says so." },
-  { icon: "terminal", title: "CPU and processes", text: "Hold a busy server to the cores you give it, and stop a plugin from starting processes without end. Changes apply while it runs." },
-  { icon: "shield", title: "Its own account", text: "On Linux service installs every server runs under its own system account, so a plugin can't read the panel's database or the other servers." },
-];
 const lanes: { name: string; software: string; memory: [number, number]; cpu: [number, number]; note: string; hot?: boolean }[] = [
   { name: "survival", software: "Paper", memory: [2.1, 3.4], cpu: [1.2, 2], note: "within its limits" },
   { name: "lobby", software: "Velocity", memory: [0.4, 1.5], cpu: [0.1, 1], note: "within its limits" },
   { name: "modpack", software: "NeoForge", memory: [6.9, 7], cpu: [2, 2], note: "at its cap · the others keep running", hot: true },
 ];
-
-// Security chapter: the checks a request passes from the browser to Minecraft. Every claim names where it holds.
 const hops: { icon: UiIconName; name: string; where: string; checks: string[] }[] = [
   { icon: "lock", name: "Browser", where: "your device", checks: ["HTTPS, built in or behind a proxy", "private networks only by default"] },
-  { icon: "users", name: "Dashboard", where: "web app", checks: ["sign-in with two-factor", "role checked on every request", "files only inside the server folder", "rate limits and an audit log"] },
-  { icon: "box", name: "Runtime", where: "own service", checks: ["private token over a local socket", "Java started without a shell", "commands go to Minecraft only"] },
+  { icon: "users", name: "Dashboard", where: "web app", checks: ["sign-in with two-factor", "role checked on every request", "files only inside the server folder"] },
+  { icon: "box", name: "Runtime", where: "own service", checks: ["private token, local socket", "Java started without a shell", "commands go to Minecraft only"] },
   { icon: "blocks", name: "Minecraft", where: "per server", checks: ["memory, CPU and process limits", "own account on Linux service installs"] },
 ];
+const backups = [
+  { when: "Today 04:00", size: "1.24 GB", tag: "nightly" },
+  { when: "Yesterday 04:00", size: "1.23 GB", tag: "nightly" },
+  { when: "Sun 03:00", size: "1.20 GB", tag: "weekly" },
+  { when: "Before 1.21.4", size: "1.18 GB", tag: "manual" },
+];
 const extras: { icon: UiIconName; title: string; text: string }[] = [
-  { icon: "seal", title: "Verified downloads", text: "Server software, Java, plugins and mods come from official hosts and are checked against their checksums." },
-  { icon: "check", title: "Nothing phones home", text: "No telemetry and no cloud account, not even a counter. Optional: an update check against GitHub." },
+  { icon: "users", title: "Teams", text: "Roles per server, two-factor sign-in and an audit log." },
+  { icon: "cup", title: "Java, handled", text: "The right Java for every Minecraft version, per server." },
+  { icon: "clock", title: "Schedules", text: "Restarts with a warning in chat, backups, commands." },
+  { icon: "bell", title: "Alerts", text: "Discord or e-mail when a server crashes or a backup fails." },
+  { icon: "signal", title: "Network checks", text: "Addresses to share, port checks, CGNAT detection, DuckDNS." },
+  { icon: "folder", title: "Files and worlds", text: "Edit configs in the browser, import and export worlds." },
 ];
 
-const looks = [
-  {
-    key: "overview",
-    label: "Overview",
-    alt: "Server overview with players, CPU, memory, TPS, uptime, storage, the last console lines and connection addresses",
-    spots: [
-      { x: 95.8, y: 20.5, text: "Players, CPU, memory, TPS, uptime and disk, refreshed live." },
-      { x: 66, y: 50, text: "The newest console lines, without opening the console." },
-      { x: 89.5, y: 49.5, text: "Addresses to copy for this computer, your LAN and your VPN." },
-      { x: 88.3, y: 9.6, text: "Start, stop, restart. Force-kill is for Administrators only." },
-    ],
-  },
-  {
-    key: "console",
-    label: "Console",
-    alt: "Live Minecraft console with a filter, level selector and command input",
-    spots: [
-      { x: 72.5, y: 21.7, text: "Filter by text or log level. Download or copy the log." },
-      { x: 31, y: 27, text: "Live. After a dashboard restart it reconnects and replays what you missed." },
-      { x: 88, y: 92, text: "Commands go to Minecraft only, never to a shell. ↑ and ↓ browse history." },
-    ],
-  },
-  {
-    key: "performance",
-    label: "Performance",
-    alt: "Performance tab with live charts for TPS, tick time, CPU, memory and players",
-    spots: [
-      { x: 66, y: 30.6, text: "TPS and tick time against the 50 ms budget. Lag shows where it happened." },
-      { x: 52.5, y: 70.6, text: "CPU, memory against the Java heap, and players over the same hour." },
-      { x: 78, y: 22.7, text: "Five minutes to an hour. Hover or touch a chart to read a moment." },
-    ],
-  },
-  {
-    key: "plugins",
-    label: "Plugins",
-    alt: "Plugin browser with Modrinth results marked as compatible with Minecraft 1.21.4",
-    spots: [
-      { x: 95.5, y: 22.5, text: "Plugins are code. CraftPanel says so, every time." },
-      { x: 30, y: 57.4, text: "Switch between Modrinth and Hangar." },
-      { x: 44, y: 74.6, text: "Checked against your exact Minecraft version before you install." },
-      { x: 89, y: 75.1, text: "One click. The download is verified against its checksum." },
-    ],
-  },
-  {
-    key: "assistant",
-    label: "Assistant",
-    alt: "The optional AI assistant beside the server overview, asking for approval before it whitelists a player",
-    spots: [
-      { x: 95, y: 15.8, text: "Ask in plain words. It reads status, players and the console for you." },
-      { x: 85.5, y: 32.7, text: "Changes wait for Approve. Decline, and nothing happens." },
-      { x: 80, y: 3.5, text: "Optional, with your own key: Claude, OpenAI or a local model." },
-    ],
-  },
-  {
-    key: "servers",
-    label: "All servers",
-    alt: "Server list with a running Paper server and two stopped servers",
-    spots: [
-      { x: 42.5, y: 19.7, text: "Status at a glance: running, stopped, starting, crashed." },
-      { x: 87.5, y: 7.8, text: "The eight-step wizard: software, version, world, memory, network." },
-      { x: 15.5, y: 42, text: "Every server one click away, with its player count." },
-    ],
-  },
-] as const;
-
 const devices = [
-  { name: "The PC under your desk", os: "Windows · Linux · macOS", scene: pcScene(), ram: "4–8 GB", players: "10–30", note: "Automatic services on Windows and Linux; manual setup on macOS. Your gaming PC works too: Minecraft servers don't use the GPU." },
-  { name: "Raspberry Pi 4 / 5", os: "64-bit Raspberry Pi OS", scene: piScene(), ram: "2–3 GB", players: "2–8", note: "Draws a few watts. Pick the Pi preset, pre-generate the world, keep worlds on an SSD." },
-  { name: "A small VPS", os: "Linux with systemd", scene: vpsScene(), ram: "4–8 GB", players: "10–20", note: "Choose a plan with a public IP and allow the Minecraft port in its firewall. Keep the dashboard behind a VPN, SSH tunnel or HTTPS reverse proxy." },
+  { name: "The PC under your desk", os: "Windows · Linux · macOS", scene: pcScene(), ram: "4–8 GB", players: "10–30", href: "/windows/" },
+  { name: "Raspberry Pi 4 / 5", os: "64-bit Raspberry Pi OS", scene: piScene(), ram: "2–3 GB", players: "2–8", href: "/raspberry-pi/" },
+  { name: "A small VPS", os: "Linux with systemd", scene: vpsScene(), ram: "4–8 GB", players: "10–20", href: "/docs/getting-started/installation/" },
 ];
 
 // Each cell is marked as a strength (+), a trade-off (−) or "it depends" (~), so the table reads at a glance.
@@ -341,22 +154,13 @@ const marks: Record<Mark, { icon: UiIconName; label: string }> = {
   con: { icon: "minus", label: "Trade-off" },
   mid: { icon: "tilde", label: "Depends" },
 };
-const compare: { cols: [string, string]; rows: { aspect: string; cells: [Mark, string][] }[] } = {
-  cols: ["CraftPanel on your machine", "Managed Minecraft hosting"],
-  rows: [
-    { aspect: "Cost", cells: [["pro", "Free panel. You pay for power, or for a VPS."], ["con", "A monthly fee, by plan and memory."]] },
-    { aspect: "Files & worlds", cells: [["pro", "Every file on your own disk."], ["mid", "Through the host's file manager or SFTP, by plan."]] },
-    { aspect: "Server software", cells: [["pro", "Paper, Purpur, Fabric, NeoForge, Vanilla or Velocity."], ["mid", "What the host offers."]] },
-    { aspect: "Upkeep", cells: [["con", "Yours: the machine, its updates, the network. Backups run on a schedule."], ["pro", "The host looks after hardware and network."]] },
-    { aspect: "Uptime", cells: [["con", "As long as your machine is on."], ["pro", "Data-centre hardware, on around the clock."]] },
-    { aspect: "Reaching players", cells: [["mid", "Port forwarding or a VPS. CraftPanel checks whether friends can join."], ["pro", "A public address is included."]] },
-    { aspect: "Getting started", cells: [["mid", "One-line installer on Linux and Windows; manual setup on macOS."], ["pro", "Sign up and pick a plan."]] },
-  ],
-};
-const choices: { title: string; text: string; link?: { href: string; label: string } }[] = [
-  { title: "Run CraftPanel if…", text: "you have a spare PC, a Raspberry Pi or a VPS, and want your worlds and settings on hardware you control.", link: { href: "#install", label: "Install it" } },
-  { title: "Rent a server if…", text: "nobody wants to look after a machine or a router, and the server has to stay online around the clock." },
-  { title: "Pick another panel if…", text: "you run many machines or games: Pterodactyl spreads servers across nodes in Docker, Crafty Controller also runs Bedrock. CraftPanel manages one host today; more are planned." },
+const compare: { aspect: string; cells: [Mark, string][] }[] = [
+  { aspect: "Cost", cells: [["pro", "Free panel. You pay for power, or for a VPS."], ["con", "A monthly fee, by plan and memory."]] },
+  { aspect: "Files & worlds", cells: [["pro", "Every file on your own disk."], ["mid", "Through the host's file manager or SFTP."]] },
+  { aspect: "Server software", cells: [["pro", "Paper, Purpur, Fabric, NeoForge, Vanilla or Velocity."], ["mid", "What the host offers."]] },
+  { aspect: "Upkeep", cells: [["con", "Yours: the machine, its updates, the network."], ["pro", "The host looks after hardware and network."]] },
+  { aspect: "Uptime", cells: [["con", "As long as your machine is on."], ["pro", "Data-centre hardware, around the clock."]] },
+  { aspect: "Reaching players", cells: [["mid", "Port forwarding or a VPS; CraftPanel checks it."], ["pro", "A public address is included."]] },
 ];
 
 const faqs: Faq[] = [
@@ -368,7 +172,6 @@ const faqs: Faq[] = [
   { id: "bedrock", q: "Bedrock?", a: "Not yet. CraftPanel runs Minecraft Java Edition servers. A Bedrock adapter is on the roadmap." },
   { id: "world", q: "Can I bring my existing world?", a: "Yes. Create a server with the same software and version, then import the world as a zip in the Worlds tab, or upload files in the file manager.", more: { href: "/docs/guides/worlds-and-backups/", label: "Worlds and backups" } },
   { id: "internet", q: "Should I open the dashboard to the internet?", a: "No. Only the Minecraft port should be public. Reach the dashboard through a VPN like Tailscale, an SSH tunnel or an HTTPS reverse proxy. By default CraftPanel only lets in private networks and refuses public clients without HTTPS.", more: { href: "/docs/administration/remote-access/", label: "Remote access" } },
-  { id: "ai", q: "Is there AI in it?", a: "Only if you want it. The optional assistant is off until the owner adds their own key for Claude, OpenAI or a local model such as Ollama. It acts with the asking user's permissions and asks before it changes anything.", more: { href: "/docs/guides/ai-assistant/", label: "AI assistant" } },
   { id: "privacy", q: "Does it phone home?", a: "No telemetry and no CraftPanel cloud account. You create local users on your installation. CraftPanel goes online for official downloads, Modrinth and Hangar when you browse add-ons, and an optional update check against GitHub.", more: { href: "/docs/reference/security/", label: "Security and privacy" } },
 ];
 
@@ -386,607 +189,233 @@ const app = {
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   author: { "@type": "Person", name: "Victor Chappot", url: "https://github.com/vctrchappot" },
 };
-
-const backups = [
-  { when: "Today 04:00", size: "1.24 GB", tag: "nightly" },
-  { when: "Yesterday 04:00", size: "1.23 GB", tag: "nightly" },
-  { when: "Sun 03:00", size: "1.20 GB", tag: "weekly" },
-  { when: "Before 1.21.4", size: "1.18 GB", tag: "manual" },
-];
+const no = (i: number) => String(i).padStart(2, "0");
 ---
 
 <SiteLayout title={title} description={description} path="/" jsonLd={[app, faqJsonLd(faqs)]}>
-  <!-- Hero -->
-  <section class="hero grid-bg grid-bg-radial" id="install" aria-labelledby="hero-title">
-    <div class="wrap hero-grid">
-      <div class="hero-copy">
-        <p class="hero-kicker mono"><span class="px-dot" aria-hidden="true"></span><a href={release.url}>{release.tag}</a> · self-hosted Minecraft panel</p>
-        <h1 id="hero-title" class="display"><span class="h-line">Your server.</span><br /><span class="h-line">Your hardware.</span><br /><span class="h-line"><span class="mark">No panel fee.</span></span></h1>
-        <p class="hero-lead">
-          A Minecraft Java server for you and your friends, on your own PC, Raspberry Pi or VPS. Create it, update it and back it up from your browser.
-        </p>
-        <Terminal version={version} id="hero-term" />
-        <div class="hero-next">
-          <a class="hero-link" href="#dashboard">See the dashboard <span aria-hidden="true">↓</span></a>
-          <a class="hero-link" href="/docs/getting-started/installation/">Installation guide <span aria-hidden="true">↗</span></a>
-        </div>
-        <ul class="hero-facts mono" aria-label="Supported platforms">
-          <li>Windows · Linux · macOS</li>
-          <li>x64 · ARM64 · Raspberry Pi</li>
-          <li>No Docker, no Java setup</li>
-        </ul>
-      </div>
-      <div class="hero-art" aria-hidden="false">
-        <div class="hero-scene">
-          <Iso boxes={heroScene()} label="A Raspberry Pi with a small Minecraft world floating above it" class="iso hero-iso" />
-          <!-- Shown when scrolling pulls the scene apart into its three layers. -->
-          <ul class="hero-layers mono" aria-hidden="true">
-            <li class="hl-world">Minecraft</li>
-            <li class="hl-data">CraftPanel</li>
-            <li class="hl-board">your hardware</li>
-          </ul>
-          <div class="hero-chip mono" aria-hidden="true">
-            <span class="chip-row"><span class="dot-run"></span>survival</span>
-            <span class="chip-row muted">Paper 1.21.4</span>
-            <span class="chip-row"><b>6</b>/20 online · TPS <b>20.0</b></span>
+  <div class="frame">
+    <!-- Hero: the claim, two ways in, the scene; the product itself in the row below -->
+    <section class="row" aria-labelledby="hero-title">
+      <div class="cells hero2">
+        <div class="cell hero2-copy">
+          <p class="kicker mono"><span class="px-dot" aria-hidden="true"></span><a href={release.url}>{release.tag}</a><span>Minecraft Java Edition</span><span>free</span></p>
+          <h1 id="hero-title" class="display hero2-title">Your Minecraft server, <span class="dim">on your own hardware.</span></h1>
+          <p class="hero2-lead">CraftPanel installs, runs, updates and backs up Paper, Purpur, Fabric, NeoForge, Vanilla and Velocity servers on a PC, a Raspberry Pi or a VPS. You manage them from a browser.</p>
+          <div class="hero2-actions">
+            <a class="btn btn-ink" href="#install">Install CraftPanel <UiIcon name="arrow-right" size={12} /></a>
+            <a class="btn btn-outline" href={github} rel="noopener"><UiIcon name="github" size={24} />GitHub{facts.stars !== null && facts.stars >= 10 && <span class="btn-count mono">{facts.stars}</span>}</a>
           </div>
+          <ul class="hero2-facts mono" aria-label="Platforms">
+            <li>Windows · Linux · macOS</li>
+            <li>x64 · ARM64</li>
+            <li>no Docker needed</li>
+          </ul>
         </div>
-        <p class="hero-host mono" aria-hidden="true">raspberrypi.local · 4 GB</p>
+        <div class="cell cell-vis hero2-art">
+          <Iso boxes={heroScene()} label="A Raspberry Pi with a small Minecraft world floating above it" class="iso night hero2-iso" />
+          <p class="vis-tag mono" aria-hidden="true"><span class="px-dot"></span>raspberrypi.local · 4 GB · 3 online</p>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+    <section class="row row-mock" id="dashboard" aria-label="The dashboard">
+      <div class="cell mock-cell">
+        <DashboardMock />
+        <p class="mock-caption mono">The server overview, as it looks in CraftPanel. The console and numbers are a recording.</p>
+      </div>
+    </section>
 
-  <!-- From install to update -->
-  <section class="sec-band" aria-labelledby="band-title">
-    <div class="wrap">
-      <h2 id="band-title" class="sr-only">From install to update</h2>
-      <ProcessBand />
-    </div>
-  </section>
+    <!-- What it is, in one sentence -->
+    <section class="row" aria-label="Who CraftPanel is for">
+      <p class="cell statement">A free panel for people who run their own Minecraft server: friends on a Raspberry Pi, a family on the PC under the desk, a small community on a VPS.</p>
+    </section>
 
-  <!-- Who it's for -->
-  <section class="sec sec-audience" aria-labelledby="audience-title">
-    <div class="wrap">
-      <h2 id="audience-title" class="display">Who runs CraftPanel?</h2>
-      <ul class="choices audiences">
-        {audiences.map((a) => (
-          <li class="choice">
-            <h3>{a.title}</h3>
-            <p class="aud-q">“{a.question}”</p>
-            <p>{a.text}</p>
-            <a class="choice-link" href={a.link.href}>{a.link.label} <UiIcon name="arrow-right" size={12} /></a>
+    <!-- Server software -->
+    <section class="row" aria-labelledby="soft-title">
+      <h2 id="soft-title" class="sr-only">Server software</h2>
+      <ul class="cells soft">
+        {software.map((s) => (
+          <li class="cell">
+            <Pixel name={s.icon} size={48} />
+            <p class="soft-name">{s.name}</p>
+            <p class="soft-note">{s.note}</p>
+            <p class="soft-kind mono">{s.kind}</p>
           </li>
         ))}
       </ul>
-    </div>
-  </section>
+      <p class="cell row-foot mono"><span>Downloaded from the project that makes it · checksum checked · the right Java per server</span><a href="/docs/guides/server-software/">Server software <UiIcon name="arrow-right" size={12} /></a></p>
+    </section>
 
-  <hr class="px-rule" />
-
-  <!-- 01 Server software -->
-  <section class="sec" aria-labelledby="types-title" data-types data-software={JSON.stringify(software)}>
-    <div class="wrap">
-      <header class="sec-head">
-        <p class="sec-no mono"><span>01</span>Server software</p>
-        <h2 id="types-title" class="display">Six kinds of server. <span class="dim">One wizard.</span></h2>
-        <p class="sec-lead">Pick the software, the version and the memory. CraftPanel does the rest and shows you what you'll get.</p>
-      </header>
-
-      <div class="types">
-        <div class="type-groups" role="radiogroup" aria-label="Server software">
-          {
-            softwareGroups.map((group) => (
-              <div class:list={["type-group", { "is-wide": group.wide }]}>
-                <p class="type-group-label">{group.label}</p>
-                <div class="type-cards">
-                  {group.items.map((key) => {
-                    const t = software[key];
-                    return (
-                      <label class:list={["type", { "has-badge": t.rec }]} style={`--type:${t.color}`}>
-                        <input type="radio" name="sw" value={t.key} checked={t.key === "paper"} />
-                        <span class="type-body">
-                          <span class="type-icon"><Pixel name={t.icon} size={32} /></span>
-                          <span class="type-text">
-                            <span class="type-name">
-                              {t.name}
-                              {t.rec && <span class="type-rec mono">Recommended</span>}
-                            </span>
-                            <span class="type-note">{t.note}</span>
-                          </span>
-                        </span>
-                        <span class="type-check" aria-hidden="true"><UiIcon name="check" size={12} /></span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            ))
-          }
-        </div>
-
-        <div class="preview-col">
-          <div class="pv-cap mono">
-            <span>Your panel</span>
-            <span data-pv="cap">{defaultSw.name} {defaultVer[0]} selected</span>
-          </div>
-          <div class="preview" style={`--type:${defaultSw.color}`}>
-            <div class="pv-bar">
-              <span class="pv-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="mono">localhost:8080/server</span>
-            </div>
-            <div class="pv-body">
-              <aside class="pv-side" aria-hidden="true">
-                <span class="pv-brand"><Wordmark /></span>
-                <span class="pv-side-label mono">Servers</span>
-                <div class="pv-side-list" data-pv="servers">
-                  {
-                    defaultSw.servers.map((srv) => (
-                      <span class:list={["pv-side-item", `is-${srv.status}`]}>
-                        <span class="pv-srv-dot"></span>
-                        <span>{srv.name}</span>
-                      </span>
-                    ))
-                  }
-                </div>
-              </aside>
-              <div class="pv-main" aria-live="polite">
-                <div class="pv-head">
-                  <span class="pv-name" data-pv="title">{defaultSw.title}</span>
-                  <span class="pv-status"><span class="dot-run"></span>Running</span>
-                  <span class="pv-badge" data-pv="name">{defaultSw.name}</span>
-                </div>
-                <p class="pv-meta mono" data-pv="meta">{defaultMeta}</p>
-                <div class="pv-tabs" aria-hidden="true" data-pv="tabs">
-                  {
-                    defaultSw.tabs.map((tab, idx) => (
-                      <span class:list={["pv-tab", { "is-on": idx === 0, "is-new": tab === defaultSw.highlightTab }]}>{tab}</span>
-                    ))
-                  }
-                </div>
-                <dl class="pv-stats" data-pv="stats">
-                  <div><dt>Players</dt><dd class="mono" data-pv="players">{defaultSw.players}</dd></div>
-                  <div><dt data-pv="mid-label">{defaultSw.middleStat[0]}</dt><dd class="mono" data-pv="mid-val">{defaultSw.middleStat[1]}</dd></div>
-                  <div><dt>Memory</dt><dd class="mono" data-pv="mem"><span>{defaultMemText}</span><small>GB</small></dd></div>
-                </dl>
-                <div class="pv-addons" data-pv="source-wrap">
-                  <span class="pv-source-icon" data-source-icon="plug"><UiIcon name="plug" size={24} /></span>
-                  <span class="pv-source-icon" data-source-icon="mod" hidden><UiIcon name="mod" size={24} /></span>
-                  <span class="pv-source-icon" data-source-icon="cube" hidden><UiIcon name="box" size={24} /></span>
-                  <span data-pv="addons">{defaultSw.source}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="wizard" aria-label="Your server setup">
-        <div class="wz-step">
-          <div class="wz-step-head"><b class="mono">1</b><span>Software</span></div>
-          <div class="wz-step-val">
-            {
-              Object.values(software).map((s) => (
-                <span class="type-icon wz-sw-icon" data-wz-icon={s.key} style={`--type:${s.color}`} hidden={s.key !== "paper"}>
-                  <Pixel name={s.icon} size={32} />
-                </span>
-              ))
-            }
-            <span data-wz="sw-name">{defaultSw.name}</span>
-          </div>
-        </div>
-        <div class="wz-step">
-          <div class="wz-step-head"><b class="mono">2</b><label for="wz-ver">Version</label></div>
-          <div class="wz-select">
-            <select id="wz-ver" data-wz-ver>
-              {defaultSw.versions.map((v, idx) => <option value={String(idx)} selected={idx === 0}>{v[0]}</option>)}
-            </select>
-          </div>
-        </div>
-        <div class="wz-step">
-          <div class="wz-step-head"><b class="mono">3</b><span>Memory</span></div>
-          <div class="wz-step-val">
-            <div class="wz-seg" role="radiogroup" aria-label="Memory in gigabytes" data-wz-mem>
-              {
-                memoryOptions.map((m) => (
-                  <label>
-                    <input type="radio" name="wz-mem" value={String(m)} checked={m === defaultMem} aria-label={`${m} gigabytes`} />
-                    <span class="mono">{m}</span>
-                  </label>
-                ))
-              }
-            </div>
-            <span class="wz-unit">GB</span>
-          </div>
-        </div>
-        <div class="wz-cta-wrap">
-          <button class="wz-btn" type="button" data-wz-cta>Create a {defaultSw.name} server</button>
-          <a class="wz-link" href="/docs/guides/server-software/">See all supported versions</a>
-        </div>
-      </div>
-
-      <div class="sw-trust">
-        {
-          softwareTrust.map((item) => (
-            <div class="sw-trust-item">
-              <span class="sw-trust-icon"><UiIcon name={item.icon} size={24} /></span>
-              <div>
-                <strong>{item.title}</strong>
-                <p>{item.text}</p>
-              </div>
-            </div>
-          ))
-        }
-      </div>
-    </div>
-  </section>
-
-  <!-- 02 Features -->
-  <section class="sec sec-dense" id="features" aria-labelledby="features-title">
-    <div class="wrap">
-      <header class="sec-head">
-        <p class="sec-no mono"><span>02</span>What it does</p>
-        <h2 id="features-title" class="display">The stuff you'd otherwise do <span class="dim">over SSH at 23:00.</span></h2>
-      </header>
-
-      <div class="bento">
-        <article class="tile tile-console">
-          <div class="tile-copy">
-            <p class="tile-label mono"><UiIcon name="terminal" size={24} />live console · metrics</p>
-            <h3>See what your server is doing. Right now.</h3>
-            <p>The real console over WebSockets, with history, filters and command input. Players, CPU, memory and TPS update every few seconds.</p>
-          </div>
-          <div class="demo-console" data-console>
-            <div class="dc-metrics mono" aria-hidden="true">
-              <span>players <b data-m="players">2</b>/20</span>
-              <span>tps <b data-m="tps">20.0</b></span>
-              <span>cpu <b data-m="cpu">12</b>%</span>
-              <span class="dc-spark" data-spark>{Array.from({ length: 24 }, (_, i) => <i style={`--v:${(30 + ((i * 37) % 50))}%`}></i>)}</span>
-            </div>
-            <ol class="dc-log mono" aria-label="Example console output">
-              <li>[19:57:51 INFO]: Starting minecraft server version 1.21.4</li>
-              <li>[19:57:52 INFO]: Loading properties</li>
-              <li>[19:57:55 INFO]: Preparing level "world"</li>
-              <li>[19:57:58 INFO]: Preparing start region for dimension minecraft:overworld</li>
-              <li>[19:58:02 INFO]: Done (8.412s)! For help, type "help"</li>
-              <li>[19:58:41 INFO]: UUID of player Alex is 8667ba71-b85a-4004-af54-457a9734eed7</li>
-              <li>[19:58:41 INFO]: Alex joined the game</li>
-              <li>[19:59:07 INFO]: &lt;Alex&gt; anyone up for the nether?</li>
-              <li>[20:00:12 INFO]: UUID of player Sam is 0ba1d6e5-61c4-4f7f-9b2c-3f2a6d1c88a0</li>
-              <li>[20:00:12 INFO]: Sam joined the game</li>
-              <li class="dc-warn">[20:00:30 WARN]: Can't keep up! Is the server overloaded? Running 2154ms behind, skipping 43 ticks</li>
-              <li>[20:02:18 INFO]: UUID of player Mia is c4f8a2b0-9d3e-4c71-8a65-1e7b0d2f4a93</li>
-              <li>[20:02:18 INFO]: Mia joined the game</li>
-              <li>[20:02:55 INFO]: &lt;Sam&gt; yes, after the cave</li>
-              <li>[20:03:41 INFO]: Mia left the game</li>
-              <li class="dc-cmd">&gt; say Nether trip at 9. Bring food.</li>
-              <li>[20:04:02 INFO]: [Server] Nether trip at 9. Bring food.</li>
-              <li>[20:15:00 INFO]: Saving the game (this may take a moment!)</li>
-              <li>[20:15:00 INFO]: Saved the game</li>
-              <li>[20:21:37 INFO]: Sam has made the advancement [Hot Stuff]</li>
-              <li>[20:24:09 INFO]: &lt;Alex&gt; see you at 9</li>
-            </ol>
-            <div class="dc-input mono" aria-hidden="true"><span>&gt;</span><span class="dc-typed">say hello</span></div>
-          </div>
-        </article>
-
-        <article class="tile tile-update">
-          <div class="tile-copy">
-            <p class="tile-label mono"><UiIcon name="upload" size={24} />independent runtime</p>
-            <h3>Update the panel. Keep playing.</h3>
-            <p>Minecraft runs in its own service. Watch the dashboard update and reconnect while your worlds keep ticking.</p>
-          </div>
-          <RuntimeDiagram />
-        </article>
-
-        <article class="tile tile-backup">
-          <div class="tile-copy">
-            <p class="tile-label mono"><UiIcon name="archive" size={24} />backups</p>
-            <h3>23:04. Someone TNT'd the base.</h3>
-            <p>Pick last night's backup and press Restore. CraftPanel verifies the archive and saves the current mess first, just in case.</p>
-          </div>
-          <div class="demo-backup" data-backup>
-            <fieldset class="db-list">
-              <legend class="sr-only">Backups of survival</legend>
-              {
-                backups.map((b, i) => (
-                  <label class="db-item">
-                    <input type="radio" name="backup" value={b.when} checked={i === 1} />
-                    <span class="db-when">{b.when}</span>
-                    <span class="db-size mono">{b.size}</span>
-                    <span class="db-tag mono">{b.tag} · verified</span>
-                  </label>
-                ))
-              }
-            </fieldset>
-            <div class="db-foot">
-              <button type="button" class="btn btn-small btn-ink" data-restore>Restore</button>
-              <ol class="db-steps mono" aria-live="polite" data-steps></ol>
-            </div>
-          </div>
-        </article>
-
-        <article class="tile tile-plugins">
-          <div class="tile-copy">
-            <p class="tile-label mono"><UiIcon name="blocks" size={24} />plugins · mods · modpacks</p>
-            <h3>Modrinth and Hangar, built in.</h3>
-            <p>Search, install with checksum checks and get update suggestions. Or start from a Modrinth modpack: the Minecraft and loader version come from the pack.</p>
-          </div>
-          <div class="demo-search">
-            <p class="dp-field mono" aria-label="Example search for luck"><UiIcon name="search" size={12} /><span class="dp-query">luck</span><span class="dp-count">3 results · Paper 1.21.4</span></p>
-            <ul class="demo-plugins" aria-label="Example search results">
-              <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">Modrinth</span></li>
-              <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">Hangar</span></li>
-              <li><span class="dp-name">Lucky Block</span><span class="dp-warn mono">needs Fabric</span><span class="dp-src mono">Modrinth</span></li>
-            </ul>
-            <p class="dp-note">Same plugin, two sources. CraftPanel picks the one that fits your version.</p>
-          </div>
-        </article>
-
-        <article class="tile tile-ai">
-          <div class="tile-copy">
-            <p class="tile-label mono"><UiIcon name="sparkle" size={24} />ai assistant · optional · your key</p>
-            <h3>Say what you want. Approve what it does.</h3>
-            <p>Ask in plain words. The assistant reads status, players and the console, and every change waits for your OK. Bring a key for Claude or OpenAI, or run a local model.</p>
-          </div>
-          <div class="demo-ai" data-ai>
-            <p class="ai-row ai-user">Whitelist Steve, he joins tonight</p>
-            <p class="ai-row ai-tool mono"><UiIcon name="check" size={12} />List players on survival</p>
-            <p class="ai-row ai-bot">Alex and Sam are online and the whitelist is on. I'll add Steve.</p>
-            <div class="ai-row ai-card" data-ai-card>
-              <p class="ai-card-title">Add Steve to the whitelist</p>
-              <div class="ai-card-foot">
-                <span class="ai-state mono" aria-live="polite" data-ai-state>Waiting for your approval</span>
-                <button type="button" class="btn btn-small btn-outline" data-ai-act="decline">Decline</button>
-                <button type="button" class="btn btn-small btn-ink" data-ai-act="approve">Approve</button>
-                <button type="button" class="btn btn-small btn-outline" data-ai-act="reset" hidden>Ask again</button>
-              </div>
-            </div>
-            <p class="ai-console mono" data-ai-out hidden>[21:04:12 INFO]: Added Steve to the whitelist</p>
-          </div>
-        </article>
-
-        <article class="tile tile-perf">
-          <div class="tile-copy">
-            <p class="tile-label mono"><UiIcon name="chart" size={24} />performance · insights</p>
-            <h3>Lag, with a reason.</h3>
-            <p>TPS, tick time, CPU and memory over the last hour. When ticks run long, CraftPanel marks the moment and says what would help.</p>
-          </div>
-          <figure class="demo-perf" data-perf>
-            <div class="dpf-head mono"><span>Tick time</span><span><b>18.6</b> ms avg · peak <b class="dpf-bad">71.4</b></span></div>
-            <svg class="dpf-chart" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true">
-              <line class="dpf-budget" x1="0" y1="40" x2="320" y2="40" />
-              <path class="dpf-area" d="M0 96 L20 94 L40 95 L60 92 L80 93 L100 90 L120 88 L140 70 L150 30 L160 18 L170 34 L180 62 L200 84 L220 86 L240 72 L250 36 L260 46 L270 78 L290 88 L320 90 L320 120 L0 120 Z" />
-              <path class="dpf-line" d="M0 96 L20 94 L40 95 L60 92 L80 93 L100 90 L120 88 L140 70 L150 30 L160 18 L170 34 L180 62 L200 84 L220 86 L240 72 L250 36 L260 46 L270 78 L290 88 L320 90" />
-              <rect class="dpf-mark" x="140" y="0" width="40" height="120" />
-              <rect class="dpf-mark" x="240" y="0" width="30" height="120" />
-            </svg>
-            <p class="dpf-axis mono" aria-hidden="true"><span>20:00</span><span>50 ms budget</span><span>21:00</span></p>
-            <figcaption class="dpf-insight">
-              <b>Generating new terrain is likely a big part of the load</b>
-              <span>Exploring players force the server to generate chunks while it ticks.</span>
-              <span class="dpf-fix mono">Open pre-generation <UiIcon name="arrow-right" size={12} /></span>
-            </figcaption>
-          </figure>
-        </article>
-
-        <article class="tile tile-list">
-          <ul class="minor">
-            {
-              minor.map((m) => (
-                <li>
-                  <h3 class="minor-title"><UiIcon name={m.icon} size={24} />{m.title}</h3>
-                  <p class="minor-text">{m.text}</p>
-                  <p class="minor-chips mono">{m.chips.map((c) => <span>{c}</span>)}</p>
-                </li>
-              ))
-            }
-          </ul>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <!-- 03 Closer look -->
-  <section class="sec" id="dashboard" aria-labelledby="look-title">
-    <div class="wrap">
-      <header class="sec-head sec-head-row">
-        <div>
-          <p class="sec-no mono"><span>03</span>Inside the dashboard</p>
-          <h2 id="look-title" class="display">Inside CraftPanel.</h2>
-        </div>
-        <div class="look-tabs" role="tablist" aria-label="Dashboard screens" data-look-tabs>
-          {
-            looks.map((l, i) => (
-              <button role="tab" type="button" id={`look-tab-${l.key}`} aria-controls={`look-${l.key}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
-                {l.label}
-              </button>
-            ))
-          }
-        </div>
-      </header>
-      <div class="look" data-look>
-        <div class="window">
-          <div class="window-bar" aria-hidden="true"><span class="pv-dots"><i></i><i></i><i></i></span><span class="mono">craftpanel · localhost:8080</span></div>
-          <div class="look-stage">
-            {
-              looks.map((l, i) => (
-                <div class="look-panel" role="tabpanel" id={`look-${l.key}`} aria-labelledby={`look-tab-${l.key}`} data-active={i === 0 ? "true" : "false"} inert={i !== 0}>
-                  <div class="look-zoom">
-                    <Shot name={l.key} alt={l.alt} eager={i === 0} />
-                    {l.spots.map((s, n) => (
-                      <button
-                        type="button"
-                        class="spot"
-                        style={`left:${s.x}%;top:${s.y}%`}
-                        aria-describedby={`spot-${l.key}-${n}`}
-                        data-spot={`${l.key}-${n}`}
-                        data-x={s.x}
-                        data-y={s.y}
-                        data-v={s.y < 18 ? "below" : undefined}
-                        data-h={s.x > 74 ? "end" : s.x < 22 ? "start" : undefined}
-                      >
-                        <span class="spot-n mono">{n + 1}</span>
-                        <span class="spot-tip" role="tooltip" id={`spot-${l.key}-${n}`}>{s.text}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))
-            }
-            <button type="button" class="look-out mono" data-look-out hidden>
-              <UiIcon name="search" size={12} /> Whole screen
-            </button>
-          </div>
-        </div>
-        <div class="look-legend">
-          <p class="look-hint mono">Pick a number to zoom in.</p>
-          {
-            looks.map((l, i) => (
-              <ol class="legend" data-legend={l.key} hidden={i !== 0}>
-                {l.spots.map((s, n) => (
-                  <li>
-                    <button type="button" data-spot-ref={`${l.key}-${n}`} aria-pressed="false">
-                      <span class="legend-n mono">{n + 1}</span>
-                      <span>{s.text}</span>
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            ))
-          }
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 04 Hardware -->
-  <section class="sec sec-stone" id="hardware" aria-labelledby="hw-title">
-    <div class="wrap">
-      <header class="sec-head">
-        <p class="sec-no mono"><span>04</span>Hardware</p>
-        <h2 id="hw-title" class="display">Runs on <span class="dim">what you have.</span></h2>
-        <p class="sec-lead">Planning estimates for Paper with a pre-generated world, not measured hardware benchmarks. Mods, mob farms and view distance change the load.</p>
-      </header>
-      <div class="devices">
-        {
-          devices.map((d) => (
-            <article class="device">
-              <div class="device-art">
-                <Iso boxes={d.scene} label={d.name} class="iso" />
-              </div>
-              <h3>{d.name}</h3>
-              <p class="device-os mono">{d.os}</p>
-              <dl class="device-stats">
-                <div><dt class="mono">RAM for Minecraft</dt><dd class="display">{d.ram}</dd></div>
-                <div><dt class="mono">Players, estimate</dt><dd class="display">{d.players}</dd></div>
-              </dl>
-              <p class="device-note">{d.note}</p>
-            </article>
-          ))
-        }
-      </div>
-    </div>
-  </section>
-
-  <!-- 05–06 Isolation and security, as chapters with a sticky index -->
-  <div class="chapters grid-bg" data-chapters>
-    <div class="wrap chapters-in">
-      <nav class="chapter-nav mono" aria-label="Chapters">
-        <a href="#isolation" data-chapter="isolation"><span>05</span>Isolation &amp; limits</a>
-        <a href="#security" data-chapter="security"><span>06</span>Security</a>
+    <!-- Chapters with a sticky index -->
+    <div class="row chapters2" id="features">
+      <nav class="chapter-index mono" aria-label="Features">
+        {chapters.map((c, i) => <a href={`#${c.id}`} data-chapter={c.id}><span>{no(i + 1)}</span>{c.label}</a>)}
       </nav>
-      <div class="chapter-body">
-        <section class="chapter" id="isolation" aria-labelledby="isolation-title">
-          <header class="sec-head">
-            <p class="sec-no mono"><span>05</span>Isolation &amp; limits</p>
-            <h2 id="isolation-title" class="display">Many servers, one machine. <span class="dim">Each in its own lane.</span></h2>
-            <p class="sec-lead">A modpack that wants every gigabyte, a plugin that forks: the operating system holds each server to its own share, so the rest of the host stays responsive.</p>
-          </header>
-          <figure class="lanes-fig dl-marks">
-            <Iso boxes={isolationScene()} label="Three Minecraft worlds on one machine, each under its own glass box; the third box is at its limit" class="iso iso-lanes" />
-            <div class="lanes">
-              {lanes.map((l) => (
-                <div class:list={["lane", { "is-hot": l.hot }]}>
-                  <p class="lane-head mono"><span class="lane-dot" aria-hidden="true" />{l.name}<span class="lane-sw">{l.software}</span></p>
-                  <p class="meter mono">
-                    <span class="meter-k">memory</span>
-                    <span class="meter-bar" style={`--v:${(l.memory[0] / l.memory[1]).toFixed(2)}`} aria-hidden="true"><i /></span>
-                    <span class="meter-v">{l.memory[0].toFixed(1)} / {l.memory[1].toFixed(1)} GB</span>
-                  </p>
-                  <p class="meter mono">
-                    <span class="meter-k">cpu</span>
-                    <span class="meter-bar" style={`--v:${(l.cpu[0] / l.cpu[1]).toFixed(2)}`} aria-hidden="true"><i /></span>
-                    <span class="meter-v">{l.cpu[0].toFixed(1)} / {l.cpu[1]} cores</span>
-                  </p>
-                  <p class="lane-note mono">{l.note}</p>
-                </div>
-              ))}
+      <div class="chapter-list">
+        {chapters.map((c, i) => (
+          <section class="chapter2" id={c.id} aria-labelledby={`${c.id}-title`}>
+            <div class="cells chapter2-cells">
+              <div class="cell chapter2-copy">
+                <p class="sec-no mono"><span>{no(i + 1)}</span>{c.label}</p>
+                <h2 id={`${c.id}-title`} class="display">{c.title} <span class="dim">{c.dim}</span></h2>
+                {c.text.map((t) => <p class="chapter2-text">{t}</p>)}
+              </div>
+              <div class:list={["cell", "cell-vis", `vis-${c.id}`]}>
+                {c.id === "isolation" && (
+                  <div class="iso-stage">
+                    <Iso boxes={isolationScene()} label="Three Minecraft worlds on one machine, each under its own glass box; the third box is at its limit" class="iso night iso-lanes" />
+                    <div class="lanes">
+                      {lanes.map((l) => (
+                        <div class:list={["lane", { "is-hot": l.hot }]}>
+                          <p class="lane-head mono"><span class="lane-dot" aria-hidden="true" />{l.name}<span class="lane-sw">{l.software}</span></p>
+                          <p class="meter mono"><span class="meter-k">memory</span><span class="meter-bar" style={`--v:${(l.memory[0] / l.memory[1]).toFixed(2)}`} aria-hidden="true"><i /></span><span class="meter-v">{l.memory[0].toFixed(1)} / {l.memory[1].toFixed(1)} GB</span></p>
+                          <p class="meter mono"><span class="meter-k">cpu</span><span class="meter-bar" style={`--v:${(l.cpu[0] / l.cpu[1]).toFixed(2)}`} aria-hidden="true"><i /></span><span class="meter-v">{l.cpu[0].toFixed(1)} / {l.cpu[1]} cores</span></p>
+                          <p class="lane-note mono">{l.note}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {c.id === "updates" && <RuntimeDiagram />}
+                {c.id === "backups" && (
+                  <div class="demo-backup" data-backup>
+                    <fieldset class="db-list">
+                      <legend class="sr-only">Backups of survival</legend>
+                      {backups.map((b, j) => (
+                        <label class="db-item">
+                          <input type="radio" name="backup" value={b.when} checked={j === 1} />
+                          <span class="db-when">{b.when}</span>
+                          <span class="db-size mono">{b.size}</span>
+                          <span class="db-tag mono">{b.tag} · verified</span>
+                        </label>
+                      ))}
+                    </fieldset>
+                    <div class="db-foot">
+                      <button type="button" class="btn btn-small btn-ink" data-restore>Restore</button>
+                      <ol class="db-steps mono" aria-live="polite" data-steps></ol>
+                    </div>
+                  </div>
+                )}
+                {c.id === "plugins" && (
+                  <div class="demo-search">
+                    <p class="dp-field mono" aria-label="Example search for luck"><UiIcon name="search" size={12} /><span class="dp-query">luck</span><span class="dp-count">3 results · Paper 1.21.4</span></p>
+                    <ul class="demo-plugins" aria-label="Example search results">
+                      <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">Modrinth</span></li>
+                      <li><span class="dp-name">LuckPerms</span><span class="dp-ok mono">supports 1.21.4</span><span class="dp-src mono">Hangar</span></li>
+                      <li><span class="dp-name">Lucky Block</span><span class="dp-warn mono">needs Fabric</span><span class="dp-src mono">Modrinth</span></li>
+                    </ul>
+                  </div>
+                )}
+                {c.id === "performance" && (
+                  <figure class="demo-perf" data-perf>
+                    <div class="dpf-head mono"><span>Tick time</span><span><b>18.6</b> ms avg · peak <b class="dpf-bad">71.4</b></span></div>
+                    <svg class="dpf-chart" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true">
+                      <line class="dpf-budget" x1="0" y1="40" x2="320" y2="40" />
+                      <path class="dpf-area" d="M0 96 L20 94 L40 95 L60 92 L80 93 L100 90 L120 88 L140 70 L150 30 L160 18 L170 34 L180 62 L200 84 L220 86 L240 72 L250 36 L260 46 L270 78 L290 88 L320 90 L320 120 L0 120 Z" />
+                      <path class="dpf-line" d="M0 96 L20 94 L40 95 L60 92 L80 93 L100 90 L120 88 L140 70 L150 30 L160 18 L170 34 L180 62 L200 84 L220 86 L240 72 L250 36 L260 46 L270 78 L290 88 L320 90" />
+                      <rect class="dpf-mark" x="140" y="0" width="40" height="120" />
+                      <rect class="dpf-mark" x="240" y="0" width="30" height="120" />
+                    </svg>
+                    <p class="dpf-axis mono" aria-hidden="true"><span>20:00</span><span>50 ms budget</span><span>21:00</span></p>
+                    <figcaption class="dpf-insight">
+                      <b>Generating new terrain is likely a big part of the load</b>
+                      <span>Exploring players force the server to generate chunks while it ticks.</span>
+                      <span class="dpf-fix mono">Open pre-generation <UiIcon name="arrow-right" size={12} /></span>
+                    </figcaption>
+                  </figure>
+                )}
+                {c.id === "assistant" && (
+                  <div class="demo-ai" data-ai>
+                    <p class="ai-row ai-user">Whitelist Steve, he joins tonight</p>
+                    <p class="ai-row ai-tool mono"><UiIcon name="check" size={12} />List players on survival</p>
+                    <p class="ai-row ai-bot">Alex and Sam are online and the whitelist is on. I'll add Steve.</p>
+                    <div class="ai-row ai-card" data-ai-card>
+                      <p class="ai-card-title">Add Steve to the whitelist</p>
+                      <div class="ai-card-foot">
+                        <span class="ai-state mono" aria-live="polite" data-ai-state>Waiting for your approval</span>
+                        <button type="button" class="btn btn-small btn-outline" data-ai-act="decline">Decline</button>
+                        <button type="button" class="btn btn-small btn-ink" data-ai-act="approve">Approve</button>
+                        <button type="button" class="btn btn-small btn-outline" data-ai-act="reset" hidden>Ask again</button>
+                      </div>
+                    </div>
+                    <p class="ai-console mono" data-ai-out hidden>[21:04:12 INFO]: Added Steve to the whitelist</p>
+                  </div>
+                )}
+                {c.id === "security" && (
+                  <ol class="hops">
+                    {hops.map((h) => (
+                      <li class="hop">
+                        <p class="hop-name"><UiIcon name={h.icon} size={24} />{h.name}<span class="hop-where mono">{h.where}</span></p>
+                        <ul class="hop-checks mono">{h.checks.map((k) => <li>{k}</li>)}</ul>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
             </div>
-            <figcaption class="dl-tab mono">one host · three servers · example values</figcaption>
-          </figure>
-          <ul class="points">
-            {lanePoints.map((p) => (
-              <li>
-                <h3 class="minor-title"><UiIcon name={p.icon} size={24} />{p.title}</h3>
-                <p class="minor-text">{p.text}</p>
-              </li>
-            ))}
-          </ul>
-          <p class="chapter-foot mono">Limits: Linux service installs (cgroup v2) and Windows (job objects). Own accounts: Linux service installs. <a href="/docs/reference/architecture/#resource-limits">How it works</a></p>
-        </section>
-
-        <section class="chapter" id="security" aria-labelledby="security-title">
-          <header class="sec-head">
-            <p class="sec-no mono"><span>06</span>Security</p>
-            <h2 id="security-title" class="display">Safe by default. <span class="dim">Honest about the rest.</span></h2>
-            <p class="sec-lead">Your server runs on your machine, so every request is checked on its way from your browser to Minecraft.</p>
-          </header>
-          <figure class="hops-fig dl-marks">
-            <ol class="hops">
-              {hops.map((h) => (
-                <li class="hop">
-                  <p class="hop-name"><UiIcon name={h.icon} size={24} />{h.name}</p>
-                  <p class="hop-where mono">{h.where}</p>
-                  <ul class="hop-checks mono">
-                    {h.checks.map((c) => <li>{c}</li>)}
-                  </ul>
-                </li>
+            <dl class="cells specs">
+              {c.specs.map(([k, v]) => (
+                <div class="cell"><dt class="mono">{k}</dt><dd>{v}</dd></div>
               ))}
-            </ol>
-            <figcaption class="dl-tab mono">request path · browser to world</figcaption>
-          </figure>
-          <ul class="safe">
-            {extras.map((s) => (
-              <li>
-                <h3 class="minor-title"><UiIcon name={s.icon} size={24} />{s.title}</h3>
-                <p class="minor-text">{s.text}</p>
-              </li>
-            ))}
-            <li class="safe-links">
-              <a href="/docs/reference/security/">Protections and limits <UiIcon name="arrow-right" size={12} /></a>
-              <a href={`${github}/blob/main/docs/STATUS.md`} rel="noopener">How each feature was tested <UiIcon name="arrow-right" size={12} /></a>
-            </li>
-          </ul>
-        </section>
+            </dl>
+          </section>
+        ))}
       </div>
     </div>
-  </div>
 
-  <!-- 07 Comparison -->
-  <section class="sec" id="compare" aria-labelledby="compare-title">
-    <div class="wrap wrap-mid">
-      <header class="sec-head">
-        <p class="sec-no mono"><span>07</span>Hosting choices</p>
+    <!-- The rest, as a dense grid -->
+    <section class="row" aria-labelledby="more-title">
+      <div class="cell row-head row-head-inline">
+        <h2 id="more-title" class="display">Also in the box.</h2>
+        <a class="mono" href="/docs/">All features in the docs <UiIcon name="arrow-right" size={12} /></a>
+      </div>
+      <ul class="cells extras">
+        {extras.map((e) => (
+          <li class="cell">
+            <p class="extra-title"><UiIcon name={e.icon} size={24} />{e.title}</p>
+            <p class="extra-text">{e.text}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <!-- Hardware -->
+    <section class="row" id="hardware" aria-labelledby="hw-title">
+      <div class="cell row-head">
+        <p class="sec-no mono"><span>08</span>Hardware</p>
+        <h2 id="hw-title" class="display">Runs on what you have.</h2>
+        <p class="row-lead">Planning estimates for Paper with a pre-generated world. Mods, mob farms and view distance change the load.</p>
+      </div>
+      <div class="cells devices2">
+        {devices.map((d) => (
+          <a class="cell cell-vis device2" href={d.href}>
+            <Iso boxes={d.scene} label={d.name} class="iso night" />
+            <span class="device2-body">
+              <span class="device2-name">{d.name} <UiIcon name="arrow-right" size={12} /></span>
+              <span class="device2-os mono">{d.os}</span>
+              <span class="device2-stats">
+                <span><span class="mono">RAM for Minecraft</span><b>{d.ram}</b></span>
+                <span><span class="mono">players, estimate</span><b>{d.players}</b></span>
+              </span>
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <!-- Comparison -->
+    <section class="row" id="compare" aria-labelledby="compare-title">
+      <div class="cell row-head">
+        <p class="sec-no mono"><span>09</span>Hosting choices</p>
         <h2 id="compare-title" class="display">Run it yourself, <span class="dim">or rent a managed server?</span></h2>
-        <p class="sec-lead">Both are good answers. The real question is who looks after the machine.</p>
-      </header>
+        <p class="row-lead">Both are good answers; the question is who looks after the machine. If nobody wants to, rent one. If you run many machines or games, Pterodactyl or Crafty Controller fit better.</p>
+      </div>
       <div class="table-scroll" tabindex="0" role="region" aria-label="Self-hosting and managed Minecraft hosting comparison">
         <table class="compare">
           <thead>
-            <tr><th scope="col"><span class="sr-only">Aspect</span></th>{compare.cols.map((c, i) => <th scope="col" class={i === 0 ? "is-us" : undefined}>{c}</th>)}</tr>
+            <tr><th scope="col"><span class="sr-only">Aspect</span></th><th scope="col" class="is-us">CraftPanel on your machine</th><th scope="col">Managed Minecraft hosting</th></tr>
           </thead>
           <tbody>
-            {compare.rows.map((r) => (
+            {compare.map((r) => (
               <tr>
                 <th scope="row" class="mono">{r.aspect}</th>
                 {r.cells.map(([m, text], i) => (
@@ -1000,76 +429,53 @@ const backups = [
           </tbody>
         </table>
       </div>
-      <p class="cmp-key mono" aria-hidden="true">
-        {(Object.keys(marks) as Mark[]).map((m) => <span data-mark={m}><span class="cmp-mark"><UiIcon name={marks[m].icon} size={12} /></span>{marks[m].label.toLowerCase()}</span>)}
-      </p>
-      <ul class="choices">
-        {choices.map((c, i) => (
-          <li class:list={["choice", { "is-us": i === 0 }]}>
-            <h3>{c.title}</h3>
-            <p>{c.text}</p>
-            {c.link && <a class="choice-link" href={c.link.href}>{c.link.label} <UiIcon name="arrow-right" size={12} /></a>}
-          </li>
-        ))}
-      </ul>
-    </div>
-  </section>
+    </section>
 
-  <!-- 08 Trust -->
-  <section class="sec sec-trust" aria-labelledby="trust-title">
-    <div class="wrap trust">
-      <div class="trust-project">
-        <p class="sec-no mono"><span>08</span>Project & source</p>
-        <h2 id="trust-title" class="display">Built by Victor.</h2>
-        <p>CraftPanel is built for people running their own Minecraft server. The source, issues and release notes are public.</p>
-        <a class="trust-cta" href={github} rel="noopener">
-          <UiIcon name="github" size={24} /> View on GitHub
-          {facts.stars !== null && facts.stars >= 10 && <span class="trust-cta-count">{facts.stars} stars</span>}
-        </a>
-        <div class="project-author">
-          <a class="avatar-link" href="https://github.com/vctrchappot" rel="noopener">
-            <Image src={avatar} alt="Victor Chappot, author of CraftPanel (GitHub profile)" width={48} height={48} class="avatar" />
-          </a>
-          <div>
-            <p class="author-name">Victor</p>
-            <a class="author-handle" href="https://github.com/vctrchappot" rel="noopener">@vctrchappot</a>
+    <!-- Project -->
+    <section class="row" aria-labelledby="trust-title">
+      <div class="cells project">
+        <div class="cell">
+          <p class="sec-no mono"><span>10</span>Project</p>
+          <h2 id="trust-title" class="display">Built by Victor, <span class="dim">in the open.</span></h2>
+          <div class="project-author">
+            <a href="https://github.com/vctrchappot" rel="noopener">
+              <Image src={avatar} alt="Victor Chappot, author of CraftPanel (GitHub profile)" width={48} height={48} class="avatar" />
+            </a>
+            <p><b>Victor</b><a href="https://github.com/vctrchappot" rel="noopener">@vctrchappot</a></p>
           </div>
         </div>
+        <dl class="cell project-facts">
+          <div><dt class="mono">latest release</dt><dd><a href={release.url}>{release.tag}</a>{releaseDate && <span class="dim"> · {releaseDate}</span>}</dd></div>
+          <div><dt class="mono">tests</dt><dd>400+ automated, plus real servers joined by a bot</dd></div>
+          <div><dt class="mono">ci</dt><dd>Linux, Windows, macOS and ARM64 on every push</dd></div>
+          <div><dt class="mono">license</dt><dd><a href={`${github}/blob/main/LICENSE`}>FSL-1.1-ALv2</a>, Apache-2.0 after two years</dd></div>
+          <div><dt class="mono">telemetry</dt><dd>None</dd></div>
+          <div><dt class="mono">source</dt><dd><a href={github} rel="noopener">GitHub</a> · <a href={`${github}/issues`} rel="noopener">issues</a> · <a href={`${github}/blob/main/docs/ROADMAP.md`} rel="noopener">roadmap</a></dd></div>
+        </dl>
       </div>
-      <dl class="trust-facts">
-        <div>
-          <dt class="mono">latest release</dt>
-          <dd>
-            <span class="fact-badge mono">{release.tag}</span>{releaseDate && <span class="muted"> {releaseDate}</span>} · <a href={release.url}>Release notes</a>
-          </dd>
-        </div>
-        <div><dt class="mono">tests</dt><dd>400+ automated tests, plus real-server scenarios with a bot that joins and chats</dd></div>
-        <div><dt class="mono">ci</dt><dd>Every push: Linux, Windows, macOS and ARM64</dd></div>
-        <div><dt class="mono">license</dt><dd><a href={`${github}/blob/main/LICENSE`}>FSL-1.1-ALv2</a>, Apache-2.0 after two years</dd></div>
-        <div><dt class="mono">telemetry</dt><dd><span class="fact-none"><UiIcon name="check" size={12} /><strong>None.</strong></span> Not even a counter.</dd></div>
-        <div><dt class="mono">github</dt><dd><a href={github} rel="noopener">Source</a>, <a href={`${github}/issues`} rel="noopener">issues</a> and <a href={`${github}/blob/main/docs/ROADMAP.md`} rel="noopener">roadmap</a>. A star helps.</dd></div>
-      </dl>
+    </section>
+
+    <div class="row row-faq">
+      <FaqSection items={faqs} no="11" />
     </div>
-  </section>
 
-  <FaqSection items={faqs} no="09" />
-
-  <!-- CTA -->
-  <section class="cta" aria-labelledby="cta-title">
-    <div class="wrap cta-in">
-      <div>
-        <h2 id="cta-title" class="display">Install CraftPanel.</h2>
-        <ol class="cta-steps">
-          <li><span class="cta-step-no mono" aria-hidden="true">1</span>Run the command</li>
-          <li><span class="cta-step-no mono" aria-hidden="true">2</span>Open <span class="mono">localhost:8080</span></li>
-          <li><span class="cta-step-no mono" aria-hidden="true">3</span>Create your first server</li>
-        </ol>
-        <div class="cta-links">
-          <a class="cta-btn cta-btn-primary" href="/docs/getting-started/installation/">Installation guide <UiIcon name="arrow-right" size={12} /></a>
-          <a class="cta-btn cta-btn-secondary" href={github} rel="noopener"><UiIcon name="github" size={24} /> View on GitHub</a>
+    <!-- Install -->
+    <section class="row" id="install" aria-labelledby="install-title">
+      <div class="cells install2">
+        <div class="cell">
+          <p class="sec-no mono"><span>12</span>Install</p>
+          <h2 id="install-title" class="display">One command, <span class="dim">then the browser.</span></h2>
+          <ol class="install2-steps">
+            <li><span class="mono">1</span>Run the command for your system.</li>
+            <li><span class="mono">2</span>Open the address it prints, with the setup token.</li>
+            <li><span class="mono">3</span>Create your first server.</li>
+          </ol>
+          <p class="install2-links"><a href="/docs/getting-started/installation/">Installation guide <UiIcon name="arrow-right" size={12} /></a><a href="/raspberry-pi/">On a Raspberry Pi <UiIcon name="arrow-right" size={12} /></a><a href="/windows/">On Windows <UiIcon name="arrow-right" size={12} /></a></p>
+        </div>
+        <div class="cell cell-term">
+          <Terminal version={version} id="install-term" />
         </div>
       </div>
-      <Terminal version={version} id="cta-term" compact />
-    </div>
-  </section>
+    </section>
+  </div>
 </SiteLayout>

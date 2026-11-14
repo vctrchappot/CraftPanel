@@ -1,0 +1,1067 @@
+/* Home page layout: one frame with 1px rails, rows split by full-width rules with crosshair marks, and cells
+   divided by hairlines (a 1px gap over the line colour). Visual cells sit on a dot grid with a pool of light
+   under the drawing. Shared pieces (buttons, demos, iso scenes, terminal, FAQ, table) come from landing.css. */
+
+.frame {
+  max-width: 1232px;
+  margin: 0 auto;
+  border-inline: 1px solid var(--line);
+}
+.row {
+  position: relative;
+}
+.row + .row {
+  border-top: 1px solid var(--line);
+}
+/* Crosshairs where a row rule meets the rails */
+.row + .row::before,
+.row + .row::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -6px;
+  width: 11px;
+  height: 11px;
+  background:
+    linear-gradient(var(--line-strong), var(--line-strong)) center / 1px 100% no-repeat,
+    linear-gradient(var(--line-strong), var(--line-strong)) center / 100% 1px no-repeat;
+  pointer-events: none;
+}
+.row + .row::before {
+  left: -6px;
+}
+.row + .row::after {
+  right: -6px;
+}
+
+.cells {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--line);
+}
+.cell {
+  min-width: 0;
+  padding: 40px;
+  background: var(--bg);
+}
+.cell-vis {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--bg-2);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--fg) 16%, transparent) 1px, transparent 1.4px);
+  background-size: 16px 16px;
+  background-position: 8px 8px;
+}
+/* Light pooling on the floor under the drawing */
+.cell-vis::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse 60% 45% at 50% 62%, var(--bg-2) 30%, transparent 75%);
+  pointer-events: none;
+}
+.vis-tag {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.vis-tag .px-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.frame h2.display {
+  font-size: clamp(32px, 3vw, 40px);
+  line-height: 1.1;
+}
+.frame .sec-no {
+  margin-bottom: 24px;
+}
+
+/* ---- hero ---- */
+.hero2 {
+  grid-template-columns: minmax(0, 6fr) minmax(0, 6fr);
+}
+.hero2-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 88px 48px 72px;
+}
+.kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-bottom: 32px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.kicker a {
+  color: var(--fg);
+  text-decoration: none;
+}
+.kicker a:hover {
+  text-decoration: underline;
+}
+.kicker > span:not(.px-dot)::before {
+  content: "/";
+  margin-right: 10px;
+  color: var(--line-strong);
+}
+.hero2-title {
+  font-size: clamp(48px, 5vw, 72px);
+  line-height: 1;
+  text-wrap: balance;
+}
+.hero2-lead {
+  max-width: 34em;
+  margin-top: 28px;
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.hero2-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 36px;
+}
+.btn-count {
+  padding-left: 10px;
+  margin-left: 2px;
+  border-left: 1px solid var(--line-strong);
+  font-size: 12px;
+  color: var(--muted);
+}
+.hero2-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 28px;
+  margin: 40px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hero2-art {
+  display: grid;
+  place-items: center;
+  padding: 56px 40px 64px;
+}
+.hero2-iso {
+  max-width: 560px;
+}
+
+/* ---- the dashboard, rebuilt ---- */
+.mock-cell {
+  padding: 56px 48px 28px;
+  background-color: var(--bg-2);
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: -1px -1px;
+}
+.mock-caption {
+  margin-top: 20px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+.mock {
+  --mk-line: var(--cp-border);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.4 var(--font-text);
+  box-shadow: 12px 12px 0 color-mix(in srgb, var(--shadow) 35%, transparent);
+}
+.mock-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--mk-line);
+  background: var(--bg-2);
+  font-size: 11px;
+  color: var(--muted);
+}
+.mock-bar i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.mock-bar span {
+  margin: 0 auto;
+  padding: 3px 14px;
+  border: 1px solid var(--mk-line);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.mock-app {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+}
+.mock-side {
+  padding: 16px 12px;
+  border-right: 1px solid var(--mk-line);
+  background: var(--bg-2);
+}
+.mock-brand {
+  padding: 2px 8px 16px;
+}
+.mock-brand svg {
+  height: 18px;
+  width: auto;
+}
+.mock-nav,
+.mock-servers,
+.mock-tabs,
+.mock-connect ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mock-nav li {
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: var(--muted);
+}
+.mock-nav li.on,
+.mock-servers li.on {
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--mk-line);
+}
+.mock-h {
+  margin: 18px 8px 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mock-servers li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+.mock-servers b {
+  display: block;
+  font-weight: 500;
+}
+.mock-servers small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+.mock-ico {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--mk-line);
+  font-weight: 600;
+  font-size: 12px;
+}
+.mock-ico i {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--bg-2);
+  border-radius: 50%;
+  background: var(--ash);
+}
+.mock-ico i.run {
+  background: var(--signal);
+}
+.mock-ico-lg {
+  width: 40px;
+  height: 40px;
+  font-size: 16px;
+  background: color-mix(in srgb, var(--grass) 22%, var(--surface));
+}
+.mock-main {
+  min-width: 0;
+  padding: 20px 24px 24px;
+}
+.mock-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.mock-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 600 18px/1.2 var(--font-display);
+}
+.mock-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--signal) 16%, transparent);
+  color: var(--grass-text);
+  font-size: 11px;
+  font-weight: 500;
+}
+.mock-state i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal);
+}
+.mock-meta {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mock-btns {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.mock-btns span {
+  padding: 6px 12px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font-size: 12px;
+  font-weight: 500;
+}
+.mock-tabs {
+  display: flex;
+  gap: 18px;
+  margin: 18px 0 18px;
+  border-bottom: 1px solid var(--mk-line);
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.mock-tabs li {
+  padding-bottom: 9px;
+}
+.mock-tabs li.on {
+  color: var(--fg);
+  box-shadow: inset 0 -2px 0 var(--grass);
+}
+.mock-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.4fr);
+  gap: 10px;
+}
+.mock-stats > div {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--mk-line);
+  border-radius: 5px;
+  background: var(--surface);
+}
+.mock-stats small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.mock-stats b {
+  font: 600 20px/1.2 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.mock-meter {
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.mock-meter i {
+  display: block;
+  width: 70%;
+  height: 100%;
+  background: var(--grass);
+}
+.mock-spark-cell .dc-spark {
+  display: flex;
+  height: 38px;
+  margin: 8px 0 0;
+}
+.mock-spark-cell .dc-spark i {
+  flex: 1;
+  width: auto;
+  background: color-mix(in srgb, var(--grass) 45%, transparent);
+}
+.mock-spark-cell .dc-spark i:last-child {
+  background: var(--grass);
+}
+.mock-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+.mock-console,
+.mock-connect {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--mk-line);
+  border-radius: 5px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.mock-sub {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--mk-line);
+  font-size: 12px;
+  font-weight: 600;
+}
+.mock-console .dc-log {
+  min-height: 0;
+  height: 196px;
+  flex: none;
+  background: var(--term-bg);
+  color: var(--term-fg);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+.mock-console .dc-log li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mock-console .dc-input {
+  font-size: 11.5px;
+}
+.mock-connect li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--mk-line);
+}
+.mock-connect li:last-child {
+  border-bottom: 0;
+}
+.mock-connect small {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--muted);
+}
+.mock-connect .mono {
+  font-size: 12.5px;
+}
+.mock-connect em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---- statement ---- */
+.statement {
+  padding: 72px 48px;
+  max-width: none;
+  font-family: var(--font-serif);
+  font-size: clamp(24px, 2.6vw, 34px);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* ---- server software ---- */
+.soft {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.soft .cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 32px 24px 28px;
+}
+.soft .px-icon {
+  margin-bottom: 14px;
+}
+.soft-name {
+  font: 600 18px/1.2 var(--font-display);
+  letter-spacing: var(--cp-tracking-heading);
+}
+.soft-note {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.soft-kind {
+  margin-top: auto;
+  padding-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.row-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+.row-foot a,
+.row-head-inline a,
+.install2-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg);
+  text-decoration: none;
+}
+.row-foot a:hover,
+.row-head-inline a:hover,
+.install2-links a:hover {
+  text-decoration: underline;
+}
+
+/* ---- chapters ---- */
+.chapters2 {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+}
+.chapter-index {
+  position: sticky;
+  top: 64px;
+  align-self: start;
+  display: grid;
+  padding: 32px 0;
+  font-size: 13px;
+}
+.chapter-index a {
+  display: flex;
+  gap: 12px;
+  padding: 9px 24px;
+  border-left: 2px solid transparent;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color var(--dur-hover) var(--ease-out), border-color var(--dur-hover) var(--ease-out);
+}
+.chapter-index a span {
+  color: var(--line-strong);
+}
+.chapter-index a:hover,
+.chapter-index a.is-on {
+  color: var(--fg);
+}
+.chapter-index a.is-on {
+  border-left-color: var(--grass);
+  background: var(--bg-2);
+}
+.chapter-index a.is-on span {
+  color: var(--grass-text);
+}
+.chapter-list {
+  border-left: 1px solid var(--line);
+}
+.chapter2 {
+  scroll-margin-top: 64px;
+}
+.chapter2 + .chapter2 {
+  border-top: 1px solid var(--line-strong);
+}
+.chapter2-cells {
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+}
+.chapter2-copy {
+  padding: 56px 40px;
+}
+.chapter2-copy h2 {
+  text-wrap: balance;
+}
+.chapter2-text {
+  margin-top: 20px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.chapter2-text + .chapter2-text {
+  margin-top: 14px;
+}
+.chapter2 .cell-vis {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px 40px;
+}
+/* Demos sit on the dot grid as surfaces of their own */
+.chapter2 .cell-vis > :is(.demo-backup, .demo-search, .demo-perf, .demo-ai, .runtime-figure, .hops, .iso-stage) {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  box-shadow: 8px 8px 0 color-mix(in srgb, var(--shadow) 25%, transparent);
+}
+.chapter2 .cell-vis > :is(.demo-backup, .demo-search, .demo-perf, .demo-ai) {
+  padding: 20px;
+}
+.vis-security,
+.vis-isolation {
+  padding: 40px 32px;
+}
+.iso-stage .lane {
+  padding: 14px 16px 16px;
+}
+.iso-stage .meter {
+  grid-template-columns: auto auto;
+  justify-content: space-between;
+  gap: 6px 10px;
+  font-size: 11px;
+}
+.iso-stage .meter-bar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+.iso-stage .iso-lanes {
+  max-height: 300px;
+  padding: 32px 28px 12px;
+}
+.vis-security .hops {
+  grid-template-columns: minmax(0, 1fr);
+}
+.vis-security .hop {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 16px;
+  padding: 20px 22px;
+  border-left: 0;
+}
+.vis-security .hop + .hop {
+  border-top: 1px solid var(--line);
+}
+.vis-security .hop-name {
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 4px 10px;
+}
+.vis-security .hop-where {
+  flex-basis: 100%;
+  margin: 0 0 0 34px;
+}
+.vis-security .hop-checks {
+  margin: 0;
+}
+.vis-security .hop:not(:last-child)::after {
+  top: auto;
+  right: auto;
+  bottom: -7px;
+  left: 28px;
+  transform: rotate(135deg);
+}
+.specs {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  border-top: 1px solid var(--line);
+}
+.specs .cell {
+  display: grid;
+  gap: 4px;
+  padding: 18px 24px;
+}
+.specs dt {
+  font-size: 11px;
+  color: var(--muted);
+}
+.specs dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ---- rows with a heading ---- */
+.row-head {
+  padding: 56px 40px 40px;
+}
+.row-head-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 32px;
+}
+.row-head-inline a {
+  font-size: 12px;
+}
+.row-lead {
+  max-width: 44em;
+  margin-top: 18px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.row-head + .cells,
+.row-head + .table-scroll {
+  border-top: 1px solid var(--line);
+}
+
+.extras {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.extras .cell {
+  padding: 28px 32px 32px;
+}
+.extra-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 600 17px/1.2 var(--font-display);
+  letter-spacing: var(--cp-tracking-heading);
+}
+.extra-text {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.devices2 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.device2 {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.device2 .iso {
+  width: 100%;
+  height: 240px;
+  padding: 36px 40px 20px;
+}
+.device2-body {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 20px 28px 28px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.device2-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: 600 18px/1.2 var(--font-display);
+  letter-spacing: var(--cp-tracking-heading);
+}
+.device2-name .px-icon {
+  transition: transform var(--dur-hover) var(--ease-out);
+}
+.device2:hover .device2-name .px-icon {
+  transform: translateX(3px);
+}
+.device2-os {
+  font-size: 12px;
+  color: var(--muted);
+}
+.device2-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 18px;
+}
+.device2-stats > span {
+  display: grid;
+  gap: 2px;
+}
+.device2-stats .mono {
+  font-size: 11px;
+  color: var(--muted);
+}
+.device2-stats b {
+  font: 600 22px/1.2 var(--font-display);
+}
+.device2:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.row .table-scroll {
+  border: 0;
+  background: var(--bg);
+}
+
+.project {
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+}
+.project > .cell {
+  padding: 56px 40px;
+}
+.project-author {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 32px;
+}
+.project-author .avatar {
+  display: block;
+  width: 48px;
+  height: 48px;
+}
+.project-author p {
+  display: grid;
+  font-size: 14px;
+}
+.project-author p a {
+  color: var(--muted);
+}
+.project-facts {
+  display: grid;
+  align-content: center;
+  margin: 0;
+}
+.project-facts > div {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 16px;
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+}
+.project-facts > div:first-child {
+  border-top: 0;
+}
+.project-facts dt {
+  font-size: 12px;
+  color: var(--muted);
+  padding-top: 2px;
+}
+.project-facts dd {
+  margin: 0;
+  font-size: 15px;
+}
+.project-facts a {
+  color: var(--fg);
+}
+
+.row-faq .sec {
+  padding: 64px 40px;
+}
+.row-faq .wrap {
+  max-width: none;
+  padding: 0;
+}
+
+.install2 {
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+}
+.install2 > .cell:first-child {
+  padding: 56px 40px;
+}
+.install2-steps {
+  display: grid;
+  gap: 14px;
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 16px;
+}
+.install2-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.install2-steps .mono {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line-strong);
+  font-size: 12px;
+}
+.install2-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin-top: 32px;
+  font-size: 14px;
+}
+.cell-term {
+  display: flex;
+  align-items: center;
+  padding: 40px;
+  background: var(--bg-2);
+}
+.cell-term .term {
+  width: 100%;
+}
+
+/* ---- night: in dark mode the scenes are lit from inside ----
+   Windows, LEDs and data packets are the only light sources; the rest of the scene is dimmed so they read
+   as lit. This is the one place where something glows. */
+:root[data-theme="dark"] .iso.night {
+  filter: brightness(0.72) saturate(0.85) drop-shadow(6px 6px 0 color-mix(in srgb, var(--shadow) 55%, transparent));
+}
+:root[data-theme="dark"] .iso.night :is(.window, .led, .led-act, .packet) polygon {
+  fill: #ffe7a3;
+}
+:root[data-theme="dark"] .iso.night :is(.led, .led-act, .packet) polygon {
+  fill: #8dff6e;
+}
+:root[data-theme="dark"] .iso.night :is(g.window, g.led, g.packet) {
+  filter: drop-shadow(0 0 3px #ffd36b) drop-shadow(0 0 10px color-mix(in srgb, #ffb53d 70%, transparent));
+}
+:root[data-theme="dark"] .iso.night :is(g.led, g.packet) {
+  filter: drop-shadow(0 0 3px #7dff5c) drop-shadow(0 0 8px color-mix(in srgb, #5bbf4a 70%, transparent));
+}
+
+/* ---- smaller screens ---- */
+@media (max-width: 1100px) {
+  .soft {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .mock-app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mock-side {
+    display: none;
+  }
+}
+@media (max-width: 980px) {
+  .hero2,
+  .chapter2-cells,
+  .project,
+  .install2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hero2-copy {
+    padding: 64px 32px 48px;
+  }
+  .chapters2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .chapter-index {
+    display: none;
+  }
+  .chapter-list {
+    border-left: 0;
+  }
+  .extras,
+  .devices2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mock-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .mock-spark-cell {
+    display: none !important;
+  }
+  .mock-lower {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mock-connect {
+    display: none;
+  }
+}
+@media (max-width: 620px) {
+  .frame {
+    border-inline: 0;
+  }
+  .row + .row::before,
+  .row + .row::after {
+    display: none;
+  }
+  .cell,
+  .hero2-copy,
+  .chapter2-copy,
+  .row-head,
+  .project > .cell,
+  .install2 > .cell:first-child,
+  .cell-term,
+  .statement {
+    padding-inline: 16px;
+  }
+  .hero2-copy {
+    padding-top: 48px;
+  }
+  .hero2-art {
+    padding: 32px 16px 56px;
+  }
+  .chapter2 .cell-vis {
+    padding: 32px 16px;
+  }
+  .mock-cell {
+    padding: 32px 16px 20px;
+  }
+  .mock {
+    box-shadow: 6px 6px 0 color-mix(in srgb, var(--shadow) 35%, transparent);
+  }
+  .mock-main {
+    padding: 16px;
+  }
+  .mock-btns,
+  .mock-meta {
+    display: none;
+  }
+  .mock-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mock-stats > div:nth-child(4) {
+    display: none;
+  }
+  .soft {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .soft .cell {
+    padding: 24px 16px;
+  }
+  .extras,
+  .devices2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .vis-security .hop {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .vis-security .hop::after {
+    display: none;
+  }
+  .device2 .iso {
+    height: 200px;
+  }
+  .iso-stage .lanes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .iso-stage .lane {
+    border-left: 0;
+  }
+  .iso-stage .lane + .lane {
+    border-top: 1px solid var(--line);
+  }
+  .project-facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .row-faq .sec {
+    padding: 48px 16px;
+  }
+  .row-foot {
+    padding-inline: 16px;
+  }
+}

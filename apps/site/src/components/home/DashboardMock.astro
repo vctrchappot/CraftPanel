@@ -1,0 +1,84 @@
+---
+// The server overview of the dashboard, rebuilt in HTML for the hero (layout of src/assets/screenshots/overview-*.png).
+// The console streams and the numbers move through the console demo in landing.ts ([data-console]).
+import Wordmark from "../Wordmark.astro";
+
+const nav = ["Overview", "Servers", "Activity", "Backups", "Settings"];
+const servers = [
+  { name: "Survival", detail: "players online", on: true },
+  { name: "Creative", detail: "Stopped", on: false },
+  { name: "Lobby", detail: "Stopped", on: false },
+];
+const tabs = ["Overview", "Console", "Players", "Worlds", "Plugins", "Files", "Backups", "Automation", "Performance", "Settings", "Network"];
+const history = [
+  "[20:57:51 INFO]: Starting minecraft server version 1.21.4",
+  "[20:57:55 INFO]: Preparing level \"world\"",
+  "[20:58:02 INFO]: Done (8.412s)! For help, type \"help\"",
+  "[20:58:41 INFO]: UUID of player Alex is 8667ba71-b85a-4004-af54-457a9734eed7",
+  "[20:58:41 INFO]: Alex joined the game",
+  "[20:59:07 INFO]: <Alex> anyone up for the nether?",
+  "[21:00:12 INFO]: Sam joined the game",
+  "[21:00:31 INFO]: <Sam> yes, after the cave",
+];
+const live = [
+  "[21:02:18 INFO]: Mia joined the game",
+  "> say Nether trip at 9. Bring food.",
+  "[21:02:40 INFO]: [Server] Nether trip at 9. Bring food.",
+  "[21:03:12 INFO]: <Mia> building the farm by spawn",
+];
+const connect = [
+  ["Local network", "192.168.1.23:25565"],
+  ["Tailscale", "100.82.14.7:25565"],
+  ["This computer", "localhost:25565"],
+];
+---
+
+<figure class="mock" aria-label="The CraftPanel dashboard: overview of a running Paper server" data-console>
+  <div class="mock-bar mono" aria-hidden="true"><i></i><i></i><i></i><span>craftpanel.local:8080/servers/survival</span></div>
+  <div class="mock-app" aria-hidden="true">
+    <aside class="mock-side">
+      <p class="mock-brand"><Wordmark /></p>
+      <ul class="mock-nav">{nav.map((n) => <li class:list={{ on: n === "Servers" }}>{n}</li>)}</ul>
+      <p class="mock-h mono">servers</p>
+      <ul class="mock-servers">
+        {servers.map((s) => (
+          <li class:list={{ on: s.on }}>
+            <span class="mock-ico">{s.name[0]}<i class:list={{ run: s.on }}></i></span>
+            <span><b>{s.name}</b><small>{s.on ? <><span data-m="players">2</span> {s.detail}</> : s.detail}</small></span>
+          </li>
+        ))}
+      </ul>
+    </aside>
+    <div class="mock-main">
+      <header class="mock-head">
+        <span class="mock-ico mock-ico-lg">S</span>
+        <div>
+          <p class="mock-title">Survival <span class="mock-state mono"><i></i>Running</span></p>
+          <p class="mock-meta">Paper 1.21.4 · build 232 · Java 21 · 3.0 GB · port 25565</p>
+        </div>
+        <span class="mock-btns"><span>Restart</span><span>Stop</span></span>
+      </header>
+      <ul class="mock-tabs">{tabs.map((t, i) => <li class:list={{ on: i === 0 }}>{t}</li>)}</ul>
+      <div class="mock-stats">
+        <div><small>Players</small><b><span data-m="players">2</span> / 20</b></div>
+        <div><small>CPU</small><b><span data-m="cpu">14</span>%</b><small>100% = one core</small></div>
+        <div><small>Memory</small><b>2.1 GB</b><small>of 3.0 GB heap</small><span class="mock-meter"><i></i></span></div>
+        <div><small>TPS</small><b data-m="tps">20.0</b><small>4.1 ms/tick</small></div>
+        <div class="mock-spark-cell"><small>Tick time · 1 h</small><span class="dc-spark" data-spark>{Array.from({ length: 28 }, (_, i) => <i style={`--v:${20 + ((i * 37) % 45)}%`}></i>)}</span></div>
+      </div>
+      <div class="mock-lower">
+        <section class="mock-console">
+          <p class="mock-sub">Console</p>
+          <ol class="dc-log mono">
+            {[...history, ...live].map((l) => <li class:list={{ "dc-cmd": l.startsWith(">") }}>{l}</li>)}
+          </ol>
+          <p class="dc-input mono"><span>&gt;</span><span class="dc-typed">list</span></p>
+        </section>
+        <section class="mock-connect">
+          <p class="mock-sub">Connect</p>
+          <ul>{connect.map(([k, v]) => <li><small>{k}</small><span class="mono">{v}</span><em>Copy</em></li>)}</ul>
+        </section>
+      </div>
+    </div>
+  </div>
+</figure>
