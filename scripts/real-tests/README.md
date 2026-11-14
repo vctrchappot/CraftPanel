@@ -15,6 +15,15 @@ node scripts/real-tests/wsl-sandbox.mjs [--keep] -- "cd /mnt/c/…/CraftPanel &&
 
 It imports a fresh Ubuntu 24.04 (systemd, Node 22, root) from a cached base image, runs the command in one `wsl` call and unregisters the distro afterwards (`--keep` leaves it for a look).
 
+Windows scenarios that need administrator rights (service installs, ACLs, firewall, network isolation) run in Windows Sandbox (enable the optional feature `Containers-DisposableClientVM` once, as administrator, and reboot):
+
+```powershell
+node scripts/real-tests/windows-sandbox.mjs [--offline] [--keep] [--timeout 30] [--map <dir>]... --script scenario.ps1
+node scripts/real-tests/windows-sandbox.mjs -- "bash scripts/real-tests/run.sh 19690 C:/cp-test perf.mjs; exit `$LASTEXITCODE"
+```
+
+The PowerShell command runs as the sandbox's administrator in the checkout, with Node and Git Bash on `PATH`; the checkout, Node, Git and every `--map` folder are mapped read-only at their host paths, and `$env:SANDBOX_OUT` is the only writable host folder. End the script with an explicit `exit <code>`: that code becomes the runner's. On a timeout or Ctrl+C the runner asks the sandbox to stop the command and shut down (closing the window alone leaves the VM running), then deletes its folder. One sandbox runs at a time.
+
 `run.sh` copies `apps/api/dist`, starts it on `127.0.0.1:<api-port>` with its own data dir, runs the scenario and stops the API (servers are stopped gracefully). The first sign-in creates a throwaway owner account (`client.mjs`, overridable with `CP_USER`/`CP_PASSWORD`). Use local test instances only.
 
 | Scenario | Args | What it checks |
