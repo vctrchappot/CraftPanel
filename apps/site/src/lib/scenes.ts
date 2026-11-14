@@ -168,6 +168,28 @@ export function runtimeScene(): Box[] {
   return [...parts, ...terrain.sort(byDepth), ...pathParts, ...homes, ...walkers, ...chimneys, ...sockets, light];
 }
 
+/**
+ * Three servers on one host, each world on its own plot under a glass box: the limits the system enforces.
+ * The third box is at its cap (class "cage-hot"). Cages are styled in landing.css; without CSS they are plain boxes.
+ */
+export function isolationScene(): Box[] {
+  const host = [box(-0.5, -0.5, -0.5, 13, 4.4, 0.5, C.case)];
+  const plots: Box[] = [];
+  const homes: Box[] = [];
+  const chimneys: Box[] = [];
+  const cages: Box[] = [];
+  [0, 4.2, 8.4].forEach((ox, n) => {
+    const plot: Box[] = [];
+    for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) plot.push(...grassBlock(ox + x + 0.6, y + 0.2, 0));
+    plots.push(...plot.sort(byDepth));
+    homes.push(...cottage(ox + 1.2, 0.6, 1, 0.6).map((b) => (b.class === "window" ? { ...b, class: `window window-${n}` } : b)));
+    // Chimney top of a 0.6 cottage: x + 0.07–0.24, y + 0.21–0.39, z + 2.1.
+    chimneys.push(...smoke(ox + 1.3, 0.83, 3.1, n));
+    cages.push(box(ox + 0.45, 0.05, 0, 3.3, 3.3, 3.2, C.case, n === 2 ? "cage cage-hot" : "cage"));
+  });
+  return [...host, ...plots, ...homes, ...chimneys, ...cages];
+}
+
 export function piScene(): Box[] {
   return piBoard(0, 0);
 }

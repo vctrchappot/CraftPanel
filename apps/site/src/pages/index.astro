@@ -9,7 +9,7 @@ import Terminal from "../components/Terminal.astro";
 import RuntimeDiagram from "../components/RuntimeDiagram.astro";
 import ProcessBand from "../components/ProcessBand.astro";
 import Shot from "../components/Shot.astro";
-import { heroScene, pcScene, piScene, vpsScene } from "../lib/scenes";
+import { heroScene, isolationScene, pcScene, piScene, vpsScene } from "../lib/scenes";
 import { repoFacts, shownRelease } from "../lib/github";
 // release.mjs bumps every workspace package, so this matches the latest release.
 import pkg from "../../package.json";
@@ -239,14 +239,28 @@ const audiences: { title: string; question: string; text: string; link: { href: 
   },
 ];
 
-// Every claim here names where it holds; the security docs list the limits.
-const safety: { icon: UiIconName; title: string; text: string }[] = [
-  { icon: "lock", title: "Dashboard stays private", text: "Only private networks get in by default, and public clients are refused without HTTPS. Open only the Minecraft port." },
-  { icon: "users", title: "Accounts, not a shared password", text: "Roles per server, two-factor sign-in, rate-limited logins and an audit log of who did what." },
+// Isolation chapter: what the limits do, and three example servers for the meters under the drawing.
+const lanePoints: { icon: UiIconName; title: string; text: string }[] = [
+  { icon: "chart", title: "A memory cap, on by default", text: "The server's memory plus headroom for Java. A server at its cap can't take memory from the others, and its console says so." },
+  { icon: "terminal", title: "CPU and processes", text: "Hold a busy server to the cores you give it, and stop a plugin from starting processes without end. Changes apply while it runs." },
+  { icon: "shield", title: "Its own account", text: "On Linux service installs every server runs under its own system account, so a plugin can't read the panel's database or the other servers." },
+];
+const lanes: { name: string; software: string; memory: [number, number]; cpu: [number, number]; note: string; hot?: boolean }[] = [
+  { name: "survival", software: "Paper", memory: [2.1, 3.4], cpu: [1.2, 2], note: "within its limits" },
+  { name: "lobby", software: "Velocity", memory: [0.4, 1.5], cpu: [0.1, 1], note: "within its limits" },
+  { name: "modpack", software: "NeoForge", memory: [6.9, 7], cpu: [2, 2], note: "at its cap · the others keep running", hot: true },
+];
+
+// Security chapter: the checks a request passes from the browser to Minecraft. Every claim names where it holds.
+const hops: { icon: UiIconName; name: string; where: string; checks: string[] }[] = [
+  { icon: "lock", name: "Browser", where: "your device", checks: ["HTTPS, built in or behind a proxy", "private networks only by default"] },
+  { icon: "users", name: "Dashboard", where: "web app", checks: ["sign-in with two-factor", "role checked on every request", "files only inside the server folder", "rate limits and an audit log"] },
+  { icon: "box", name: "Runtime", where: "own service", checks: ["private token over a local socket", "Java started without a shell", "commands go to Minecraft only"] },
+  { icon: "blocks", name: "Minecraft", where: "per server", checks: ["memory, CPU and process limits", "own account on Linux service installs"] },
+];
+const extras: { icon: UiIconName; title: string; text: string }[] = [
   { icon: "seal", title: "Verified downloads", text: "Server software, Java, plugins and mods come from official hosts and are checked against their checksums." },
-  { icon: "shield", title: "Each server on its own account", text: "On Linux service installs every Minecraft server runs under its own system account and can't read the others or the panel." },
-  { icon: "chart", title: "Limits per server", text: "A memory cap, a CPU limit and a process limit, enforced by the system on Linux service installs and on Windows." },
-  { icon: "terminal", title: "No shell, no telemetry", text: "The browser can only send Minecraft commands, never shell commands. Nothing phones home, not even a counter." },
+  { icon: "check", title: "Nothing phones home", text: "No telemetry and no cloud account, not even a counter. Optional: an update check against GitHub." },
 ];
 
 const looks = [
@@ -383,7 +397,7 @@ const backups = [
 
 <SiteLayout title={title} description={description} path="/" jsonLd={[app, faqJsonLd(faqs)]}>
   <!-- Hero -->
-  <section class="hero" id="install" aria-labelledby="hero-title">
+  <section class="hero grid-bg grid-bg-radial" id="install" aria-labelledby="hero-title">
     <div class="wrap hero-grid">
       <div class="hero-copy">
         <p class="hero-kicker mono"><span class="px-dot" aria-hidden="true"></span><a href={release.url}>{release.tag}</a> · self-hosted Minecraft panel</p>
@@ -454,7 +468,7 @@ const backups = [
     <div class="wrap">
       <header class="sec-head">
         <p class="sec-no mono"><span>01</span>Server software</p>
-        <h2 id="types-title" class="display">Six kinds of server. One wizard.</h2>
+        <h2 id="types-title" class="display">Six kinds of server. <span class="dim">One wizard.</span></h2>
         <p class="sec-lead">Pick the software, the version and the memory. CraftPanel does the rest and shows you what you'll get.</p>
       </header>
 
@@ -611,7 +625,7 @@ const backups = [
     <div class="wrap">
       <header class="sec-head">
         <p class="sec-no mono"><span>02</span>What it does</p>
-        <h2 id="features-title" class="display">The stuff you'd otherwise do over SSH at 23:00.</h2>
+        <h2 id="features-title" class="display">The stuff you'd otherwise do <span class="dim">over SSH at 23:00.</span></h2>
       </header>
 
       <div class="bento">
@@ -850,7 +864,7 @@ const backups = [
     <div class="wrap">
       <header class="sec-head">
         <p class="sec-no mono"><span>04</span>Hardware</p>
-        <h2 id="hw-title" class="display">Runs on what you have.</h2>
+        <h2 id="hw-title" class="display">Runs on <span class="dim">what you have.</span></h2>
         <p class="sec-lead">Planning estimates for Paper with a pre-generated world, not measured hardware benchmarks. Mods, mob farms and view distance change the load.</p>
       </header>
       <div class="devices">
@@ -874,35 +888,96 @@ const backups = [
     </div>
   </section>
 
-  <!-- 05 Security -->
-  <section class="sec sec-dense" id="security" aria-labelledby="security-title">
-    <div class="wrap">
-      <header class="sec-head">
-        <p class="sec-no mono"><span>05</span>Security</p>
-        <h2 id="security-title" class="display">Safe by default. Honest about the rest.</h2>
-        <p class="sec-lead">Your server runs on your machine, so CraftPanel treats every server, plugin and download as something to contain.</p>
-      </header>
-      <ul class="safe">
-        {safety.map((s) => (
-          <li>
-            <h3 class="minor-title"><UiIcon name={s.icon} size={24} />{s.title}</h3>
-            <p class="minor-text">{s.text}</p>
-          </li>
-        ))}
-      </ul>
-      <p class="safe-more">
-        <a href="/docs/reference/security/">What CraftPanel protects, and its limits <UiIcon name="arrow-right" size={12} /></a>
-        <a href={`${github}/blob/main/docs/STATUS.md`} rel="noopener">How each feature was tested <UiIcon name="arrow-right" size={12} /></a>
-      </p>
-    </div>
-  </section>
+  <!-- 05–06 Isolation and security, as chapters with a sticky index -->
+  <div class="chapters grid-bg" data-chapters>
+    <div class="wrap chapters-in">
+      <nav class="chapter-nav mono" aria-label="Chapters">
+        <a href="#isolation" data-chapter="isolation"><span>05</span>Isolation &amp; limits</a>
+        <a href="#security" data-chapter="security"><span>06</span>Security</a>
+      </nav>
+      <div class="chapter-body">
+        <section class="chapter" id="isolation" aria-labelledby="isolation-title">
+          <header class="sec-head">
+            <p class="sec-no mono"><span>05</span>Isolation &amp; limits</p>
+            <h2 id="isolation-title" class="display">Many servers, one machine. <span class="dim">Each in its own lane.</span></h2>
+            <p class="sec-lead">A modpack that wants every gigabyte, a plugin that forks: the operating system holds each server to its own share, so the rest of the host stays responsive.</p>
+          </header>
+          <figure class="lanes-fig dl-marks">
+            <Iso boxes={isolationScene()} label="Three Minecraft worlds on one machine, each under its own glass box; the third box is at its limit" class="iso iso-lanes" />
+            <div class="lanes">
+              {lanes.map((l) => (
+                <div class:list={["lane", { "is-hot": l.hot }]}>
+                  <p class="lane-head mono"><span class="lane-dot" aria-hidden="true" />{l.name}<span class="lane-sw">{l.software}</span></p>
+                  <p class="meter mono">
+                    <span class="meter-k">memory</span>
+                    <span class="meter-bar" style={`--v:${(l.memory[0] / l.memory[1]).toFixed(2)}`} aria-hidden="true"><i /></span>
+                    <span class="meter-v">{l.memory[0].toFixed(1)} / {l.memory[1].toFixed(1)} GB</span>
+                  </p>
+                  <p class="meter mono">
+                    <span class="meter-k">cpu</span>
+                    <span class="meter-bar" style={`--v:${(l.cpu[0] / l.cpu[1]).toFixed(2)}`} aria-hidden="true"><i /></span>
+                    <span class="meter-v">{l.cpu[0].toFixed(1)} / {l.cpu[1]} cores</span>
+                  </p>
+                  <p class="lane-note mono">{l.note}</p>
+                </div>
+              ))}
+            </div>
+            <figcaption class="dl-tab mono">one host · three servers · example values</figcaption>
+          </figure>
+          <ul class="points">
+            {lanePoints.map((p) => (
+              <li>
+                <h3 class="minor-title"><UiIcon name={p.icon} size={24} />{p.title}</h3>
+                <p class="minor-text">{p.text}</p>
+              </li>
+            ))}
+          </ul>
+          <p class="chapter-foot mono">Limits: Linux service installs (cgroup v2) and Windows (job objects). Own accounts: Linux service installs. <a href="/docs/reference/architecture/#resource-limits">How it works</a></p>
+        </section>
 
-  <!-- 06 Comparison -->
+        <section class="chapter" id="security" aria-labelledby="security-title">
+          <header class="sec-head">
+            <p class="sec-no mono"><span>06</span>Security</p>
+            <h2 id="security-title" class="display">Safe by default. <span class="dim">Honest about the rest.</span></h2>
+            <p class="sec-lead">Your server runs on your machine, so every request is checked on its way from your browser to Minecraft.</p>
+          </header>
+          <figure class="hops-fig dl-marks">
+            <ol class="hops">
+              {hops.map((h) => (
+                <li class="hop">
+                  <p class="hop-name"><UiIcon name={h.icon} size={24} />{h.name}</p>
+                  <p class="hop-where mono">{h.where}</p>
+                  <ul class="hop-checks mono">
+                    {h.checks.map((c) => <li>{c}</li>)}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+            <figcaption class="dl-tab mono">request path · browser to world</figcaption>
+          </figure>
+          <ul class="safe">
+            {extras.map((s) => (
+              <li>
+                <h3 class="minor-title"><UiIcon name={s.icon} size={24} />{s.title}</h3>
+                <p class="minor-text">{s.text}</p>
+              </li>
+            ))}
+            <li class="safe-links">
+              <a href="/docs/reference/security/">Protections and limits <UiIcon name="arrow-right" size={12} /></a>
+              <a href={`${github}/blob/main/docs/STATUS.md`} rel="noopener">How each feature was tested <UiIcon name="arrow-right" size={12} /></a>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- 07 Comparison -->
   <section class="sec" id="compare" aria-labelledby="compare-title">
     <div class="wrap wrap-mid">
       <header class="sec-head">
-        <p class="sec-no mono"><span>06</span>Hosting choices</p>
-        <h2 id="compare-title" class="display">Run it yourself, or rent a managed server?</h2>
+        <p class="sec-no mono"><span>07</span>Hosting choices</p>
+        <h2 id="compare-title" class="display">Run it yourself, <span class="dim">or rent a managed server?</span></h2>
         <p class="sec-lead">Both are good answers. The real question is who looks after the machine.</p>
       </header>
       <div class="table-scroll" tabindex="0" role="region" aria-label="Self-hosting and managed Minecraft hosting comparison">
@@ -940,11 +1015,11 @@ const backups = [
     </div>
   </section>
 
-  <!-- 07 Trust -->
+  <!-- 08 Trust -->
   <section class="sec sec-trust" aria-labelledby="trust-title">
     <div class="wrap trust">
       <div class="trust-project">
-        <p class="sec-no mono"><span>07</span>Project & source</p>
+        <p class="sec-no mono"><span>08</span>Project & source</p>
         <h2 id="trust-title" class="display">Built by Victor.</h2>
         <p>CraftPanel is built for people running their own Minecraft server. The source, issues and release notes are public.</p>
         <a class="trust-cta" href={github} rel="noopener">
@@ -977,7 +1052,7 @@ const backups = [
     </div>
   </section>
 
-  <FaqSection items={faqs} no="08" />
+  <FaqSection items={faqs} no="09" />
 
   <!-- CTA -->
   <section class="cta" aria-labelledby="cta-title">

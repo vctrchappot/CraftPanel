@@ -255,7 +255,7 @@ if (!reduced) {
   }, { threshold: 0.15, rootMargin: "0px 0px -6% 0px" });
   const groups: Element[][] = [
     ...[...document.querySelectorAll(".sec-head")].map((h) => [...h.querySelectorAll(".sec-no, h2, .sec-lead, [role=tablist]")]),
-    ...[...document.querySelectorAll(".bento, .devices, .compare tbody, .choices, .faq")].map((g) => [...g.children]),
+    ...[...document.querySelectorAll(".bento, .devices, .compare tbody, .choices, .faq, .points, .hops, .lanes")].map((g) => [...g.children]),
     ...[...document.querySelectorAll(".px-rule")].map((r) => [r]),
   ];
   for (const group of groups)
@@ -264,6 +264,25 @@ if (!reduced) {
       (el as HTMLElement).style.setProperty("--i", String(i));
       reveal.observe(el);
     });
+}
+
+// ---- chapters ----------------------------------------------------------------------
+// The sticky index marks the chapter that holds the middle of the screen.
+const chapterLinks = [...document.querySelectorAll<HTMLAnchorElement>("[data-chapter]")];
+if (chapterLinks.length) {
+  const mark = (id: string) => chapterLinks.forEach((a) => {
+    const on = a.dataset.chapter === id;
+    a.classList.toggle("is-on", on);
+    if (on) a.setAttribute("aria-current", "true");
+    else a.removeAttribute("aria-current");
+  });
+  const spy = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) mark(e.target.id);
+  }, { rootMargin: "-50% 0px -50% 0px" });
+  for (const a of chapterLinks) {
+    const chapter = document.getElementById(a.dataset.chapter!);
+    if (chapter) spy.observe(chapter);
+  }
 }
 
 // ---- faq ---------------------------------------------------------------------------

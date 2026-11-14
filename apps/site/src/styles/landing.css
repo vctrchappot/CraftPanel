@@ -1019,7 +1019,8 @@ p {
   color: var(--fg);
   font-weight: 500;
 }
-.sec h2 {
+.sec h2,
+.chapter h2 {
   font-size: clamp(32px, 3.5vw, 48px);
   line-height: 1.1;
 }
@@ -2233,6 +2234,278 @@ p {
   margin-top: 10px;
   font-size: 14.5px;
   color: var(--muted);
+}
+
+/* ---- grids and two-tone headings ----
+   A hairline grid behind framed sections, faded at the edges so content keeps the contrast. The second
+   part of a heading steps back in muted ink. */
+.dim {
+  color: var(--muted);
+}
+.grid-bg {
+  position: relative;
+  isolation: isolate;
+}
+.grid-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: center top;
+  opacity: 0.55;
+  mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+}
+.grid-bg-radial::before {
+  mask-image: radial-gradient(ellipse 70% 80% at 70% 45%, #000 20%, transparent 75%);
+}
+
+/* ---- chapters: isolation and security with a sticky index ---- */
+.chapters {
+  padding: 96px 0;
+  border-block: 1px solid var(--line);
+}
+.chapters-in {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 56px;
+}
+.chapter-nav {
+  position: sticky;
+  top: 104px;
+  align-self: start;
+  display: grid;
+  border-left: 1px solid var(--line);
+  font-size: 13px;
+}
+.chapter-nav a {
+  display: flex;
+  gap: 10px;
+  margin-left: -1px;
+  padding: 9px 0 9px 14px;
+  border-left: 1px solid transparent;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color var(--dur-hover) var(--ease-out), border-color var(--dur-hover) var(--ease-out);
+}
+.chapter-nav a:hover,
+.chapter-nav a.is-on {
+  color: var(--fg);
+}
+.chapter-nav a.is-on {
+  border-left-color: var(--grass);
+}
+.chapter-nav a.is-on span {
+  color: var(--grass-text);
+}
+.chapter {
+  scroll-margin-top: 96px;
+}
+.chapter + .chapter {
+  margin-top: 128px;
+}
+.chapter-foot {
+  margin-top: 32px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.chapter-foot a {
+  color: var(--fg);
+}
+
+/* isolation: the glass boxes are the limits; the one at its cap is amber, a state colour */
+.lanes-fig {
+  margin: 0 0 64px;
+  border: 1px solid var(--line-strong);
+}
+.iso-lanes {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  padding: 36px 32px 20px;
+}
+.iso-lanes .cage polygon {
+  fill: color-mix(in srgb, var(--fg) 4%, transparent);
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.iso-lanes .cage-hot polygon {
+  fill: color-mix(in srgb, var(--amber) 9%, transparent);
+  stroke: var(--amber);
+  animation: cage-hot 1.6s steps(2, jump-none) infinite;
+}
+@keyframes cage-hot {
+  50% {
+    stroke-opacity: 0.35;
+  }
+}
+.iso[data-paused] .cage-hot polygon {
+  animation-play-state: paused;
+}
+.lanes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+}
+.lane {
+  display: grid;
+  gap: 9px;
+  padding: 16px 20px 18px;
+  border-left: 1px solid var(--line);
+}
+.lane:first-child {
+  border-left: 0;
+}
+.lane-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg);
+}
+.lane-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--signal);
+}
+.is-hot .lane-dot {
+  background: var(--amber);
+}
+.lane-sw {
+  margin-left: auto;
+  color: var(--muted);
+}
+.meter {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.meter-bar {
+  position: relative;
+  height: 8px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+/* Filled in blocks, like the experience bar */
+.meter-bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--v) * 100%);
+  background: repeating-linear-gradient(90deg, var(--muted) 0 6px, transparent 6px 8px);
+}
+.is-hot .meter-bar i {
+  background: repeating-linear-gradient(90deg, var(--amber) 0 6px, transparent 6px 8px);
+}
+.meter-v {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.lane-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+.is-hot .lane-note {
+  color: var(--amber-text);
+}
+.points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px;
+}
+
+/* security: the request path, one column per hop, chevrons on the dividers */
+.hops-fig {
+  margin: 0 0 64px;
+  border: 1px solid var(--line-strong);
+}
+.hops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.hop {
+  position: relative;
+  padding: 24px 20px 28px;
+  border-left: 1px solid var(--line);
+}
+.hop:first-child {
+  border-left: 0;
+}
+.hop:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 30px;
+  right: -7px;
+  width: 12px;
+  height: 12px;
+  border-top: 1px solid var(--line-strong);
+  border-right: 1px solid var(--line-strong);
+  background: var(--surface);
+  transform: rotate(45deg);
+}
+.hop-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: var(--cp-tracking-heading);
+  color: var(--fg);
+}
+.hop-where {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hop-checks {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--fg);
+}
+.hop-checks li {
+  display: flex;
+  gap: 9px;
+}
+.hop-checks li::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-top: 0.5em;
+  background: var(--grass);
+}
+.safe .safe-links {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+}
+.safe-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: var(--grass-text);
 }
 
 /* ---- guide pages ---- */
@@ -3877,6 +4150,37 @@ p {
   }
   .page-hero-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .chapters {
+    padding: 72px 0;
+  }
+  .chapters-in,
+  .lanes,
+  .points,
+  .hops {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .chapter-nav {
+    display: none;
+  }
+  .iso-lanes {
+    padding: 24px 12px 12px;
+  }
+  .lane,
+  .hop {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .lane:first-child,
+  .hop:first-child {
+    border-top: 0;
+  }
+  .hop:not(:last-child)::after {
+    top: auto;
+    right: auto;
+    bottom: -7px;
+    left: 28px;
+    transform: rotate(135deg);
   }
   .steps li {
     grid-template-columns: 36px minmax(0, 1fr);
