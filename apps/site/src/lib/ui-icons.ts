@@ -1,8 +1,8 @@
 // UI icons for the landing page: 24x24 viewBox, 2-unit pixels, one colour (currentColor).
 // Most are from pixelarticons 2.4.2 (https://github.com/halfmage/pixelarticons, MIT, (c) 2019 Gerrit Halfmann;
-// licence in src/assets/pixelarticons-LICENSE.txt). "seal", "cup", "mod", "sparkle", "chart", "plus", "minus" and
-// "tilde" are drawn on the same grid and stroke weight because the set has no verified seal, no cup with steam, no
-// puzzle piece, no sparkle, no line chart and no plain comparison marks.
+// licence in src/assets/pixelarticons-LICENSE.txt). "seal", "cup", "mod", "sparkle", "chart", "plus", "minus",
+// "tilde", "lock" and "shield" are drawn on the same grid and stroke weight because the set has no verified seal, no
+// cup with steam, no puzzle piece, no sparkle, no line chart, no plain comparison marks and no lock or shield here.
 export const uiIcons = {
   "terminal": "M4 2h16v2H4zm0 18h16v2H4zM2 4h2v16H2zm18 0h2v16h-2zM6 16h2v2H6zm2-2h2v2H8zm-2-2h2v2H6z",
   "archive": "M3 2h18v2H3zm0 5h18v2H3zM1 4h2v3H1zm20 0h2v3h-2zm-2 5h2v11h-2zM3 9h2v11H3zm2 11h14v2H5zm4-9h6v2H9z",
@@ -33,6 +33,8 @@ export const uiIcons = {
   "plus": "M11 5h2v14h-2zM5 11h14v2H5z",
   "minus": "M5 11h14v2H5z",
   "menu": "M3 5h18v2H3zm0 6h18v2H3zm0 6h18v2H3z",
-  "tilde": "M4 12h2v2H4zm2-2h4v2H6zm4 2h4v2h-4zm4 2h4v2h-4zm4-2h2v2h-2z"
+  "tilde": "M4 12h2v2H4zm2-2h4v2H6zm4 2h4v2h-4zm4 2h4v2h-4zm4-2h2v2h-2z",
+  "lock": "M8 2h8v2H8zM6 4h2v6H6zm10 0h2v6h-2zM4 10h16v2H4zm0 10h16v2H4zM4 12h2v8H4zm14 0h2v8h-2zm-7 2h2v4h-2z",
+  "shield": "M4 2h16v2H4zM4 4h2v9H4zm14 0h2v9h-2zM6 13h2v3H6zm10 0h2v3h-2zM8 16h2v2H8zm6 0h2v2h-2zm-4 2h4v2h-4zm-1-9h2v2H9zm2 2h2v2h-2zm2-4h2v4h-2z"
 } as const;
 export type UiIconName = keyof typeof uiIcons;

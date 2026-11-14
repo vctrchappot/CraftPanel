@@ -216,6 +216,38 @@ const minor: { title: string; icon: UiIconName; text: string; chips: string[] }[
   { title: "Files and worlds", icon: "folder", text: "Edit configs in the browser. Upload a world as a zip, or download one for single player.", chips: ["server.properties", "world.zip"] },
 ];
 
+// Who the page speaks to; each card points at the part of the page that answers that group's first question.
+const audiences: { title: string; question: string; text: string; link: { href: string; label: string } }[] = [
+  {
+    title: "Friends and family",
+    question: "Can I do this without knowing Linux?",
+    text: "The wizard picks the Java and memory, the network check tells you whether friends can join, and backups run on a schedule.",
+    link: { href: "/docs/getting-started/first-server/", label: "Your first server" },
+  },
+  {
+    title: "A Pi or a home server",
+    question: "Does it run cleanly on my hardware?",
+    text: "No Docker, no Java to install. Memory, CPU and process limits per server keep one server from starving the others.",
+    link: { href: "#hardware", label: "Hardware estimates" },
+  },
+  {
+    title: "Small communities",
+    question: "Will it hold up with a team and several servers?",
+    text: "Velocity in front of your servers, roles per server, two-factor sign-in, an audit log, scheduled restarts and crash alerts.",
+    link: { href: "#features", label: "Features" },
+  },
+];
+
+// Every claim here names where it holds; the security docs list the limits.
+const safety: { icon: UiIconName; title: string; text: string }[] = [
+  { icon: "lock", title: "Dashboard stays private", text: "Only private networks get in by default, and public clients are refused without HTTPS. Open only the Minecraft port." },
+  { icon: "users", title: "Accounts, not a shared password", text: "Roles per server, two-factor sign-in, rate-limited logins and an audit log of who did what." },
+  { icon: "seal", title: "Verified downloads", text: "Server software, Java, plugins and mods come from official hosts and are checked against their checksums." },
+  { icon: "shield", title: "Each server on its own account", text: "On Linux service installs every Minecraft server runs under its own system account and can't read the others or the panel." },
+  { icon: "chart", title: "Limits per server", text: "A memory cap, a CPU limit and a process limit, enforced by the system on Linux service installs and on Windows." },
+  { icon: "terminal", title: "No shell, no telemetry", text: "The browser can only send Minecraft commands, never shell commands. Nothing phones home, not even a counter." },
+];
+
 const looks = [
   {
     key: "overview",
@@ -315,6 +347,9 @@ const choices: { title: string; text: string; link?: { href: string; label: stri
 const faqs: { id: string; q: string; a: string; more?: { href: string; label: string } }[] = [
   { id: "cost", q: "What does it cost?", a: "The CraftPanel software is free. You pay for hardware, electricity and any VPS or connectivity you use. It is source-available under FSL-1.1-ALv2, which restricts competing commercial uses. Each version becomes Apache-2.0 after two years.", more: { href: `${github}/blob/main/LICENSE`, label: "Read the license" } },
   { id: "hardware", q: "What hardware do I need?", a: "Anything that runs Node.js 22.13 or newer: a Windows or Linux PC, a Mac, a Raspberry Pi 4/5 with a 64-bit OS, or a small VPS. Minecraft needs most of the memory: about 2 GB for a small Paper server, 4 GB or more for modpacks.", more: { href: "/docs/getting-started/installation/", label: "Installation guide" } },
+  { id: "join", q: "How do my friends join?", a: "At home they use the LAN address on the server's overview. Over the internet, forward the game port in your router, let friends join a VPN such as Tailscale, or run CraftPanel on a VPS. The Network tab checks whether the port is reachable and tells you when your provider's CGNAT rules out port forwarding.", more: { href: "/docs/guides/networking/", label: "Networking" } },
+  { id: "offline", q: "What happens when my computer is off?", a: "Your servers are offline too; that is the trade-off of running them yourself. When the machine starts again, CraftPanel starts with it and brings back the servers set to start with CraftPanel. For a server that is always on, use a Raspberry Pi or a small VPS.", more: { href: "/docs/administration/maintenance/", label: "Maintenance" } },
+  { id: "backups", q: "How do backups and updates work?", a: "Schedule backups per server and keep the newest few. A restore checks the archive and saves the current state first. Most updates install from the browser while Minecraft keeps running; the rare runtime update asks first and restarts the servers once.", more: { href: "/docs/getting-started/updating/", label: "Updating" } },
   { id: "bedrock", q: "Bedrock?", a: "Not yet. CraftPanel runs Minecraft Java Edition servers. A Bedrock adapter is on the roadmap." },
   { id: "world", q: "Can I bring my existing world?", a: "Yes. Create a server with the same software and version, then import the world as a zip in the Worlds tab, or upload files in the file manager.", more: { href: "/docs/guides/worlds-and-backups/", label: "Worlds and backups" } },
   { id: "internet", q: "Should I open the dashboard to the internet?", a: "No. Only the Minecraft port should be public. Reach the dashboard through a VPN like Tailscale, an SSH tunnel or an HTTPS reverse proxy. By default CraftPanel only lets in private networks and refuses public clients without HTTPS.", more: { href: "/docs/administration/remote-access/", label: "Remote access" } },
@@ -365,6 +400,7 @@ const backups = [
         <nav aria-label="Main" class="nav-links">
           <a href="#features">Features</a>
           <a href="#dashboard">Dashboard</a>
+          <a href="#security">Security</a>
           <a href="#compare">Compare</a>
           <a href="/docs/">Docs</a>
         </nav>
@@ -385,6 +421,7 @@ const backups = [
             <nav aria-label="Main, compact" class="nav-menu-list">
               <a href="#features">Features</a>
               <a href="#dashboard">Dashboard</a>
+              <a href="#security">Security</a>
               <a href="#compare">Compare</a>
               <a href="/docs/">Docs</a>
               <a href={github} rel="noopener">GitHub</a>
@@ -407,11 +444,11 @@ const backups = [
             <p class="hero-kicker mono"><span class="px-dot" aria-hidden="true"></span><a href={release.url}>{release.tag}</a> · self-hosted Minecraft panel</p>
             <h1 id="hero-title" class="display"><span class="h-line">Your server.</span><br /><span class="h-line">Your hardware.</span><br /><span class="h-line"><span class="mark">No panel fee.</span></span></h1>
             <p class="hero-lead">
-              Run Minecraft Java servers on your PC, Raspberry Pi or VPS. Manage them from your browser.
+              A Minecraft Java server for you and your friends, on your own PC, Raspberry Pi or VPS. Create it, update it and back it up from your browser.
             </p>
             <Terminal version={version} id="hero-term" />
             <div class="hero-next">
-              <a class="hero-btn" href="#dashboard">See the dashboard <span aria-hidden="true">↓</span></a>
+              <a class="hero-link" href="#dashboard">See the dashboard <span aria-hidden="true">↓</span></a>
               <a class="hero-link" href="/docs/getting-started/installation/">Installation guide <span aria-hidden="true">↗</span></a>
             </div>
             <ul class="hero-facts mono" aria-label="Supported platforms">
@@ -445,6 +482,23 @@ const backups = [
         <div class="wrap">
           <h2 id="band-title" class="sr-only">From install to update</h2>
           <ProcessBand />
+        </div>
+      </section>
+
+      <!-- Who it's for -->
+      <section class="sec sec-audience" aria-labelledby="audience-title">
+        <div class="wrap">
+          <h2 id="audience-title" class="display">Who runs CraftPanel?</h2>
+          <ul class="choices audiences">
+            {audiences.map((a) => (
+              <li class="choice">
+                <h3>{a.title}</h3>
+                <p class="aud-q">“{a.question}”</p>
+                <p>{a.text}</p>
+                <a class="choice-link" href={a.link.href}>{a.link.label} <UiIcon name="arrow-right" size={12} /></a>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
@@ -847,7 +901,7 @@ const backups = [
       </section>
 
       <!-- 04 Hardware -->
-      <section class="sec sec-stone" aria-labelledby="hw-title">
+      <section class="sec sec-stone" id="hardware" aria-labelledby="hw-title">
         <div class="wrap">
           <header class="sec-head">
             <p class="sec-no mono"><span>04</span>Hardware</p>
@@ -875,11 +929,34 @@ const backups = [
         </div>
       </section>
 
-      <!-- 05 Comparison -->
+      <!-- 05 Security -->
+      <section class="sec sec-dense" id="security" aria-labelledby="security-title">
+        <div class="wrap">
+          <header class="sec-head">
+            <p class="sec-no mono"><span>05</span>Security</p>
+            <h2 id="security-title" class="display">Safe by default. Honest about the rest.</h2>
+            <p class="sec-lead">Your server runs on your machine, so CraftPanel treats every server, plugin and download as something to contain.</p>
+          </header>
+          <ul class="safe">
+            {safety.map((s) => (
+              <li>
+                <h3 class="minor-title"><UiIcon name={s.icon} size={24} />{s.title}</h3>
+                <p class="minor-text">{s.text}</p>
+              </li>
+            ))}
+          </ul>
+          <p class="safe-more">
+            <a href="/docs/reference/security/">What CraftPanel protects, and its limits <UiIcon name="arrow-right" size={12} /></a>
+            <a href={`${github}/blob/main/docs/STATUS.md`} rel="noopener">How each feature was tested <UiIcon name="arrow-right" size={12} /></a>
+          </p>
+        </div>
+      </section>
+
+      <!-- 06 Comparison -->
       <section class="sec" id="compare" aria-labelledby="compare-title">
         <div class="wrap wrap-mid">
           <header class="sec-head">
-            <p class="sec-no mono"><span>05</span>Hosting choices</p>
+            <p class="sec-no mono"><span>06</span>Hosting choices</p>
             <h2 id="compare-title" class="display">Run it yourself, or rent a managed server?</h2>
             <p class="sec-lead">Both are good answers. The real question is who looks after the machine.</p>
           </header>
@@ -918,11 +995,11 @@ const backups = [
         </div>
       </section>
 
-      <!-- 06 Trust -->
+      <!-- 07 Trust -->
       <section class="sec sec-trust" aria-labelledby="trust-title">
         <div class="wrap trust">
           <div class="trust-project">
-            <p class="sec-no mono"><span>06</span>Project & source</p>
+            <p class="sec-no mono"><span>07</span>Project & source</p>
             <h2 id="trust-title" class="display">Built by Victor.</h2>
             <p>CraftPanel is built for people running their own Minecraft server. The source, issues and release notes are public.</p>
             <a class="trust-cta" href={github} rel="noopener">
@@ -955,12 +1032,12 @@ const backups = [
         </div>
       </section>
 
-      <!-- 07 FAQ -->
+      <!-- 08 FAQ -->
       <section class="sec" aria-labelledby="faq-title">
         <div class="wrap wrap-mid faq-layout">
           <div class="faq-side">
             <header class="sec-head">
-              <p class="sec-no mono"><span>07</span>Questions</p>
+              <p class="sec-no mono"><span>08</span>Questions</p>
               <h2 id="faq-title" class="display">Asked before.</h2>
               <p class="sec-lead">Short answers to what people ask before installing. The docs have the long ones.</p>
             </header>

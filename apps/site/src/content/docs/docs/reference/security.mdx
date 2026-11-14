@@ -43,8 +43,8 @@ No telemetry, no third-party requests from the dashboard, self-hosted fonts. Cra
 
 ## Limits to be aware of
 
-<Aside type="caution" title="No per-server isolation">
-Minecraft servers and their plugins run as the CraftPanel service account, not in containers. Install CraftPanel under a dedicated, unprivileged account (the Linux installer does) and never run it as root or Administrator.
+<Aside type="caution" title="Per-server isolation on Linux service installs only">
+On a Linux service install every Minecraft server runs under its own system account (see [architecture](/docs/reference/architecture/#every-server-under-its-own-account-linux)). On Windows, macOS and manual runs, servers and their plugins run as the CraftPanel account, not in containers. Either way, install CraftPanel under a dedicated, unprivileged account (the installers do) and never run it as root or Administrator.
 </Aside>
 
 - **Plain HTTP by default.** On a LAN, passwords travel unencrypted. Use a VPN or HTTPS beyond a trusted home network.
