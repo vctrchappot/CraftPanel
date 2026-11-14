@@ -1,4 +1,5 @@
 ---
+import "../styles/frame.css";
 import SiteLayout from "../layouts/SiteLayout.astro";
 import FaqSection from "../components/FaqSection.astro";
 import Iso from "../components/Iso.astro";
@@ -28,55 +29,52 @@ const faqs: Faq[] = [
 ---
 
 <SiteLayout title={title} description={description} path="/play-with-friends/" installHref="/#install" jsonLd={[faqJsonLd(faqs)]}>
-  <section class="page-hero" aria-labelledby="page-title">
-    <div class="wrap page-hero-grid">
-      <div>
-        <p class="hero-kicker mono"><a href="/">CraftPanel</a> · guide</p>
-        <h1 id="page-title" class="display page-title">Let your friends <span class="mark">join.</span></h1>
-        <p class="hero-lead">Same Wi-Fi, over the internet or behind your provider's CGNAT: there are four ways in, and CraftPanel's Network tab checks which one works for you.</p>
-        <div class="hero-next">
-          <a class="hero-link" href="#ways">The four ways <span aria-hidden="true">↓</span></a>
-          <a class="hero-link" href="/docs/guides/networking/">Networking guide <span aria-hidden="true">↗</span></a>
+  <div class="frame">
+    <section class="row" aria-labelledby="page-title">
+      <div class="cells hero2">
+        <div class="cell hero2-copy guide-copy">
+          <p class="kicker mono"><a href="/">CraftPanel</a><span>guide</span></p>
+          <h1 id="page-title" class="display hero2-title guide-title">Let your friends <span class="dim">join.</span></h1>
+          <p class="hero2-lead">Same Wi-Fi, over the internet or behind your provider's CGNAT: there are four ways in, and CraftPanel's Network tab checks which one works for you.</p>
+          <div class="hero2-actions">
+            <a class="btn btn-ink" href="#ways">The four ways <UiIcon name="arrow-right" size={12} /></a>
+            <a class="btn btn-outline" href="/docs/guides/networking/">Networking guide</a>
+          </div>
+        </div>
+        <div class="cell cell-vis hero2-art">
+          <Iso boxes={heroScene()} label="A small Minecraft world above a Raspberry Pi" class="iso night guide-iso" />
         </div>
       </div>
-      <div class="page-art">
-        <Iso boxes={heroScene()} label="A small Minecraft world above a Raspberry Pi" class="iso" />
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="sec" id="ways" aria-labelledby="ways-title">
-    <div class="wrap">
-      <header class="sec-head">
+    <section class="row" id="ways" aria-labelledby="ways-title">
+      <div class="cell row-head">
         <p class="sec-no mono"><span>01</span>Four ways in</p>
-        <h2 id="ways-title" class="display">Pick the one that fits your network.</h2>
-        <p class="sec-lead">Start at the top. If friends can't reach the server, the checks in the Network tab tell you why.</p>
-      </header>
-      <ul class="safe safe-2">
-        {ways.map((w) => (
-          <li>
-            <h3 class="minor-title"><UiIcon name={w.icon} size={24} />{w.title}</h3>
-            <p class="way-when mono">{w.when}</p>
-            <p class="minor-text">{w.text}</p>
+        <h2 id="ways-title" class="display">Pick the one <span class="dim">that fits your network.</span></h2>
+        <p class="row-lead">Start at the top. If friends can't reach the server, the checks in the Network tab tell you why.</p>
+      </div>
+      <ul class="cells extras extras-2">
+        {ways.map((t) => (
+          <li class="cell">
+            <h3 class="extra-title"><UiIcon name={t.icon} size={24} />{t.title}</h3>
+            <p class="extra-when mono">{t.when}</p>
+            <p class="extra-text">{t.text}</p>
           </li>
         ))}
       </ul>
-    </div>
-  </section>
+    </section>
 
-  <section class="sec sec-dense" aria-labelledby="private-title">
-    <div class="wrap wrap-mid">
-      <header class="sec-head">
+    <section class="row" aria-labelledby="private-title">
+      <div class="cell row-head">
         <p class="sec-no mono"><span>02</span>Keep the dashboard private</p>
-        <h2 id="private-title" class="display">The game port is public. The dashboard is not.</h2>
-        <p class="sec-lead">Players only ever need the Minecraft port. Never forward the dashboard's port: reach it through a VPN, an SSH tunnel or an HTTPS reverse proxy. By default CraftPanel only lets in private networks and refuses public clients without HTTPS.</p>
-      </header>
-      <p class="safe-more">
-        <a href="/docs/administration/remote-access/">Remote access <UiIcon name="arrow-right" size={12} /></a>
-        <a href="/#security">How CraftPanel is secured <UiIcon name="arrow-right" size={12} /></a>
-      </p>
-    </div>
-  </section>
+        <h2 id="private-title" class="display">The game port is public. <span class="dim">The dashboard is not.</span></h2>
+        <p class="row-lead">Players only ever need the Minecraft port. Never forward the dashboard's port: reach it through a VPN, an SSH tunnel or an HTTPS reverse proxy. By default CraftPanel only lets in private networks and refuses public clients without HTTPS.</p>
+      </div>
+      <p class="cell row-foot mono"><span>Public: the game port · private: the dashboard</span><a href="/docs/administration/remote-access/">Remote access <UiIcon name="arrow-right" size={12} /></a><a href="/#security">How CraftPanel is secured <UiIcon name="arrow-right" size={12} /></a></p>
+    </section>
 
-  <FaqSection items={faqs} no="03" title="Joining questions." lead="What people ask when their friends can't get in yet." />
+    <div class="row row-faq">
+      <FaqSection items={faqs} no="03" title="Joining questions." lead="What people ask when their friends can't get in yet." />
+    </div>
+  </div>
 </SiteLayout>

@@ -1,4 +1,5 @@
 ---
+import "../styles/frame.css";
 import SiteLayout from "../layouts/SiteLayout.astro";
 import FaqSection from "../components/FaqSection.astro";
 import Terminal from "../components/Terminal.astro";
@@ -39,66 +40,61 @@ const faqs: Faq[] = [
 ---
 
 <SiteLayout title={title} description={description} path="/raspberry-pi/" jsonLd={[faqJsonLd(faqs)]}>
-  <section class="page-hero" id="install" aria-labelledby="page-title">
-    <div class="wrap page-hero-grid">
-      <div>
-        <p class="hero-kicker mono"><a href="/">CraftPanel</a> · guide</p>
-        <h1 id="page-title" class="display page-title">A Minecraft server on your <span class="mark">Raspberry Pi.</span></h1>
-        <p class="hero-lead">Run Paper on a Pi 4 or 5 for a handful of friends. CraftPanel installs Java, picks settings that suit the board and lets you manage everything from a browser.</p>
-        <Terminal version={pkg.version} id="pi-term" os="linux" compact />
-        <ul class="hero-facts mono" aria-label="At a glance">
-          <li>Pi 4 / 5 · 4–8 GB</li>
-          <li>2–3 GB for Minecraft</li>
-          <li>2–8 players, estimate</li>
-        </ul>
+  <div class="frame">
+    <section class="row" id="install" aria-labelledby="page-title">
+      <div class="cells hero2">
+        <div class="cell hero2-copy guide-copy">
+          <p class="kicker mono"><a href="/">CraftPanel</a><span>guide</span></p>
+          <h1 id="page-title" class="display hero2-title guide-title">A Minecraft server <span class="dim">on your Raspberry Pi.</span></h1>
+          <p class="hero2-lead">Run Paper on a Pi 4 or 5 for a handful of friends. CraftPanel installs Java, picks settings that suit the board and lets you manage everything from a browser.</p>
+          <div class="guide-term"><Terminal version={pkg.version} id="pi-term" os="linux" compact /></div>
+          <ul class="hero2-facts mono" aria-label="At a glance">
+            <li>Pi 4 / 5 · 4–8 GB</li>
+            <li>2–3 GB for Minecraft</li>
+            <li>2–8 players, estimate</li>
+          </ul>
+        </div>
+        <div class="cell cell-vis hero2-art">
+          <Iso boxes={piScene()} label="A Raspberry Pi" class="iso night guide-iso" />
+        </div>
       </div>
-      <div class="page-art">
-        <Iso boxes={piScene()} label="A Raspberry Pi" class="iso" />
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="sec" aria-labelledby="steps-title">
-    <div class="wrap wrap-mid">
-      <header class="sec-head">
+    <section class="row" aria-labelledby="steps-title">
+      <div class="cell row-head">
         <p class="sec-no mono"><span>01</span>Steps</p>
-        <h2 id="steps-title" class="display">From a bare Pi to friends online.</h2>
-        <p class="sec-lead">Most of the time goes into downloads and pre-generating the world; the rest is a few clicks.</p>
-      </header>
-      <ol class="steps">
+        <h2 id="steps-title" class="display">From a bare Pi <span class="dim">to friends online.</span></h2>
+        <p class="row-lead">Most of the time goes into downloads and pre-generating the world; the rest is a few clicks.</p>
+      </div>
+      <ol class="cells steps2">
         {steps.map((s, i) => (
-          <li>
-            <span class="step-no mono" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
-            <div>
-              <h3>{s.title}</h3>
-              <p>{s.text}</p>
-            </div>
+          <li class="cell">
+            <span class="step2-no mono" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+            <h3>{s.title}</h3>
+            <p>{s.text}</p>
           </li>
         ))}
       </ol>
-      <p class="safe-more">
-        <a href="/docs/getting-started/installation/#raspberry-pi">Raspberry Pi in the installation guide <UiIcon name="arrow-right" size={12} /></a>
-        <a href="/docs/guides/performance/">Performance guide <UiIcon name="arrow-right" size={12} /></a>
-      </p>
-    </div>
-  </section>
+      <p class="cell row-foot mono"><span>Pi 4 or 5 · 64-bit Raspberry Pi OS · an SSD for worlds</span><a href="/docs/getting-started/installation/#raspberry-pi">Installation guide <UiIcon name="arrow-right" size={12} /></a><a href="/docs/guides/performance/">Performance guide <UiIcon name="arrow-right" size={12} /></a></p>
+    </section>
 
-  <section class="sec sec-dense" aria-labelledby="tips-title">
-    <div class="wrap">
-      <header class="sec-head">
+    <section class="row" aria-labelledby="cards-title">
+      <div class="cell row-head">
         <p class="sec-no mono"><span>02</span>Made for small boards</p>
-        <h2 id="tips-title" class="display">What CraftPanel does for a Pi.</h2>
-      </header>
-      <ul class="safe safe-2">
+        <h2 id="cards-title" class="display">What CraftPanel does <span class="dim">for a Pi.</span></h2>
+      </div>
+      <ul class="cells extras extras-2">
         {tips.map((t) => (
-          <li>
-            <h3 class="minor-title"><UiIcon name={t.icon} size={24} />{t.title}</h3>
-            <p class="minor-text">{t.text}</p>
+          <li class="cell">
+            <h3 class="extra-title"><UiIcon name={t.icon} size={24} />{t.title}</h3>
+            <p class="extra-text">{t.text}</p>
           </li>
         ))}
       </ul>
-    </div>
-  </section>
+    </section>
 
-  <FaqSection items={faqs} no="03" title="Pi questions." lead="What people ask before putting a Minecraft server on a Raspberry Pi." />
+    <div class="row row-faq">
+      <FaqSection items={faqs} no="03" title="Pi questions." lead="What people ask before putting a Minecraft server on a Raspberry Pi." />
+    </div>
+  </div>
 </SiteLayout>

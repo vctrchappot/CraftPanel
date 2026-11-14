@@ -133,117 +133,14 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
   }
 }
 
-// ---- server software picker --------------------------------------------------
-interface SoftwareEntry {
-  key: string;
-  name: string;
-  color: string;
-  title: string;
-  versions: [string, string][];
-  java: string;
-  tabs: string[];
-  highlightTab: string | null;
-  servers: { name: string; status: "on" | "up" | "off" }[];
-  players: string;
-  middleStat: [string, string];
-  memRatio: number;
-  sourceIcon: "plug" | "mod" | "cube";
-  source: string;
-}
-
-const typesEl = document.querySelector<HTMLElement>("[data-types]");
-if (typesEl) {
-  const softwareMap = JSON.parse(typesEl.dataset.software!) as Record<string, SoftwareEntry>;
-  const preview = typesEl.querySelector<HTMLElement>(".preview")!;
-  const verSelect = typesEl.querySelector<HTMLSelectElement>("[data-wz-ver]")!;
-  const ctaBtn = typesEl.querySelector<HTMLButtonElement>("[data-wz-cta]")!;
-  const wzSwName = typesEl.querySelector<HTMLElement>('[data-wz="sw-name"]')!;
-  const wzIcons = [...typesEl.querySelectorAll<HTMLElement>("[data-wz-icon]")];
-  const sourceIcons = [...typesEl.querySelectorAll<HTMLElement>("[data-source-icon]")];
-  const pv = (k: string) => typesEl.querySelector<HTMLElement>(`[data-pv="${k}"]`)!;
-
-  const state = { sw: "paper", ver: 0, mem: 2 };
-
-  function flash(el: HTMLElement) {
-    if (reduced) return;
-    el.classList.remove("is-swap");
-    void el.offsetWidth;
-    el.classList.add("is-swap");
-  }
-
-  function render(changed: "sw" | "ver" | "mem") {
-    const s = softwareMap[state.sw];
-    const v = s.versions[state.ver] ?? s.versions[0];
-    const usedMem = (state.mem * s.memRatio).toFixed(1);
-    const totalMem = state.mem.toFixed(1);
-
-    preview.style.setProperty("--type", s.color);
-    wzSwName.textContent = s.name;
-    for (const icon of wzIcons) icon.hidden = icon.dataset.wzIcon !== state.sw;
-    ctaBtn.textContent = `Create a ${s.name} server`;
-    pv("cap").textContent = `${s.name} ${v[0]} selected`;
-
-    if (changed === "sw") {
-      verSelect.innerHTML = s.versions.map((ver, i) => `<option value="${i}">${ver[0]}</option>`).join("");
-      verSelect.value = String(state.ver);
-    }
-
-    pv("title").textContent = s.title;
-    pv("name").textContent = s.name;
-    pv("meta").textContent = [`${s.name} ${v[0]}`, v[1], s.java].filter(Boolean).join(" · ");
-
-    pv("tabs").innerHTML = s.tabs
-      .map((t, i) => `<span class="pv-tab${i === 0 ? " is-on" : ""}${t === s.highlightTab ? " is-new" : ""}">${t}</span>`)
-      .join("");
-
-    pv("players").textContent = s.players;
-    pv("mid-label").textContent = s.middleStat[0];
-    pv("mid-val").textContent = s.middleStat[1];
-    pv("mem").innerHTML = `<span>${usedMem} / ${totalMem}</span><small>GB</small>`;
-
-    for (const icon of sourceIcons) icon.hidden = icon.dataset.sourceIcon !== s.sourceIcon;
-    pv("addons").textContent = s.source;
-
-    pv("servers").innerHTML = s.servers
-      .map((srv) => `<span class="pv-side-item is-${srv.status}"><span class="pv-srv-dot"></span><span>${srv.name}</span></span>`)
-      .join("");
-
-    const targets: Record<typeof changed, string[]> = {
-      sw: ["name", "meta", "tabs", "stats", "source-wrap", "servers"],
-      ver: ["meta"],
-      mem: ["stats"],
-    };
-    targets[changed].forEach((k) => flash(pv(k)));
-  }
-
-  typesEl.addEventListener("change", (e) => {
-    const target = e.target as HTMLInputElement | HTMLSelectElement;
-    if (target.name === "sw") {
-      state.sw = target.value;
-      state.ver = 0;
-      render("sw");
-    } else if (target === verSelect) {
-      state.ver = Number(verSelect.value);
-      render("ver");
-    } else if (target.name === "wz-mem") {
-      state.mem = Number(target.value);
-      render("mem");
-    }
-  });
-
-  ctaBtn.addEventListener("click", () => {
-    document.getElementById("install")?.scrollIntoView({ behavior: reduced ? "auto" : "smooth" });
-  });
-}
-
 // ---- scene motion ----------------------------------------------------------------
-// Looping scenes pause while they are off-screen; tiles and device cards settle in once.
+// Looping scenes pause while they are off-screen.
 const sceneIo = new IntersectionObserver((entries) => {
   for (const e of entries) (e.target as HTMLElement).toggleAttribute("data-paused", !e.isIntersecting);
 });
-document.querySelectorAll(".iso, .runtime-figure, .pb").forEach((el) => sceneIo.observe(el));
+document.querySelectorAll(".iso, .runtime-figure").forEach((el) => sceneIo.observe(el));
 
-// Section heads, tiles, cards and rules rise once in reading order (styled under "scroll motion" in landing.css).
+// Headings, table rows, FAQ entries and diagram parts rise once in reading order (styled under "scroll motion" in landing.css).
 if (!reduced) {
   root.classList.add("motion");
   const reveal = new IntersectionObserver((entries) => {
@@ -255,8 +152,8 @@ if (!reduced) {
   }, { threshold: 0.15, rootMargin: "0px 0px -6% 0px" });
   const groups: Element[][] = [
     ...[...document.querySelectorAll(".sec-head")].map((h) => [...h.querySelectorAll(".sec-no, h2, .sec-lead, [role=tablist]")]),
-    ...[...document.querySelectorAll(".bento, .devices, .compare tbody, .choices, .faq")].map((g) => [...g.children]),
-    ...[...document.querySelectorAll(".px-rule")].map((r) => [r]),
+    ...[...document.querySelectorAll(".row-head, .chapter2-copy")].map((h) => [...h.querySelectorAll(".sec-no, h2, .row-lead")]),
+    ...[...document.querySelectorAll(".compare tbody, .faq, .hops, .lanes")].map((g) => [...g.children]),
   ];
   for (const group of groups)
     group.forEach((el, i) => {
@@ -264,6 +161,25 @@ if (!reduced) {
       (el as HTMLElement).style.setProperty("--i", String(i));
       reveal.observe(el);
     });
+}
+
+// ---- chapters ----------------------------------------------------------------------
+// The sticky index marks the chapter that holds the middle of the screen.
+const chapterLinks = [...document.querySelectorAll<HTMLAnchorElement>("[data-chapter]")];
+if (chapterLinks.length) {
+  const mark = (id: string) => chapterLinks.forEach((a) => {
+    const on = a.dataset.chapter === id;
+    a.classList.toggle("is-on", on);
+    if (on) a.setAttribute("aria-current", "true");
+    else a.removeAttribute("aria-current");
+  });
+  const spy = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) mark(e.target.id);
+  }, { rootMargin: "-50% 0px -50% 0px" });
+  for (const a of chapterLinks) {
+    const chapter = document.getElementById(a.dataset.chapter!);
+    if (chapter) spy.observe(chapter);
+  }
 }
 
 // ---- faq ---------------------------------------------------------------------------
@@ -320,57 +236,6 @@ if (xpLevel && levels.length) {
   levels.forEach((l) => levelIo.observe(l.section));
 }
 
-// ---- process band ------------------------------------------------------------------
-// The story plays once through while the band is on screen: the line fills and each step turns "done" in
-// turn, rests, then starts over. Hovering or focusing a step shows the state right after that step.
-const band = document.querySelector<HTMLElement>("[data-band]");
-if (band) {
-  const steps = [...band.querySelectorAll<HTMLElement>(".pb-step")];
-  const note = band.querySelector<HTMLElement>("[data-pb-note]")!;
-  const idleNote = note.textContent ?? "";
-  let pinned = false;
-  /** `on` is the current step (or -1), `done` how many steps before it are finished. */
-  const paint = (on: number, done: number) => {
-    steps.forEach((s, k) => {
-      s.classList.toggle("is-on", k === on);
-      s.classList.toggle("is-done", k < done);
-    });
-    band.classList.toggle("is-start", on >= 0 || done > 0);
-    band.classList.toggle("is-end", done === steps.length);
-    note.textContent = on >= 0 ? steps[on].dataset.note! : idleNote;
-  };
-  steps.forEach((s, i) => {
-    const pin = () => {
-      pinned = true;
-      paint(i, i);
-    };
-    s.addEventListener("mouseenter", pin);
-    s.addEventListener("focusin", pin);
-  });
-  const release = () => {
-    pinned = false;
-    if (reduced) paint(-1, steps.length);
-  };
-  band.addEventListener("mouseleave", release);
-  band.addEventListener("focusout", (e) => {
-    if (!band.contains(e.relatedTarget as Node | null)) release();
-  });
-  if (reduced) paint(-1, steps.length);
-  else
-    onVisible(band, async () => {
-      for (;;) {
-        for (let i = 0; i < steps.length; i++) {
-          if (!pinned) paint(i, i);
-          await wait(1800);
-        }
-        if (!pinned) paint(-1, steps.length);
-        await wait(3200);
-        if (!pinned) paint(-1, 0);
-        await wait(700);
-      }
-    });
-}
-
 // ---- plugin search demo -----------------------------------------------------------
 const searchEl = document.querySelector<HTMLElement>(".demo-search");
 if (searchEl && !reduced) {
@@ -399,10 +264,13 @@ const consoleEl = document.querySelector<HTMLElement>("[data-console]");
 if (consoleEl) {
   const lines = [...consoleEl.querySelectorAll<HTMLElement>(".dc-log li")];
   const bars = [...consoleEl.querySelectorAll<HTMLElement>("[data-spark] i")];
-  const m = (k: string) => consoleEl.querySelector<HTMLElement>(`[data-m="${k}"]`)!;
+  // A number can appear more than once (the sidebar and the stats both count players).
+  const set = (k: string, v: string) => consoleEl.querySelectorAll<HTMLElement>(`[data-m="${k}"]`).forEach((el) => (el.textContent = v));
   const playerDelta = (l: HTMLElement) => (/joined the game/.test(l.textContent ?? "") ? 1 : /left the game/.test(l.textContent ?? "") ? -1 : 0);
-  if (reduced) lines.forEach((l) => l.classList.add("is-in"));
-  else
+  if (reduced) {
+    lines.forEach((l) => l.classList.add("is-in"));
+    set("players", String(lines.reduce((n, l) => n + playerDelta(l), 0)));
+  } else
     onVisible(consoleEl, async () => {
       // The first lines are the history that is already there; the rest arrive live.
       const history = lines.length - 4;
@@ -412,12 +280,12 @@ if (consoleEl) {
           l.classList.toggle("is-in", i < history);
           if (i < history) players += playerDelta(l);
         });
-        m("players").textContent = String(players);
+        set("players", String(players));
         for (const l of lines.slice(history)) {
           await wait(1400);
           l.classList.add("is-in");
           players += playerDelta(l);
-          m("players").textContent = String(players);
+          set("players", String(players));
         }
         await wait(4000);
       }
@@ -425,8 +293,8 @@ if (consoleEl) {
   if (!reduced)
     setInterval(() => {
       bars.forEach((b, i) => b.style.setProperty("--v", bars[i + 1]?.style.getPropertyValue("--v") || `${22 + Math.round(Math.random() * 30)}%`));
-      m("cpu").textContent = String(9 + Math.round(Math.random() * 9));
-      m("tps").textContent = Math.random() > 0.85 ? "19.9" : "20.0";
+      set("cpu", String(9 + Math.round(Math.random() * 9)));
+      set("tps", Math.random() > 0.85 ? "19.9" : "20.0");
     }, 1400);
 }
 
@@ -533,61 +401,6 @@ if (aiEl) {
 
 const perfEl = document.querySelector<HTMLElement>("[data-perf]");
 if (perfEl) onVisible(perfEl, () => perfEl.classList.add("is-in"));
-
-// ---- closer look ---------------------------------------------------------------
-// Picking a legend number zooms the screenshot onto that spot; picking it again, the button, Esc or a click zooms out.
-const look = document.querySelector<HTMLElement>("[data-look]");
-const lookOut = document.querySelector<HTMLButtonElement>("[data-look-out]");
-let zoomed: string | null = null;
-const zoom = (ref: string | null) => {
-  zoomed = ref;
-  if (look) look.toggleAttribute("data-zoomed", !!ref);
-  if (lookOut) lookOut.hidden = !ref;
-  for (const b of document.querySelectorAll<HTMLElement>("[data-spot-ref]")) b.setAttribute("aria-pressed", String(b.dataset.spotRef === ref));
-  for (const s of document.querySelectorAll<HTMLElement>(".spot")) {
-    const on = s.dataset.spot === ref;
-    s.classList.toggle("is-hint", on);
-    const stage = s.closest<HTMLElement>(".look-zoom");
-    if (!on || !stage) continue;
-    stage.style.setProperty("--zx", `${s.dataset.x}%`);
-    stage.style.setProperty("--zy", `${s.dataset.y}%`);
-    // Ask for a sharper source at the zoomed size; the browser keeps the larger one once it has it.
-    const width = Math.round(stage.offsetWidth * (matchMedia("(max-width: 620px)").matches ? 3 : 2));
-    stage.querySelectorAll("img").forEach((img) => (img.sizes = `${width}px`));
-  }
-};
-for (const b of document.querySelectorAll<HTMLButtonElement>("[data-spot-ref]")) {
-  b.addEventListener("click", () => zoom(zoomed === b.dataset.spotRef ? null : b.dataset.spotRef!));
-  b.addEventListener("mouseenter", () => !zoomed && document.querySelector(`[data-spot="${b.dataset.spotRef}"]`)?.classList.add("is-hint"));
-  b.addEventListener("mouseleave", () => !zoomed && document.querySelector(`[data-spot="${b.dataset.spotRef}"]`)?.classList.remove("is-hint"));
-}
-lookOut?.addEventListener("click", () => zoom(null));
-document.querySelectorAll(".look-zoom").forEach((z) => z.addEventListener("click", (e) => {
-  if (zoomed && !(e.target as Element).closest(".spot")) zoom(null);
-}));
-addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && zoomed) zoom(null);
-});
-
-const lookTabs = [...document.querySelectorAll<HTMLButtonElement>("[data-look-tabs] [role=tab]")];
-roving(lookTabs, (tab) => {
-  zoom(null);
-  for (const t of lookTabs) {
-    const on = t === tab;
-    t.setAttribute("aria-selected", String(on));
-    t.tabIndex = on ? 0 : -1;
-    const id = t.getAttribute("aria-controls")!;
-    const panel = document.getElementById(id)!;
-    panel.dataset.active = String(on);
-    panel.inert = !on;
-    const legend = document.querySelector<HTMLElement>(`[data-legend="${id.replace(/^look-/, "")}"]`);
-    if (legend) legend.hidden = !on;
-  }
-});
-// A marker zooms like its legend entry; while zoomed out, hover and focus still show its tooltip.
-for (const spot of document.querySelectorAll<HTMLButtonElement>(".spot")) {
-  spot.addEventListener("click", () => zoom(zoomed === spot.dataset.spot ? null : spot.dataset.spot!));
-}
 
 // ---- footer console --------------------------------------------------------------
 const fc = document.querySelector<HTMLFormElement>("[data-foot-console]");
