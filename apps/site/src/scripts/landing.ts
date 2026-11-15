@@ -144,16 +144,19 @@ document.querySelectorAll(".iso, .runtime-figure").forEach((el) => sceneIo.obser
 if (!reduced) {
   root.classList.add("motion");
   const reveal = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (!e.isIntersecting) continue;
+    // Stagger by what arrives together, not by position in the group: on a phone the rows of a stacked list come
+    // in one at a time, and a row far down must not wait for the delay of the rows above it.
+    const arriving = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top || a.boundingClientRect.left - b.boundingClientRect.left);
+    arriving.forEach((e, n) => {
+      (e.target as HTMLElement).style.setProperty("--i", String(Math.min(n, 5)));
       e.target.classList.add("is-in");
       reveal.unobserve(e.target);
-    }
-  }, { threshold: 0.15, rootMargin: "0px 0px -6% 0px" });
+    });
+  }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
   const groups: Element[][] = [
     ...[...document.querySelectorAll(".sec-head")].map((h) => [...h.querySelectorAll(".sec-no, h2, .sec-lead, [role=tablist]")]),
-    ...[...document.querySelectorAll(".row-head, .chapter2-copy")].map((h) => [...h.querySelectorAll(".sec-no, h2, .row-lead")]),
-    ...[...document.querySelectorAll(".compare tbody, .faq, .hops, .lanes")].map((g) => [...g.children]),
+    ...[...document.querySelectorAll(".row-head, .chapter2-copy, .project .cell:first-child, .install2 > .cell:first-child")].map((h) => [...h.querySelectorAll(".sec-no, h2, .row-lead, .project-author")]),
+    ...[...document.querySelectorAll(".compare tbody, .faq, .hops, .lanes, .project-facts, .install2-steps")].map((g) => [...g.children]),
   ];
   for (const group of groups)
     group.forEach((el, i) => {
