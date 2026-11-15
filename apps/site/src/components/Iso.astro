@@ -22,9 +22,14 @@ interface Props {
   pad?: number;
   /** Technical-drawing register: outlined faces that hide what is behind them, styled by .iso-line in landing.css. */
   outline?: boolean;
+  /**
+   * Minimum drawing size in page-grid px (16 per unit). A smaller scene is centred horizontally and stands on the
+   * bottom edge, so drawings that share a fit render at one scale and on one baseline.
+   */
+  fit?: { w: number; h: number };
 }
 
-const { boxes, label, class: className, pad = 4, outline = false } = Astro.props;
+const { boxes, label, class: className, pad = 4, outline = false, fit } = Astro.props;
 const S = 16;
 const p = (x: number, y: number, z: number) => [(x - y) * S, ((x + y) * S) / 2 - z * S] as const;
 const poly = (pts: (readonly [number, number])[]) => pts.map(([a, b]) => `${+a.toFixed(2)},${+b.toFixed(2)}`).join(" ");
@@ -45,10 +50,18 @@ for (const f of faces.filter(({ b }) => !b.class?.split(" ").includes("ghost")))
   if (last && last.layer === f.b.layer) last.faces.push(f);
   else groups.push({ layer: f.b.layer, faces: [f] });
 }
-const minX = Math.min(...all.map((q) => q[0])) - pad;
-const maxX = Math.max(...all.map((q) => q[0])) + pad;
-const minY = Math.min(...all.map((q) => q[1])) - pad;
+let minX = Math.min(...all.map((q) => q[0])) - pad;
+let maxX = Math.max(...all.map((q) => q[0])) + pad;
+let minY = Math.min(...all.map((q) => q[1])) - pad;
 const maxY = Math.max(...all.map((q) => q[1])) + pad;
+if (fit) {
+  const spare = fit.w - (maxX - minX);
+  if (spare > 0) {
+    minX -= spare / 2;
+    maxX += spare / 2;
+  }
+  minY = Math.min(minY, maxY - fit.h);
+}
 ---
 
 <svg

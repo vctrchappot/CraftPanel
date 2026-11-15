@@ -49,7 +49,8 @@ function grassBlock(x: number, y: number, z: number): Box[] {
   return [box(x, y, z, 1, 1, 0.78, C.dirt), box(x, y, z + 0.78, 1, 1, 0.22, C.grass)];
 }
 
-function piBoard(ox: number, oy: number): Box[] {
+/** The board; `extra` is drawn after the parts on it and before the ports, which stand in front of it. */
+function piBoard(ox: number, oy: number, extra: Box[] = []): Box[] {
   const parts: Box[] = [box(ox, oy, 0, 6, 4, 0.22, C.pcb)];
   // Copper tracks, mounting pads and tiny surface-mount parts make this a board, not a green slab.
   const trace: Shades = ["#438557", "#327043", "#285b36"];
@@ -68,6 +69,7 @@ function piBoard(ox: number, oy: number): Box[] {
   for (let i = 0; i < 5; i++) parts.push(box(ox + 1.15 + i * 0.48, oy + 2.95, 0.22, 0.23, 0.15, 0.11, C.silver));
   parts.push(box(ox + 0.35, oy + 3.2, 0.22, 0.28, 0.28, 0.14, C.led, "led led-act")); // activity LED
   parts.push(box(ox + 0.8, oy + 3.2, 0.22, 0.28, 0.28, 0.14, C.ledRed));
+  parts.push(...extra);
   // USB and Ethernet ports overhanging the right edge
   parts.push(box(ox + 5.0, oy + 0.35, 0.22, 1.25, 0.95, 0.72, C.silver));
   parts.push(box(ox + 5.0, oy + 1.5, 0.22, 1.25, 0.95, 0.72, C.silver));
@@ -190,8 +192,9 @@ export function isolationScene(): Box[] {
   return [...host, ...plots, ...homes, ...chimneys, ...cages];
 }
 
+/** The Pi on its own, carrying the one grass block every machine card has: the world it runs. */
 export function piScene(): Box[] {
-  return piBoard(0, 0);
+  return piBoard(0, 0, grassBlock(3.75, 2.7, 0.22));
 }
 
 /**
@@ -262,13 +265,17 @@ export function pcScene(): Box[] {
 }
 
 export function vpsScene(): Box[] {
+  // Lighter than the PC's case, so the rack still reads once dark mode dims the scene.
+  const unit: Shades = ["#605c56", "#4a4742", "#3c3935"];
   const parts: Box[] = [];
   for (let u = 0; u < 3; u++) {
     const z = u * 0.95;
-    parts.push(box(0, 0, z, 6, 3.6, 0.85, u === 1 ? C.caseLight : C.case));
-    parts.push(box(0.4, 3.6, z + 0.25, 0.22, 0.05, 0.22, u === 1 ? C.led : C.gold, u === 1 ? "led" : `led-act unit-${u}`));
+    parts.push(box(0, 0, z, 6, 3.6, 0.85, u === 1 ? C.caseLight : unit));
+    parts.push(box(0.25, 3.6, z + 0.25, 0.18, 0.05, 0.18, C.led, "led")); // power
+    parts.push(box(0.55, 3.6, z + 0.25, 0.18, 0.05, 0.18, C.gold, `led-act unit-${u}`)); // disk activity
     for (let i = 0; i < 6; i++) parts.push(box(1.2 + i * 0.7, 3.6, z + 0.2, 0.5, 0.04, 0.42, C.bezel));
   }
+  parts.push(...grassBlock(2.5, 1.3, 2.75));
   // Rack ears and screws keep the cloud machine as physical as the PC and Pi.
   for (const x of [-0.25, 5.95]) {
     parts.push(box(x, 3.62, 0.05, 0.3, 0.09, 2.65, C.caseLight));

@@ -400,7 +400,7 @@ const no = (i: number) => String(i).padStart(2, "0");
       <div class="cells devices2">
         {devices.map((d) => (
           <a class="cell cell-vis device2" href={d.href}>
-            <Iso boxes={d.scene} label={d.name} class="iso night" />
+            <Iso boxes={d.scene} label={d.name} class="iso night" fit={{ w: 176, h: 142 }} />
             <span class="device2-body">
               <span class="device2-name">{d.name} <UiIcon name="arrow-right" size={12} /></span>
               <span class="device2-os mono">{d.os}</span>
