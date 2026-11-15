@@ -102,7 +102,8 @@ then change permissions above the data directory: see below), `off` disables it.
 
 - **Token.** A restricted token passes an access check only if both its account and one of its restricting
   SIDs are granted. The account keeps the runtime's own access; the restricting SIDs are the server's own SID,
-  Everyone, Users, Authenticated Users and RESTRICTED (`S-1-5-12`). The server SID is `S-1-9-…` (resource
+  Everyone, Users, Authenticated Users, RESTRICTED (`S-1-5-12`) and the logon SID (a service's window station
+  and desktop grant only that; without them Java fails with `0xC0000142`, found in CI). The server SID is `S-1-9-…` (resource
   manager authority), derived from the server id; it names no account and only appears in the token and on
   the server's folders. Administrators is deny-only, every privilege but traversal is removed, and the default
   DACL grants SYSTEM, the account and the server SID. Network access, loopback included, is unchanged

@@ -14,7 +14,7 @@
  *
  * Access checks on a restricted token pass only if both the account and one of the restricting SIDs
  * are granted: the account keeps the runtime's own access, the restricting SIDs (this server, Everyone,
- * Users, Authenticated Users, RESTRICTED) narrow it to what any local user could reach plus the server's
+ * Users, Authenticated Users, RESTRICTED, the logon SID) narrow it to what any local user could reach plus the server's
  * own folders. Network access, loopback included, is unchanged.
  * https://learn.microsoft.com/windows/win32/secauthz/restricted-tokens
  */
@@ -47,6 +47,7 @@ public static class CraftPanelServerToken {
     [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
     [DllImport("advapi32.dll", SetLastError = true)]
     static extern bool CreateRestrictedToken(IntPtr existing, uint flags, uint disableCount, SidAndAttributes[] disable, uint deleteCount, IntPtr delete, uint restrictCount, SidAndAttributes[] restrict, out IntPtr token);
+    [DllImport("advapi32.dll", SetLastError = true)] static extern bool GetTokenInformation(IntPtr token, int kind, IntPtr info, int length, out int returned);
     [DllImport("advapi32.dll", SetLastError = true)] static extern bool SetTokenInformation(IntPtr token, int kind, ref IntPtr info, int length);
     [DllImport("advapi32.dll", SetLastError = true)] static extern bool DuplicateToken(IntPtr token, int level, out IntPtr duplicate);
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
@@ -87,6 +88,17 @@ public static class CraftPanelServerToken {
         Check(OpenProcessToken(GetCurrentProcess(), 0x1 | 0x2 | 0x8 | 0x80, out token), "OpenProcessToken");
         var restrict = new List<SidAndAttributes>();
         foreach (var sid in new[] { serverSid, "S-1-1-0", "S-1-5-32-545", "S-1-5-11", Restricted }) restrict.Add(Sid(sid));
+        // The logon SID: a service's window station and desktop grant only it, and without them user32 fails to
+        // initialise (STATUS_DLL_INIT_FAILED). Files and the data directory never grant it.
+        int length;
+        GetTokenInformation(token, 2, IntPtr.Zero, 0, out length);
+        IntPtr groups = Marshal.AllocHGlobal(length);
+        Check(GetTokenInformation(token, 2, groups, length, out length), "GetTokenInformation");
+        int count = Marshal.ReadInt32(groups);
+        for (int i = 0; i < count; i++) {
+            var group = (SidAndAttributes)Marshal.PtrToStructure(groups + IntPtr.Size + i * Marshal.SizeOf(typeof(SidAndAttributes)), typeof(SidAndAttributes));
+            if ((group.Attributes & 0xC0000000) == 0xC0000000) restrict.Add(new SidAndAttributes { Sid = group.Sid });
+        }
         var disable = new[] { Sid("S-1-5-32-544") };
         // DISABLE_MAX_PRIVILEGE keeps only SeChangeNotifyPrivilege (traversal).
         Check(CreateRestrictedToken(token, 0x1, (uint)disable.Length, disable, 0, IntPtr.Zero, (uint)restrict.Count, restrict.ToArray(), out restricted), "CreateRestrictedToken");
