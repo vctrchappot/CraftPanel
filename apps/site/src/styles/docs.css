@@ -244,3 +244,105 @@ h1#_top {
   border: 0;
   margin: 0;
 }
+
+/* ---- heading links ----
+   The link icon next to a heading answers a click: the icon turns into a check mark and pops, a small tag says the
+   link was copied (see scripts/docs-anchors.js), and the heading is highlighted. Hover and keyboard focus colour the
+   icon; pressing it shrinks it a little. Starlight shows the icon only on hover where hover exists, always on touch. */
+.sl-markdown-content .sl-anchor-link {
+  color: var(--sl-color-gray-3);
+  transition: color 180ms var(--cp-ease-out, cubic-bezier(0.22, 1, 0.36, 1)), opacity 180ms var(--cp-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.sl-markdown-content .sl-anchor-link .sl-anchor-icon {
+  display: inline-flex;
+  transition: transform 140ms var(--cp-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.sl-markdown-content .sl-anchor-link:is(:hover, :focus-visible) {
+  color: var(--sl-color-accent);
+}
+.sl-markdown-content .sl-anchor-link:active .sl-anchor-icon {
+  transform: scale(0.82);
+}
+.sl-markdown-content .sl-anchor-link:focus-visible {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.sl-markdown-content .sl-anchor-link.is-copied {
+  color: var(--sl-color-accent);
+  opacity: 1;
+}
+.sl-markdown-content .sl-anchor-link.is-copied .sl-anchor-icon {
+  animation: anchor-pop 360ms var(--cp-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.sl-markdown-content .sl-anchor-link.is-copied::before {
+  content: "Link copied";
+  position: absolute;
+  z-index: 2;
+  bottom: calc(100% + 0.4rem);
+  left: -0.4rem;
+  padding: 2px 8px 3px;
+  border: 1px solid var(--sl-color-gray-4);
+  background: var(--sl-color-black);
+  color: var(--sl-color-white);
+  font: 500 12px/1.4 var(--sl-font-mono);
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: anchor-tag 2000ms var(--cp-ease-out, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+.sl-markdown-content .sl-anchor-link.is-copied.is-flip::before {
+  left: auto;
+  right: -0.4rem;
+}
+@keyframes anchor-pop {
+  0% {
+    transform: scale(0.4);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes anchor-tag {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  12%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* The linked heading (after a click on its icon, a link from the table of contents or a link with a #hash). */
+.sl-markdown-content .sl-heading-wrapper > :first-child:is(.is-linked, :target) {
+  border-radius: 2px;
+  animation: anchor-flash 1800ms var(--cp-ease-out, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+@keyframes anchor-flash {
+  0%,
+  25% {
+    background-color: color-mix(in srgb, var(--sl-color-accent) 24%, transparent);
+    box-shadow: 0 0 0 0.2em color-mix(in srgb, var(--sl-color-accent) 24%, transparent);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 0.2em transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sl-markdown-content .sl-anchor-link.is-copied .sl-anchor-icon,
+  .sl-markdown-content .sl-anchor-link.is-copied::before,
+  .sl-markdown-content .sl-heading-wrapper > :first-child:is(.is-linked, :target) {
+    animation: none;
+  }
+  .sl-markdown-content .sl-anchor-link:active .sl-anchor-icon {
+    transform: none;
+  }
+}
