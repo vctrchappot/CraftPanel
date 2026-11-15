@@ -1869,6 +1869,17 @@ p {
   transform: none;
   filter: none;
 }
+/* Phones: a shorter rise and no blur (it is costly to repaint and the headings are big), and a quicker settle. */
+@media (max-width: 720px) {
+  .motion [data-reveal] {
+    transform: translateY(12px);
+    transition-duration: 480ms;
+  }
+  .motion .sec-head h2[data-reveal]:not(.is-in),
+  .motion .row-head h2[data-reveal]:not(.is-in) {
+    filter: none;
+  }
+}
 /* Comparison rows: once a row is in, its marks drop into place like blocks. */
 .motion .compare [data-reveal] .cmp-mark {
   transform: scale(0);
@@ -2073,10 +2084,13 @@ p {
   .compare thead {
     display: none;
   }
+  .compare tbody {
+    display: grid;
+    gap: 12px;
+  }
   .compare tr {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-bottom: 10px;
     border: 1px solid var(--line-strong);
     background: var(--surface);
   }
@@ -2090,25 +2104,31 @@ p {
     grid-column: 1 / -1;
     position: static;
     width: auto;
-    padding: 8px 12px;
+    padding: 10px 14px;
     border-top: 0;
+    border-bottom: 1px solid var(--line);
     background: var(--surface-2);
     color: var(--fg);
     font-weight: 600;
   }
   .compare td {
-    padding: 10px 12px 12px;
+    padding: 12px 14px 16px;
     border-top: 0;
-    font-size: 14px;
+    font-size: 14.5px;
+    line-height: 1.5;
   }
   .compare td + td {
     border-left: 1px solid var(--line);
   }
   .cmp-col {
     display: block;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     font-size: 11px;
+    line-height: 1;
     color: var(--muted);
+  }
+  .compare .is-us .cmp-col {
+    color: var(--grass-text);
   }
   .cmp-cell {
     gap: 8px;
@@ -2116,13 +2136,39 @@ p {
   .cmp-mark {
     width: 18px;
     height: 18px;
+    margin-top: 2px;
   }
   .compare .is-us {
     box-shadow: inset 0 3px 0 var(--grass);
   }
+  /* Narrow phones: a column would be only ~100px of text, so the two answers stack. */
+  @media (max-width: 359px) {
+    .compare tr {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .compare td + td {
+      border-left: 0;
+      border-top: 1px solid var(--line);
+    }
+    .compare .is-us {
+      box-shadow: inset 3px 0 0 var(--grass);
+    }
+  }
   
+  .foot {
+    padding-top: 48px;
+  }
+  .foot-in {
+    gap: 36px;
+  }
   .foot-cols {
-    gap: 32px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px 24px;
+    width: 100%;
+  }
+  .foot-console {
+    margin-top: 36px;
   }
 }
 

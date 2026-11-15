@@ -1041,9 +1041,48 @@
     display: none;
   }
 }
+@media (max-width: 720px) {
+  /* The comparison turns into cards here (landing.css), so the cards need the row's gutter. */
+  .row .table-scroll {
+    padding: 24px 40px 40px;
+  }
+}
 @media (max-width: 620px) {
   .frame {
     border-inline: 0;
+  }
+  .frame .sec-no {
+    margin-bottom: 18px;
+  }
+  .row .table-scroll {
+    padding: 20px 16px 32px;
+  }
+  .row-head {
+    padding-block: 40px 28px;
+  }
+  .row-lead {
+    margin-top: 14px;
+    font-size: 15px;
+  }
+  .project > .cell,
+  .install2 > .cell:first-child {
+    padding-block: 40px;
+  }
+  .project-author {
+    margin-top: 24px;
+  }
+  .project-facts {
+    padding-top: 8px;
+  }
+  .project-facts > div {
+    padding: 12px 0;
+  }
+  .install2-steps,
+  .install2-links {
+    margin-top: 24px;
+  }
+  .cell-term {
+    padding-block: 24px;
   }
   .row + .row::before,
   .row + .row::after {
