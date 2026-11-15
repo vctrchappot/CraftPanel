@@ -4,7 +4,8 @@
 
 - 🧪 CI runs only the jobs a change needs: `scripts/ci-changes.mjs` maps changed files to the areas `app`, `install`, `site` and `plugin`, with seven unit tests for the rules and a check of the Git diff mode (new branch, unknown base and failed diff fall back to everything). Docs-only changes run nothing, website-only changes run the new `Website` job, dashboard-only changes skip the installers.
 - 🧪 New `Website` job: website unit tests, production build and `apps/site/scripts/smoke.mjs`, which opens all 32 built pages at 390 and 1440 px plus the home page with reduced motion (script and console errors, failed same-origin requests, horizontal overflow, missing `<h1>`, scroll reveals that stay hidden). Passes on the current site in about 90 s locally; with an injected console error, a 2000 px wide element and a broken reveal it reported all three.
-- 🟡 The changed workflow has not run on GitHub yet (no `actionlint` here, only a YAML parse): the first pull request that contains it will show whether the `Changes` job, the `if:` conditions and the `CI result` check behave as intended.
+- ✅ The changed workflow on GitHub (PR #3, which touches `ci.yml` and therefore runs everything): `Changes` succeeded and started all jobs; the new `Website` job (unit tests, build, smoke test of all pages) passed in about 2 minutes; `CI result` passed with all 12 other checks green (tests on three systems, end-to-end on x64 and ARM64, both release packages, Linux installer, plugin check).
+- ✅ Skipping on GitHub (PR #4, which changes only `docs/STATUS.md`): `Changes` and `CI result` ran and passed, the other eight jobs were skipped within seconds. Skipped matrix jobs show up under their unexpanded name (`Test (${{ matrix.os }})`), so branch protection should require `CI result` only.
 
 ## Website motion audit (2026-11-15)
 
