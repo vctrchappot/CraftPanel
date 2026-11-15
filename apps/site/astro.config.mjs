@@ -1,5 +1,9 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import { readFileSync } from "node:fs";
+
+// Click feedback for the heading link icons (see the file for what it does).
+const docsAnchors = readFileSync(new URL("./src/scripts/docs-anchors.js", import.meta.url), "utf8");
 
 export default defineConfig({
   site: "https://craftpanel.vctr.site",
@@ -14,7 +18,10 @@ export default defineConfig({
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/vctrchappot/CraftPanel" }],
       editLink: { baseUrl: "https://github.com/vctrchappot/CraftPanel/edit/main/apps/site/" },
       lastUpdated: true,
-      head: [{ tag: "meta", attrs: { property: "og:image", content: "https://craftpanel.vctr.site/og.png" } }],
+      head: [
+        { tag: "meta", attrs: { property: "og:image", content: "https://craftpanel.vctr.site/og.png" } },
+        { tag: "script", content: docsAnchors },
+      ],
       sidebar: [
         {
           label: "Getting started",

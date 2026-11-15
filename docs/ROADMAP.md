@@ -136,5 +136,13 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 - Optional hosted tunnel so servers are reachable without port forwarding.
 - Per-server process isolation (systemd sandboxing, later containers).
 
+### Website: motion on phones (done 2026-11-15, one gap)
+
+User outcome: the home page feels alive on a phone, not only the headings. Inventory: [design/README.md](design/README.md) ("Landing page motion").
+
+- [x] Entrances for the blocks that arrive alone on a one-column page: hero on load, cell content, drawings, demos, terminal.
+- [x] Scroll-linked drift of the drawings (CSS view timeline, behind `@supports`).
+- [ ] Check on a real phone (touch scrolling, frame rate) and tune distances and timings.
+
 ## Recommended order
 1 → 2 → 3, then 4/5 depending on feedback. Announce publicly (r/admincraft, r/selfhosted) once release packages and one-line installers exist.
