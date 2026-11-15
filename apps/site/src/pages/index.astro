@@ -27,13 +27,14 @@ const title = "CraftPanel – Your Minecraft server, on your hardware";
 const description =
   "Self-hosted panel for Minecraft Java servers on a PC, a Raspberry Pi or a VPS. Paper, Purpur, Fabric, NeoForge, Vanilla and Velocity. No panel fee, no telemetry.";
 
-const software: { name: string; icon: PixelName; note: string; kind: string }[] = [
-  { name: "Paper", icon: "paper", note: "Plugins, fast and Vanilla-like.", kind: "plugins" },
-  { name: "Purpur", icon: "purpur", note: "Paper with more settings.", kind: "plugins" },
-  { name: "Fabric", icon: "fabric", note: "Light mods like Lithium.", kind: "mods" },
-  { name: "NeoForge", icon: "neoforge", note: "Big mods and modpacks.", kind: "mods" },
-  { name: "Vanilla", icon: "vanilla", note: "Mojang's server, untouched.", kind: "unmodified" },
-  { name: "Velocity", icon: "velocity", note: "Several servers, one address.", kind: "proxy" },
+const softwareGuide = "/docs/guides/server-software/";
+const software: { name: string; icon: PixelName; note: string; kind: string; href: string; proxy?: boolean }[] = [
+  { name: "Paper", icon: "paper", note: "Plugins, fast and close to Vanilla.", kind: "Plugins", href: softwareGuide },
+  { name: "Purpur", icon: "purpur", note: "Paper with more settings to tune.", kind: "Plugins", href: softwareGuide },
+  { name: "Fabric", icon: "fabric", note: "Light mods like Lithium for speed.", kind: "Mods", href: softwareGuide },
+  { name: "NeoForge", icon: "neoforge", note: "Big mods and full modpacks.", kind: "Mods", href: softwareGuide },
+  { name: "Vanilla", icon: "vanilla", note: "Mojang's own server, untouched.", kind: "No add-ons", href: softwareGuide },
+  { name: "Velocity", icon: "velocity", note: "Sits in front of your servers: one address for all.", kind: "Proxy", href: "/docs/guides/velocity/", proxy: true },
 ];
 
 type Spec = [key: string, value: string];
@@ -231,18 +232,28 @@ const no = (i: number) => String(i).padStart(2, "0");
 
     <!-- Server software -->
     <section class="row" aria-labelledby="soft-title">
-      <h2 id="soft-title" class="sr-only">Server software</h2>
+      <div class="cell row-head row-head-inline">
+        <div>
+          <p class="kicker mono"><span class="px-dot" aria-hidden="true"></span>Server software</p>
+          <h2 id="soft-title" class="display">Pick the software, <span class="dim">CraftPanel does the rest.</span></h2>
+          <p class="row-lead">Downloaded from the project that makes it, checksum checked, with the right Java for each server.</p>
+        </div>
+        <a class="mono" href={softwareGuide}>All server software <UiIcon name="arrow-right" size={12} /></a>
+      </div>
       <ul class="cells soft">
         {software.map((s) => (
           <li class="cell">
-            <Pixel name={s.icon} size={48} />
-            <p class="soft-name">{s.name}</p>
-            <p class="soft-note">{s.note}</p>
-            <p class="soft-kind mono">{s.kind}</p>
+            <a class="soft-card" href={s.href}>
+              <span class="cell-vis soft-vis"><Pixel name={s.icon} size={96} /></span>
+              <span class="soft-body">
+                <span class:list={["soft-chip", "mono", { "is-proxy": s.proxy }]}>{s.kind}</span>
+                <span class="soft-name">{s.name} <UiIcon name="arrow-right" size={16} /></span>
+                <span class="soft-note">{s.note}</span>
+              </span>
+            </a>
           </li>
         ))}
       </ul>
-      <p class="cell row-foot mono"><span>Downloaded from the project that makes it · checksum checked · the right Java per server</span><a href="/docs/guides/server-software/">Server software <UiIcon name="arrow-right" size={12} /></a></p>
     </section>
 
     <!-- Chapters with a sticky index -->
