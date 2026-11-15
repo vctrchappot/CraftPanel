@@ -647,10 +647,12 @@
   border-top: 1px solid var(--line-strong);
 }
 .chapter2-cells {
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 .chapter2-copy {
-  padding: 56px 40px;
+  display: flex;
+  flex-direction: column;
+  padding: 56px 40px 40px;
 }
 .chapter2-copy h2 {
   text-wrap: balance;
@@ -664,11 +666,16 @@
 .chapter2-text + .chapter2-text {
   margin-top: 14px;
 }
+/* The drawing starts level with the heading and stays in view while its text is read. */
 .chapter2 .cell-vis {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 48px 40px;
+  justify-content: flex-start;
+  padding: 56px 40px;
+}
+.chapter2 .cell-vis > * {
+  position: sticky;
+  top: 104px;
 }
 /* Demos sit on the dot grid as surfaces of their own */
 .chapter2 .cell-vis > :is(.demo-backup, .demo-search, .demo-perf, .demo-ai, .runtime-figure, .hops, .iso-stage) {
@@ -680,9 +687,8 @@
 .chapter2 .cell-vis > :is(.demo-backup, .demo-search, .demo-perf, .demo-ai) {
   padding: 20px;
 }
-.vis-security,
-.vis-isolation {
-  padding: 40px 32px;
+.chapter2 :is(.vis-security, .vis-isolation) {
+  padding: 56px 32px 40px;
 }
 .iso-stage .lane {
   padding: 14px 16px 16px;
@@ -696,6 +702,29 @@
 .iso-stage .meter-bar {
   grid-column: 1 / -1;
   grid-row: 2;
+}
+/* Beside the text, half a chapter is narrow for three lanes: each meter stacks its name, value and bar, and the
+   software goes under the server's name. */
+@media (min-width: 981px) {
+  .iso-stage .meter {
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+    gap: 3px;
+  }
+  .iso-stage .meter-bar {
+    grid-column: auto;
+    grid-row: 3;
+    margin-top: 4px;
+  }
+  .iso-stage .lane-head {
+    flex-wrap: wrap;
+    gap: 2px 8px;
+  }
+  .iso-stage .lane-sw {
+    flex-basis: 100%;
+    margin-left: 16px;
+    font-size: 11.5px;
+  }
 }
 .iso-stage .iso-lanes {
   max-height: 300px;
@@ -733,20 +762,28 @@
   left: 28px;
   transform: rotate(135deg);
 }
-.specs {
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+/* The chapter's facts follow its text: key left, value right. */
+.chapter2-facts {
+  display: grid;
+  margin: 0;
+  padding-top: 32px;
+}
+.chapter2-facts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  align-items: baseline;
+  gap: 16px;
+  padding: 11px 0;
   border-top: 1px solid var(--line);
 }
-.specs .cell {
-  display: grid;
-  gap: 4px;
-  padding: 18px 24px;
+.chapter2-facts > div:last-child {
+  border-bottom: 1px solid var(--line);
 }
-.specs dt {
-  font-size: 11px;
+.chapter2-facts dt {
+  font-size: 11.5px;
   color: var(--muted);
 }
-.specs dd {
+.chapter2-facts dd {
   margin: 0;
   font-size: 14px;
   font-weight: 500;
@@ -1045,6 +1082,24 @@
 }
 
 /* ---- smaller screens ---- */
+/* Laptops: the chapter index keeps only its numbers, so text and drawing get the width. */
+@media (max-width: 1280px) {
+  .chapters2 {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  .chapter-index a {
+    justify-content: center;
+    padding: 9px 0;
+  }
+  .chapter-index .ci-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 @media (max-width: 1100px) {
   .mock-app {
     grid-template-columns: minmax(0, 1fr);
@@ -1154,7 +1209,8 @@
   .hero2-art {
     padding: 32px 16px 56px;
   }
-  .chapter2 .cell-vis {
+  .chapter2 .cell-vis,
+  .chapter2 :is(.vis-security, .vis-isolation) {
     padding: 32px 16px;
   }
   .mock-cell {
@@ -1211,15 +1267,8 @@
   .extras .cell {
     padding: 24px 16px;
   }
-  /* Facts as a list: key left, value right, so an odd count leaves no empty cell */
-  .specs {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .specs .cell {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-    align-items: baseline;
-    gap: 12px;
-    padding: 12px 16px;
+  .chapter2-facts {
+    padding-top: 28px;
   }
   .vis-security .hop {
     grid-template-columns: minmax(0, 1fr);

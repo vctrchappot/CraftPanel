@@ -168,11 +168,11 @@ if (!reduced) {
     ...[...document.querySelectorAll(".sec-head")].map((h) => [...h.querySelectorAll(".sec-no, h2, .sec-lead, [role=tablist]")]),
     ...[...document.querySelectorAll(".row-head, .chapter2-copy, .project .cell:first-child, .install2 > .cell:first-child")].map((h) => [...h.querySelectorAll(".sec-no, h2, .row-lead, .chapter2-text, .project-author")]),
     // Lists: one entry after the other.
-    ...[...document.querySelectorAll(".compare tbody, .faq, .hops, .lanes, .project-facts, .install2-steps")].map((g) => [...g.children]),
+    ...[...document.querySelectorAll(".compare tbody, .faq, .hops, .lanes, .project-facts, .install2-steps, .chapter2-facts")].map((g) => [...g.children]),
     // Blocks that stand alone.
     ...[...document.querySelectorAll(".statement, .install2-links, .cell-term > .term")].map((el) => [el]),
     // The content of a cell: the cell keeps its frame, its content rises.
-    ...[...document.querySelectorAll(".mock-cell, .extras .cell, .specs .cell, .row-foot")].map((c) => kids(c)),
+    ...[...document.querySelectorAll(".mock-cell, .extras .cell, .row-foot")].map((c) => kids(c)),
     ...[...document.querySelectorAll(".device2, .soft-card")].map((c) => [c.querySelector(".iso")!, ...kids(c.querySelector(".device2-body, .soft-body")!)]),
     // Chapter drawings and demos. Lanes and hops rise one by one themselves, so only the drawing above them goes here; the performance meter has its own entrance.
     ...[...document.querySelectorAll(".chapter2 .cell-vis")].map((c) => kids(c, (k) => !k.matches(".hops, [data-perf]")).flatMap((k) => (k.matches(".iso-stage") ? kids(k, (x) => x.matches(".iso")) : [k]))),

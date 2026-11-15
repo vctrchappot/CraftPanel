@@ -36,7 +36,7 @@ const software: { name: string; scene: string; note: string; kind: string; href:
 ];
 
 type Spec = [key: string, value: string];
-// Each chapter: a short text, one large visual (rendered below by id) and a strip of facts. Facts say where they hold.
+// Each chapter: a short text with its facts underneath, and one large visual (rendered below by id). Facts say where they hold.
 const chapters: { id: string; label: string; title: string; dim: string; text: string[]; specs: Spec[] }[] = [
   {
     id: "isolation",
@@ -267,6 +267,11 @@ const no = (i: number) => String(i).padStart(2, "0");
                 <p class="sec-no mono"><span>{no(i + 2)}</span>{c.label}</p>
                 <h2 id={`${c.id}-title`} class="display">{c.title} <span class="dim">{c.dim}</span></h2>
                 {c.text.map((t) => <p class="chapter2-text">{t}</p>)}
+                <dl class="chapter2-facts">
+                  {c.specs.map(([k, v]) => (
+                    <div><dt class="mono">{k}</dt><dd>{v}</dd></div>
+                  ))}
+                </dl>
               </div>
               <div class:list={["cell", "cell-vis", `vis-${c.id}`]}>
                 {c.id === "isolation" && (
@@ -361,11 +366,6 @@ const no = (i: number) => String(i).padStart(2, "0");
                 )}
               </div>
             </div>
-            <dl class="cells specs">
-              {c.specs.map(([k, v]) => (
-                <div class="cell"><dt class="mono">{k}</dt><dd>{v}</dd></div>
-              ))}
-            </dl>
           </section>
         ))}
       </div>
