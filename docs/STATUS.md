@@ -1,5 +1,11 @@
 # Implementation status
 
+## Scoped CI and website checks (2026-11-15)
+
+- 🧪 CI runs only the jobs a change needs: `scripts/ci-changes.mjs` maps changed files to the areas `app`, `install`, `site` and `plugin`, with seven unit tests for the rules and a check of the Git diff mode (new branch, unknown base and failed diff fall back to everything). Docs-only changes run nothing, website-only changes run the new `Website` job, dashboard-only changes skip the installers.
+- 🧪 New `Website` job: website unit tests, production build and `apps/site/scripts/smoke.mjs`, which opens all 32 built pages at 390 and 1440 px plus the home page with reduced motion (script and console errors, failed same-origin requests, horizontal overflow, missing `<h1>`, scroll reveals that stay hidden). Passes on the current site in about 90 s locally; with an injected console error, a 2000 px wide element and a broken reveal it reported all three.
+- 🟡 The changed workflow has not run on GitHub yet (no `actionlint` here, only a YAML parse): the first pull request that contains it will show whether the `Changes` job, the `if:` conditions and the `CI result` check behave as intended.
+
 ## Website motion audit (2026-11-15)
 
 - ✅ Docs page footer (2026-11-15): edit link, date and previous/next cards restyled; checked in Chromium at 390 and 1280 px in both themes (stacked and side by side, hover states, no horizontal overflow). 🟡 Not checked on a page with only a previous or only a next link beyond the CSS rule for it.

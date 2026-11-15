@@ -18,6 +18,7 @@ In development the dashboard calls the API cross-origin (`NEXT_PUBLIC_API_URL`),
 | `pnpm start` | Start the production runtime (unless one is running for this data directory) and dashboard together (`scripts/start.mjs`) |
 | `pnpm test` | Vitest: unit + integration tests (no network required) |
 | `pnpm test:e2e` | Playwright: full user flow against the production build with a real Minecraft server (needs internet, ~1 min after the first download). Run `npx playwright install chromium` once. |
+| `pnpm test:site` | Build the website and open every built page at 390 and 1440 px (`apps/site/scripts/smoke.mjs`): console errors, horizontal overflow, scroll reveals. Needs Chromium (`SMOKE_CHROMIUM_PATH` points at an existing one) |
 | `pnpm typecheck` | `tsc` for every package |
 | `pnpm db:generate` | Generate a migration after editing `packages/database/src/schema.ts` |
 | `pnpm --filter @craftpanel/site dev` | Website and user documentation (Astro + Starlight, `apps/site`) on :4321 |
@@ -37,6 +38,19 @@ In development the dashboard calls the API cross-origin (`NEXT_PUBLIC_API_URL`),
 - `packages/minecraft-providers/test`: gamerule extraction, Java version parsing and compatibility policy, plugin.yml parsing, download host allowlist.
 - `apps/api/test`: authentication, CSRF, Origin checks, the RBAC matrix for all roles, input validation, file-manager traversal, EULA enforcement, audit log, setup-token protection.
 - `tests/e2e`: the primary success path in a browser: setup → wizard → install → EULA → start → console command → settings → backup → stop → restore.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on pushes to `main`, pull requests, manually and once a week. A change only runs the jobs of the areas it touches; `scripts/ci-changes.mjs` holds the rules and `scripts/ci-changes.test.ts` tries them (`node scripts/ci-changes.mjs --files <paths>` shows what a change would run).
+
+| Area | Runs when these change | Jobs |
+| --- | --- | --- |
+| `app` | `apps/api`, `apps/web`, `packages/*`, `plugins/`, `deploy/`, `scripts/`, `tests/`, root manifests | Typecheck, tests and build on Linux, Windows and macOS; the HTTPS deployment test; end-to-end with a real server on x64 and ARM64 |
+| `install` | `apps/api`, `packages/*` except `packages/ui`, `deploy/`, `scripts/release.mjs`, `start.mjs`, `update.mjs`, root manifests | Linux installer, release package on Linux and Windows |
+| `site` | `apps/site`, `packages/ui`, root manifests | Website unit tests, production build, smoke test of every page |
+| `plugin` | `plugins/craftpanel-info`, `apps/api/assets/CraftPanelInfo.jar`, `scripts/build-info-plugin.mjs` | The committed jar matches its source |
+
+Docs and other text (`docs/`, `*.md`) run nothing. Changes to `ci.yml` or `ci-changes.mjs`, manual runs, the weekly run and a push without a base to compare with run everything. Skipped jobs count as passing; `CI result` is the one check to require in branch protection, because a skipped matrix job reports without its operating system. When a new folder belongs to an area, add it to `AREAS` in `ci-changes.mjs` and to the test.
 
 ## Conventions
 

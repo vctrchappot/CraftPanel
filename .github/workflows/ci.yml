@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Pushes and pull requests only run the jobs their changes need (see "Changes" below). A weekly full run catches
+  # what no change in this repository causes: new Minecraft releases, runner images, dependency drift.
+  schedule:
+    - cron: "17 4 * * 1"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -14,9 +18,40 @@ permissions:
   contents: read
 
 jobs:
+  # Which areas does this change touch? scripts/ci-changes.mjs lists the rules (and scripts/ci-changes.test.ts tries
+  # them). Jobs of an area that is untouched are skipped, which counts as passing. Manual and weekly runs, a missing
+  # base to compare with, and changes to this workflow run everything.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.scope.outputs.app }}
+      install: ${{ steps.scope.outputs.install }}
+      site: ${{ steps.scope.outputs.site }}
+      plugin: ${{ steps.scope.outputs.plugin }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          case "$EVENT" in
+            pull_request) node scripts/ci-changes.mjs --base "$PR_BASE" --head "$PR_HEAD" ;;
+            push) node scripts/ci-changes.mjs --base "$PUSH_BEFORE" --head "$SHA" ;;
+            *) node scripts/ci-changes.mjs --all ;;
+          esac
+
   # Typecheck, unit/integration tests and a production build on every OS.
   test:
     name: Test (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +74,8 @@ jobs:
   # The committed /craftpanel plugin jar must match its source.
   plugin:
     name: Info plugin is up to date
+    needs: changes
+    if: needs.changes.outputs.plugin == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -51,6 +88,8 @@ jobs:
   # Full browser flow with a real Minecraft server, on x64 and ARM64 (stand-in for Raspberry Pi).
   e2e:
     name: End-to-end (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -80,6 +119,8 @@ jobs:
   # deploy/install-linux.sh on a real systemd host: install, health check, update path.
   installer:
     name: Linux installer
+    needs: changes
+    if: needs.changes.outputs.install == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -109,6 +150,8 @@ jobs:
   # The release package with the one-line installers: install, update in place, uninstall.
   package-linux:
     name: Release package (Linux installer)
+    needs: changes
+    if: needs.changes.outputs.install == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -149,6 +192,8 @@ jobs:
 
   package-windows:
     name: Release package (Windows installer)
+    needs: changes
+    if: needs.changes.outputs.install == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -196,3 +241,38 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           node scripts/real-tests/runtime-continuity-windows.mjs test-results/installer-recovery $tools
           if ($LASTEXITCODE -ne 0) { exit 1 }
+
+  # The website: unit tests, production build, and every built page opened at a phone and a desktop width
+  # (apps/site/scripts/smoke.mjs: no console errors, no horizontal overflow, scroll reveals fire).
+  site:
+    name: Website
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run apps/site
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:site
+
+  # One check to require in branch protection: skipped areas pass, a failed or cancelled job fails. (Requiring the
+  # matrix jobs by name doesn't work once they can be skipped: a skipped matrix job reports without its OS.)
+  result:
+    name: CI result
+    needs: [changes, test, plugin, e2e, installer, package-linux, package-windows, site]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job that ran succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          case " $RESULTS " in *" failure "*|*" cancelled "*) exit 1 ;; esac
