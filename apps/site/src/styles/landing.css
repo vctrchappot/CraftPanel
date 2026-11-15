@@ -1859,7 +1859,8 @@ p {
   opacity: 0;
   transform: translateY(16px);
   transition: opacity var(--dur-reveal) var(--ease-out), transform var(--dur-reveal) var(--ease-out), filter var(--dur-reveal) var(--ease-out);
-  transition-delay: calc(var(--i, 0) * var(--stagger));
+  /* --i: rank among what arrives together; --k: position inside the same cell */
+  transition-delay: calc(var(--i, 0) * var(--stagger) + var(--k, 0) * 50ms);
 }
 .motion .sec-head h2[data-reveal]:not(.is-in) {
   filter: blur(6px);
@@ -1867,7 +1868,15 @@ p {
 .motion [data-reveal].is-in {
   opacity: 1;
   transform: none;
-  filter: none;
+}
+/* Pixel icons of the software cells drop in as blocks, in steps. */
+.motion .soft .cell > [data-reveal]:first-child {
+  transform: translateY(-10px) scale(0.6);
+  transition: opacity 120ms linear, transform 280ms steps(4, end);
+  transition-delay: calc(var(--i, 0) * var(--stagger));
+}
+.motion .soft .cell > [data-reveal].is-in:first-child {
+  transform: none;
 }
 /* Phones: a shorter rise and no blur (it is costly to repaint and the headings are big), and a quicker settle. */
 @media (max-width: 720px) {
@@ -1891,6 +1900,60 @@ p {
 }
 .motion .compare [data-reveal].is-in .cmp-mark {
   transform: none;
+}
+
+/* The hero arrives on load, in reading order, with CSS only (no script in the way of the first paint): the headline
+   starts at once, the rest follows within about 400 ms. */
+@media (prefers-reduced-motion: no-preference) {
+  .hero2-copy > *,
+  .hero2-art > * {
+    animation: rise var(--dur-reveal) var(--ease-out) calc(var(--n, 0) * 80ms) both;
+  }
+  .hero2-copy > :nth-child(3) {
+    --n: 1;
+  }
+  .hero2-copy > :nth-child(4) {
+    --n: 2;
+  }
+  .hero2-copy > :nth-child(5) {
+    --n: 3;
+  }
+  .hero2-art > .iso {
+    --n: 1;
+  }
+  .hero2-art > .vis-tag {
+    --n: 3;
+  }
+}
+/* Scroll-linked: drawings drift against the scroll (the `translate` property, so it combines with the reveal's
+   `transform`). Browsers without view timelines show them still. */
+@keyframes drift {
+  from {
+    translate: 0 18px;
+  }
+  to {
+    translate: 0 -18px;
+  }
+}
+@keyframes hero-drift {
+  to {
+    translate: 0 44px;
+  }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .chapter2 .cell-vis .iso,
+    .device2 .iso {
+      animation: drift linear both;
+      animation-timeline: view();
+    }
+    /* The hero drawing keeps its entrance and, once the hero leaves, lags behind the page. */
+    .hero2-art > .iso {
+      animation: rise var(--dur-reveal) var(--ease-out) 80ms both, hero-drift linear both;
+      animation-timeline: auto, view();
+      animation-range: normal, exit 0% exit 100%;
+    }
+  }
 }
 
 /* Experience bar: the nav's bottom edge fills with reading progress in pixel steps, segmented like Minecraft's.

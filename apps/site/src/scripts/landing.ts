@@ -140,30 +140,53 @@ const sceneIo = new IntersectionObserver((entries) => {
 });
 document.querySelectorAll(".iso, .runtime-figure").forEach((el) => sceneIo.observe(el));
 
-// Headings, table rows, FAQ entries and diagram parts rise once in reading order (styled under "scroll motion" in landing.css).
+// Entrances, once and in reading order (styled under "scroll motion" in landing.css). Frames and hairlines stay where
+// they are; what rises is the content of a cell, as if the datasheet were being filled in.
 if (!reduced) {
   root.classList.add("motion");
   const reveal = new IntersectionObserver((entries) => {
-    // Stagger by what arrives together, not by position in the group: on a phone the rows of a stacked list come
-    // in one at a time, and a row far down must not wait for the delay of the rows above it.
-    const arriving = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top || a.boundingClientRect.left - b.boundingClientRect.left);
-    arriving.forEach((e, n) => {
-      (e.target as HTMLElement).style.setProperty("--i", String(Math.min(n, 5)));
+    // Stagger by what arrives together, not by position in a group: on a phone the blocks of a one-column page come
+    // in one at a time and must not wait for a delay meant for their neighbours. Cells count as one unit; the
+    // content inside a cell staggers by --k (set below).
+    const unit = (e: IntersectionObserverEntry) => e.target.closest(".cell") ?? e.target;
+    const arriving = entries
+      .filter((e) => e.isIntersecting)
+      .sort((a, b) => unit(a).getBoundingClientRect().top - unit(b).getBoundingClientRect().top || unit(a).getBoundingClientRect().left - unit(b).getBoundingClientRect().left);
+    const rank = new Map<Element, number>();
+    for (const e of arriving) {
+      const u = unit(e);
+      if (!rank.has(u)) rank.set(u, rank.size);
+      (e.target as HTMLElement).style.setProperty("--i", String(Math.min(rank.get(u)!, 5)));
       e.target.classList.add("is-in");
       reveal.unobserve(e.target);
-    });
+    }
   }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+
+  const kids = (el: Element, keep: (c: Element) => boolean = () => true) => [...el.children].filter(keep);
   const groups: Element[][] = [
+    // Heads: number tag, heading, lead and the paragraphs under a chapter heading.
     ...[...document.querySelectorAll(".sec-head")].map((h) => [...h.querySelectorAll(".sec-no, h2, .sec-lead, [role=tablist]")]),
-    ...[...document.querySelectorAll(".row-head, .chapter2-copy, .project .cell:first-child, .install2 > .cell:first-child")].map((h) => [...h.querySelectorAll(".sec-no, h2, .row-lead, .project-author")]),
+    ...[...document.querySelectorAll(".row-head, .chapter2-copy, .project .cell:first-child, .install2 > .cell:first-child")].map((h) => [...h.querySelectorAll(".sec-no, h2, .row-lead, .chapter2-text, .project-author")]),
+    // Lists: one entry after the other.
     ...[...document.querySelectorAll(".compare tbody, .faq, .hops, .lanes, .project-facts, .install2-steps")].map((g) => [...g.children]),
+    // Blocks that stand alone.
+    ...[...document.querySelectorAll(".statement, .install2-links, .cell-term > .term")].map((el) => [el]),
+    // The content of a cell: the cell keeps its frame, its content rises.
+    ...[...document.querySelectorAll(".mock-cell, .soft .cell, .extras .cell, .specs .cell, .row-foot")].map((c) => kids(c)),
+    ...[...document.querySelectorAll(".device2")].map((c) => [c.querySelector(".iso")!, ...kids(c.querySelector(".device2-body")!)]),
+    // Chapter drawings and demos. Lanes and hops rise one by one themselves, so only the drawing above them goes here; the performance meter has its own entrance.
+    ...[...document.querySelectorAll(".chapter2 .cell-vis")].map((c) => kids(c, (k) => !k.matches(".hops, [data-perf]")).flatMap((k) => (k.matches(".iso-stage") ? kids(k, (x) => x.matches(".iso")) : [k]))),
   ];
   for (const group of groups)
     group.forEach((el, i) => {
       (el as HTMLElement).dataset.reveal = "";
-      (el as HTMLElement).style.setProperty("--i", String(i));
+      (el as HTMLElement).style.setProperty("--i", String(Math.min(i, 5)));
       reveal.observe(el);
     });
+  // Position of an element among everything revealed in the same cell.
+  for (const cell of document.querySelectorAll(".cell")) {
+    [...cell.querySelectorAll<HTMLElement>("[data-reveal]")].forEach((el, k) => el.style.setProperty("--k", String(Math.min(k, 6))));
+  }
 }
 
 // ---- chapters ----------------------------------------------------------------------
