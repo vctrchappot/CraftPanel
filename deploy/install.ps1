@@ -207,7 +207,8 @@ function Install-CraftPanel {
     # Custom server locations. The DB is read-only and no migration is run by this helper.
     $dbFile = Join-Path $DataDir "craftpanel.db"
     if (Test-Path -LiteralPath $dbFile) {
-      $query = 'const {DatabaseSync}=require("node:sqlite"); const db=new DatabaseSync(process.argv[1],{readOnly:true}); console.log(JSON.stringify(db.prepare("SELECT directory FROM servers").all().map(r=>r.directory))); db.close();'
+      # No double quotes: Windows PowerShell 5.1 drops them from arguments to native programs.
+      $query = 'const {DatabaseSync}=require(''node:sqlite''); const db=new DatabaseSync(process.argv[1],{readOnly:true}); console.log(JSON.stringify(db.prepare(''SELECT directory FROM servers'').all().map(r=>r.directory))); db.close();'
       $directories = (& $node -e $query $dbFile) | ConvertFrom-Json
       if ($LASTEXITCODE -ne 0) { Fail "Could not read existing server locations." }
       foreach ($serverDirectory in $directories) {
