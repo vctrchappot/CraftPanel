@@ -2,6 +2,7 @@
 
 ## Website motion audit (2026-11-15)
 
+- ✅ Docs page footer (2026-11-15): edit link, date and previous/next cards restyled; checked in Chromium at 390 and 1280 px in both themes (stacked and side by side, hover states, no horizontal overflow). 🟡 Not checked on a page with only a previous or only a next link beyond the CSS rule for it.
 - ✅ Docs heading links (2026-11-15): clicking the link icon copies the URL, swaps the icon for a check mark, shows a "Link copied" tag and highlights the heading; resets after 2 s, no console errors. Checked in Chromium on a docs page at 1280 px (dark) and 390 px (light) with a granted clipboard: the clipboard held the full URL, the status text was set, the state reset. 🟡 Not tried with a screen reader or on a real phone.
 - ✅ Measured in Chromium at 390 and 1440 px by scrolling the home page and recording every running animation and transition: 60 elements reveal on scroll and all of them fire at both widths; the demos (plugin search, console, assistant, performance meter) start when 35 % of them is visible; the loops in the drawings run and pause off-screen. On a phone the dashboard's tick-time chart is hidden, so its transitions don't run there; otherwise both widths behave the same.
 - Finding: only headings, section tags and a few lists got an entrance (60 elements). Feature paragraphs, fact strips, software cells, the "More" grid, device cards, the hero and the large drawings and demos had none, so a one-column phone page looked static.
