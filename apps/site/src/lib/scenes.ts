@@ -312,3 +312,89 @@ export const processScenes: Record<string, () => Box[]> = {
   /** ...and the players who connect to it. */
   players: () => [...plate(), ...figure(1, 1), ...figure(3, 2.6, false)],
 };
+
+// ---- server software ---------------------------------------------------------------------------
+// Each software stands on the same floating 3×3 island with a ghost box above it, so the six cards share
+// one scale and baseline. What sits on the island says what the software is for.
+const purpur: Shades = ["#b48ab4", "#946c94", "#7c597c"];
+const iron: Shades = ["#8a8f97", "#666b73", "#53575e"];
+const cream: Shades = ["#ece4d2", "#d2c8b3", "#bbb09a"];
+const tan: Shades = ["#c9a877", "#a88a5e", "#8f744e"];
+
+function island(): Box[] {
+  const top: Box[] = [];
+  for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) top.push(...grassBlock(x, y, 0));
+  return [
+    box(0.5, 0.5, -0.7, 2, 2, 0.7, C.dirt),
+    box(1, 1, -1.15, 1, 1, 0.45, C.stone),
+    ...top.sort(byDepth),
+    box(1.5, 1.5, 1, 0.01, 0.01, 2.7, C.case, "ghost"),
+  ];
+}
+
+/** A plugin: a small brick with a stud, the way add-ons click into Paper and Purpur. */
+function plugin(x: number, y: number, z: number, c: Shades, cls?: string): Box[] {
+  return [box(x, y, z, 0.6, 0.6, 0.5, c, cls), box(x + 0.18, y + 0.18, z + 0.5, 0.24, 0.24, 0.12, c, cls)];
+}
+
+export const softwareScenes: Record<string, () => Box[]> = {
+  /** Four sockets; three plugins in place, the fourth on its way in. */
+  paper: () => {
+    const slots = [[0.45, 0.45], [1.95, 0.45], [0.45, 1.95], [1.95, 1.95]] as const;
+    const parts: Box[] = slots.map(([x, y]) => box(x - 0.08, y - 0.08, 1, 0.76, 0.76, 0.04, C.case));
+    parts.push(...plugin(0.45, 0.45, 1.04, C.led), ...plugin(1.95, 0.45, 1.04, C.gold), ...plugin(0.45, 1.95, 1.04, C.water));
+    parts.push(...plugin(1.95, 1.95, 1.55, C.silver, "float"));
+    return [...island(), ...parts];
+  },
+  /** A ridged purpur pillar between two slabs, with one plugin: Paper underneath. */
+  purpur: () => {
+    const ridge = flat("#7c597c");
+    const parts: Box[] = [box(0.15, 0.15, 1, 0.8, 0.8, 0.45, purpur), box(1, 1, 1, 1, 1, 1.7, purpur)];
+    for (const z of [1.3, 1.85, 2.4]) parts.push(box(1, 2, z, 1, 0.02, 0.07, ridge), box(2, 1, z, 0.02, 1, 0.07, ridge));
+    parts.push(box(1.2, 1.2, 2.7, 0.6, 0.6, 0.02, flat("#d2aed2")));
+    parts.push(box(2.1, 2.1, 1, 0.8, 0.8, 0.45, purpur), ...plugin(0.3, 2.15, 1, C.led));
+    return [...island(), ...parts];
+  },
+  /** A woven mat: light mods laid over the world without changing its shape. */
+  fabric: () => {
+    const tiles: Box[] = [];
+    for (let j = 0; j < 5; j++)
+      for (let i = 0; i < 5; i++) {
+        const up = (i + j) % 2 === 0;
+        tiles.push(box(0.25 + i * 0.5, 0.25 + j * 0.5, 1, 0.5, 0.5, up ? 0.18 : 0.1, up ? cream : tan));
+      }
+    return [...island(), ...tiles.sort(byDepth), ...plugin(1.2, 1.2, 1.18, C.led, "float")];
+  },
+  /** An anvil with a glowing ingot: the heavy work of big mods and modpacks. */
+  neoforge: () => [
+    ...island(),
+    box(0.9, 0.85, 1, 1.2, 1.3, 0.28, iron),
+    box(1.05, 1.05, 1.28, 0.9, 0.9, 0.14, iron),
+    box(1.2, 1.2, 1.42, 0.6, 0.6, 0.5, iron),
+    box(0.95, 0.3, 1.92, 1.1, 2.3, 0.45, iron),
+    box(1.15, 2.6, 2.0, 0.7, 0.4, 0.3, iron),
+    box(1.2, 0.9, 2.37, 0.55, 0.95, 0.16, C.gold),
+  ],
+  /** The world as Mojang ships it: an oak, a flower, nothing added. */
+  vanilla: () => [
+    ...island(),
+    box(0.65, 0.65, 1, 0.3, 0.3, 1.2, C.log),
+    box(0.1, 0.1, 2.2, 1.4, 1.4, 0.8, C.leaves),
+    box(0.4, 0.4, 3.0, 0.8, 0.8, 0.4, C.leaves),
+    box(2.2, 1.3, 1, 0.1, 0.1, 0.3, C.leaves),
+    box(2.15, 1.25, 1.3, 0.2, 0.2, 0.14, C.gold),
+    box(1.4, 2.3, 1, 0.1, 0.1, 0.25, C.leaves),
+    box(1.35, 2.25, 1.25, 0.2, 0.2, 0.14, C.ledRed),
+  ],
+  /** One proxy in front, cabled to three servers behind it: one address for all. */
+  velocity: () => {
+    const cable = flat("#5bbf4a");
+    const parts: Box[] = [];
+    for (const x of [0.15, 1.15, 2.15]) parts.push(...grassBlock(x, 0.15, 1).map((b) => ({ ...b, w: 0.7, d: 0.7, h: b.h * 0.7, z: 1 + (b.z - 1) * 0.7 })));
+    for (const x of [0.47, 1.47, 2.47]) parts.push(box(x, 0.85, 1, 0.06, 0.85, 0.02, cable, "led"));
+    parts.push(box(0.47, 1.65, 1, 2.06, 0.06, 0.02, cable, "led"), box(1.47, 1.7, 1, 0.06, 0.4, 0.02, cable, "led"));
+    parts.push(box(1.05, 2.05, 1, 0.9, 0.8, 0.9, C.case));
+    parts.push(box(1.2, 2.85, 1.55, 0.6, 0.02, 0.1, C.bezel), box(1.2, 2.86, 1.25, 0.16, 0.02, 0.16, C.led, "led"));
+    return [...island(), ...parts];
+  },
+};

@@ -515,13 +515,16 @@
 .soft-vis {
   display: grid;
   place-items: center;
-  height: 176px;
-  padding-top: 8px;
+  height: 232px;
+  padding: 24px 24px 12px;
 }
-.soft-vis .px-icon {
+.soft-vis .soft-iso {
+  width: auto;
+  height: 196px;
+  max-width: 100%;
   transition: transform var(--dur-hover) var(--ease-out);
 }
-.soft-card:hover .soft-vis .px-icon {
+.soft-card:hover .soft-iso {
   transform: translateY(-4px);
 }
 /* Category of the software, in the corner of the picture */
@@ -1178,17 +1181,16 @@
   }
   /* One column: the picture becomes a square beside the text */
   .soft-card {
-    grid-template-columns: 88px minmax(0, 1fr);
+    grid-template-columns: 104px minmax(0, 1fr);
     grid-template-rows: none;
   }
   .soft-vis {
     height: auto;
     min-height: 104px;
-    padding-top: 0;
+    padding: 12px 8px;
   }
-  .soft-vis .px-icon {
-    width: 64px;
-    height: 64px;
+  .soft-vis .soft-iso {
+    height: 84px;
   }
   .soft-chip {
     position: static;

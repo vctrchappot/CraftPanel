@@ -1,9 +1,7 @@
 ---
 import "../styles/frame.css";
 import { Image } from "astro:assets";
-import Pixel from "../components/Pixel.astro";
 import UiIcon from "../components/UiIcon.astro";
-import type { PixelName } from "../lib/pixel-icons";
 import type { UiIconName } from "../lib/ui-icons";
 import Iso from "../components/Iso.astro";
 import Terminal from "../components/Terminal.astro";
@@ -11,7 +9,7 @@ import RuntimeDiagram from "../components/RuntimeDiagram.astro";
 import DashboardMock from "../components/home/DashboardMock.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 import FaqSection from "../components/FaqSection.astro";
-import { heroScene, isolationScene, pcScene, piScene, vpsScene } from "../lib/scenes";
+import { heroScene, isolationScene, pcScene, piScene, softwareScenes, vpsScene } from "../lib/scenes";
 import { repoFacts, shownRelease } from "../lib/github";
 import { faqJsonLd, type Faq } from "../lib/faq";
 // release.mjs bumps every workspace package, so this matches the latest release.
@@ -28,13 +26,13 @@ const description =
   "Self-hosted panel for Minecraft Java servers on a PC, a Raspberry Pi or a VPS. Paper, Purpur, Fabric, NeoForge, Vanilla and Velocity. No panel fee, no telemetry.";
 
 const softwareGuide = "/docs/guides/server-software/";
-const software: { name: string; icon: PixelName; note: string; kind: string; href: string; proxy?: boolean }[] = [
-  { name: "Paper", icon: "paper", note: "Plugins, fast and close to Vanilla.", kind: "Plugins", href: softwareGuide },
-  { name: "Purpur", icon: "purpur", note: "Paper with more settings to tune.", kind: "Plugins", href: softwareGuide },
-  { name: "Fabric", icon: "fabric", note: "Light mods like Lithium for speed.", kind: "Mods", href: softwareGuide },
-  { name: "NeoForge", icon: "neoforge", note: "Big mods and full modpacks.", kind: "Mods", href: softwareGuide },
-  { name: "Vanilla", icon: "vanilla", note: "Mojang's own server, untouched.", kind: "No add-ons", href: softwareGuide },
-  { name: "Velocity", icon: "velocity", note: "Sits in front of your servers: one address for all.", kind: "Proxy", href: "/docs/guides/velocity/", proxy: true },
+const software: { name: string; scene: string; note: string; kind: string; href: string; proxy?: boolean }[] = [
+  { name: "Paper", scene: "paper", note: "Plugins, fast and close to Vanilla.", kind: "Plugins", href: softwareGuide },
+  { name: "Purpur", scene: "purpur", note: "Paper with more settings to tune.", kind: "Plugins", href: softwareGuide },
+  { name: "Fabric", scene: "fabric", note: "Light mods like Lithium for speed.", kind: "Mods", href: softwareGuide },
+  { name: "NeoForge", scene: "neoforge", note: "Big mods and full modpacks.", kind: "Mods", href: softwareGuide },
+  { name: "Vanilla", scene: "vanilla", note: "Mojang's own server, untouched.", kind: "No add-ons", href: softwareGuide },
+  { name: "Velocity", scene: "velocity", note: "Sits in front of your servers: one address for all.", kind: "Proxy", href: "/docs/guides/velocity/", proxy: true },
 ];
 
 type Spec = [key: string, value: string];
@@ -244,7 +242,7 @@ const no = (i: number) => String(i).padStart(2, "0");
         {software.map((s) => (
           <li class="cell">
             <a class="soft-card" href={s.href}>
-              <span class="cell-vis soft-vis"><Pixel name={s.icon} size={96} /></span>
+              <span class="cell-vis soft-vis"><Iso boxes={softwareScenes[s.scene]()} label={`${s.name}: ${s.note}`} class="iso night soft-iso" /></span>
               <span class="soft-body">
                 <span class:list={["soft-chip", "mono", { "is-proxy": s.proxy }]}>{s.kind}</span>
                 <span class="soft-name">{s.name} <UiIcon name="arrow-right" size={16} /></span>
