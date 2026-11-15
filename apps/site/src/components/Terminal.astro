@@ -1,6 +1,7 @@
 ---
 // The install command as a terminal window. The full variant types itself once and, after the command was copied,
-// prints the installer's real output as a preview; the compact variant is just the command with tabs and a copy button.
+// prints the installer's real output as a preview; with `autoplay` it waits until it is on screen, types and then
+// prints the output by itself. The compact variant is just the command with tabs and a copy button.
 import UiIcon from "./UiIcon.astro";
 
 interface Props {
@@ -9,8 +10,10 @@ interface Props {
   id: string;
   /** Start on this tab instead of the visitor's own system (pages about one platform). */
   os?: "linux" | "windows";
+  /** Full variant only: start typing once visible and show the installer's output without waiting for a copy. */
+  autoplay?: boolean;
 }
-const { version, compact = false, id, os } = Astro.props;
+const { version, compact = false, id, os, autoplay = false } = Astro.props;
 const tabs = [
   {
     os: "linux",
@@ -52,7 +55,7 @@ const mac = { os: "macos", label: "macOS", guide: "/docs/getting-started/install
 const allTabs = [...tabs, mac];
 ---
 
-<div class:list={["term", { "term-compact": compact, "term-full": !compact }]} data-term={compact ? "compact" : "full"} data-os={os}>
+<div class:list={["term", { "term-compact": compact, "term-full": !compact }]} data-term={compact ? "compact" : "full"} data-os={os} data-autoplay={autoplay && !compact ? "" : undefined}>
   <div class="term-bar">
     <span class="term-dots" aria-hidden="true"><i></i><i></i><i></i></span>
     <div class="term-tabs" role="tablist" aria-label="Operating system">

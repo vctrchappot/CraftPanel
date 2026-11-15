@@ -765,6 +765,11 @@ p {
 .term-full [data-panel]:not(.is-ran) .term-out {
   display: none;
 }
+/* A terminal that plays by itself keeps the output's room from the start, so the page doesn't jump when it prints
+   (only with the script running; without it the output stays out of the way as before). */
+.term-full[data-autoplay].is-live [data-panel]:not(.is-ran) .term-out {
+  display: block;
+}
 .term-out .term-line {
   opacity: 0;
   transform: translateY(2px);

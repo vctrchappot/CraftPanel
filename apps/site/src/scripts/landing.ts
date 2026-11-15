@@ -41,6 +41,7 @@ function onVisible(el: Element, fn: () => void) {
 // ---- terminals --------------------------------------------------------------
 for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
   const full = term.dataset.term === "full";
+  const autoplay = full && term.hasAttribute("data-autoplay");
   const tabs = [...term.querySelectorAll<HTMLButtonElement>("[role=tab]")];
   const typedOnce = new Set<string>();
 
@@ -67,6 +68,7 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
   async function preview(panel: HTMLElement) {
     if (panel.classList.contains("is-ran")) return;
     panel.classList.add("is-ran");
+    if (autoplay) await wait(300);
     for (const l of panel.querySelectorAll<HTMLElement>(".term-out .term-line")) {
       l.classList.add("is-in");
       await wait(l.classList.contains("term-ok") ? 420 : 170);
@@ -82,7 +84,8 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
       const panel = term.querySelector<HTMLElement>(`#${t.getAttribute("aria-controls")}`)!;
       panel.hidden = !on;
       if (on) {
-        void play(panel);
+        const typed = play(panel);
+        if (autoplay && panel.querySelector(".term-out")) void typed.then(() => preview(panel));
         // Keep the chosen tab in view when the bar is narrower than its tabs.
         const bar = t.parentElement!;
         if (bar.scrollWidth > bar.clientWidth) bar.scrollLeft = Math.max(0, t.offsetLeft - 8);
@@ -99,7 +102,16 @@ for (const term of document.querySelectorAll<HTMLElement>("[data-term]")) {
   if (full) {
     // Blank the command first so the page doesn't flash the full text before typing.
     if (!reduced) term.querySelectorAll<HTMLElement>(".term-typed").forEach((t) => (t.textContent = ""));
-    select(first);
+    if (autoplay) {
+      term.classList.add("is-live");
+      // Wait until the terminal is on screen, so the typing and the output are seen, not played to an empty room.
+      const seen = new IntersectionObserver((entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        seen.disconnect();
+        select(first);
+      }, { threshold: 0.4 });
+      seen.observe(term);
+    } else select(first);
   } else if (preferred) select(preferred);
 
   for (const btn of term.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
