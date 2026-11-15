@@ -1,5 +1,11 @@
 # Implementation status
 
+## Website motion audit (2026-11-15)
+
+- ✅ Measured in Chromium at 390 and 1440 px by scrolling the home page and recording every running animation and transition: 60 elements reveal on scroll and all of them fire at both widths; the demos (plugin search, console, assistant, performance meter) start when 35 % of them is visible; the loops in the drawings run and pause off-screen. On a phone the dashboard's tick-time chart is hidden, so its transitions don't run there; otherwise both widths behave the same.
+- 🟡 Finding: only headings, section tags, lists (lanes, hops, comparison rows, FAQ, project facts, install steps) and a few leads get an entrance. Feature paragraphs, fact strips, software cells, the "More" grid, device cards, the hero copy and the large drawings and demos as blocks have none, so on a one-column phone page most of the page looks static. Reveal distance and blur on phones were reduced on 2026-11-15; no new entrances were added. A feel test on a real phone is still open. Current state and gaps: [design/README.md](design/README.md) ("Landing page motion").
+- Docs corrected: the design notes still described a process band, a hero scene that pulls apart on scroll and revealed "bento tiles"; none of them exists since the redesign of 2026-11-14.
+
 ## Resource limits per server on Windows (2026-11-13)
 
 - The same limits on Windows through one job object per server: the runtime compiles a small C# helper with the `csc.exe` that ships with Windows on the first limited start (`runtime/job-helper-<hash>.exe`, no native add-on) and starts one per running server, which nests the Java process in its own job (`JobMemoryLimit`, hard `CpuRateControl`, `ActiveProcessLimit`), takes live changes on stdin, reports memory and process limit hits from the job's completion port (written to the console once per run; an exit after a memory hit is "Memory limit reached") and terminates the job's leftovers when the server exits. The card says "Processes" on Windows, which counts no threads. Design: [architecture/runtime.md](architecture/runtime.md#windows-job-objects).
