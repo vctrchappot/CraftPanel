@@ -161,26 +161,13 @@ p {
   max-width: 1104px;
 }
 
-/* pixel icon colours */
+/* pixel icon colour */
 .px-icon {
   flex: none;
   display: block;
 }
 .px-a {
   fill: var(--px-a, currentColor);
-}
-/* Software icons: o = outline (fixed ink, so it reads on any surface), a/b = fills, h = highlight. */
-.px-o {
-  fill: #1c1b18;
-}
-.px-b {
-  fill: var(--px-b, var(--grass));
-}
-.px-h {
-  fill: var(--px-h, var(--px-a, currentColor));
-}
-.px-i-vanilla {
-  --px-b: #8d5b3d;
 }
 
 /* stepped "pixel" corners for small solid elements */
