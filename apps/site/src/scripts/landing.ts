@@ -172,8 +172,8 @@ if (!reduced) {
     // Blocks that stand alone.
     ...[...document.querySelectorAll(".statement, .install2-links, .cell-term > .term")].map((el) => [el]),
     // The content of a cell: the cell keeps its frame, its content rises.
-    ...[...document.querySelectorAll(".mock-cell, .soft .cell, .extras .cell, .specs .cell, .row-foot")].map((c) => kids(c)),
-    ...[...document.querySelectorAll(".device2")].map((c) => [c.querySelector(".iso")!, ...kids(c.querySelector(".device2-body")!)]),
+    ...[...document.querySelectorAll(".mock-cell, .extras .cell, .specs .cell, .row-foot")].map((c) => kids(c)),
+    ...[...document.querySelectorAll(".device2, .soft-card")].map((c) => [c.querySelector(".iso")!, ...kids(c.querySelector(".device2-body, .soft-body")!)]),
     // Chapter drawings and demos. Lanes and hops rise one by one themselves, so only the drawing above them goes here; the performance meter has its own entrance.
     ...[...document.querySelectorAll(".chapter2 .cell-vis")].map((c) => kids(c, (k) => !k.matches(".hops, [data-perf]")).flatMap((k) => (k.matches(".iso-stage") ? kids(k, (x) => x.matches(".iso")) : [k]))),
   ];

@@ -522,10 +522,10 @@
   width: auto;
   height: 196px;
   max-width: 100%;
-  transition: transform var(--dur-hover) var(--ease-out);
+  transition: translate var(--dur-hover) var(--ease-out);
 }
 .soft-card:hover .soft-iso {
-  transform: translateY(-4px);
+  translate: 0 -4px;
 }
 /* Category of the software, in the corner of the picture */
 .soft-chip {
@@ -623,7 +623,7 @@
   text-decoration: none;
   transition: color var(--dur-hover) var(--ease-out), border-color var(--dur-hover) var(--ease-out);
 }
-.chapter-index a span {
+.chapter-index a span:first-child {
   color: var(--line-strong);
 }
 .chapter-index a:hover,
@@ -634,7 +634,7 @@
   border-left-color: var(--grass);
   background: var(--bg-2);
 }
-.chapter-index a.is-on span {
+.chapter-index a.is-on span:first-child {
   color: var(--grass-text);
 }
 .chapter-list {

@@ -250,6 +250,17 @@ p {
 .btn-ink:focus-visible {
   box-shadow: inset 0 0 0 2px var(--fg), inset 0 0 0 4px var(--surface);
 }
+/* A page's call to action: Signal green, like the nav's Install and the terminal's copy button. */
+.btn-brand {
+  background: var(--cp-signal);
+  color: var(--cp-signal-night);
+}
+.btn-brand:hover {
+  filter: brightness(1.08);
+}
+.btn-brand:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--cp-signal-night), inset 0 0 0 4px var(--cp-signal);
+}
 .btn-outline {
   --px: 2px;
   background: transparent;
@@ -1869,13 +1880,13 @@ p {
   opacity: 1;
   transform: none;
 }
-/* Pixel icons of the software cells drop in as blocks, in steps. */
-.motion .soft .cell > [data-reveal]:first-child {
+/* The islands of the software cards drop in as blocks, in steps. */
+.motion .soft-iso[data-reveal] {
   transform: translateY(-10px) scale(0.6);
-  transition: opacity 120ms linear, transform 280ms steps(4, end);
-  transition-delay: calc(var(--i, 0) * var(--stagger));
+  transition: opacity 120ms linear, transform 280ms steps(4, end), translate var(--dur-hover) var(--ease-out);
+  transition-delay: calc(var(--i, 0) * var(--stagger)), calc(var(--i, 0) * var(--stagger)), 0s;
 }
-.motion .soft .cell > [data-reveal].is-in:first-child {
+.motion .soft-iso[data-reveal].is-in {
   transform: none;
 }
 /* Phones: a shorter rise and no blur (it is costly to repaint and the headings are big), and a quicker settle. */

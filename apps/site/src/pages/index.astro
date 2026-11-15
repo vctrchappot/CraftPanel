@@ -201,7 +201,7 @@ const no = (i: number) => String(i).padStart(2, "0");
           <h1 id="hero-title" class="display hero2-title">Your Minecraft server, <span class="dim">on your own hardware.</span></h1>
           <p class="hero2-lead">CraftPanel installs, runs, updates and backs up Paper, Purpur, Fabric, NeoForge, Vanilla and Velocity servers on a PC, a Raspberry Pi or a VPS. You manage them from a browser.</p>
           <div class="hero2-actions">
-            <a class="btn btn-ink" href="#install">Install CraftPanel <UiIcon name="arrow-right" size={12} /></a>
+            <a class="btn btn-brand" href="#install">Install CraftPanel <UiIcon name="arrow-right" size={12} /></a>
             <a class="btn btn-outline" href={github} rel="noopener"><UiIcon name="github" size={24} />GitHub{facts.stars !== null && facts.stars >= 10 && <span class="btn-count mono">{facts.stars}</span>}</a>
           </div>
           <ul class="hero2-facts mono" aria-label="Platforms">
@@ -232,7 +232,7 @@ const no = (i: number) => String(i).padStart(2, "0");
     <section class="row" aria-labelledby="soft-title">
       <div class="cell row-head row-head-inline">
         <div>
-          <p class="kicker mono"><span class="px-dot" aria-hidden="true"></span>Server software</p>
+          <p class="sec-no mono"><span>01</span>Server software</p>
           <h2 id="soft-title" class="display">Pick the software, <span class="dim">CraftPanel does the rest.</span></h2>
           <p class="row-lead">Downloaded from the project that makes it, checksum checked, with the right Java for each server.</p>
         </div>
@@ -257,14 +257,14 @@ const no = (i: number) => String(i).padStart(2, "0");
     <!-- Chapters with a sticky index -->
     <div class="row chapters2" id="features">
       <nav class="chapter-index mono" aria-label="Features">
-        {chapters.map((c, i) => <a href={`#${c.id}`} data-chapter={c.id}><span>{no(i + 1)}</span>{c.label}</a>)}
+        {chapters.map((c, i) => <a href={`#${c.id}`} data-chapter={c.id} title={c.label}><span>{no(i + 2)}</span><span class="ci-label">{c.label}</span></a>)}
       </nav>
       <div class="chapter-list">
         {chapters.map((c, i) => (
           <section class="chapter2" id={c.id} aria-labelledby={`${c.id}-title`}>
             <div class="cells chapter2-cells">
               <div class="cell chapter2-copy">
-                <p class="sec-no mono"><span>{no(i + 1)}</span>{c.label}</p>
+                <p class="sec-no mono"><span>{no(i + 2)}</span>{c.label}</p>
                 <h2 id={`${c.id}-title`} class="display">{c.title} <span class="dim">{c.dim}</span></h2>
                 {c.text.map((t) => <p class="chapter2-text">{t}</p>)}
               </div>
@@ -374,7 +374,10 @@ const no = (i: number) => String(i).padStart(2, "0");
     <!-- The rest, as a dense grid -->
     <section class="row" aria-labelledby="more-title">
       <div class="cell row-head row-head-inline">
-        <h2 id="more-title" class="display">Also in the box.</h2>
+        <div>
+          <p class="sec-no mono"><span>09</span>More</p>
+          <h2 id="more-title" class="display">Also in the box.</h2>
+        </div>
         <a class="mono" href="/docs/">All features in the docs <UiIcon name="arrow-right" size={12} /></a>
       </div>
       <ul class="cells extras">
@@ -390,7 +393,7 @@ const no = (i: number) => String(i).padStart(2, "0");
     <!-- Hardware -->
     <section class="row" id="hardware" aria-labelledby="hw-title">
       <div class="cell row-head">
-        <p class="sec-no mono"><span>08</span>Hardware</p>
+        <p class="sec-no mono"><span>10</span>Hardware</p>
         <h2 id="hw-title" class="display">Runs on what you have.</h2>
         <p class="row-lead">Planning estimates for Paper with a pre-generated world. Mods, mob farms and view distance change the load.</p>
       </div>
@@ -414,7 +417,7 @@ const no = (i: number) => String(i).padStart(2, "0");
     <!-- Comparison -->
     <section class="row" id="compare" aria-labelledby="compare-title">
       <div class="cell row-head">
-        <p class="sec-no mono"><span>09</span>Hosting choices</p>
+        <p class="sec-no mono"><span>11</span>Hosting choices</p>
         <h2 id="compare-title" class="display">Run it yourself, <span class="dim">or rent a managed server?</span></h2>
         <p class="row-lead">Both are good answers; the question is who looks after the machine. If nobody wants to, rent one. If you run many machines or games, Pterodactyl or Crafty Controller fit better.</p>
       </div>
@@ -444,7 +447,7 @@ const no = (i: number) => String(i).padStart(2, "0");
     <section class="row" aria-labelledby="trust-title">
       <div class="cells project">
         <div class="cell">
-          <p class="sec-no mono"><span>10</span>Project</p>
+          <p class="sec-no mono"><span>12</span>Project</p>
           <h2 id="trust-title" class="display">Built by Victor, <span class="dim">in the open.</span></h2>
           <div class="project-author">
             <a href="https://github.com/vctrchappot" rel="noopener">
@@ -465,14 +468,14 @@ const no = (i: number) => String(i).padStart(2, "0");
     </section>
 
     <div class="row row-faq">
-      <FaqSection items={faqs} no="11" />
+      <FaqSection items={faqs} no="13" />
     </div>
 
     <!-- Install -->
     <section class="row" id="install" aria-labelledby="install-title">
       <div class="cells install2">
         <div class="cell">
-          <p class="sec-no mono"><span>12</span>Install</p>
+          <p class="sec-no mono"><span>14</span>Install</p>
           <h2 id="install-title" class="display">One command, <span class="dim">then the browser.</span></h2>
           <ol class="install2-steps">
             <li><span class="mono">1</span>Run the command for your system.</li>
