@@ -14,7 +14,7 @@
  *
  * Access checks on a restricted token pass only if both the account and one of the restricting SIDs
  * are granted: the account keeps the runtime's own access, the restricting SIDs (this server, Everyone,
- * Users, Authenticated Users, RESTRICTED, the logon SID) narrow it to what any local user could reach plus the server's
+ * Users, Authenticated Users, RESTRICTED) narrow it to what any local user could reach plus the server's
  * own folders. Network access, loopback included, is unchanged.
  * https://learn.microsoft.com/windows/win32/secauthz/restricted-tokens
  */
@@ -47,7 +47,12 @@ public static class CraftPanelServerToken {
     [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
     [DllImport("advapi32.dll", SetLastError = true)]
     static extern bool CreateRestrictedToken(IntPtr existing, uint flags, uint disableCount, SidAndAttributes[] disable, uint deleteCount, IntPtr delete, uint restrictCount, SidAndAttributes[] restrict, out IntPtr token);
-    [DllImport("advapi32.dll", SetLastError = true)] static extern bool GetTokenInformation(IntPtr token, int kind, IntPtr info, int length, out int returned);
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern bool GetUserObjectInformation(IntPtr handle, int index, StringBuilder info, int length, out int needed);
+    [DllImport("user32.dll", SetLastError = true)] static extern IntPtr GetProcessWindowStation();
+    [DllImport("user32.dll", SetLastError = true)] static extern IntPtr GetThreadDesktop(int thread);
+    [DllImport("kernel32.dll")] static extern int GetCurrentThreadId();
+    [DllImport("user32.dll", SetLastError = true)] static extern bool GetUserObjectSecurity(IntPtr handle, ref int information, byte[] descriptor, int length, out int needed);
+    [DllImport("user32.dll", SetLastError = true)] static extern bool SetUserObjectSecurity(IntPtr handle, ref int information, byte[] descriptor);
     [DllImport("advapi32.dll", SetLastError = true)] static extern bool SetTokenInformation(IntPtr token, int kind, ref IntPtr info, int length);
     [DllImport("advapi32.dll", SetLastError = true)] static extern bool DuplicateToken(IntPtr token, int level, out IntPtr duplicate);
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
@@ -88,27 +93,54 @@ public static class CraftPanelServerToken {
         Check(OpenProcessToken(GetCurrentProcess(), 0x1 | 0x2 | 0x8 | 0x80, out token), "OpenProcessToken");
         var restrict = new List<SidAndAttributes>();
         foreach (var sid in new[] { serverSid, "S-1-1-0", "S-1-5-32-545", "S-1-5-11", Restricted }) restrict.Add(Sid(sid));
-        // The logon SID: a service's window station and desktop grant only it, and without them user32 fails to
-        // initialise (STATUS_DLL_INIT_FAILED). Files and the data directory never grant it.
-        int length;
-        GetTokenInformation(token, 2, IntPtr.Zero, 0, out length);
-        IntPtr groups = Marshal.AllocHGlobal(length);
-        Check(GetTokenInformation(token, 2, groups, length, out length), "GetTokenInformation");
-        int count = Marshal.ReadInt32(groups);
-        for (int i = 0; i < count; i++) {
-            var group = (SidAndAttributes)Marshal.PtrToStructure(groups + IntPtr.Size + i * Marshal.SizeOf(typeof(SidAndAttributes)), typeof(SidAndAttributes));
-            if ((group.Attributes & 0xC0000000) == 0xC0000000) restrict.Add(new SidAndAttributes { Sid = group.Sid });
-        }
         var disable = new[] { Sid("S-1-5-32-544") };
         // DISABLE_MAX_PRIVILEGE keeps only SeChangeNotifyPrivilege (traversal).
         Check(CreateRestrictedToken(token, 0x1, (uint)disable.Length, disable, 0, IntPtr.Zero, (uint)restrict.Count, restrict.ToArray(), out restricted), "CreateRestrictedToken");
         // Objects the game creates without a parent to inherit from (its own process, threads, events) stay usable for it and the runtime.
         IntPtr descriptor, dacl; bool present, defaulted;
-        string user = WindowsIdentity.GetCurrent().User.Value;
-        Check(ConvertStringSecurityDescriptorToSecurityDescriptor("D:(A;;GA;;;SY)(A;;GA;;;" + user + ")(A;;GA;;;" + serverSid + ")", 1, out descriptor, IntPtr.Zero), "Default DACL");
+        Check(ConvertStringSecurityDescriptorToSecurityDescriptor(Sddl(serverSid), 1, out descriptor, IntPtr.Zero), "Default DACL");
         Check(GetSecurityDescriptorDacl(descriptor, out present, out dacl, out defaulted), "GetSecurityDescriptorDacl");
         Check(SetTokenInformation(restricted, 6, ref dacl, IntPtr.Size), "SetTokenInformation");
         return restricted;
+    }
+
+    /** Full access for SYSTEM, the runtime's account and the server. */
+    static string Sddl(string serverSid) {
+        return "D:(A;;GA;;;SY)(A;;GA;;;" + WindowsIdentity.GetCurrent().User.Value + ")(A;;GA;;;" + serverSid + ")";
+    }
+
+    /**
+     * Every process that loads user32 opens its window station and desktop; a service's grant only the service
+     * account, so a restricted game fails with STATUS_DLL_INIT_FAILED (0xC0000142). A service may not create a
+     * window station of its own, so RESTRICTED, which every game token carries, gets access to the service's.
+     * Idempotent; it lasts as long as the service's logon session.
+     */
+    static void ShareDesktop() {
+        IntPtr station = GetProcessWindowStation();
+        // An interactive desktop already admits restricted processes; never open up a signed-in user's.
+        var name = new StringBuilder(256);
+        int length;
+        if (GetUserObjectInformation(station, 2, name, name.Capacity * 2, out length) && name.ToString() == "WinSta0") return;
+        // WINSTA_ALL_ACCESS and DESKTOP_ALL (without WRITE_DAC/WRITE_OWNER/DELETE).
+        Allow(station, 0x37F | 0x20000);
+        Allow(GetThreadDesktop(GetCurrentThreadId()), 0x1FF | 0x20000);
+    }
+
+    static void Allow(IntPtr handle, int mask) {
+        int dacl = 4, needed;
+        GetUserObjectSecurity(handle, ref dacl, null, 0, out needed);
+        var bytes = new byte[needed];
+        Check(GetUserObjectSecurity(handle, ref dacl, bytes, needed, out needed), "GetUserObjectSecurity");
+        var descriptor = new RawSecurityDescriptor(bytes, 0);
+        var restricted = new SecurityIdentifier(Restricted);
+        foreach (GenericAce ace in descriptor.DiscretionaryAcl) {
+            var allowed = ace as CommonAce;
+            if (allowed != null && allowed.AceQualifier == AceQualifier.AccessAllowed && allowed.SecurityIdentifier.Equals(restricted) && (allowed.AccessMask & mask) == mask) return;
+        }
+        descriptor.DiscretionaryAcl.InsertAce(0, new CommonAce(AceFlags.None, AceQualifier.AccessAllowed, mask, restricted, false, null));
+        var updated = new byte[descriptor.BinaryLength];
+        descriptor.GetBinaryForm(updated, 0);
+        Check(SetUserObjectSecurity(handle, ref dacl, updated), "SetUserObjectSecurity");
     }
 
     // CommandLineToArgvW / MSVC CRT rules, as Java parses them.
@@ -137,6 +169,7 @@ public static class CraftPanelServerToken {
         block.Append('\0');
         var line = new StringBuilder();
         for (int i = 4; i < args.Length; i++) { if (i > 4) line.Append(' '); line.Append(Quote(args[i])); }
+        ShareDesktop();
         var startup = new StartupInfo { cb = Marshal.SizeOf(typeof(StartupInfo)), Flags = 0x100, StdInput = GetStdHandle(-10), StdOutput = GetStdHandle(-11), StdError = GetStdHandle(-12) };
         ProcessInformation info;
         // CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT

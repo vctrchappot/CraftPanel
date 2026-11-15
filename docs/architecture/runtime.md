@@ -102,8 +102,7 @@ then change permissions above the data directory: see below), `off` disables it.
 
 - **Token.** A restricted token passes an access check only if both its account and one of its restricting
   SIDs are granted. The account keeps the runtime's own access; the restricting SIDs are the server's own SID,
-  Everyone, Users, Authenticated Users, RESTRICTED (`S-1-5-12`) and the logon SID (a service's window station
-  and desktop grant only that; without them Java fails with `0xC0000142`, found in CI). The server SID is `S-1-9-…` (resource
+  Everyone, Users, Authenticated Users and RESTRICTED (`S-1-5-12`). The server SID is `S-1-9-…` (resource
   manager authority), derived from the server id; it names no account and only appears in the token and on
   the server's folders. Administrators is deny-only, every privilege but traversal is removed, and the default
   DACL grants SYSTEM, the account and the server SID. Network access, loopback included, is unchanged
@@ -113,7 +112,11 @@ then change permissions above the data directory: see below), `off` disables it.
   with the token, puts it into a kill-on-close job, prints `craftpanel-pid <pid>` and resumes it. Java shares
   the helper's stdin/stdout/stderr, so console and `stop` work unchanged; `ManagedServer` takes the reported
   PID as the server's (metrics, limits, orphan checks) and hides that line. Killing the helper closes the job
-  and ends Java and anything it started; the helper exits with Java's exit code. The job helper for resource
+  and ends Java and anything it started; the helper exits with Java's exit code. Every process that loads
+  user32 opens its window station and desktop, and a service's grant only the service account, so Java failed
+  with `0xC0000142` under the service (found in CI, reproduced with a virtual-account service in Windows
+  Sandbox). A service may not create a window station of its own, so the helper adds RESTRICTED to the
+  service's window station and desktop (not to an interactive `WinSta0`, which admits restricted processes). The job helper for resource
   limits nests its job inside that one.
 - **Files.** Before every start `prepare` adds the server SID with Modify (inherited) to the server directory
   and to `game-temp/<id>/` in the data directory (emptied first; `TEMP`/`TMP` point there, since the
