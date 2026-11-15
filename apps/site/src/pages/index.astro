@@ -131,13 +131,14 @@ const backups = [
   { when: "Sun 03:00", size: "1.20 GB", tag: "weekly" },
   { when: "Before 1.21.4", size: "1.18 GB", tag: "manual" },
 ];
-const extras: { icon: UiIconName; title: string; text: string }[] = [
-  { icon: "users", title: "Teams", text: "Roles per server, two-factor sign-in and an audit log." },
-  { icon: "cup", title: "Java, handled", text: "The right Java for every Minecraft version, per server." },
-  { icon: "clock", title: "Schedules", text: "Restarts with a warning in chat, backups, commands." },
-  { icon: "bell", title: "Alerts", text: "Discord or e-mail when a server crashes or a backup fails." },
-  { icon: "signal", title: "Network checks", text: "Addresses to share, port checks, CGNAT detection, DuckDNS." },
-  { icon: "folder", title: "Files and worlds", text: "Edit configs in the browser, import and export worlds." },
+// Each extra ends in a few real values from the product, so the cell shows the thing instead of only naming it.
+const extras: { icon: UiIconName; title: string; text: string; chips: string[] }[] = [
+  { icon: "users", title: "Teams", text: "Roles per server, two-factor sign-in and an audit log.", chips: ["viewer", "operator", "admin", "owner"] },
+  { icon: "cup", title: "Java, handled", text: "The right Java for every Minecraft version, per server.", chips: ["1.16.5 → Java 8", "1.21.4 → Java 21"] },
+  { icon: "clock", title: "Schedules", text: "Restarts with a warning in chat, backups, commands.", chips: ["restart · 60 s warning", "backup", "command"] },
+  { icon: "bell", title: "Alerts", text: "Discord or e-mail when a server crashes or a backup fails.", chips: ["Discord", "e-mail"] },
+  { icon: "signal", title: "Network checks", text: "Addresses to share, port checks, CGNAT detection, DuckDNS.", chips: ["port check", "CGNAT", "DuckDNS"] },
+  { icon: "folder", title: "Files and worlds", text: "Edit configs in the browser, import and export worlds.", chips: ["server.properties", "world.zip"] },
 ];
 
 const devices = [
@@ -385,6 +386,7 @@ const no = (i: number) => String(i).padStart(2, "0");
           <li class="cell">
             <p class="extra-title"><UiIcon name={e.icon} size={24} />{e.title}</p>
             <p class="extra-text">{e.text}</p>
+            <p class="extra-chips mono">{e.chips.map((c) => <span>{c}</span>)}</p>
           </li>
         ))}
       </ul>
@@ -455,6 +457,11 @@ const no = (i: number) => String(i).padStart(2, "0");
             </a>
             <p><b>Victor</b><a href="https://github.com/vctrchappot" rel="noopener">@vctrchappot</a></p>
           </div>
+          <p class="project-text">One person builds it, in public: every change, the roadmap and how each feature was checked (and what is still untested) are on GitHub.</p>
+          <p class="project-links mono">
+            <a href={`${github}/blob/main/docs/STATUS.md`} rel="noopener">How features were tested <UiIcon name="arrow-right" size={12} /></a>
+            <a href={`${github}/blob/main/CHANGELOG.md`} rel="noopener">Changelog <UiIcon name="arrow-right" size={12} /></a>
+          </p>
         </div>
         <dl class="cell project-facts">
           <div><dt class="mono">latest release</dt><dd><a href={release.url}>{release.tag}</a>{releaseDate && <span class="dim"> · {releaseDate}</span>}</dd></div>

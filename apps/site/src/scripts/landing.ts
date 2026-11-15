@@ -178,7 +178,7 @@ if (!reduced) {
   const groups: Element[][] = [
     // Heads: number tag, heading, lead and the paragraphs under a chapter heading.
     ...[...document.querySelectorAll(".sec-head")].map((h) => [...h.querySelectorAll(".sec-no, h2, .sec-lead, [role=tablist]")]),
-    ...[...document.querySelectorAll(".row-head, .chapter2-copy, .project .cell:first-child, .install2 > .cell:first-child")].map((h) => [...h.querySelectorAll(".sec-no, h2, .row-lead, .chapter2-text, .project-author")]),
+    ...[...document.querySelectorAll(".row-head, .chapter2-copy, .project .cell:first-child, .install2 > .cell:first-child")].map((h) => [...h.querySelectorAll(".sec-no, h2, .row-lead, .chapter2-text, .project-author, .project-text, .project-links")]),
     // Lists: one entry after the other.
     ...[...document.querySelectorAll(".compare tbody, .faq, .hops, .lanes, .project-facts, .install2-steps, .chapter2-facts")].map((g) => [...g.children]),
     // Blocks that stand alone.
