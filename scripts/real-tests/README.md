@@ -78,6 +78,8 @@ sudo node scripts/real-tests/isolation.mjs test-results/isolation craftpanel-ops
 
 `limits-windows.mjs` (Windows, `run.sh <port> <data-dir> limits-windows.mjs` from Git Bash after `pnpm build`) checks the job object limits with a real Paper server: Java in a job held by the helper, a live CPU cap and its removal measured from Java's CPU time, refusal of a cap below the heap, a live memory cap below what Java has committed reported in the console and as "Memory limit reached", and the helper ending with the server.
 
+`isolation-windows.mjs` (Windows, no administrator rights needed) checks per-server restricted tokens with a real Paper server: Java runs under the token and is the reported PID, it answers a status ping on 127.0.0.1, its folder carries the server SID, the limits helper holds Java, a probe with the same token cannot read the database, the runtime token or a neighbour's file, a forced kill ends Java, and it restarts and stops cleanly. Give the data directory the installer's permissions first and keep it in a folder whose parents Users may list (for example `C:\cpiso\data`, see the script's header), then `CRAFTPANEL_ISOLATION=on KEEP_DATA=1 scripts/real-tests/run.sh <port> <data-dir> isolation-windows.mjs <data-dir>`. The installed service is covered by `runtime-continuity-windows.mjs` in CI.
+
 ## Installer recovery tests
 
 After `pnpm build`, generate controlled release archives. The fixtures deliberately change the SQLite schema and then crash or hang; another has an invalid systemd unit/Windows launcher and one lacks the recovery protocol.

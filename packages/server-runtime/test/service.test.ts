@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { runtimeReporter } from "../src/diagnostics";
 import { RuntimeClient, RuntimeService, runtimePaths, prepareRuntimeEndpoint, RUNTIME_PROTOCOL, channel } from "../src/index";
 
+// These cover the transport; the servers run in os.tmpdir(). Windows token isolation has its own test.
+process.env.CRAFTPANEL_ISOLATION = "off";
 const fake = path.join(path.dirname(fileURLToPath(import.meta.url)), "fake-minecraft.mjs");
 const spec = { javaPath: "unused", directory: os.tmpdir(), jarFile: "unused", memoryMb: 512, jvmArgs: [], software: "vanilla" as const,
   command: { file: process.execPath, args: [fake, "normal"] } };

@@ -40,7 +40,16 @@ On a Linux service install, each Minecraft server runs under its own system acco
 - A server directory outside `/var/lib/craftpanel` needs execute permission for others on every parent folder (`chmod o+x`); the start message says which folder is missing it.
 - To turn it off, add `CRAFTPANEL_ISOLATION=off` to `/etc/craftpanel/craftpanel.env` and restart `craftpanel-runtime`.
 
-On Windows, macOS and when you run CraftPanel by hand, servers still run under CraftPanel's own account.
+## Every server in its own sandbox (Windows)
+
+On a Windows install, the runtime service starts each Minecraft server with a restricted copy of its own access rights, marked with an ID of that server. A plugin or mod reaches its own server folder and whatever any local user may read (Windows, Program Files), but not CraftPanel's database, its runtime token or the files of your other servers. Anything it starts in the background is stopped together with its server. Players, a Velocity proxy and CraftPanel's status checks reach the server as before, also on the same PC (127.0.0.1).
+
+- Before every start the runtime checks, with exactly the server's rights, that it can use its folder and Java and can't read the database. If something is missing, the start message says which folder and how to fix it.
+- A server folder outside the data directory gets its permissions when you choose it in CraftPanel. Java lists every folder above the server folder, so those folders must be listable for restricted processes; the installer does this for the data directory.
+- Plugins can't write to your user profile or the service's temp folder; each server gets its own temp folder in `game-temp\` in the data directory, emptied before every start.
+- To turn it off, add `CRAFTPANEL_ISOLATION=off` to `config.env` in the install folder and restart the runtime service. CraftPanel builds the small helper for this with the C# compiler that is part of Windows.
+
+On macOS and when you run CraftPanel by hand, servers still run under CraftPanel's own account.
 
 ## Resource limits
 

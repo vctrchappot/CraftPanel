@@ -9,6 +9,9 @@ import { createContext } from "../src/bootstrap";
 import { loadConfig } from "../src/config";
 import { getProvider } from "@craftpanel/minecraft-providers";
 
+// Covers reconnection; Windows token isolation has its own test in server-runtime.
+process.env.CRAFTPANEL_ISOLATION = "off";
+
 it("reconciles the actual process after dashboard replacement without orphaning or restarting it", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "cp-reconnect-"));
   const runtime = new RuntimeService(root);

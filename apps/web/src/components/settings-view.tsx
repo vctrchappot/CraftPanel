@@ -311,7 +311,7 @@ function About() {
   return (
     <div className="max-w-2xl space-y-6">
       <Callout variant="warning" icon={<ShieldAlert />} title="Native execution">
-        Minecraft servers and their plugins run as regular processes under the same operating-system user as CraftPanel, without container isolation. A malicious plugin can access anything that user can. Run CraftPanel under a dedicated, unprivileged user account and only install plugins you trust.
+        Minecraft servers and their plugins run as regular processes, not in containers. Installed Linux and Windows services isolate each server, so its plugins cannot read CraftPanel&apos;s database or other servers&apos; files; elsewhere they run as the same operating-system user as CraftPanel and can access anything that user can. Either way they can use the network. Run CraftPanel under a dedicated, unprivileged user account and only install plugins you trust.
       </Callout>
       <Section title="Dashboard exposure">
         <p className="text-[13px] text-muted-foreground">

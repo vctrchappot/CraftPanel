@@ -92,6 +92,47 @@ read the panel database, secrets, the runtime token or another server's files. C
   before Java starts.
 - **Leftovers.** When a server exits, every remaining process of its account is killed.
 
+## Per-server restricted tokens (Windows)
+
+On the installed Windows service (its virtual account, `S-1-5-80-…`) every Minecraft server runs under a
+restricted copy of the service's token, so a plugin cannot read the panel database, secrets, the runtime
+token or another server's files. `CRAFTPANEL_ISOLATION=on` enables it for a runtime started by hand (it may
+then change permissions above the data directory: see below), `off` disables it. Code:
+`packages/server-runtime/src/windows-isolation.ts`, helper source in `windows-token-helper.ts`.
+
+- **Token.** A restricted token passes an access check only if both its account and one of its restricting
+  SIDs are granted. The account keeps the runtime's own access; the restricting SIDs are the server's own SID,
+  Everyone, Users, Authenticated Users and RESTRICTED (`S-1-5-12`). The server SID is `S-1-9-…` (resource
+  manager authority), derived from the server id; it names no account and only appears in the token and on
+  the server's folders. Administrators is deny-only, every privilege but traversal is removed, and the default
+  DACL grants SYSTEM, the account and the server SID. Network access, loopback included, is unchanged
+  (an AppContainer blocked inbound loopback even with a loopback exemption: see ROADMAP.md).
+- **Launch.** Node cannot create a process with another token, so a small C# helper does, compiled like the
+  job helper (`runtime/server-token-<hash>.exe`): `run <sid> <temp> -- <java> <args>` starts Java suspended
+  with the token, puts it into a kill-on-close job, prints `craftpanel-pid <pid>` and resumes it. Java shares
+  the helper's stdin/stdout/stderr, so console and `stop` work unchanged; `ManagedServer` takes the reported
+  PID as the server's (metrics, limits, orphan checks) and hides that line. Killing the helper closes the job
+  and ends Java and anything it started; the helper exits with Java's exit code. The job helper for resource
+  limits nests its job inside that one.
+- **Files.** Before every start `prepare` adds the server SID with Modify (inherited) to the server directory
+  and to `game-temp/<id>/` in the data directory (emptied first; `TEMP`/`TMP` point there, since the
+  account's own temp folder is out of reach), lets RESTRICTED list the folders between the data directory and
+  the server or Java directory, and lets it read a Java runtime inside the data directory. Java under Program
+  Files is readable by Users already. This needs WRITE_DAC: the installer grants the service `(M,WDAC)` on the
+  data directory and on custom server locations, the dashboard on newly chosen ones.
+- **Above the data directory** the service cannot change permissions. Java's `toRealPath` (Paperclip) lists
+  every ancestor of the server directory, so the installer lets RESTRICTED list (`RD,X,RA,S`, not inherited)
+  the folders above the data directory and custom server locations, and the dashboard those above newly chosen
+  ones. Listing shows names, not contents.
+- **Check.** `prepare` then impersonates the token and tries what Java will do: list each ancestor, write the
+  server and temp directories, open Java for execution. Any failure stops the start with the folder and the
+  `icacls` command that fixes it. It also tries to read `craftpanel.db` and `runtime/token`; if it can (a data
+  directory that inherits access for Users), the server starts with an "Isolation is incomplete" warning in
+  its console.
+- **Not covered:** files every local user may read, including a server directory outside the data directory
+  that inherits such access, and the network. Windows has no `share` step: files Java writes inherit the
+  directory's permissions, which include the dashboard's account.
+
 ## Resource limits
 
 Each server has a memory cap, a CPU limit and a process/thread limit (`servers.limit_*`; `null` is
@@ -140,4 +181,4 @@ Code: `packages/server-runtime/src/windows-jobs.ts`, helper source in `windows-j
   escapes the limits. Java starts no processes that early.
 - Without `csc.exe` or with `CRAFTPANEL_LIMITS=off` the runtime reports why; settings are kept.
 
-Windows isolation is tracked in ROADMAP.md.
+With isolation the job helper attaches to the PID the token helper reports.

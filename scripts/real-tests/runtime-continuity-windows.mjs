@@ -118,6 +118,15 @@ try {
   await connectPlayer();
   record("real-player-connected", { javaPid, runtimePid, playerPort });
 
+  // Per-server isolation: the service starts Java under a restricted token with the server's own SID.
+  // Before that, the runtime checked under exactly this token that the database and its token are unreadable.
+  const startLog = await c.log(id);
+  assert.match(startLog.find((line) => line.text.startsWith("Starting:"))?.text ?? "", /\(restricted token\)$/, "The service did not isolate the server");
+  assert(!startLog.some((line) => line.text.includes("Isolation is incomplete")), "The server's token can read the panel's secrets");
+  assert.equal((await ps("(Get-Process -Id $env:CP_PID).ProcessName", { CP_PID: String(javaPid) })).toLowerCase(), "java", "The reported PID is not Java's");
+  assert.match((await run("icacls", [directory])).stdout, /S-1-9-\d+-\d+-\d+-\d+-\d+:\(OI\)\(CI\)\(M\)/, "The server directory has no server SID");
+  record("server-runs-under-restricted-token", { javaPid });
+
   let marker = 0;
   const continuity = async (scenario) => {
     await ready();

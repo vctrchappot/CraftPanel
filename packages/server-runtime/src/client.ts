@@ -191,7 +191,7 @@ export class RuntimeClient extends EventEmitter<AgentEvents> implements RuntimeA
 function parseIsolation(v: unknown): IsolationStatus | undefined {
   const i = v as IsolationStatus | null;
   if (!i || (i.mode !== "isolated" && i.mode !== "shared")) return undefined;
-  return { mode: i.mode, ...(typeof i.reason === "string" ? { reason: i.reason.slice(0, 300) } : {}), ...(Number.isInteger(i.accounts) ? { accounts: i.accounts } : {}) };
+  return { mode: i.mode, ...(i.method === "accounts" || i.method === "token" ? { method: i.method } : {}), ...(typeof i.reason === "string" ? { reason: i.reason.slice(0, 300) } : {}), ...(Number.isInteger(i.accounts) ? { accounts: i.accounts } : {}) };
 }
 
 function parseLimitSupport(v: unknown): LimitSupport | undefined {

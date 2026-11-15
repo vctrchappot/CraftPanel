@@ -3,6 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { findCompiler } from "./windows-helper";
+import { currentUserSid, WindowsIsolation } from "./windows-isolation";
 
 const run = promisify(execFile);
 
@@ -20,16 +22,30 @@ const REQUIRED_CAPS = [0, 3, 5, 6, 7];
 const PRIVATE_FILES = new Set([".craftpanel-map.json"]);
 
 export interface GameSlot { index: number; name: string; uid: number; gid: number }
-export interface IsolationStatus { mode: "isolated" | "shared"; reason?: string; accounts?: number }
-export type Isolation = { mode: "isolated"; setpriv: string; slots: GameSlot[] } | { mode: "shared"; reason: string };
+/** `method`: game accounts (Linux) or a restricted token per server (Windows). */
+export interface IsolationStatus { mode: "isolated" | "shared"; method?: "accounts" | "token"; reason?: string; accounts?: number }
+export type Isolation = { mode: "isolated"; setpriv: string; slots: GameSlot[] } | { mode: "token"; windows: WindowsIsolation } | { mode: "shared"; reason: string };
 
 export function isolationStatus(isolation: Isolation): IsolationStatus {
-  return isolation.mode === "isolated" ? { mode: "isolated", accounts: isolation.slots.length } : { mode: "shared", reason: isolation.reason };
+  if (isolation.mode === "isolated") return { mode: "isolated", method: "accounts", accounts: isolation.slots.length };
+  if (isolation.mode === "token") return { mode: "isolated", method: "token" };
+  return { mode: "shared", reason: isolation.reason };
 }
 
-export async function detectIsolation(env: NodeJS.ProcessEnv = process.env): Promise<Isolation> {
-  if (process.platform !== "linux") return { mode: "shared", reason: "Per-server isolation is available on Linux service installs" };
+/** `dataDir` and `runtimeDir` are used on Windows, where the token helper is compiled into the runtime directory. */
+export async function detectIsolation(env: NodeJS.ProcessEnv = process.env, dataDir?: string, runtimeDir?: string): Promise<Isolation> {
   if (env.CRAFTPANEL_ISOLATION === "off") return { mode: "shared", reason: "Disabled by CRAFTPANEL_ISOLATION=off" };
+  if (process.platform === "win32" && dataDir && runtimeDir) {
+    // Like game accounts on Linux, only the installed service isolates by default: its installer opened the
+    // folders above the data directory for listing. Elsewhere it would change permissions in the user's profile.
+    if (env.CRAFTPANEL_ISOLATION !== "on" && !(await currentUserSid())?.startsWith("S-1-5-80-")) {
+      return { mode: "shared", reason: "Per-server isolation applies to the installed Windows service (CRAFTPANEL_ISOLATION=on enables it here)" };
+    }
+    const compiler = findCompiler(env);
+    if (!compiler) return { mode: "shared", reason: "The .NET Framework C# compiler (csc.exe) that builds the restricted token helper is missing" };
+    return { mode: "token", windows: new WindowsIsolation(runtimeDir, compiler, path.resolve(dataDir)) };
+  }
+  if (process.platform !== "linux") return { mode: "shared", reason: "Per-server isolation is available on Linux service installs and Windows" };
   const passwd = await fs.readFile("/etc/passwd", "utf8").catch(() => "");
   const prefix = `${os.userInfo().username}-game-`;
   const groups = new Set(process.getgroups?.() ?? []);

@@ -38,8 +38,11 @@ export interface LaunchHooks {
   exited?(): void;
 }
 
-/** Rewrites the final command line, e.g. to run it under a game account. */
-export type LaunchWrapper = (file: string, args: string[]) => { file: string; args: string[]; label?: string };
+/**
+ * Rewrites the final command line, e.g. to run it under a game account. With `reportsPid` the
+ * wrapper starts the game as its child and prints "craftpanel-pid <pid>" as its first line.
+ */
+export type LaunchWrapper = (file: string, args: string[]) => { file: string; args: string[]; label?: string; reportsPid?: boolean };
 
 export interface ManagedServerEvents {
   status: [status: ServerStatus, detail?: string];
@@ -78,6 +81,10 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
   /** `restart` was typed in the console: the process is meant to stop and be started again. */
   private restartRequested = false;
   private killRequested = false;
+  /** The wrapper has not reported the game's PID yet; until then there is none to show or measure. */
+  private awaitingPid = false;
+  private gamePid: number | null = null;
+  private onGamePid: ((pid: number) => void) | null = null;
   private queries: PendingQuery[] = [];
   private _players = new Map<string, OnlinePlayer>();
   private recentErrors: string[] = [];
@@ -98,7 +105,8 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
     return this._status;
   }
   get pid(): number | null {
-    return this.child?.pid ?? null;
+    if (!this.child || this.awaitingPid) return null;
+    return this.gamePid ?? this.child.pid ?? null;
   }
   get players(): OnlinePlayer[] {
     return [...this._players.values()];
@@ -154,7 +162,10 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
       env: { ...process.env, JAVA_TOOL_OPTIONS: undefined } as NodeJS.ProcessEnv,
     });
     this.child = child;
-    if (child.pid) hooks.spawned?.(child.pid);
+    this.awaitingPid = !!launch.reportsPid;
+    this.gamePid = null;
+    this.onGamePid = (pid) => hooks.spawned?.(pid);
+    if (child.pid && !launch.reportsPid) hooks.spawned?.(child.pid);
     this.startedAt = Date.now();
     this.readyAt = null;
 
@@ -166,6 +177,8 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
       this.lastError = msg;
       this.system(msg, "ERROR");
       this.child = null;
+      this.awaitingPid = false;
+      this.gamePid = null;
       this.startedAt = null;
       hooks.exited?.();
       this.setStatus("error", msg);
@@ -178,6 +191,8 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
       const restart = this.restartRequested && !this.killRequested;
       this.lastExitCode = code;
       this.child = null;
+      this.awaitingPid = false;
+      this.gamePid = null;
       this.startedAt = null;
       this.readyAt = null;
       for (const q of this.queries.splice(0)) {
@@ -228,6 +243,15 @@ export class ManagedServer extends EventEmitter<ManagedServerEvents> {
   }
 
   private handleLine(raw: string, stream: "stdout" | "stderr") {
+    if (this.awaitingPid && stream === "stdout") {
+      this.awaitingPid = false;
+      const reported = /^craftpanel-pid (\d+)$/.exec(raw);
+      if (reported) {
+        this.gamePid = Number(reported[1]);
+        this.onGamePid?.(this.gamePid);
+        return;
+      }
+    }
     const parsed = parseLine(raw);
     // JVM warnings on stderr ("WARNING: ...") are not errors.
     const level = stream === "stderr" && parsed.level === "UNKNOWN" ? (/^WARNING:/.test(parsed.message) ? "WARN" : "ERROR") : parsed.level;

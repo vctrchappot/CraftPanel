@@ -33,7 +33,8 @@ export class RuntimeService {
   private starting = new Set<string>();
   private limiter = unavailableLimiter("Not detected yet");
 
-  constructor(private dataDir: string, private build = "development", diagnostics?: RuntimeDiagnosticSink, private detect: () => Promise<Isolation> = detectIsolation,
+  constructor(private dataDir: string, private build = "development", diagnostics?: RuntimeDiagnosticSink,
+    private detect: () => Promise<Isolation> = () => detectIsolation(process.env, dataDir, runtimePaths(dataDir).directory),
     private detectLimits: () => Promise<Limiter> = () => detectLimiter(runtimePaths(dataDir).directory)) {
     this.paths = runtimePaths(dataDir);
     this.report = runtimeReporter("service", diagnostics);
@@ -85,6 +86,15 @@ export class RuntimeService {
 
   private async launch(id: string, spec: Spec) {
     const isolation = this.isolation;
+    if (isolation.mode === "token") {
+      const { problems, warnings } = await isolation.windows.prepare(id, spec.directory, spec.command?.file ?? spec.javaPath);
+      for (const warning of warnings) this.agent.systemLine(id, `Isolation is incomplete: ${warning}`, "WARN");
+      if (problems.length) throw new Error(problems.join(" "));
+      const wrap = await isolation.windows.wrap(id);
+      if (this.closing) throw new Error("The runtime is shutting down");
+      if (this.agent.isRunning(id)) throw new Error("The server is already running");
+      return this.agent.start(id, spec, wrap, this.limitHooks(id, spec));
+    }
     if (isolation.mode !== "isolated") return this.agent.start(id, spec, undefined, this.limitHooks(id, spec));
     const slot = this.assignSlot(id);
     await this.persist();
@@ -273,7 +283,12 @@ export class RuntimeService {
             }
             case "watch": if (!watches.has(id)) watches.set(id, this.agent.watch(id)); break;
             case "unwatch": watches.get(id)?.(); watches.delete(id); break;
-            case "forget": await this.agent.forget(id); delete this.records[id]; await this.persist(); break;
+            case "forget":
+              await this.agent.forget(id);
+              delete this.records[id];
+              await this.persist();
+              if (this.isolation.mode === "token") await this.isolation.windows.forget(id);
+              break;
             case "autoStart":
               if (typeof m.value !== "boolean") throw new Error("Invalid auto-start value");
               if (entry) { entry.spec.autoStart = m.value; await this.persist(); }

@@ -197,16 +197,38 @@ function Install-CraftPanel {
           $parent = Split-Path -Parent $parent
         }
       }
-      # Preserve custom server locations. The DB is read-only and no migration is run by this helper.
-      $dbFile = Join-Path $DataDir "craftpanel.db"
-      if (Test-Path -LiteralPath $dbFile) {
-        $query = 'const {DatabaseSync}=require("node:sqlite"); const db=new DatabaseSync(process.argv[1],{readOnly:true}); console.log(JSON.stringify(db.prepare("SELECT directory FROM servers").all().map(r=>r.directory))); db.close();'
-        $directories = (& $node -e $query $dbFile) | ConvertFrom-Json
-        if ($LASTEXITCODE -ne 0) { Fail "Could not read existing server locations." }
-        foreach ($serverDirectory in $directories) {
-          & icacls.exe $serverDirectory /grant "${account}:(OI)(CI)M" | Out-Null
-          if ($LASTEXITCODE -ne 0) { Fail "Could not grant runtime access to $serverDirectory." }
+    }
+    # Per-server isolation: the runtime gives every server its own folders (which needs WRITE_DAC), and
+    # Java lists each folder above its server directory, which a server's restricted token may only do
+    # where RESTRICTED (S-1-5-12) may list. Idempotent, so updates of older installations get it too.
+    $account = "NT SERVICE\$RuntimeName"
+    $dataRoot = [IO.Path]::GetFullPath($DataDir).TrimEnd('\')
+    $locations = @($dataRoot)
+    # Custom server locations. The DB is read-only and no migration is run by this helper.
+    $dbFile = Join-Path $DataDir "craftpanel.db"
+    if (Test-Path -LiteralPath $dbFile) {
+      $query = 'const {DatabaseSync}=require("node:sqlite"); const db=new DatabaseSync(process.argv[1],{readOnly:true}); console.log(JSON.stringify(db.prepare("SELECT directory FROM servers").all().map(r=>r.directory))); db.close();'
+      $directories = (& $node -e $query $dbFile) | ConvertFrom-Json
+      if ($LASTEXITCODE -ne 0) { Fail "Could not read existing server locations." }
+      foreach ($serverDirectory in $directories) {
+        $full = [IO.Path]::GetFullPath($serverDirectory)
+        if (-not $full.StartsWith($dataRoot + '\', [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $full)) { $locations += $full }
+      }
+    }
+    $listed = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($location in $locations) {
+      & icacls.exe $location /grant "${account}:(OI)(CI)(M,WDAC)" | Out-Null
+      if ($LASTEXITCODE -ne 0) {
+        if ($location -eq $dataRoot) { Fail "Could not grant runtime access to $location." }
+        Write-Warning "Could not let the runtime isolate the server in $location; it reports this when it starts."
+      }
+      $parent = Split-Path -Parent $location
+      while ($parent -and $parent.TrimEnd('\') -ne [IO.Path]::GetPathRoot($parent).TrimEnd('\')) {
+        if ($listed.Add($parent)) {
+          & icacls.exe $parent /grant '*S-1-5-12:(RD,X,RA,S)' | Out-Null
+          if ($LASTEXITCODE -ne 0) { Write-Warning "Could not let isolated servers list $parent; a server below it reports this when it starts." }
         }
+        $parent = Split-Path -Parent $parent
       }
     }
   }
