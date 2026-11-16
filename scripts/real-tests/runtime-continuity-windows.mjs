@@ -127,6 +127,21 @@ try {
   assert.match((await run("icacls", [directory])).stdout, /S-1-9-\d+-\d+-\d+-\d+-\d+:\(OI\)\(CI\)\(M\)/, "The server directory has no server SID");
   record("server-runs-under-restricted-token", { javaPid });
 
+  // Resource limits under the service's virtual account: one job helper per server holds the token helper's Java.
+  const helperFor = async (pid) => (await ps("@(Get-CimInstance Win32_Process -Filter \"Name like 'job-helper-%'\" | Where-Object { $_.CommandLine -match ('\\s' + $env:CP_PID + '\\s') }).Count", { CP_PID: String(pid) })) === "1";
+  const limitsBefore = (await c.server(id)).resourceLimits;
+  assert.equal(limitsBefore.available, true, limitsBefore.reason);
+  assert.deepEqual(limitsBefore.controllers, ["memory", "cpu", "processes"]);
+  assert(await helperFor(javaPid), "No job helper holds the server's Java under the service");
+  assert(!(await c.log(id)).some((line) => line.text.startsWith("Resource limits could not be applied")), "The service could not apply the limits");
+  await c.call("PATCH", `/api/servers/${id}`, { limitCpuPercent: 200 });
+  const limited = await c.server(id);
+  assert.equal(limited.pid, javaPid);
+  assert.equal(limited.restartRequired, false, "A live limit change asked for a restart");
+  assert.equal(await helperFor(javaPid), true, "The job helper went away after a live change");
+  await c.call("PATCH", `/api/servers/${id}`, { limitCpuPercent: null });
+  record("limits-apply-under-service", { javaPid, controllers: limitsBefore.controllers });
+
   let marker = 0;
   const continuity = async (scenario) => {
     await ready();
@@ -200,6 +215,7 @@ try {
   await c.signIn(...credentials);
   const restarted = await wait(async () => { const s = await c.server(id); return s.status === "running" && s.pid !== javaPid ? s : null; }, 300_000);
   javaPid = restarted.pid;
+  assert(await wait(() => helperFor(javaPid), 30_000), "No job helper holds the restarted server's Java");
   await connectPlayer();
   for (const [x, block] of [[0, "gold_block"], [1, "diamond_block"]]) {
     const text = `windows-${block}-${Date.now()}`;

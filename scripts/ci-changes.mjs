@@ -31,7 +31,8 @@ export const AREAS = {
   // What a packaged install depends on: the API bundle and its packages, the installers, the pack script.
   // Dashboard-only changes (apps/web, packages/ui) can't break an install, so they stay out.
   install: {
-    include: ["apps/api/", "packages/", "deploy/", "scripts/release.mjs", "scripts/start.mjs", "scripts/update.mjs", ...ROOT_BUILD],
+    include: ["apps/api/", "packages/", "deploy/", "scripts/release.mjs", "scripts/start.mjs", "scripts/update.mjs",
+      "scripts/real-tests/runtime-continuity-windows.mjs", "scripts/real-tests/installer-fixtures.mjs", "scripts/real-tests/client.mjs", ...ROOT_BUILD],
     exclude: ["packages/ui/"],
   },
   // The installed Linux service with real Paper servers (isolation, limits, player continuity): what the packaged

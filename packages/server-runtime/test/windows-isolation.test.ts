@@ -60,6 +60,18 @@ describe.skipIf(process.platform !== "win32")("Windows restricted token isolatio
     expect(stdout).toContain(serverSid("alpha"));
   }, 120_000);
 
+  it("warns about a server folder outside the data directory that every local account may read", async () => {
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), "cp-outside-"));
+    try {
+      // The user profile admits only its owner, so this folder starts closed.
+      expect((await isolation.prepare("gamma", outside, process.execPath)).warnings).toEqual([]);
+      await run("icacls", [outside, "/grant", "*S-1-5-32-545:(OI)(CI)R"], { windowsHide: true });
+      const { warnings } = await isolation.prepare("gamma", outside, process.execPath);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toMatch(/^Every local account on this computer can read .* icacls ".*" \/inheritance:d \/remove:g /);
+    } finally { await fs.rm(outside, { recursive: true, force: true, maxRetries: 10 }); await isolation.forget("gamma"); }
+  }, 120_000);
+
   it("runs a process that can write its own folders but not the panel's secrets or a neighbour", async () => {
     const wrap = await isolation.wrap("alpha");
     const launch = wrap(process.execPath, ["-e", PROBE, data, other]);

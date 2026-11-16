@@ -132,9 +132,10 @@ then change permissions above the data directory: see below), `off` disables it.
   server and temp directories, open Java for execution. Any failure stops the start with the folder and the
   `icacls` command that fixes it. It also tries to read `craftpanel.db` and `runtime/token`; if it can (a data
   directory that inherits access for Users), the server starts with an "Isolation is incomplete" warning in
-  its console.
-- **Not covered:** files every local user may read, including a server directory outside the data directory
-  that inherits such access, and the network. Windows has no `share` step: files Java writes inherit the
+  its console. For a server directory outside the data directory it also reads the folder's ACL: if Users,
+  Authenticated Users or Everyone may read it (inherited from a parent), the same warning names the `icacls`
+  command that closes it.
+- **Not covered:** files every local user may read elsewhere on the machine, and the network. Windows has no `share` step: files Java writes inherit the
   directory's permissions, which include the dashboard's account.
 
 ## Resource limits

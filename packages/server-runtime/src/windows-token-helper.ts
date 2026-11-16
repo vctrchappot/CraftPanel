@@ -247,6 +247,18 @@ public static class CraftPanelServerToken {
                 catch (Exception) { }
             }
         }
+        // Outside the data directory the folder inherits what its parents allow. Open to every local account, it is open to the game too.
+        if (!Inside(server, data)) {
+            try {
+                foreach (FileSystemAccessRule rule in new DirectoryInfo(server).GetAccessControl(AccessControlSections.Access).GetAccessRules(true, true, typeof(SecurityIdentifier))) {
+                    var who = rule.IdentityReference.Value;
+                    if (rule.AccessControlType == AccessControlType.Allow && (who == "S-1-5-32-545" || who == "S-1-5-11" || who == "S-1-1-0") && (rule.FileSystemRights & FileSystemRights.ReadData) != 0) {
+                        warnings.Add("Every local account on this computer can read " + server + " (it inherits access for Users, Authenticated Users or Everyone), so can every plugin. Remove that access: icacls \"" + server + "\" /inheritance:d /remove:g *S-1-5-32-545 *S-1-5-11 *S-1-1-0");
+                        break;
+                    }
+                }
+            } catch (Exception) { }
+        }
         var output = new StringBuilder();
         foreach (var p in problems) output.Append("problem ").Append(p.Replace('\n', ' ')).Append('\n');
         foreach (var w in warnings) output.Append("warn ").Append(w.Replace('\n', ' ')).Append('\n');
