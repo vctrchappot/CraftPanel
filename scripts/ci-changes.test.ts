@@ -22,26 +22,36 @@ describe("CI change areas", () => {
   });
 
   it("runs the installers when the API, its packages or the installers change", () => {
-    only(["apps/api/src/index.ts"], "app", "install");
-    only(["packages/database/src/schema.ts"], "app", "install");
-    only(["deploy/install-linux.sh"], "app", "install");
-    only(["scripts/release.mjs"], "app", "install");
+    only(["apps/api/src/index.ts"], "app", "install", "service");
+    only(["packages/database/src/schema.ts"], "app", "install", "service");
+    only(["deploy/install-linux.sh"], "app", "install", "service");
+    only(["scripts/release.mjs"], "app", "install", "service");
   });
 
   it("checks the plugin jar when the plugin or the jar changes", () => {
     only(["plugins/craftpanel-info/src/Main.java"], "app", "plugin");
-    only(["apps/api/assets/CraftPanelInfo.jar"], "app", "install", "plugin");
+    only(["apps/api/assets/CraftPanelInfo.jar"], "app", "install", "service", "plugin");
   });
 
   it("runs every area when dependencies or CI itself change", () => {
-    const all = ["app", "install", "plugin", "site"];
+    const all = ["app", "install", "plugin", "service", "site"];
     only(["pnpm-lock.yaml"], ...all.filter((a) => a !== "plugin"));
     only([".github/workflows/ci.yml"], ...all);
     only(["scripts/ci-changes.mjs"], ...all);
   });
 
+  it("runs the Linux service scenarios when they or what they test change, not for other scenarios", () => {
+    only(["scripts/real-tests/isolation.mjs"], "app", "service");
+    only(["scripts/real-tests/neoforge.mjs"], "app");
+  });
+
+  it("runs the areas a manual run picked, whatever changed", () => {
+    expect(classify(["docs/ROADMAP.md"], { only: ["service", "site"] })).toEqual({ app: false, install: false, plugin: false, service: true, site: true });
+    expect(Object.values(classify([], { only: [] }))).toEqual([false, false, false, false, false]);
+  });
+
   it("combines areas and runs everything when asked", () => {
     only(["apps/site/src/pages/index.astro", "apps/web/src/app/page.tsx"], "app", "site");
-    expect(Object.values(classify([], { all: true }))).toEqual([true, true, true, true]);
+    expect(Object.values(classify([], { all: true }))).toEqual([true, true, true, true, true]);
   });
 });

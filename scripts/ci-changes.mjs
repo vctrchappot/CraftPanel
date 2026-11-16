@@ -2,7 +2,8 @@
 // .github/workflows/ci.yml, which writes the result to $GITHUB_OUTPUT.
 //
 //   node scripts/ci-changes.mjs --base <sha> --head <sha>   files changed on the head since the merge base
-//   node scripts/ci-changes.mjs --all                       everything (manual and scheduled runs)
+//   node scripts/ci-changes.mjs --all                       everything (scheduled runs, manual runs without a choice)
+//   node scripts/ci-changes.mjs --areas service,site        only these areas (a manual run that picked some)
 //   node scripts/ci-changes.mjs --files a/b.ts c.md         a given list (to try the rules)
 //
 // When in doubt it says "run it": if the diff can't be computed, or a file that CI itself depends on changed,
@@ -33,6 +34,16 @@ export const AREAS = {
     include: ["apps/api/", "packages/", "deploy/", "scripts/release.mjs", "scripts/start.mjs", "scripts/update.mjs", ...ROOT_BUILD],
     exclude: ["packages/ui/"],
   },
+  // The installed Linux service with real Paper servers (isolation, limits, player continuity): what the packaged
+  // service depends on, plus the scenarios themselves.
+  service: {
+    include: [
+      "apps/api/", "packages/", "deploy/", "scripts/release.mjs", "scripts/start.mjs", "scripts/update.mjs",
+      "scripts/real-tests/isolation.mjs", "scripts/real-tests/limits.mjs", "scripts/real-tests/runtime-continuity.mjs",
+      "scripts/real-tests/installer-fixtures.mjs", "scripts/real-tests/client.mjs", ...ROOT_BUILD,
+    ],
+    exclude: ["packages/ui/"],
+  },
   // The website builds from its own folder and the shared UI package.
   site: {
     include: ["apps/site/", "packages/ui/", "vitest.config.ts", ...ROOT_BUILD],
@@ -48,7 +59,8 @@ export const AREAS = {
 const matches = (file, rule) => (rule.endsWith("/") ? file.startsWith(rule) : file === rule);
 
 /** @param {string[]} files @param {{ all?: boolean }} [options] @returns {Record<string, boolean>} */
-export function classify(files, { all = false } = {}) {
+export function classify(files, { all = false, only } = {}) {
+  if (only) return Object.fromEntries(Object.keys(AREAS).map((name) => [name, only.includes(name)]));
   const everything = all || files.some((f) => CI_ITSELF.includes(f));
   return Object.fromEntries(
     Object.entries(AREAS).map(([name, { include, exclude }]) => [
@@ -74,6 +86,12 @@ function main(argv) {
   if (argv.includes("--all")) {
     result = classify([], { all: true });
     note = "all areas (requested)";
+  } else if (argv.includes("--areas")) {
+    const only = (arg("--areas") ?? "").split(",").map((a) => a.trim()).filter(Boolean);
+    const unknown = only.filter((a) => !(a in AREAS));
+    if (unknown.length) throw new Error(`Unknown area(s): ${unknown.join(", ")}. Known: ${Object.keys(AREAS).join(", ")}`);
+    result = classify([], { only });
+    note = `areas ${only.join(", ") || "(none)"} (chosen)`;
   } else if (argv.includes("--files")) {
     const files = argv.slice(argv.indexOf("--files") + 1).filter((a) => !a.startsWith("--"));
     result = classify(files);

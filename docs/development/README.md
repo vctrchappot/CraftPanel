@@ -47,10 +47,11 @@ In development the dashboard calls the API cross-origin (`NEXT_PUBLIC_API_URL`),
 | --- | --- | --- |
 | `app` | `apps/api`, `apps/web`, `packages/*`, `plugins/`, `deploy/`, `scripts/`, `tests/`, root manifests | Typecheck, tests and build on Linux, Windows and macOS; the HTTPS deployment test; end-to-end with a real server on x64 and ARM64 |
 | `install` | `apps/api`, `packages/*` except `packages/ui`, `deploy/`, `scripts/release.mjs`, `start.mjs`, `update.mjs`, root manifests | Linux installer, release package on Linux and Windows |
+| `service` | The same as `install`, plus `scripts/real-tests/{isolation,limits,runtime-continuity,installer-fixtures,client}.mjs` | The installed Linux service with real Paper servers on x64 and ARM64 (root, systemd, cgroup v2): servers under their own game accounts that can't read the panel's secrets, resource limits and the out-of-memory stop, a player who stays connected through dashboard restarts and updates (`isolation.mjs`, `limits.mjs`, `runtime-continuity.mjs`) |
 | `site` | `apps/site`, `packages/ui`, root manifests | Website unit tests, production build, smoke test of every page |
 | `plugin` | `plugins/craftpanel-info`, `apps/api/assets/CraftPanelInfo.jar`, `scripts/build-info-plugin.mjs` | The committed jar matches its source |
 
-Docs and other text (`docs/`, `*.md`) run nothing. Changes to `ci.yml` or `ci-changes.mjs`, manual runs, the weekly run and a push without a base to compare with run everything. Skipped jobs count as passing; `CI result` is the one check to require in branch protection, because a skipped matrix job reports without its operating system. When a new folder belongs to an area, add it to `AREAS` in `ci-changes.mjs` and to the test.
+Docs and other text (`docs/`, `*.md`) run nothing. Changes to `ci.yml` or `ci-changes.mjs`, the weekly run and a manual run without a choice and a push without a base to compare with run everything. Skipped jobs count as passing; `CI result` is the one check to require in branch protection, because a skipped matrix job reports without its operating system. A manual run (Actions → CI → Run workflow) can pick areas, for example `service`, to try one job on a branch without a pull request. When a new folder belongs to an area, add it to `AREAS` in `ci-changes.mjs` and to the test.
 
 ## Conventions
 
