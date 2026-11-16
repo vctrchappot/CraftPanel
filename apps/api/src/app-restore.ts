@@ -156,6 +156,10 @@ export async function importApplicationBackup(layout: DataLayout, archive: strin
     const final = `${layout.database}.importing`;
     await fsp.copyFile(database, final);
     await fsp.chmod(final, 0o600);
+    // A fresh installation can still have an uncheckpointed WAL after an abrupt task stop.
+    // It belongs to the old database; replaying it over the imported file can erase the restored accounts.
+    // --replace already moved these aside. With no owner, the validated import replaces the empty database.
+    for (const suffix of ["-wal", "-shm"]) await fsp.rm(layout.database + suffix, { force: true });
     await fsp.rename(final, layout.database);
 
     const importDir = path.join(layout.root, "import");

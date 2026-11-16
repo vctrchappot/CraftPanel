@@ -2,6 +2,7 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
@@ -108,6 +109,29 @@ describe("application backup and import", () => {
     try {
       expect((await second.inject({ method: "POST", url: "/api/auth/login", payload: { username: "owner", password: "owner-password-1" } })).statusCode).toBe(200);
       expect((await restored.servers.rows())[0]!.directory).toBe(target);
+    } finally { await second.close(); restored.database.close(); }
+  }, 60_000);
+
+  it("does not replay an empty installation's abandoned WAL over the imported accounts", async () => {
+    const fresh = path.join(root, "abruptly-stopped");
+    const empty = await createContext(config(fresh));
+    empty.database.close();
+    const layout = dataLayout(fresh);
+    // Like Stop-ScheduledTask: terminate without SQLite's close/checkpoint. The last WAL pages have no owner.
+    spawnSync(process.execPath, ["-e", `
+      const { DatabaseSync } = require('node:sqlite');
+      const db = new DatabaseSync(process.argv[1]);
+      db.exec("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; VACUUM;");
+      db.exec("INSERT INTO users (id, username, password_hash, role, created_at) VALUES ('temporary', 'temporary', 'unused', 'owner', 1); DELETE FROM users;");
+      process.kill(process.pid, 'SIGKILL');
+    `, layout.database], { windowsHide: true, timeout: 10_000 });
+    expect((await fsp.stat(layout.database + "-wal")).size).toBeGreaterThan(32);
+    await importApplicationBackup(layout, archive);
+    const restored = await createContext(config(fresh));
+    const second = await buildApp(restored, { logger: false });
+    try {
+      expect((await second.inject({ method: "GET", url: "/api/auth/state" })).json().setupRequired).toBe(false);
+      expect((await second.inject({ method: "POST", url: "/api/auth/login", payload: { username: "owner", password: "owner-password-1" } })).statusCode).toBe(200);
     } finally { await second.close(); restored.database.close(); }
   }, 60_000);
 
