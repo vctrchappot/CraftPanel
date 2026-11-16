@@ -42,6 +42,7 @@ describe("CI change areas", () => {
 
   it("runs the Linux service scenarios when they or what they test change, not for other scenarios", () => {
     only(["scripts/real-tests/isolation.mjs"], "app", "service");
+    only(["scripts/real-tests/app-migration-service.mjs"], "app", "install", "service");
     only(["scripts/real-tests/neoforge.mjs"], "app");
   });
 

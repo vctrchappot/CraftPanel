@@ -388,7 +388,7 @@ const TOOLS: ToolDef[] = [
       server: serverField,
       name: z.string().min(1).max(64),
       cron: z.string().min(1).max(120),
-      action: scheduleSchema.shape.action,
+      action: scheduleSchema.shape.action.exclude(["application-backup"]),
       payload: z
         .object({
           message: z.string().max(256).optional(),

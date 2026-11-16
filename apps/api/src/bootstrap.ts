@@ -48,7 +48,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const servers = new ServerService(db, agent, hub, activity, java, config, settings, runtimeAccess(opts.installRoot, agent));
   const backups = new BackupService(db, servers, hub, activity, settings, config);
   const appBackups = new AppBackupService(database, servers, backups, activity, settings, config);
-  const schedules = new ScheduleService(db, servers, backups, activity, settings);
+  const schedules = new ScheduleService(db, servers, backups, activity, settings, appBackups);
   const game = new GameService(db, servers, activity, config);
   const pregen = new PregenService(servers, game);
   const maps = new MapService(servers, game, settings, activity);

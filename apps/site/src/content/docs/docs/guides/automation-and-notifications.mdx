@@ -23,6 +23,14 @@ Presets cover common schedules: every day at 04:00, every 6 hours, every hour, e
 
 Each task runs at most once per minute and never overlaps itself, even if the previous run is still going.
 
+### Automatic application backups
+
+Owners can schedule a backup of **all of CraftPanel** under **Settings → Backups → Application backup → Add schedule**. Choose a preset or a cron expression, whether to include every server's files and worlds, and how many backups to keep (7 by default). The schedule runs in this computer's local time while the dashboard is running; missed runs are not caught up.
+
+After a successful backup, only older files from that schedule are removed. Manual application backups and files from other schedules stay. Disabling or deleting a schedule keeps its existing files. Use **Run now** to try it and **Run history** to check the result. A run is skipped if another application backup is already running.
+
+Enable **Backups** under **Settings → Notifications** for application backup failure alerts. These archives contain account data and secrets, so store them privately and copy them to another disk or computer. See [moving CraftPanel](/docs/administration/maintenance/#moving-craftpanel-to-another-computer) to restore one.
+
 ## Rules
 
 Schedules act at a time; **rules** act on a situation. A rule on the **Automation** tab reads "when *this* holds for *n* minutes, do *that*". CraftPanel looks at the server every 15 seconds, and a rule only acts once its condition has held without a break for the time you set. If the condition ends before that, the clock starts over. The rule then waits for the condition to end before it can act again, so it doesn't repeat itself.

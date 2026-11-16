@@ -10,6 +10,7 @@ import type { ActivityService, Actor } from "./activity";
 import type { BackupService } from "./backups";
 import type { ServerService } from "./servers";
 import type { SettingsService } from "./settings";
+import type { AppBackupService } from "./app-backup";
 
 type Row = typeof schedules.$inferSelect;
 const SCHEDULER_ACTOR: Actor = { id: null, username: "scheduler" };
@@ -17,6 +18,7 @@ const DDNS_JOB = "__ddns__";
 
 export class ScheduleService {
   private scheduler: Scheduler;
+  private running = new Set<string>();
 
   constructor(
     private db: Database,
@@ -24,6 +26,7 @@ export class ScheduleService {
     private backups: BackupService,
     private activity: ActivityService,
     private settings: SettingsService,
+    private appBackups: AppBackupService,
   ) {
     this.scheduler = new Scheduler(
       (id) => this.fire(id),
@@ -60,6 +63,12 @@ export class ScheduleService {
     return row.serverId;
   }
 
+  async get(id: string): Promise<ScheduleInfo> {
+    const [row] = await this.db.select().from(schedules).where(eq(schedules.id, id));
+    if (!row) throw notFound("Schedule");
+    return this.toInfo(row);
+  }
+
   async runs(scheduleId: string, limit = 50) {
     return this.db.select().from(scheduleRuns).where(eq(scheduleRuns.scheduleId, scheduleId)).orderBy(desc(scheduleRuns.startedAt)).limit(limit);
   }
@@ -69,6 +78,7 @@ export class ScheduleService {
     if (err) throw badRequest(`Invalid schedule: ${err}`);
     const serverActions = ["start", "restart", "stop", "backup", "announce", "command", "prune-backups", "cleanup-logs"];
     if (serverActions.includes(input.action) && !input.serverId) throw badRequest("This action needs a server");
+    if (input.action === "application-backup" && input.serverId) throw badRequest("An application backup must be a global schedule");
     if (input.action === "announce" && !input.payload.message?.trim()) throw badRequest("Announcement text is required");
     if (input.action === "command" && !input.payload.command?.trim()) throw badRequest("Command is required");
     if (input.payload.command && /[\r\n]/.test(input.payload.command)) throw badRequest("Command must be a single line");
@@ -90,6 +100,7 @@ export class ScheduleService {
 
   async update(id: string, input: z.output<typeof scheduleSchema>, actor: Actor) {
     this.validate(input);
+    if (input.serverId) await this.servers.row(input.serverId);
     const [row] = await this.db
       .update(schedules)
       .set({ name: input.name, cron: input.cron, action: input.action, payload: JSON.stringify(input.payload), enabled: input.enabled, serverId: input.serverId ?? null })
@@ -137,6 +148,13 @@ export class ScheduleService {
   }
 
   private async fire(id: string, manual = false) {
+    if (this.running.has(id)) return;
+    this.running.add(id);
+    try { await this.fireOnce(id, manual); }
+    finally { this.running.delete(id); }
+  }
+
+  private async fireOnce(id: string, manual: boolean) {
     if (id === DDNS_JOB) {
       const r = await this.updateDdns().catch((e) => ({ ok: false, message: (e as Error).message }));
       if (!r.ok) await this.activity.event(null, "ddns.failed", r.message, { level: "warn" });
@@ -172,10 +190,13 @@ export class ScheduleService {
   }
 
   private async execute(row: Row): Promise<string | void> {
-    const payload = JSON.parse(row.payload) as { message?: string; command?: string; keep?: number; olderThanDays?: number; warnSeconds?: number };
+    const payload = JSON.parse(row.payload) as { message?: string; command?: string; keep?: number; includeServers?: boolean; olderThanDays?: number; warnSeconds?: number };
     const sid = row.serverId!;
     const running = () => this.servers.agent.isRunning(sid);
     switch (row.action) {
+      case "application-backup":
+        if (this.appBackups.progress().running) return "SKIP:another application backup is already running";
+        return `Created ${await this.appBackups.run(payload.includeServers ?? true, SCHEDULER_ACTOR, { id: row.id, keep: payload.keep ?? 7 })}`;
       case "start":
         if (running()) return "SKIP:already running";
         await this.servers.start(sid, SCHEDULER_ACTOR);

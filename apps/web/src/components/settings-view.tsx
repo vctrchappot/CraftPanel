@@ -71,7 +71,7 @@ export function SettingsView() {
           <Account />
         </TabsContent>
         <TabsContent value="users">{canOwner && <UsersAdmin />}</TabsContent>
-        <TabsContent value="backups">{canOwner && <div className="max-w-2xl space-y-8"><BackupSettings /><AppBackups /></div>}</TabsContent>
+        <TabsContent value="backups" className="min-w-0">{canOwner && <div className="max-w-2xl space-y-8"><BackupSettings /><AppBackups /></div>}</TabsContent>
         <TabsContent value="access">{canOwner && <RemoteAccess />}</TabsContent>
         <TabsContent value="network">{canOwner && <DdnsSettings />}</TabsContent>
         <TabsContent value="notifications">{canOwner && <NotificationSettings />}</TabsContent>

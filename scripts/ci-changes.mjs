@@ -32,7 +32,7 @@ export const AREAS = {
   // Dashboard-only changes (apps/web, packages/ui) can't break an install, so they stay out.
   install: {
     include: ["apps/api/", "packages/", "deploy/", "scripts/release.mjs", "scripts/start.mjs", "scripts/update.mjs",
-      "scripts/real-tests/runtime-continuity-windows.mjs", "scripts/real-tests/installer-fixtures.mjs", "scripts/real-tests/client.mjs", ...ROOT_BUILD],
+      "scripts/real-tests/runtime-continuity-windows.mjs", "scripts/real-tests/app-migration-service.mjs", "scripts/real-tests/installer-fixtures.mjs", "scripts/real-tests/client.mjs", ...ROOT_BUILD],
     exclude: ["packages/ui/"],
   },
   // The installed Linux service with real Paper servers (isolation, limits, player continuity): what the packaged
@@ -41,6 +41,7 @@ export const AREAS = {
     include: [
       "apps/api/", "packages/", "deploy/", "scripts/release.mjs", "scripts/start.mjs", "scripts/update.mjs",
       "scripts/real-tests/isolation.mjs", "scripts/real-tests/limits.mjs", "scripts/real-tests/upgrade-isolation.mjs", "scripts/real-tests/runtime-continuity.mjs",
+      "scripts/real-tests/app-migration-service.mjs",
       "scripts/real-tests/installer-fixtures.mjs", "scripts/real-tests/client.mjs", ...ROOT_BUILD,
     ],
     exclude: ["packages/ui/"],

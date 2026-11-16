@@ -7,11 +7,13 @@ import { Badge, Button, Callout, ConfirmDialog, Panel, Progress, Section, Skelet
 import { api, downloadUrl } from "@/lib/api";
 import { useAction } from "@/lib/queries";
 import { formatBytes, formatDateTime } from "@/lib/format";
+import { AppBackupSchedules } from "./app-backup-schedules";
 
 interface AppBackupInfo {
   filename: string;
   size: number;
   createdAt: number;
+  scheduleId: string | null;
   servers: { total: number; withFiles: number } | null;
 }
 interface AppBackupList { backups: AppBackupInfo[]; progress: { running: boolean; message: string | null; percent: number | null; error: string | null } }
@@ -23,7 +25,7 @@ export function AppBackups() {
   const q = useQuery({
     queryKey: ["app-backups"],
     queryFn: () => api.get<AppBackupList>("/api/app-backups"),
-    refetchInterval: (query) => (query.state.data?.progress.running ? 1000 : false),
+    refetchInterval: (query) => (query.state.data?.progress.running ? 1000 : 5000),
   });
   const create = useAction(() => api.post("/api/app-backups", { includeServers }), { invalidate: [["app-backups"]] });
   const remove = useAction((filename: string) => api.del(`/api/app-backups/${filename}`), { success: "Backup deleted", invalidate: [["app-backups"]] });
@@ -52,17 +54,19 @@ export function AppBackups() {
           </div>
         )}
         {progress?.error && !running && <Callout variant="warning" title="The last backup failed">{progress.error}</Callout>}
+        <AppBackupSchedules />
         {q.isLoading ? <Skeleton className="h-20 rounded-lg" /> : q.data?.backups.length ? (
           <Panel className="divide-y divide-border">
             {q.data.backups.map((b) => (
               <div key={b.filename} className="flex flex-wrap items-center gap-3 p-4 text-[13px]">
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 basis-full sm:flex-1">
                   <div className="truncate font-mono text-xs">{b.filename}</div>
                   <div className="mt-0.5 text-xs text-muted-foreground">{formatDateTime(b.createdAt)} · {formatBytes(b.size)}</div>
                 </div>
                 {b.servers && (
                   <Badge variant="outline">{b.servers.withFiles === b.servers.total && b.servers.total > 0 ? `${b.servers.total} server${b.servers.total === 1 ? "" : "s"} with files` : b.servers.withFiles ? `${b.servers.withFiles} of ${b.servers.total} servers with files` : "Settings only"}</Badge>
                 )}
+                {b.scheduleId && <Badge variant="outline">Scheduled</Badge>}
                 <Button variant="secondary" size="sm" onClick={() => downloadUrl(`/api/app-backups/${b.filename}/download`)}><Download /> Download</Button>
                 <Button variant="ghost" size="sm" onClick={() => setDeleting(b)} aria-label={`Delete ${b.filename}`}><Trash2 /></Button>
               </div>

@@ -17,6 +17,7 @@ export interface AppBackupInfo {
   filename: string;
   size: number;
   createdAt: number;
+  scheduleId: string | null;
   /** Servers whose files are inside; null when the manifest could not be read. */
   servers: { total: number; withFiles: number } | null;
 }
@@ -53,11 +54,13 @@ export class AppBackupService {
       const stat = await fsp.stat(path.join(dir, filename)).catch(() => null);
       if (!stat?.isFile()) continue;
       let servers: AppBackupInfo["servers"] = null;
+      let scheduleId: string | null = null;
       try {
         const manifest = appBackupManifestSchema.parse(JSON.parse((await readZipEntry(path.join(dir, filename), "manifest.json"))!.toString("utf8")));
         servers = { total: manifest.servers.length, withFiles: manifest.servers.filter((s) => s.archive).length };
+        scheduleId = manifest.scheduleId ?? null;
       } catch { /* an unreadable manifest is shown without details */ }
-      out.push({ filename, size: stat.size, createdAt: stat.mtimeMs, servers });
+      out.push({ filename, size: stat.size, createdAt: stat.mtimeMs, servers, scheduleId });
     }
     return out.sort((a, b) => b.createdAt - a.createdAt);
   }
@@ -77,22 +80,41 @@ export class AppBackupService {
 
   /** Starts the backup and returns at once; `progress()` shows how far it is. */
   start(includeServers: boolean, actor: Actor): void {
+    void this.run(includeServers, actor).catch(() => undefined);
+  }
+
+  /** Holds the same lock for manual and scheduled backups, including retention. */
+  run(includeServers: boolean, actor: Actor, schedule?: { id: string; keep: number }): Promise<string> {
     if (this.current.running) throw conflict("An application backup is already running");
     this.current = { running: true, message: "Preparing", percent: null, error: null };
-    void this.create(includeServers, actor).then(
-      () => { this.current = { running: false, message: "Backup complete", percent: 100, error: null }; },
-      (err: Error) => { this.current = { running: false, message: null, percent: null, error: err.message }; },
-    );
+    return this.complete(includeServers, actor, schedule);
+  }
+
+  private async complete(includeServers: boolean, actor: Actor, schedule?: { id: string; keep: number }): Promise<string> {
+    try {
+      const filename = await this.create(includeServers, actor, schedule?.id);
+      if (schedule) {
+        const older = (await this.list()).filter((b) => b.scheduleId === schedule.id && b.filename !== filename);
+        for (const backup of older.slice(schedule.keep - 1)) await this.remove(backup.filename, actor);
+      }
+      this.current = { running: false, message: "Backup complete", percent: 100, error: null };
+      return filename;
+    } catch (err) {
+      const message = (err as Error).message;
+      this.current = { running: false, message: null, percent: null, error: message };
+      await this.activity.event(null, "app-backup.failed", `Application backup failed: ${message}`, { level: "error", actor });
+      throw err;
+    }
   }
 
   private say(message: string, percent: number | null = null) { this.current = { ...this.current, message, percent }; }
 
-  private async create(includeServers: boolean, actor: Actor): Promise<string> {
+  private async create(includeServers: boolean, actor: Actor, scheduleId?: string): Promise<string> {
     const dir = await this.directory();
     await fsp.mkdir(dir, { recursive: true, mode: 0o700 });
     const disk = await freeDiskSpace(dir);
     if (disk && disk.free < 512 * 1024 ** 2) throw new Error("Less than 512 MB free at the backup destination");
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 23);
     const filename = `${APP_BACKUP_PREFIX}${stamp}${includeServers ? "" : "-config"}.zip`;
     const staging = path.join(this.config.layout.tmp, `app-backup-${crypto.randomBytes(6).toString("hex")}`);
     await fsp.mkdir(path.join(staging, "servers"), { recursive: true, mode: 0o700 });
@@ -111,6 +133,7 @@ export class AppBackupService {
         database: { sha256: await sha256File(database) },
         config: null,
         tls: false,
+        ...(scheduleId ? { scheduleId } : {}),
         servers: [],
       };
 

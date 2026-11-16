@@ -139,3 +139,56 @@ test("create, run, configure, back up and restore a real server", async ({ page 
     await preview.getByRole("button", { name: "Later", exact: true }).click();
   }
 });
+
+test("application backup schedules can be created, run, paused and removed", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const state = await (await page.request.get("/api/auth/state")).json();
+  const login = await page.request.post(state.setupRequired ? "/api/auth/setup" : "/api/auth/login", { data: { username: "owner", password: "e2e-password-123" } });
+  expect(login.ok()).toBe(true);
+  await page.goto("/settings/?tab=backups");
+  await page.getByRole("button", { name: "Add schedule", exact: true }).click();
+  const editor = page.getByRole("dialog");
+  await editor.getByLabel("Name", { exact: true }).fill("E2E application backup");
+  await editor.getByRole("button", { name: "Every 6 hours", exact: true }).click();
+  await expect(editor.getByLabel("Schedule", { exact: true })).toHaveValue("0 */6 * * *");
+  await editor.getByLabel("Backups to keep", { exact: true }).fill("2");
+  await editor.getByRole("switch").click(); // Settings-only keeps this UI scenario quick.
+  await editor.getByRole("button", { name: "Save schedule", exact: true }).click();
+  await expect(editor).not.toBeVisible();
+  await expect(page.getByText("E2E application backup", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Run E2E application backup now", exact: true }).click();
+  await page.getByRole("button", { name: "History of E2E application backup", exact: true }).click();
+  const history = page.getByRole("dialog");
+  await expect(history.getByText("success", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(history.getByText(/^Created craftpanel-app-/)).toBeVisible();
+  await history.getByRole("button", { name: "Close", exact: true }).click();
+  await page.getByRole("switch", { name: "Enable E2E application backup", exact: true }).click();
+  await expect(page.getByRole("switch", { name: "Enable E2E application backup", exact: true })).not.toBeChecked();
+  await page.getByRole("button", { name: "Edit E2E application backup", exact: true }).click();
+  await editor.getByLabel("Name", { exact: true }).fill("E2E weekly application backup");
+  await editor.getByRole("button", { name: "Sundays at 03:00", exact: true }).click();
+  await editor.getByRole("button", { name: "Save schedule", exact: true }).click();
+  await expect(page.getByText("E2E weekly application backup", { exact: true })).toBeVisible();
+  // Let transient save messages clear before recording the layout.
+  await expect(page.getByText("Backup schedule saved", { exact: true })).toHaveCount(0, { timeout: 10_000 });
+  for (const [width, theme] of [[1440, "dark"], [390, "light"]] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate((value) => { document.documentElement.classList.toggle("dark", value === "dark"); }, theme);
+    const panel = page.getByText("Automatic application backups", { exact: true }).locator("../../..");
+    await expect(panel.getByRole("button", { name: "Add schedule" })).toBeVisible();
+    expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    const bounds = await panel.evaluate((element) => {
+      const parents = [];
+      for (let parent: Element | null = element; parent; parent = parent.parentElement) parents.push({ tag: parent.tagName, class: parent.className, width: parent.getBoundingClientRect().width });
+      return { right: element.getBoundingClientRect().right, viewport: window.innerWidth, parents };
+    });
+    expect(bounds.right, JSON.stringify(bounds)).toBeLessThanOrEqual(bounds.viewport + 1);
+    await page.screenshot(shot(`17-app-backups-${theme}-${width}`));
+  }
+  await page.getByRole("button", { name: "Delete schedule E2E weekly application backup", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByText("E2E weekly application backup", { exact: true })).not.toBeVisible();
+  await expect(page.getByText("Scheduled", { exact: true }).first()).toBeVisible(); // Deleting the schedule keeps its backup.
+  expect(errors).toEqual([]);
+});

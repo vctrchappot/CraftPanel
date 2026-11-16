@@ -23,6 +23,8 @@ export const appBackupManifestSchema = z.object({
   database: z.object({ sha256: z.string().regex(/^[a-f0-9]{64}$/) }),
   config: z.object({ variables: z.array(z.string().max(100)).max(200) }).nullable(),
   tls: z.boolean(),
+  /** Only archives made by this schedule count towards its retention. Absent on older/manual backups. */
+  scheduleId: z.string().uuid().optional(),
   servers: z.array(z.object({
     id: serverId,
     name: z.string().max(200),

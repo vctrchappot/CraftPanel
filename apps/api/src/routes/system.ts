@@ -2,9 +2,9 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { appSettingsSchema, backupCreateSchema, badRequest, CRAFTPANEL_VERSION, scheduleSchema, SOFTWARE_INFO, type ConnectAddress } from "@craftpanel/shared";
+import { appSettingsSchema, backupCreateSchema, badRequest, canAccess, CRAFTPANEL_VERSION, scheduleSchema, SOFTWARE_INFO, type ConnectAddress, type ScheduleInfo } from "@craftpanel/shared";
 import { nextRuns, validateCron } from "@craftpanel/scheduler";
 import { getProvider, log4shellMitigation, PROVIDERS } from "@craftpanel/minecraft-providers";
 import { SETTING_GROUPS, SETTINGS } from "@craftpanel/config";
@@ -58,34 +58,37 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
 
   // ---- schedules ------------------------------------------------------------------
 
+  const schedulePermission = (req: FastifyRequest, schedule: Pick<ScheduleInfo, "action" | "serverId">, write = true) =>
+    requirePermission(req, schedule.action === "application-backup" ? "app.configure" : write ? "schedule.manage" : "server.view", schedule.serverId ?? null);
+
   app.get<{ Querystring: { serverId?: string } }>("/api/schedules", async (req) => {
     const me = requirePermission(req, "server.view", req.query.serverId || undefined);
-    return (await ctx.schedules.list(req.query.serverId)).filter((x) => canSee(me, x.serverId));
+    return (await ctx.schedules.list(req.query.serverId)).filter((x) => canSee(me, x.serverId) && (x.action !== "application-backup" || canAccess(me, "app.configure")));
   });
   app.post("/api/schedules", async (req) => {
     const input = parse(scheduleSchema, req.body);
-    requirePermission(req, "schedule.manage", input.serverId ?? null);
+    schedulePermission(req, { action: input.action, serverId: input.serverId ?? null });
     return ctx.schedules.create(input, actorOf(req));
   });
   app.put<{ Params: { id: string } }>("/api/schedules/:id", async (req) => {
     const input = parse(scheduleSchema, req.body);
     // Both the schedule's current server and the one it moves to must be manageable.
-    requirePermission(req, "schedule.manage", await ctx.schedules.serverIdOf(req.params.id));
-    requirePermission(req, "schedule.manage", input.serverId ?? null);
+    schedulePermission(req, await ctx.schedules.get(req.params.id));
+    schedulePermission(req, { action: input.action, serverId: input.serverId ?? null });
     return ctx.schedules.update(req.params.id, input, actorOf(req));
   });
   app.delete<{ Params: { id: string } }>("/api/schedules/:id", async (req, reply) => {
-    requirePermission(req, "schedule.manage", await ctx.schedules.serverIdOf(req.params.id));
+    schedulePermission(req, await ctx.schedules.get(req.params.id));
     await ctx.schedules.remove(req.params.id, actorOf(req));
     return noContent(reply);
   });
   app.post<{ Params: { id: string } }>("/api/schedules/:id/run", async (req, reply) => {
-    requirePermission(req, "schedule.manage", await ctx.schedules.serverIdOf(req.params.id));
+    schedulePermission(req, await ctx.schedules.get(req.params.id));
     ctx.schedules.runNow(req.params.id, actorOf(req)).catch(() => undefined);
     return reply.code(202).send({ ok: true });
   });
   app.get<{ Params: { id: string } }>("/api/schedules/:id/runs", async (req) => {
-    requirePermission(req, "server.view", await ctx.schedules.serverIdOf(req.params.id));
+    schedulePermission(req, await ctx.schedules.get(req.params.id), false);
     return ctx.schedules.runs(req.params.id);
   });
   app.get<{ Querystring: { cron?: string } }>("/api/schedules/preview", async (req) => {

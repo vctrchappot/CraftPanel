@@ -107,6 +107,8 @@ export async function importApplicationBackup(layout: DataLayout, archive: strin
           }
         }
         if (tableExists(db, "sessions")) db.exec("DELETE FROM sessions");
+        // A scheduled application backup snapshots its own unfinished run. It cannot resume on this host.
+        if (tableExists(db, "schedule_runs")) db.prepare("UPDATE schedule_runs SET status = 'failed', finished_at = ?, output = 'Interrupted by application backup import' WHERE status = 'running'").run(Date.now());
         if (tableExists(db, "backups")) {
           const n = (db.prepare("SELECT COUNT(*) AS n FROM backups").get() as { n: number }).n;
           db.exec("DELETE FROM backups");

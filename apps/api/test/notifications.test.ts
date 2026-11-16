@@ -72,6 +72,18 @@ describe("Discord webhooks", () => {
     expect(await n.send({ title: "t", message: "m", level: "info" })).toEqual([{ channel: "discord", ok: false, error: "Discord answered HTTP 404" }]);
   });
 
+  it("sends application backup failures under Backups, including failures without a server", async () => {
+    const f = fakeFetch();
+    const n = new NotificationService(fakeSettings({ notifyDiscordWebhook: WEBHOOK, notifyEvents: ["backup"] }), noUpdates, f.fn);
+    await n.onEvent(event("app-backup.failed", null, "Application backup failed: disk full"), null);
+    await n.onEvent(event("app-backup.failed", null, "Application backup failed: disk full"), null);
+    expect(f.calls).toHaveLength(1);
+    expect(f.calls[0].body.embeds).toMatchObject([{ title: "Application backup failed", description: "Application backup failed: disk full", fields: [] }]);
+    const disabled = new NotificationService(fakeSettings({ notifyDiscordWebhook: WEBHOOK, notifyEvents: ["schedule"] }), noUpdates, f.fn);
+    await disabled.onEvent(event("app-backup.failed", null), null);
+    expect(f.calls).toHaveLength(1);
+  });
+
   it("announces each new CraftPanel release once", async () => {
     const f = fakeFetch();
     const status: UpdateStatus = {

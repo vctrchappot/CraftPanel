@@ -64,8 +64,15 @@ The file must be readable by the `craftpanel` account. If the installer put its 
   </TabItem>
   <TabItem label="Windows">
 ```powershell
-node appsapidistindex.js import-backup craftpanel-app-….zip
+# Run as the account that installed CraftPanel, from its installation folder.
+Stop-ScheduledTask -TaskName "CraftPanel"
+Stop-Service -Name "CraftPanel Runtime" # elevated shell, if installed as a service
+$env:CRAFTPANEL_DATA_DIR = "$env:LOCALAPPDATA/CraftPanel"
+node apps/api/dist/index.js import-backup C:/Backups/craftpanel-app-….zip
+Start-Service -Name "CraftPanel Runtime"
+Start-ScheduledTask -TaskName "CraftPanel"
 ```
+Use the installation's actual task name and data directory (`install.json`) if you chose different ones. Starting and stopping the runtime service needs an elevated shell; run the import as the dashboard's account. If this is a manual checkout, stop both Node.js processes and use that checkout's data directory instead.
   </TabItem>
 </Tabs>
 

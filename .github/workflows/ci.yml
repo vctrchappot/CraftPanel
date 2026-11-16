@@ -250,6 +250,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           node scripts/real-tests/runtime-continuity-windows.mjs test-results/installer-recovery $tools
           if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Scheduled application backup imports into the installed Windows service
+        run: node scripts/real-tests/app-migration-service.mjs test-results/installer-recovery
 
   # The installed Linux service with real Paper servers, as root on a systemd host: every server under its own game
   # account that can't read the panel's secrets, resource limits through cgroup v2 (an out-of-memory stop is reported),
@@ -279,6 +281,7 @@ jobs:
           node scripts/real-tests/installer-fixtures.mjs test-results/isolation craftpanel-ops-iso
           node scripts/real-tests/installer-fixtures.mjs test-results/limits craftpanel-ops-lim
           node scripts/real-tests/installer-fixtures.mjs test-results/continuity craftpanel-ops-rt
+          node scripts/real-tests/installer-fixtures.mjs test-results/service-migration craftpanel-ops-move
       - name: Host
         run: |
           systemctl --version | head -1
@@ -294,6 +297,8 @@ jobs:
           tools="$RUNNER_TEMP/mc-tools"
           npm install --prefix "$tools" --no-audit --no-fund mineflayer@4.39.0
           sudo env "PATH=$PATH" node scripts/real-tests/runtime-continuity.mjs test-results/continuity craftpanel-ops-rt 19689 "$tools"
+      - name: Scheduled application backup imports into an installed service with new game accounts
+        run: sudo env "PATH=$PATH" node scripts/real-tests/app-migration-service.mjs test-results/service-migration craftpanel-ops-move
       - if: failure()
         run: sudo journalctl --no-pager -u 'craftpanel-ops-*' | tail -200
       - if: always()
@@ -305,6 +310,7 @@ jobs:
             test-results/limits/*.json
             test-results/continuity/*.log
             test-results/continuity/*.json
+            test-results/service-migration/*.json
           if-no-files-found: ignore
           retention-days: 14
 
