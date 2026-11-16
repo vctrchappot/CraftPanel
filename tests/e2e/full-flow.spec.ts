@@ -143,6 +143,12 @@ test("create, run, configure, back up and restore a real server", async ({ page 
 test("application backup schedules can be created, run, paused and removed", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  // The real-server flow can use most of the shared per-IP budget on fast runners.
+  // Start this separate browser session with enough budget for its assets and controls.
+  await expect.poll(async () => {
+    const response = await page.request.get("/api/auth/state");
+    return Number(response.headers()["x-ratelimit-remaining"] ?? 0);
+  }, { timeout: 70_000, intervals: [1000] }).toBeGreaterThan(400);
   const state = await (await page.request.get("/api/auth/state")).json();
   const login = await page.request.post(state.setupRequired ? "/api/auth/setup" : "/api/auth/login", { data: { username: "owner", password: "e2e-password-123" } });
   expect(login.ok()).toBe(true);

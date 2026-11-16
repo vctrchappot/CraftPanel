@@ -250,8 +250,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           node scripts/real-tests/runtime-continuity-windows.mjs test-results/installer-recovery $tools
           if ($LASTEXITCODE -ne 0) { exit 1 }
-      - name: Scheduled application backup imports into the installed Windows service
-        run: node scripts/real-tests/app-migration-service.mjs test-results/installer-recovery
 
   # The installed Linux service with real Paper servers, as root on a systemd host: every server under its own game
   # account that can't read the panel's secrets, resource limits through cgroup v2 (an out-of-memory stop is reported),
@@ -281,7 +279,6 @@ jobs:
           node scripts/real-tests/installer-fixtures.mjs test-results/isolation craftpanel-ops-iso
           node scripts/real-tests/installer-fixtures.mjs test-results/limits craftpanel-ops-lim
           node scripts/real-tests/installer-fixtures.mjs test-results/continuity craftpanel-ops-rt
-          node scripts/real-tests/installer-fixtures.mjs test-results/service-migration craftpanel-ops-move
       - name: Host
         run: |
           systemctl --version | head -1
@@ -297,8 +294,6 @@ jobs:
           tools="$RUNNER_TEMP/mc-tools"
           npm install --prefix "$tools" --no-audit --no-fund mineflayer@4.39.0
           sudo env "PATH=$PATH" node scripts/real-tests/runtime-continuity.mjs test-results/continuity craftpanel-ops-rt 19689 "$tools"
-      - name: Scheduled application backup imports into an installed service with new game accounts
-        run: sudo env "PATH=$PATH" node scripts/real-tests/app-migration-service.mjs test-results/service-migration craftpanel-ops-move
       - if: failure()
         run: sudo journalctl --no-pager -u 'craftpanel-ops-*' | tail -200
       - if: always()
@@ -310,7 +305,42 @@ jobs:
             test-results/limits/*.json
             test-results/continuity/*.log
             test-results/continuity/*.json
-            test-results/service-migration/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Restore into an installed service, independently of the longer isolation/continuity scenarios.
+  application-migration:
+    name: Application backup import (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.service == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Release fixtures
+        run: node scripts/real-tests/installer-fixtures.mjs test-results/service-migration craftpanel-ops-move
+      - name: Import into systemd with a new game account
+        if: runner.os == 'Linux'
+        run: sudo env "PATH=$PATH" node scripts/real-tests/app-migration-service.mjs test-results/service-migration craftpanel-ops-move
+      - name: Import into SCM with a new restricted SID
+        if: runner.os == 'Windows'
+        run: node scripts/real-tests/app-migration-service.mjs test-results/service-migration
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-migration-${{ matrix.os }}
+          path: test-results/service-migration/*evidence.json
           if-no-files-found: ignore
           retention-days: 14
 
@@ -378,7 +408,7 @@ jobs:
   # matrix jobs by name doesn't work once they can be skipped: a skipped matrix job reports without its OS.)
   result:
     name: CI result
-    needs: [changes, test, plugin, e2e, installer, package-linux, package-windows, linux-service, linux-upgrade, site]
+    needs: [changes, test, plugin, e2e, installer, package-linux, package-windows, linux-service, application-migration, linux-upgrade, site]
     if: always()
     runs-on: ubuntu-latest
     steps:

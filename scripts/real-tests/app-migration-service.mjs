@@ -57,8 +57,15 @@ const children = [];
 const evidence = { platform: process.platform, checks: [], startedAt: new Date().toISOString() };
 const record = (check, extra = {}) => { evidence.checks.push({ check, ...extra }); console.log(`PASS ${check} ${JSON.stringify(extra)}`); };
 const stopSource = async () => {
-  for (const child of children) if (child.exitCode === null) child.kill("SIGTERM");
-  await Promise.all(children.map((child) => child.exitCode !== null ? undefined : new Promise((resolve) => child.once("exit", resolve))));
+  await Promise.all(children.map((child) => {
+    if (child.exitCode !== null || child.signalCode !== null) return;
+    // Subscribe before terminating, and allow cleanup to be called again after a signal exit.
+    return new Promise((resolve, reject) => {
+      child.once("exit", resolve);
+      child.once("error", reject);
+      child.kill("SIGTERM");
+    });
+  }));
 };
 let installed = false, id, log;
 try {
@@ -83,6 +90,7 @@ try {
   const schedule = await a.call("POST", "/api/schedules", { name: "Migration backup", cron: "* * * * * *", action: "application-backup", payload: { includeServers: true, keep: 2 }, enabled: true });
   await wait(async () => (await a.call("GET", `/api/schedules/${schedule.id}/runs`)).some((r) => r.status === "success"), 300_000);
   await a.call("PUT", `/api/schedules/${schedule.id}`, { ...schedule, enabled: false });
+  await wait(async () => !(await a.call("GET", "/api/app-backups")).progress.running, 300_000);
   for (let i = 0; i < 2; i++) {
     const before = (await a.call("GET", `/api/schedules/${schedule.id}/runs`)).length;
     await a.call("POST", `/api/schedules/${schedule.id}/run`);
@@ -103,10 +111,10 @@ try {
   await stopSource();
 
   // Install the target first, then import under the dashboard account while both services are stopped.
+  installed = true; // A partially failed install must be cleaned up too.
   if (windows) {
     await ps("& powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $env:CP_INSTALLER; exit $LASTEXITCODE");
   } else await run("bash", [path.join(fixtures, "install.sh"), "--archive", targetEnv.CRAFTPANEL_ARCHIVE, "--port", String(portB)], { env: targetEnv, timeout: 300_000, maxBuffer: 4 * 1024 * 1024 });
-  installed = true;
   await ready(portB);
   if (windows) {
     await ps("Stop-ScheduledTask -TaskName $env:CP_TASK; Stop-Service -Name $env:CP_RUNTIME");
@@ -168,6 +176,7 @@ try {
   evidence.ok = true;
 } catch (error) {
   evidence.error = error.message;
+  console.error(error.stack);
   for (const file of [path.join(root, "source.log"), path.join(data, "logs/runtime.err.log"), path.join(data, "logs/craftpanel.err.log")]) {
     const text = await fs.readFile(file, "utf8").catch(() => null);
     if (text) console.log(`${file}\n${text.split(/\r?\n/).slice(-40).join("\n")}`);
