@@ -40,4 +40,6 @@ Keep a copy of your backups on another disk or machine. A backup on the same dis
 
 ## Backing up CraftPanel itself
 
-Server backups cover Minecraft. To back up the panel (accounts, settings, schedules), stop both services and copy the whole data directory, together with your settings file (`/etc/craftpanel/craftpanel.env` or `config.env`) and any TLS certificates. See [maintenance](/docs/administration/maintenance/).
+Server backups cover Minecraft. **Settings → Backups → Application backup** covers the panel itself: one file with the database (accounts, settings, schedules, rules), the `CRAFTPANEL_*` settings CraftPanel was started with, the HTTPS certificate and key if configured and, with **Include server files and worlds**, every server. It is made while everything runs (running servers are flushed to disk first). The file holds password hashes and API keys, so store it as carefully as the data directory.
+
+To move to another computer, or to start over after a disk failure, see [moving CraftPanel](/docs/administration/maintenance/#moving-craftpanel-to-another-computer).

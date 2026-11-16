@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CRAFTPANEL_VERSION } from "@craftpanel/shared";
 import { RuntimeClient } from "@craftpanel/server-runtime";
+import { importApplicationBackup } from "./app-restore";
 import { dashboardUrls } from "@craftpanel/network";
 import { loadConfig, PROFILES, type AppConfig } from "./config";
 import { createContext } from "./bootstrap";
@@ -55,6 +56,25 @@ async function main() {
     if (process.argv.includes("--json")) console.log(JSON.stringify(report, null, 2));
     else for (const check of report.checks) console.log(`${check.status.toUpperCase().padEnd(7)} ${check.message}${check.hint ? `\n        ${check.hint}` : ""}`);
     process.exitCode = report.ok ? 0 : 1;
+    return;
+  }
+
+  if (process.argv[2] === "import-backup") {
+    const archive = process.argv[3];
+    if (!archive || archive.startsWith("--")) {
+      console.error("Usage (CraftPanel and its runtime stopped): node index.js import-backup <craftpanel-app-….zip> [--replace]");
+      process.exitCode = 2;
+      return;
+    }
+    try {
+      const result = await importApplicationBackup(config.layout, archive, { replace: process.argv.includes("--replace"), log: (m) => console.log(m) });
+      console.log(`\nRestored ${result.servers} server(s), ${result.withFiles} with their files and worlds, into ${config.layout.root}.`);
+      for (const note of result.notes) console.log(`  - ${note}`);
+      console.log("\nStart CraftPanel and sign in with the account from the old computer. The game files of every server are downloaded again at the first start.");
+    } catch (err) {
+      console.error(`Import failed: ${(err as Error).message}`);
+      process.exitCode = 1;
+    }
     return;
   }
 

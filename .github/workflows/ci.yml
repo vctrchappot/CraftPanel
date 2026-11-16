@@ -114,6 +114,8 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm build
       - run: pnpm test:e2e
+      - name: An application backup moves a real Paper server to a fresh data directory
+        run: bash scripts/real-tests/run.sh 19700 "$RUNNER_TEMP/migration-a" app-migration.mjs "$RUNNER_TEMP/migration-a"
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

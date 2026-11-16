@@ -11,6 +11,7 @@ import { randomToken } from "./auth/password";
 import { ActivityService } from "./services/activity";
 import { ServerService } from "./services/servers";
 import { BackupService } from "./services/backups";
+import { AppBackupService } from "./services/app-backup";
 import { ScheduleService } from "./services/schedules";
 import { RuleService } from "./services/rules";
 import { GameService } from "./services/game";
@@ -46,6 +47,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const sessions = new SessionStore(db, config.sessionTtlMs, async () => (await settings.get()).twoFactorRoles);
   const servers = new ServerService(db, agent, hub, activity, java, config, settings, runtimeAccess(opts.installRoot, agent));
   const backups = new BackupService(db, servers, hub, activity, settings, config);
+  const appBackups = new AppBackupService(database, servers, backups, activity, settings, config);
   const schedules = new ScheduleService(db, servers, backups, activity, settings);
   const game = new GameService(db, servers, activity, config);
   const pregen = new PregenService(servers, game);
@@ -66,5 +68,5 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
     await fsp.writeFile(tokenFile, setupToken + "\n", { mode: 0o600 });
   } else await fsp.rm(tokenFile, { force: true });
 
-  return { config, database, agent, hub, sessions, activity, servers, backups, schedules, rules, game, pregen, maps, proxies, settings, updates, notifications, java, assistant, setupToken };
+  return { config, database, agent, hub, sessions, activity, servers, backups, appBackups, schedules, rules, game, pregen, maps, proxies, settings, updates, notifications, java, assistant, setupToken };
 }

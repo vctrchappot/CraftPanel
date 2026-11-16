@@ -37,13 +37,41 @@ Restarting the dashboard never stops Minecraft. Restarting the **runtime** saves
 
 ## Backing up CraftPanel
 
-Server backups protect your worlds. To back up the panel itself (accounts, settings, schedules, all servers):
+Server backups protect your worlds. To back up the panel itself (accounts, settings, schedules, all servers), create an **Application backup** under **Settings → Backups** and download it. It works while CraftPanel runs and needs no copying of files by hand.
+
+If you prefer to copy files yourself:
 
 1. Stop the dashboard **and** the runtime.
 2. Copy the whole data directory.
 3. Copy your settings file and any TLS certificates and keys.
 
-Copying only the database file while CraftPanel runs can miss recent changes. Test a restore on another machine before you rely on it.
+Copying only the database file while CraftPanel runs can miss recent changes.
+
+## Moving CraftPanel to another computer
+
+1. On the old computer, create an application backup **with server files and worlds** (Settings → Backups) and download it.
+2. Install CraftPanel on the new computer. Don't create an account. Stop the dashboard **and** the runtime.
+3. Copy the file there and import it as the account CraftPanel runs under, with the same settings as the service (`--env-file` or the service's environment):
+
+<Tabs syncKey="os">
+  <TabItem label="Linux">
+```bash
+sudo systemctl stop craftpanel craftpanel-runtime
+sudo -u craftpanel env CRAFTPANEL_DATA_DIR=/var/lib/craftpanel node /opt/craftpanel/apps/api/dist/index.js import-backup /tmp/craftpanel-app-….zip
+sudo systemctl start craftpanel-runtime craftpanel
+```
+The file must be readable by the `craftpanel` account. If the installer put its own Node.js in `/opt/craftpanel/node`, use `/opt/craftpanel/node/bin/node`.
+  </TabItem>
+  <TabItem label="Windows">
+```powershell
+node appsapidistindex.js import-backup craftpanel-app-….zip
+```
+  </TabItem>
+</Tabs>
+
+4. Start CraftPanel and sign in with your old account. Every server downloads its game files again (the backup carries worlds and configuration, not the Minecraft jar) and starts if it had automatic start.
+
+What changes on the way: sessions end (sign in again), server folders live in the new data directory, the Java path and a bind address of the old computer are cleared, the list of earlier server backups starts empty, and a custom backup folder has to be chosen again. The old `CRAFTPANEL_*` settings and certificate are saved in `import/` in the data directory for you to apply (they hold paths of the old computer). Importing into a data directory that already has an account needs `--replace`, which moves the current database and server folders aside instead of deleting them. A backup from a newer CraftPanel than the one installed is refused: update first.
 
 <Aside type="note">
 Updates keep their own recovery points (database snapshot and startup files) under the installation folder and restore them if an update fails. They don't include worlds and are not a replacement for backups.

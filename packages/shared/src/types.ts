@@ -180,7 +180,7 @@ export interface BackupInfo {
   filename: string;
   size: number;
   sha256: string | null;
-  kind: "manual" | "scheduled" | "pre-restore" | "pre-update" | "pre-migration" | "pre-delete";
+  kind: "manual" | "scheduled" | "pre-restore" | "pre-update" | "pre-migration" | "pre-delete" | "application";
   status: "pending" | "running" | "completed" | "failed";
   error: string | null;
   note: string | null;

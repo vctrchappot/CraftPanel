@@ -17,6 +17,7 @@ import { authRoutes } from "./routes/auth";
 import { serverRoutes } from "./routes/servers";
 import { fileRoutes } from "./routes/files";
 import { systemRoutes } from "./routes/system";
+import { appBackupRoutes } from "./routes/app-backups";
 import { wsRoutes } from "./routes/ws";
 import { mapRoutes } from "./routes/maps";
 import { assistantRoutes } from "./routes/assistant";
@@ -149,6 +150,7 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
     await serverRoutes(api, ctx);
     await fileRoutes(api, ctx);
     await systemRoutes(api, ctx);
+    await appBackupRoutes(api, ctx);
     await wsRoutes(api, ctx);
     await mapRoutes(api, ctx);
     await assistantRoutes(api, ctx);

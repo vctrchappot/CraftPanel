@@ -822,8 +822,29 @@ export class ServerService {
    * Reconcile persisted state with reality after CraftPanel starts. A DB
    * record saying "running" proves nothing; we check the PID.
    */
+  /** Servers an application backup was imported for: their game files are downloaded again before anything starts them. */
+  private async importedServers(): Promise<Set<string>> {
+    try {
+      const { servers: ids } = JSON.parse(await fsp.readFile(path.join(this.config.layout.root, "import", "reinstall.json"), "utf8")) as { servers: unknown };
+      return new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : []);
+    } catch { return new Set(); }
+  }
+
+  private async reinstallImported(ids: string[]) {
+    for (const id of ids) {
+      if (!(await this.row(id).catch(() => null))) continue;
+      await this.install(id);
+      const row = await this.row(id).catch(() => null);
+      if (row?.installState !== "installed") continue;
+      await this.syncManagedProperties(row).catch(() => undefined);
+      if (row.autoStart && row.eulaAccepted) this.start(id, SYSTEM_ACTOR).catch((err) => this.activity.event(id, "server.autostart_failed", `Automatic start failed: ${(err as Error).message}`, { level: "error" }));
+    }
+    await fsp.rm(path.join(this.config.layout.root, "import", "reinstall.json"), { force: true });
+  }
+
   async recover(): Promise<void> {
     if (!this.agent.connected) return;
+    const imported = await this.importedServers();
     for (const row of await this.rows()) {
       if (row.installState === "installing" || row.installState === "pending") {
         if (this.installs.has(row.id)) continue; // A transport reconnect did not interrupt this dashboard's installation.
@@ -853,12 +874,14 @@ export class ServerService {
       await this.db.update(playerSessions).set({ leftAt: Date.now() }).where(and(eq(playerSessions.serverId, row.id), isNull(playerSessions.leftAt)));
     }
     for (const row of await this.rows()) {
+      if (imported.has(row.id)) continue;
       if (row.autoStart && row.installState === "installed" && row.eulaAccepted && !this.agent.owns(row.id) && !this.agent.isRunning(row.id) && row.lastStatus !== "orphaned") {
         this.start(row.id, SYSTEM_ACTOR).catch((err) => this.activity.event(row.id, "server.autostart_failed", `Automatic start failed: ${(err as Error).message}`, { level: "error" }));
       } else if (row.installState === "installed" && row.lastStatus !== "orphaned" && !this.agent.owns(row.id)) {
         await this.registerRuntime(row).catch((err) => this.activity.event(row.id, "runtime.registration_failed", `Runtime registration failed: ${(err as Error).message}`, { level: "error" }));
       }
     }
+    if (imported.size) void this.reinstallImported([...imported]);
   }
 }
 

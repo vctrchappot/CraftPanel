@@ -34,6 +34,7 @@ const KIND_LABEL: Record<string, string> = {
   "pre-update": "Before update",
   "pre-migration": "Before migration",
   "pre-delete": "Before delete",
+  application: "Application backup",
 };
 
 export function BackupTable({ backups, loading, showServer, serverStatus }: { backups?: BackupInfo[]; loading: boolean; showServer?: boolean; serverStatus: Record<string, ServerStatus> }) {

@@ -34,6 +34,7 @@ import { SessionsSection, TwoFactorSection } from "./account-security";
 import { UsersAdmin } from "./users-admin";
 import { NotificationSettings } from "./notifications-settings";
 import { AssistantSettingsSection } from "./assistant-settings";
+import { AppBackups } from "./app-backups";
 
 export function SettingsView() {
   const params = useSearchParams();
@@ -70,7 +71,7 @@ export function SettingsView() {
           <Account />
         </TabsContent>
         <TabsContent value="users">{canOwner && <UsersAdmin />}</TabsContent>
-        <TabsContent value="backups">{canOwner && <BackupSettings />}</TabsContent>
+        <TabsContent value="backups">{canOwner && <div className="max-w-2xl space-y-8"><BackupSettings /><AppBackups /></div>}</TabsContent>
         <TabsContent value="access">{canOwner && <RemoteAccess />}</TabsContent>
         <TabsContent value="network">{canOwner && <DdnsSettings />}</TabsContent>
         <TabsContent value="notifications">{canOwner && <NotificationSettings />}</TabsContent>

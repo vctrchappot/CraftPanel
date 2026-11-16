@@ -9,6 +9,7 @@ import type { SessionStore, SessionUser } from "./auth/sessions";
 import type { ActivityService, Actor } from "./services/activity";
 import type { ServerService } from "./services/servers";
 import type { BackupService } from "./services/backups";
+import type { AppBackupService } from "./services/app-backup";
 import type { ScheduleService } from "./services/schedules";
 import type { RuleService } from "./services/rules";
 import type { GameService } from "./services/game";
@@ -29,6 +30,7 @@ export interface AppContext {
   activity: ActivityService;
   servers: ServerService;
   backups: BackupService;
+  appBackups: AppBackupService;
   schedules: ScheduleService;
   rules: RuleService;
   game: GameService;

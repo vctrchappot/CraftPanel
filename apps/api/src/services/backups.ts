@@ -196,6 +196,13 @@ export class BackupService {
     await this.create(server.id, "pre-restore", actor, "Automatic backup before restore");
   }
 
+  /** Drops a backup that only served as a part of something else (an application backup), without an audit entry. */
+  async discard(id: string) {
+    const row = await this.get(id);
+    await (await this.storage()).remove(row.storageKey);
+    await this.db.delete(backups).where(eq(backups.id, id));
+  }
+
   async remove(id: string, actor: Actor) {
     const row = await this.get(id);
     if (row.status === "running") throw conflict("Backup is still running");

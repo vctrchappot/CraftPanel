@@ -185,6 +185,10 @@ Configure nginx's certificate and HTTP-to-HTTPS redirect separately. Restrict `1
 
 `CRAFTPANEL_TRUST_PROXY=true` is a compatibility switch that trusts loopback peers only. Prefer `CRAFTPANEL_TRUSTED_PROXIES` for an explicit configuration; unrestricted `/0` trust ranges are rejected.
 
+## Application backups and moving hosts
+
+**Settings → Backups → Application backup** writes the database, the `CRAFTPANEL_*` settings, the TLS certificate and key and, optionally, every server into one file (`<backup folder>/application/craftpanel-app-….zip`, mode 0600, not encrypted). `node apps/api/dist/index.js import-backup <file> [--replace]` restores it into a stopped installation as the service account: see [Moving CraftPanel to another computer](https://craftpanel.vctr.site/docs/administration/maintenance/#moving-craftpanel-to-another-computer). Settings and certificate of the old host are placed in `<data>/import/` and never applied automatically; the game files of every server are downloaded again at the first start.
+
 ## Deployment diagnostics
 
 **Settings → Remote access → Deployment checks** reports the current connection transport, trusted proxy peers, data-directory access, free disk space, TLS certificate validity and SQLite integrity. It also asks the Minecraft runtime whether servers are isolated (game accounts on Linux, restricted tokens on Windows) and whether resource limits are enforced, and warns, with the reason, when they are not.
