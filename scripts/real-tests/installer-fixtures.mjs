@@ -6,8 +6,14 @@ import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const [outputArg, instance = "craftpanel", legacySourceArg] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+// --previous ARCHIVE: a real earlier release (craftpanel-vX.Y.Z.tar.gz), renamed for the instance like the others, to test upgrades.
+const previousAt = argv.indexOf("--previous");
+const previousArchive = previousAt >= 0 ? argv.splice(previousAt, 2)[1] : undefined;
+const [outputArg, instance = "craftpanel", legacySourceArg] = argv;
 if (!outputArg || !/^(craftpanel|craftpanel-ops-[a-z0-9-]+)$/.test(instance)) throw new Error("Usage: installer-fixtures.mjs OUTPUT [craftpanel-ops-NAME]");
+// The installer creates game accounts named <instance>-game-NN, and Linux accepts at most 32 characters.
+if (`${instance}-game-00`.length > 32) throw new Error(`The instance name "${instance}" is too long: its game accounts (${instance}-game-00) would exceed 32 characters.`);
 const output = path.resolve(outputArg);
 await fs.mkdir(path.dirname(output), { recursive: true });
 await fs.mkdir(output); // Refuse to overwrite an existing fixture set.
@@ -82,5 +88,36 @@ if (legacySourceArg) {
   await fs.rm(stage, { recursive: true });
   legacy = { archive, installer };
 }
-await fs.writeFile(path.join(output, "fixtures.json"), JSON.stringify({ instance, archives, ...(legacy ? { legacy } : {}) }, null, 2));
+let previous;
+if (previousArchive) {
+  // The published archive, unpacked, with its service files and installer renamed for this instance (as for the
+  // archives above) and its runtime identity recomputed, then packed again.
+  const parent = path.join(output, "previous-stage");
+  await fs.mkdir(parent);
+  execFileSync("tar", ["-xzf", path.resolve(previousArchive), "-C", parent], { windowsHide: true });
+  const [name] = await fs.readdir(parent);
+  const stage = path.join(parent, name);
+  const dist = path.join(stage, "apps/api/dist");
+  const unit = (file) => path.join(stage, "deploy", file);
+  for (const file of ["install.sh", "craftpanel.service", "craftpanel-runtime.service"]) {
+    const text = rewrite(await fs.readFile(unit(file), "utf8"));
+    if (rewrite(file) !== file) await fs.rm(unit(file));
+    await fs.writeFile(unit(rewrite(file)), text, { mode: 0o755 });
+  }
+  const installer = path.join(output, "previous-install.sh");
+  await fs.copyFile(unit("install.sh"), installer);
+  const optional = async (file) => fs.readFile(path.join(dist, file)).catch(() => Buffer.alloc(0));
+  const hash = crypto.createHash("sha256").update(await fs.readFile(path.join(dist, "runtime.js"))).update(await optional("windows-job.ps1")).update(await optional("windows-runtime-service.cs"))
+    .update(await fs.readFile(unit(rewrite("craftpanel-runtime.service")))).digest("hex");
+  const manifestFile = path.join(dist, "runtime-manifest.json");
+  const manifest = JSON.parse(await fs.readFile(manifestFile, "utf8"));
+  await fs.writeFile(manifestFile, JSON.stringify({ ...manifest, sha256: hash }));
+  const release = JSON.parse(await fs.readFile(path.join(stage, "release.json"), "utf8"));
+  await fs.writeFile(path.join(stage, "release.json"), JSON.stringify({ ...release, runtime: { ...release.runtime, sha256: hash } }));
+  const archive = path.join(output, `${name}.tar.gz`);
+  execFileSync("tar", ["-czf", archive, name], { cwd: parent, windowsHide: true });
+  await fs.rm(parent, { recursive: true }); // The staging directory just created above.
+  previous = { archive, installer, version: release.version };
+}
+await fs.writeFile(path.join(output, "fixtures.json"), JSON.stringify({ instance, archives, ...(legacy ? { legacy } : {}), ...(previous ? { previous } : {}) }, null, 2));
 console.log(output);

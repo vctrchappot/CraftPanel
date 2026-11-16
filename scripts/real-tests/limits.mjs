@@ -71,8 +71,13 @@ try {
   await c.call("PATCH", `/api/servers/${id}`, { limitCpuPercent: 50 });
   assert.equal(await read(path.join(cg, "cpu.max")), "50000 100000");
   const throttledBefore = Number(/^nr_throttled (\d+)$/m.exec(await read(path.join(cg, "cpu.stat")))[1]);
-  await c.command(id, "forceload add -160 -160 160 160");
-  await c.sleep(15_000);
+  // The game accepts at most 256 chunks per forceload command (16 x 16), so load two areas and check that it took them.
+  await c.command(id, "forceload add -128 -128 127 127");
+  await c.command(id, "forceload add 128 -128 383 127");
+  await c.sleep(2000);
+  const refusal = (await c.log(id))?.map((l) => l.text).find((t) => /Too many chunks|Unknown or incomplete command/.test(t));
+  assert(!refusal, `The load generator was refused: ${refusal}`);
+  await c.sleep(13_000);
   await c.command(id, "forceload remove all");
   await c.command(id, "save-all flush");
   const throttled = Number(/^nr_throttled (\d+)$/m.exec(await read(path.join(cg, "cpu.stat")))[1]) - throttledBefore;
