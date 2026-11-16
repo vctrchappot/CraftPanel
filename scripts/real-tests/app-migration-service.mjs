@@ -26,7 +26,8 @@ const runtime = `${task} Runtime`;
 const install = windows ? path.join(root, "app") : `/opt/${instance}`;
 const data = windows ? path.join(root, "target") : `/var/lib/${instance}`;
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../apps/api/dist");
-const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("CRAFTPANEL_")));
+// PowerShell 7's module path cannot be used by the installer's Windows PowerShell 5.1 child.
+const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("CRAFTPANEL_") && (!windows || k.toLowerCase() !== "psmodulepath")));
 const freePort = async () => {
   const listener = net.createServer();
   await new Promise((resolve, reject) => { listener.once("error", reject); listener.listen(0, "127.0.0.1", resolve); });
@@ -40,8 +41,15 @@ const credentials = ["migration-owner", "throwaway-migration-test-1"];
 const targetEnv = { ...env, CRAFTPANEL_INSTALL_DIR: install, CRAFTPANEL_DATA_DIR: data, CRAFTPANEL_TASK_NAME: task,
   CRAFTPANEL_PORT: String(portB), CRAFTPANEL_GAME_ACCOUNTS: "2", CP_RUNTIME: runtime, CP_TASK: task,
   CP_INSTALLER: path.join(fixtures, "install.ps1"), CRAFTPANEL_ARCHIVE: path.join(fixtures, "craftpanel-v99.0.0.tar.gz") };
-const ps = async (script, extra = {}) => (await run("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
-  { env: { ...targetEnv, ...extra }, timeout: 300_000, maxBuffer: 4 * 1024 * 1024, windowsHide: true })).stdout.trim();
+const ps = async (script, extra = {}) => {
+  try {
+    return (await run("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+      { env: { ...targetEnv, ...extra }, timeout: 300_000, maxBuffer: 4 * 1024 * 1024, windowsHide: true })).stdout.trim();
+  } catch (error) {
+    // The installer reports errors on stdout; include them in the retained JSON evidence too.
+    throw new Error([error.message, error.stdout, error.stderr].filter(Boolean).join("\n"), { cause: error });
+  }
+};
 if (windows) assert.equal(await ps("([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)"), "True", "Run elevated");
 else { assert(instance.length <= 24); await assert.rejects(fs.access(data), { code: "ENOENT" }); }
 const original = windows ? null : (await run("systemctl", ["show", "craftpanel", "-p", "MainPID", "--value"])).stdout.trim();
