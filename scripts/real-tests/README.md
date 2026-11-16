@@ -105,8 +105,8 @@ Use a new fixture directory per run. Existing normal CraftPanel instances are no
 Generate fixtures with a fresh isolated name, then run as root on a disposable systemd test host with mineflayer already installed in a separate tools directory:
 
 ```bash
-node scripts/real-tests/installer-fixtures.mjs test-results/runtime-acceptance craftpanel-ops-runtime-test
-sudo node scripts/real-tests/runtime-continuity.mjs test-results/runtime-acceptance craftpanel-ops-runtime-test 19689 /path/to/test-tools [/path/to/java]
+node scripts/real-tests/installer-fixtures.mjs test-results/runtime-acceptance craftpanel-ops-rt
+sudo node scripts/real-tests/runtime-continuity.mjs test-results/runtime-acceptance craftpanel-ops-rt 19689 /path/to/test-tools [/path/to/java]
 ```
 
 The optional Java executable is copied into this instance's data directory; the original installation is read-only. The harness installs real Paper 1.21.4, holds a real offline player through dashboard restart/crash, successful dashboard update and migration/unit rollback, and checks unchanged PIDs, player connection, console replay and working commands. It also checks missing/expired/mismatched runtime approvals, changed-runtime rollback and successful maintenance update using a gold block in the real world, and graceful runtime-service restart with auto-start. That final scenario is not an actual host reboot. JSON evidence and installer logs remain in the fixture directory. Services are uninstalled even on failure; data is retained for diagnosis. Fixture names and ports must be unused. Playwright output is confined to `test-results/playwright` so it cannot delete these archives.

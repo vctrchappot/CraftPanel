@@ -8,6 +8,8 @@ import crypto from "node:crypto";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const [outputArg, instance = "craftpanel", legacySourceArg] = process.argv.slice(2);
 if (!outputArg || !/^(craftpanel|craftpanel-ops-[a-z0-9-]+)$/.test(instance)) throw new Error("Usage: installer-fixtures.mjs OUTPUT [craftpanel-ops-NAME]");
+// The installer creates game accounts named <instance>-game-NN, and Linux accepts at most 32 characters.
+if (`${instance}-game-00`.length > 32) throw new Error(`The instance name "${instance}" is too long: its game accounts (${instance}-game-00) would exceed 32 characters.`);
 const output = path.resolve(outputArg);
 await fs.mkdir(path.dirname(output), { recursive: true });
 await fs.mkdir(output); // Refuse to overwrite an existing fixture set.
