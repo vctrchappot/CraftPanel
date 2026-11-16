@@ -287,13 +287,6 @@ jobs:
         run: sudo env "PATH=$PATH" node scripts/real-tests/isolation.mjs test-results/isolation craftpanel-ops-iso 19686
       - name: Resource limits through cgroup v2, out-of-memory stop reported
         run: sudo env "PATH=$PATH" node scripts/real-tests/limits.mjs test-results/limits craftpanel-ops-lim 19687
-      - name: Servers of the previous release move to game accounts when CraftPanel is updated
-        run: |
-          prev=v1.0.0
-          mkdir -p test-results/previous
-          curl -fsSL -o "test-results/previous/craftpanel-$prev.tar.gz" "https://github.com/${{ github.repository }}/releases/download/$prev/craftpanel-$prev.tar.gz"
-          node scripts/real-tests/installer-fixtures.mjs test-results/upgrade craftpanel-ops-up --previous "test-results/previous/craftpanel-$prev.tar.gz"
-          sudo env "PATH=$PATH" node scripts/real-tests/upgrade-isolation.mjs test-results/upgrade craftpanel-ops-up 19688
       - name: A player stays connected through dashboard restarts and updates
         run: |
           tools="$RUNNER_TEMP/mc-tools"
@@ -308,10 +301,48 @@ jobs:
           path: |
             test-results/isolation/*.json
             test-results/limits/*.json
-            test-results/upgrade/*.json
-            test-results/upgrade/*.log
             test-results/continuity/*.log
             test-results/continuity/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # An existing install of the previous release, with servers that ran as the service account, updated to this build:
+  # the servers move to their game accounts with their worlds and files (upgrade-isolation.mjs).
+  linux-upgrade:
+    name: Linux upgrade from the previous release (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.service == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Servers of the previous release move to game accounts when CraftPanel is updated
+        run: |
+          prev=v1.0.0
+          mkdir -p test-results/previous
+          curl -fsSL -o "test-results/previous/craftpanel-$prev.tar.gz" "https://github.com/${{ github.repository }}/releases/download/$prev/craftpanel-$prev.tar.gz"
+          node scripts/real-tests/installer-fixtures.mjs test-results/upgrade craftpanel-ops-up --previous "test-results/previous/craftpanel-$prev.tar.gz"
+          sudo env "PATH=$PATH" node scripts/real-tests/upgrade-isolation.mjs test-results/upgrade craftpanel-ops-up 19688
+      - if: failure()
+        run: sudo journalctl --no-pager -u 'craftpanel-ops-*' | tail -200
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-upgrade-${{ matrix.os }}
+          path: |
+            test-results/upgrade/*.json
+            test-results/upgrade/*.log
           if-no-files-found: ignore
           retention-days: 14
 
@@ -339,7 +370,7 @@ jobs:
   # matrix jobs by name doesn't work once they can be skipped: a skipped matrix job reports without its OS.)
   result:
     name: CI result
-    needs: [changes, test, plugin, e2e, installer, package-linux, package-windows, linux-service, site]
+    needs: [changes, test, plugin, e2e, installer, package-linux, package-windows, linux-service, linux-upgrade, site]
     if: always()
     runs-on: ubuntu-latest
     steps:
