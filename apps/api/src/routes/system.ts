@@ -188,7 +188,8 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.get("/api/system/diagnostics", async (req) => {
     requirePermission(req, "app.configure");
-    return deploymentDiagnostics(ctx.config, { transportSecure: isSecureRequest(req, ctx.config) });
+    const identity = ctx.agent.identity;
+    return deploymentDiagnostics(ctx.config, { transportSecure: isSecureRequest(req, ctx.config) }, { connected: ctx.agent.connected, isolation: identity?.isolation, limits: identity?.limits });
   });
 
   app.get<{ Querystring: { refresh?: string } }>("/api/updates", async (req) => {

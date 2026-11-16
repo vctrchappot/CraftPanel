@@ -4,6 +4,7 @@ import path from "node:path";
 import { createPrivateKey, X509Certificate } from "node:crypto";
 import { isIP } from "node:net";
 import { DatabaseSync } from "node:sqlite";
+import type { IsolationStatus, LimitSupport } from "@craftpanel/server-runtime";
 import type { AppConfig } from "./config";
 
 export interface DiagnosticCheck {
@@ -13,8 +14,11 @@ export interface DiagnosticCheck {
   hint?: string;
 }
 
+/** What the dashboard knows about the Minecraft runtime it is connected to (the `doctor` command has no connection). */
+export interface RuntimeFacts { connected: boolean; isolation?: IsolationStatus; limits?: LimitSupport; platform?: NodeJS.Platform }
+
 /** Read-only checks: no migrations, downloads, process changes or test files. */
-export async function deploymentDiagnostics(config: AppConfig, request?: { transportSecure: boolean }) {
+export async function deploymentDiagnostics(config: AppConfig, request?: { transportSecure: boolean }, runtime?: RuntimeFacts) {
   const checks: DiagnosticCheck[] = [];
   const add = (id: string, status: DiagnosticCheck["status"], message: string, hint?: string) => checks.push({ id, status, message, ...(hint ? { hint } : {}) });
   add("listener", "ok", `Profile ${config.profile}; listener ${config.host}:${config.port}`);
@@ -81,5 +85,30 @@ export async function deploymentDiagnostics(config: AppConfig, request?: { trans
     const absent = (error as NodeJS.ErrnoException).code === "ENOENT";
     add("database", absent ? "warning" : "error", absent ? "No database yet; first start initializes it" : "The database could not be checked", absent ? undefined : "Check access permissions and whether another operation holds the database lock.");
   }
+  if (runtime) runtimeChecks(runtime, add);
   return { ok: !checks.some((c) => c.status === "error"), checks };
+}
+
+/** Is the runtime there, and does it keep servers apart and within limits? Warnings, never errors: servers still run. */
+function runtimeChecks(runtime: RuntimeFacts, add: (id: string, status: DiagnosticCheck["status"], message: string, hint?: string) => void) {
+  if (!runtime.connected) {
+    add("runtime", "warning", "The Minecraft runtime is not connected", "Start the runtime service with the same data directory. Servers keep running, but their state and controls are unavailable until it is back.");
+    return;
+  }
+  const isolation = runtime.isolation;
+  if (isolation?.mode === "isolated") {
+    add("isolation", "ok", isolation.method === "token"
+      ? "Every server runs under its own restricted Windows token and cannot read the panel's database or the other servers' files"
+      : `Every server runs under its own game account (${isolation.accounts} available) and cannot read the panel's database or the other servers' files`);
+  } else if (isolation) {
+    // Nothing to fix on a system that has no isolation (macOS): say so without a warning.
+    add("isolation", (runtime.platform ?? process.platform) === "darwin" ? "ok" : "warning",
+      "Servers run under the same account as CraftPanel: a plugin or mod can read the panel's database, sessions and keys and the other servers' files",
+      isolation.reason);
+  } else {
+    add("isolation", "warning", "The runtime did not report whether servers are isolated", "It is older than this dashboard. Update the runtime with a maintenance restart (Settings → Updates).");
+  }
+  const limits = runtime.limits;
+  if (limits?.available) add("limits", "ok", `Resource limits are enforced${limits.controllers?.length ? ` (${limits.controllers.join(", ")})` : ""}`);
+  else if (limits) add("limits", "warning", "Resource limits for servers are not enforced on this host", limits.reason);
 }

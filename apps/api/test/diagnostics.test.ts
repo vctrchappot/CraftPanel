@@ -38,4 +38,35 @@ describe("read-only deployment diagnostics", () => {
       expect(await fs.readFile(file)).toEqual(before);
     } finally { await fs.rm(root, { recursive: true, force: true }); }
   });
+
+  it("reports how the runtime keeps servers apart and within limits", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cp-doctor-"));
+    try {
+      const config = loadConfig({ CRAFTPANEL_DATA_DIR: root });
+      const check = async (runtime: Parameters<typeof deploymentDiagnostics>[2]) => (await deploymentDiagnostics(config, undefined, runtime)).checks;
+      // Without a runtime view (the doctor command) nothing about the runtime is claimed.
+      expect((await deploymentDiagnostics(config)).checks.map((c) => c.id)).not.toContain("isolation");
+
+      let checks = await check({ connected: false });
+      expect(checks).toContainEqual(expect.objectContaining({ id: "runtime", status: "warning" }));
+      expect(checks.map((c) => c.id)).not.toContain("isolation");
+
+      checks = await check({ connected: true, isolation: { mode: "isolated", method: "accounts", accounts: 32 }, limits: { available: true, controllers: ["memory", "cpu", "pids"] } });
+      expect(checks).toContainEqual(expect.objectContaining({ id: "isolation", status: "ok", message: expect.stringContaining("game account (32 available)") }));
+      expect(checks).toContainEqual(expect.objectContaining({ id: "limits", status: "ok", message: expect.stringContaining("memory, cpu, pids") }));
+
+      checks = await check({ connected: true, isolation: { mode: "isolated", method: "token" } });
+      expect(checks).toContainEqual(expect.objectContaining({ id: "isolation", status: "ok", message: expect.stringContaining("restricted Windows token") }));
+
+      checks = await check({ connected: true, platform: "linux", isolation: { mode: "shared", reason: "No game accounts" }, limits: { available: false, reason: "The memory controller is not enabled" } });
+      expect(checks).toContainEqual(expect.objectContaining({ id: "isolation", status: "warning", hint: "No game accounts" }));
+      expect(checks).toContainEqual(expect.objectContaining({ id: "limits", status: "warning", hint: "The memory controller is not enabled" }));
+
+      checks = await check({ connected: true, platform: "darwin", isolation: { mode: "shared", reason: "Per-server isolation is available on Linux service installs and Windows" } });
+      expect(checks).toContainEqual(expect.objectContaining({ id: "isolation", status: "ok" }));
+
+      checks = await check({ connected: true });
+      expect(checks).toContainEqual(expect.objectContaining({ id: "isolation", status: "warning", message: expect.stringContaining("did not report") }));
+    } finally { await fs.rm(root, { recursive: true, force: true }); }
+  });
 });
