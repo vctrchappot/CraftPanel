@@ -83,7 +83,7 @@ Don't port-forward the dashboard. Plain HTTP sends passwords unencrypted; use a 
 
 ## Deployment checks
 
-**Settings → Remote access → Deployment checks** reports whether your current connection uses HTTPS, which proxies are trusted, data-directory access, free disk space, certificate validity and database integrity. The same checks run without the dashboard:
+**Settings → Remote access → Deployment checks** reports whether your current connection uses HTTPS, which proxies are trusted, data-directory access, free disk space, certificate validity and database integrity. In the dashboard it also says whether the Minecraft runtime is connected, whether every server runs under its own account (Linux service installs) or restricted token (Windows service) so that a plugin can't read the panel's database or the other servers' files, and whether resource limits are enforced. A server that shares CraftPanel's account is a warning with the reason (for example no game accounts were created, or the installer must be run again). The same checks, without the runtime ones, run without the dashboard:
 
 ```bash
 node apps/api/dist/index.js doctor          # add --json for scripts
