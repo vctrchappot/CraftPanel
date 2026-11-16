@@ -46,7 +46,12 @@ async function main() {
   }
 
   if (process.argv[2] === "doctor" || process.argv.includes("--doctor")) {
-    const report = await deploymentDiagnostics(config);
+    // Ask the runtime what it enforces; `doctor` stays read-only (a handshake changes nothing) and never starts it.
+    const probe = new RuntimeClient(config.layout.root, () => undefined); // the check itself reports an unreachable runtime
+    await probe.connect().catch(() => undefined);
+    const runtime = { connected: probe.connected, ...probe.identity };
+    await probe.disconnect();
+    const report = await deploymentDiagnostics(config, undefined, runtime);
     if (process.argv.includes("--json")) console.log(JSON.stringify(report, null, 2));
     else for (const check of report.checks) console.log(`${check.status.toUpperCase().padEnd(7)} ${check.message}${check.hint ? `\n        ${check.hint}` : ""}`);
     process.exitCode = report.ok ? 0 : 1;

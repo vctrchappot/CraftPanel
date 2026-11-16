@@ -38,4 +38,25 @@ describe("read-only deployment diagnostics", () => {
       expect(await fs.readFile(file)).toEqual(before);
     } finally { await fs.rm(root, { recursive: true, force: true }); }
   });
+
+  it("reports what the runtime isolates and limits, and warns when it does not", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cp-doctor-"));
+    try {
+      const config = loadConfig({ CRAFTPANEL_DATA_DIR: root });
+      const check = async (runtime: Parameters<typeof deploymentDiagnostics>[2], id: string) =>
+        (await deploymentDiagnostics(config, undefined, runtime)).checks.find((c) => c.id === id);
+      expect(await check(undefined, "isolation")).toBeUndefined();
+      expect(await check({ connected: false }, "runtime")).toMatchObject({ status: "warning" });
+      expect(await check({ connected: true, isolation: { mode: "isolated", method: "accounts", accounts: 32 } }, "isolation")).toMatchObject({ status: "ok", message: expect.stringContaining("32 available") });
+      expect(await check({ connected: true, isolation: { mode: "isolated", method: "token" } }, "isolation")).toMatchObject({ status: "ok", message: expect.stringContaining("restricted token") });
+      expect(await check({ connected: true, isolation: { mode: "shared", reason: "No game accounts." } }, "isolation"))
+        .toMatchObject({ status: "warning", message: "Servers are not isolated: No game accounts", hint: expect.stringContaining("installer") });
+      expect(await check({ connected: true }, "isolation")).toMatchObject({ status: "warning" });
+      expect(await check({ connected: true, limits: { available: true, controllers: ["memory", "cpu", "pids"] } }, "limits")).toMatchObject({ status: "ok", message: expect.stringContaining("memory, cpu, pids") });
+      expect(await check({ connected: true, limits: { available: false, reason: "cgroup v1" } }, "limits")).toMatchObject({ status: "warning", message: "Resource limits are not enforced: cgroup v1" });
+      expect(await check({ connected: true, limits: { available: true, controllers: ["cpu"], reason: "The kernel does not offer: memory" } }, "limits")).toMatchObject({ status: "warning" });
+      // Warnings never fail the report.
+      expect((await deploymentDiagnostics(config, undefined, { connected: false })).ok).toBe(true);
+    } finally { await fs.rm(root, { recursive: true, force: true }); }
+  });
 });

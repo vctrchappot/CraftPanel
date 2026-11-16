@@ -4,7 +4,11 @@ import path from "node:path";
 import { createPrivateKey, X509Certificate } from "node:crypto";
 import { isIP } from "node:net";
 import { DatabaseSync } from "node:sqlite";
+import type { IsolationStatus, LimitSupport } from "@craftpanel/server-runtime";
 import type { AppConfig } from "./config";
+
+/** What the Minecraft runtime reported in its handshake; `connected: false` when it could not be reached. */
+export interface RuntimeReport { connected: boolean; isolation?: IsolationStatus; limits?: LimitSupport }
 
 export interface DiagnosticCheck {
   id: string;
@@ -14,7 +18,7 @@ export interface DiagnosticCheck {
 }
 
 /** Read-only checks: no migrations, downloads, process changes or test files. */
-export async function deploymentDiagnostics(config: AppConfig, request?: { transportSecure: boolean }) {
+export async function deploymentDiagnostics(config: AppConfig, request?: { transportSecure: boolean }, runtime?: RuntimeReport) {
   const checks: DiagnosticCheck[] = [];
   const add = (id: string, status: DiagnosticCheck["status"], message: string, hint?: string) => checks.push({ id, status, message, ...(hint ? { hint } : {}) });
   add("listener", "ok", `Profile ${config.profile}; listener ${config.host}:${config.port}`);
@@ -81,5 +85,26 @@ export async function deploymentDiagnostics(config: AppConfig, request?: { trans
     const absent = (error as NodeJS.ErrnoException).code === "ENOENT";
     add("database", absent ? "warning" : "error", absent ? "No database yet; first start initializes it" : "The database could not be checked", absent ? undefined : "Check access permissions and whether another operation holds the database lock.");
   }
+  if (runtime) addRuntimeChecks(runtime, add);
   return { ok: !checks.some((c) => c.status === "error"), checks };
+}
+
+type Add = (id: string, status: DiagnosticCheck["status"], message: string, hint?: string) => void;
+
+function addRuntimeChecks(runtime: RuntimeReport, add: Add) {
+  if (!runtime.connected) {
+    add("runtime", "warning", "The Minecraft runtime could not be reached", "Start the runtime service with the same data directory, as the account that owns it. Servers keep running without the dashboard.");
+    return;
+  }
+  const { isolation, limits } = runtime;
+  if (!isolation) add("isolation", "warning", "The runtime did not report its isolation state", "Update CraftPanel so the dashboard and runtime match.");
+  else if (isolation.mode === "isolated")
+    add("isolation", "ok", isolation.method === "token"
+      ? "Every server runs under its own restricted token; game processes cannot read the database or the runtime token"
+      : `Every server runs under its own game account (${isolation.accounts ?? 0} available); game processes cannot read the database or other servers`);
+  else add("isolation", "warning", `Servers are not isolated: ${(isolation.reason ?? "no reason reported").replace(/\.$/, "")}`,
+    "A plugin or mod can read the panel database and the runtime token. Install CraftPanel with its installer to isolate every server.");
+  if (limits && !limits.available) add("limits", "warning", `Resource limits are not enforced: ${(limits.reason ?? "no reason reported").replace(/\.$/, "")}`);
+  else if (limits?.reason) add("limits", "warning", limits.reason);
+  else if (limits) add("limits", "ok", `Resource limits are enforced (${(limits.controllers ?? []).join(", ") || "all kinds"})`);
 }

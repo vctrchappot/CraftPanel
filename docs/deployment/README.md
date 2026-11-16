@@ -187,7 +187,7 @@ Configure nginx's certificate and HTTP-to-HTTPS redirect separately. Restrict `1
 
 ## Deployment diagnostics
 
-**Settings → Remote access → Deployment checks** reports the current connection transport, trusted proxy peers, data-directory access, free disk space, TLS certificate validity and SQLite integrity.
+**Settings → Remote access → Deployment checks** reports the current connection transport, trusted proxy peers, data-directory access, free disk space, TLS certificate validity and SQLite integrity. It also asks the Minecraft runtime whether servers are isolated (game accounts on Linux, restricted tokens on Windows) and whether resource limits are enforced, and warns, with the reason, when they are not.
 
 The same checks can run without starting CraftPanel:
 
@@ -196,7 +196,7 @@ node apps/api/dist/index.js doctor
 node --env-file=.env apps/api/dist/index.js doctor --json
 ```
 
-Use the same environment and OS account as the service. A shell does not inherit systemd's `EnvironmentFile`; supply the service settings explicitly when running doctor manually. Exit code `1` means a check failed; warnings alone return `0`. The command does not run migrations, initialize missing data directories, download software or restart servers. CLI checks cannot verify the browser-to-proxy connection; check the external HTTPS address in the dashboard.
+`doctor` connects to the runtime read-only to ask (it needs the runtime token, so run it as the service account); if the runtime isn't reachable it warns instead of failing. Use the same environment and OS account as the service. A shell does not inherit systemd's `EnvironmentFile`; supply the service settings explicitly when running doctor manually. Exit code `1` means a check failed; warnings alone return `0`. The command does not run migrations, initialize missing data directories, download software or restart servers. CLI checks cannot verify the browser-to-proxy connection; check the external HTTPS address in the dashboard.
 
 `GET /api/health` checks that the HTTP process answers. `GET /api/ready` returns `200` after startup recovery completes and the database is accessible, or `503` while starting, shutting down or unable to query the database. Local maintenance probes work even when the external dashboard requires HTTPS.
 

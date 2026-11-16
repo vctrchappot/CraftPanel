@@ -83,10 +83,10 @@ Don't port-forward the dashboard. Plain HTTP sends passwords unencrypted; use a 
 
 ## Deployment checks
 
-**Settings → Remote access → Deployment checks** reports whether your current connection uses HTTPS, which proxies are trusted, data-directory access, free disk space, certificate validity and database integrity. The same checks run without the dashboard:
+**Settings → Remote access → Deployment checks** reports whether your current connection uses HTTPS, which proxies are trusted, data-directory access, free disk space, certificate validity and database integrity. It also tells you whether every server runs isolated (so a plugin can't read the panel database) and whether resource limits are enforced, and why not when they aren't. The same checks run without the dashboard:
 
 ```bash
 node apps/api/dist/index.js doctor          # add --json for scripts
 ```
 
-Run it as the service account with the same settings. Exit code 1 means a check failed.
+Run it as the service account with the same settings (it needs access to the runtime for the isolation and limit checks). Exit code 1 means a check failed.

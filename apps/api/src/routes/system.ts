@@ -188,7 +188,9 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.get("/api/system/diagnostics", async (req) => {
     requirePermission(req, "app.configure");
-    return deploymentDiagnostics(ctx.config, { transportSecure: isSecureRequest(req, ctx.config) });
+    // The embedded test agent has no identity to report.
+    const runtime = ctx.agent.identity || !ctx.agent.connected ? { connected: ctx.agent.connected, ...ctx.agent.identity } : undefined;
+    return deploymentDiagnostics(ctx.config, { transportSecure: isSecureRequest(req, ctx.config) }, runtime);
   });
 
   app.get<{ Querystring: { refresh?: string } }>("/api/updates", async (req) => {
