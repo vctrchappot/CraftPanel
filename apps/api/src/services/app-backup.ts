@@ -47,7 +47,10 @@ export class AppBackupService {
   }
 
   async list(): Promise<AppBackupInfo[]> {
-    const dir = await this.directory();
+    return this.listIn(await this.directory());
+  }
+
+  private async listIn(dir: string): Promise<AppBackupInfo[]> {
     const out: AppBackupInfo[] = [];
     for (const filename of await fsp.readdir(dir).catch(() => [] as string[])) {
       if (!NAME.test(filename)) continue;
@@ -74,7 +77,11 @@ export class AppBackupService {
   }
 
   async remove(filename: string, actor: Actor) {
-    await fsp.rm(await this.file(filename));
+    await this.removeFile(await this.file(filename), filename, actor);
+  }
+
+  private async removeFile(file: string, filename: string, actor: Actor) {
+    await fsp.rm(file, { force: true });
     await this.activity.audit(actor, "app-backup.delete", null, { filename });
   }
 
@@ -92,10 +99,11 @@ export class AppBackupService {
 
   private async complete(includeServers: boolean, actor: Actor, schedule?: { id: string; keep: number }): Promise<string> {
     try {
-      const filename = await this.create(includeServers, actor, schedule?.id);
+      const dir = await this.directory();
+      const filename = await this.create(dir, includeServers, actor, schedule?.id);
       if (schedule) {
-        const older = (await this.list()).filter((b) => b.scheduleId === schedule.id && b.filename !== filename);
-        for (const backup of older.slice(schedule.keep - 1)) await this.remove(backup.filename, actor);
+        const older = (await this.listIn(dir)).filter((b) => b.scheduleId === schedule.id && b.filename !== filename);
+        for (const backup of older.slice(schedule.keep - 1)) await this.removeFile(path.join(dir, backup.filename), backup.filename, actor);
       }
       this.current = { running: false, message: "Backup complete", percent: 100, error: null };
       return filename;
@@ -109,8 +117,7 @@ export class AppBackupService {
 
   private say(message: string, percent: number | null = null) { this.current = { ...this.current, message, percent }; }
 
-  private async create(includeServers: boolean, actor: Actor, scheduleId?: string): Promise<string> {
-    const dir = await this.directory();
+  private async create(dir: string, includeServers: boolean, actor: Actor, scheduleId?: string): Promise<string> {
     await fsp.mkdir(dir, { recursive: true, mode: 0o700 });
     const disk = await freeDiskSpace(dir);
     if (disk && disk.free < 512 * 1024 ** 2) throw new Error("Less than 512 MB free at the backup destination");

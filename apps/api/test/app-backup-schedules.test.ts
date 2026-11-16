@@ -113,6 +113,31 @@ describe("scheduled application backups", () => {
     await ctx.schedules.remove(schedule.id, actor);
   });
 
+  it("prunes only the destination used by the new archive when settings change during the backup", async () => {
+    const schedule = { id: crypto.randomUUID(), keep: 1 };
+    const oldDestination = path.join(root, "old-destination");
+    const newDestination = path.join(root, "new-destination");
+    await ctx.settings.set({ backupDirectory: newDestination });
+    const keepThere = await ctx.appBackups.run(false, actor, schedule);
+    await ctx.settings.set({ backupDirectory: oldDestination });
+    const oldArchive = await ctx.appBackups.run(false, actor, schedule);
+    let release!: () => void;
+    let entered!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const waiting = new Promise<void>((r) => { entered = r; });
+    const rows = vi.spyOn(ctx.servers, "rows").mockImplementationOnce(async () => { entered(); await gate; return []; });
+    const backup = ctx.appBackups.run(false, actor, schedule);
+    await waiting;
+    try {
+      await ctx.settings.set({ backupDirectory: newDestination });
+      release();
+      const created = await backup;
+      expect(await fs.readdir(path.join(oldDestination, "application"))).toEqual([created]);
+      expect(created).not.toBe(oldArchive);
+      expect(await fs.readdir(path.join(newDestination, "application"))).toEqual([keepThere]);
+    } finally { release(); await backup.catch(() => {}); rows.mockRestore(); await ctx.settings.set({ backupDirectory: "" }); }
+  });
+
   it("boots a persisted cron job once per scheduled minute and honours disabled schedules", async () => {
     const active = await ctx.schedules.create(input({ cron: "* * * * * *", enabled: true, payload: { includeServers: false, keep: 1 } }), actor);
     const paused = await ctx.schedules.create(input({ cron: "* * * * * *", enabled: false }), actor);
