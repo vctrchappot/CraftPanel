@@ -76,6 +76,16 @@ sudo node scripts/real-tests/isolation.mjs test-results/isolation craftpanel-ops
 
 `limits.mjs` (same fixtures with `craftpanel-ops-lim`, port 19687) checks per-server resource limits on such an install: the server's cgroup and its memory, swap, CPU and process limits, CPU throttling under chunk generation, live changes without a restart, refusal of a cap below the heap, an out-of-memory stop (injected by squeezing the cgroup as root) reported as "Memory limit reached", and cleanup after stop.
 
+`upgrade-isolation.mjs` (fixtures with `--previous`, instance `craftpanel-ops-up`, port 19688) checks the upgrade of a real earlier release: it installs the published `v1.0.0` archive (renamed for the throwaway instance), creates two Paper servers that run as the service account, then updates with the current installer and release (`--allow-runtime-restart`). The old servers must start under game accounts without capabilities, the old files (world, a plugin's data file) must be handed to the game account and still load, secrets must stay closed, and the deployment checks must report isolation and limits.
+
+```bash
+curl -fsSL -o craftpanel-v1.0.0.tar.gz https://github.com/vctrchappot/CraftPanel/releases/download/v1.0.0/craftpanel-v1.0.0.tar.gz
+node scripts/real-tests/installer-fixtures.mjs test-results/upgrade craftpanel-ops-up --previous craftpanel-v1.0.0.tar.gz
+sudo node scripts/real-tests/upgrade-isolation.mjs test-results/upgrade craftpanel-ops-up 19688
+```
+
+`isolation.mjs`, `limits.mjs`, `upgrade-isolation.mjs` and `runtime-continuity.mjs` also run in CI (jobs `Linux service` and `Linux upgrade`, Ubuntu on x64 and ARM64, when the `service` area changes; see [development/README.md](../../docs/development/README.md#continuous-integration)). A manual run (Actions → CI → Run workflow, areas `service`) tries them on a branch. Instance names must stay short: the game accounts are `<instance>-game-NN`, at most 32 characters.
+
 `limits-windows.mjs` (Windows, `run.sh <port> <data-dir> limits-windows.mjs` from Git Bash after `pnpm build`) checks the job object limits with a real Paper server: Java in a job held by the helper, a live CPU cap and its removal measured from Java's CPU time, refusal of a cap below the heap, a live memory cap below what Java has committed reported in the console and as "Memory limit reached", and the helper ending with the server.
 
 `isolation-windows.mjs` (Windows, no administrator rights needed) checks per-server restricted tokens with a real Paper server: Java runs under the token and is the reported PID, it answers a status ping on 127.0.0.1, its folder carries the server SID, the limits helper holds Java, a probe with the same token cannot read the database, the runtime token or a neighbour's file, a forced kill ends Java, and it restarts and stops cleanly. Give the data directory the installer's permissions first and keep it in a folder whose parents Users may list (for example `C:\cpiso\data`, see the script's header), then `CRAFTPANEL_ISOLATION=on KEEP_DATA=1 scripts/real-tests/run.sh <port> <data-dir> isolation-windows.mjs <data-dir>`. The installed service is covered by `runtime-continuity-windows.mjs` in CI.
