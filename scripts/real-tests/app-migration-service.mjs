@@ -136,7 +136,9 @@ try {
   // Restore while the fresh installed dashboard and runtime are running; no owner is created first.
   installed = true; // A partially failed install must be cleaned up too.
   if (windows) {
-    await ps("& powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $env:CP_INSTALLER; exit $LASTEXITCODE");
+    // Run in the process owned by execFile so a timeout releases the install lock too.
+    // Trace the disposable installation to retain the exact blocking command on hosted Windows runners.
+    await ps("Set-PSDebug -Trace 1; & $env:CP_INSTALLER; exit $LASTEXITCODE");
   } else await run("bash", [path.join(fixtures, "install.sh"), "--archive", targetEnv.CRAFTPANEL_ARCHIVE, "--port", String(portB)], { env: targetEnv, timeout: 300_000, maxBuffer: 4 * 1024 * 1024 });
   await ready(portB);
   const setupToken = await fs.readFile(path.join(data, "setup-token.txt"), "utf8").then((s) => s.trim()).catch(() => "");
@@ -216,7 +218,7 @@ try {
   await stopSource();
   await log?.close();
   try {
-    if (installed && windows) await ps("$env:CRAFTPANEL_UNINSTALL = '1'; & powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $env:CP_INSTALLER; exit $LASTEXITCODE");
+    if (installed && windows) await ps("$env:CRAFTPANEL_UNINSTALL = '1'; & $env:CP_INSTALLER; exit $LASTEXITCODE");
     if (!windows) {
       if (installed) await run("bash", [path.join(fixtures, "install.sh"), "--uninstall"], { timeout: 180_000 });
       // Only the throwaway instance, checked before installation above.
