@@ -19,7 +19,8 @@ const [fixturesArg, instance = "craftpanel-ops-move"] = process.argv.slice(2);
 if (!fixturesArg || (!windows && (process.platform !== "linux" || process.getuid() !== 0)) || !/^craftpanel-ops-[a-z0-9-]+$/.test(instance))
   throw new Error("Use Linux/root or Windows/elevated: app-migration-service.mjs FIXTURES [craftpanel-ops-NAME]");
 const fixtures = path.resolve(fixturesArg);
-const root = await fs.mkdtemp(path.join(os.tmpdir(), "cp-service-move-"));
+// The installed PowerShell service expands Windows 8.3 names; use the same canonical path in assertions.
+const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "cp-service-move-")));
 const source = path.join(root, "source");
 const task = `CraftPanel Move ${crypto.randomBytes(5).toString("hex")}`;
 const runtime = `${task} Runtime`;
@@ -137,8 +138,7 @@ try {
   installed = true; // A partially failed install must be cleaned up too.
   if (windows) {
     // Run in the process owned by execFile so a timeout releases the install lock too.
-    // Trace the disposable installation to retain the exact blocking command on hosted Windows runners.
-    await ps("Set-PSDebug -Trace 1; & $env:CP_INSTALLER; exit $LASTEXITCODE");
+    await ps("& $env:CP_INSTALLER; exit $LASTEXITCODE");
   } else await run("bash", [path.join(fixtures, "install.sh"), "--archive", targetEnv.CRAFTPANEL_ARCHIVE, "--port", String(portB)], { env: targetEnv, timeout: 300_000, maxBuffer: 4 * 1024 * 1024 });
   await ready(portB);
   const setupToken = await fs.readFile(path.join(data, "setup-token.txt"), "utf8").then((s) => s.trim()).catch(() => "");
