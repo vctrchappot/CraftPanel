@@ -29,6 +29,8 @@ Owners can schedule a backup of **all of CraftPanel** under **Settings → Backu
 
 After a successful backup, only older files from that schedule are removed. Manual application backups and files from other schedules stay. Disabling or deleting a schedule keeps its existing files. Use **Run now** to try it and **Run history** to check the result. A run is skipped if another application backup is already running.
 
+The schedule can also include **earlier server backups** and **encrypt with a passphrase**. The passphrase is kept in a private file on this host so automatic runs can use it; it is excluded from the database and application backups. Keep another copy separately. After restoring on a new host, encrypted schedules are paused: edit them, enter their passphrase again and enable them. Leaving the passphrase blank while editing on the original host keeps its stored value. Losing the passphrase means encrypted archives cannot be restored.
+
 Enable **Backups** under **Settings → Notifications** for application backup failure alerts. These archives contain account data and secrets, so store them privately and copy them to another disk or computer. See [moving CraftPanel](/docs/administration/maintenance/#moving-craftpanel-to-another-computer) to restore one.
 
 ## Rules

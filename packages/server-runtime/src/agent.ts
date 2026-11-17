@@ -27,6 +27,7 @@ export interface RuntimeAgent extends EventEmitter<AgentEvents> {
   readonly connected: boolean;
   readonly identity: { protocol: number; build: string; isolation?: IsolationStatus; limits?: LimitSupport } | null;
   owns(serverId: string): boolean;
+  serverIds(): string[];
   checkPaths(directory: string, javaPath: string): Promise<RuntimePathAccess>;
   start(serverId: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }): Promise<void>;
   configure(serverId: string, spec: LaunchSpec & { software: ServerSoftware; autoStart?: boolean }): Promise<void>;
@@ -87,6 +88,7 @@ export class LocalAgent extends EventEmitter<AgentEvents> implements RuntimeAgen
   }
 
   owns(id: string) { return this.servers.has(id); }
+  serverIds() { return [...this.servers.keys()]; }
   checkPaths(directory: string, javaPath: string) { return checkRuntimePaths(directory, javaPath); }
 
   async start(id: string, spec: LaunchSpec & { software: ServerSoftware }, wrap?: LaunchWrapper, hooks?: LaunchHooks) {

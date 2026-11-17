@@ -53,14 +53,24 @@ export const api = {
 
 /** Upload with progress (fetch has no upload progress). */
 export function upload(path: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return uploadForm<void>(path, fd, onProgress);
+}
+
+export function uploadForm<T>(path: string, data: FormData, onProgress?: (pct: number) => void, headers: Record<string, string> = {}): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", API_BASE + path);
     xhr.withCredentials = true;
     if (csrfToken) xhr.setRequestHeader("x-csrf-token", csrfToken);
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(Math.round((e.loaded / e.total) * 100));
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) return resolve();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { return resolve(xhr.responseText ? JSON.parse(xhr.responseText) as T : undefined as T); }
+        catch { return reject(new ApiError(xhr.status, "invalid_response", "The server returned an invalid upload response")); }
+      }
       try {
         const e = JSON.parse(xhr.responseText).error;
         reject(new ApiError(xhr.status, e.code, e.message, e.hint));
@@ -69,9 +79,7 @@ export function upload(path: string, file: File, onProgress?: (pct: number) => v
       }
     };
     xhr.onerror = () => reject(new ApiError(0, "network", "Network error during upload"));
-    const fd = new FormData();
-    fd.append("file", file);
-    xhr.send(fd);
+    xhr.send(data);
   });
 }
 

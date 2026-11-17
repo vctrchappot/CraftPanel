@@ -2,6 +2,7 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
 import { conflict, CRAFTPANEL_VERSION, notFound } from "@craftpanel/shared";
 import { createZip, readZipEntry, sha256File } from "@craftpanel/backup";
 import type { DatabaseHandle } from "@craftpanel/database";
@@ -12,23 +13,30 @@ import type { ActivityService, Actor } from "./activity";
 import type { BackupService } from "./backups";
 import type { ServerService } from "./servers";
 import type { SettingsService } from "./settings";
+import { encryptedBackupHeader, encryptApplicationBackup } from "../app-backup-crypto";
+import { BackupPassphrases } from "./backup-passphrases";
+
+export interface AppBackupOptions { passphrase?: string; includeBackupHistory?: boolean; encrypted?: boolean }
 
 export interface AppBackupInfo {
   filename: string;
   size: number;
   createdAt: number;
   scheduleId: string | null;
+  encrypted: boolean;
+  history: number | null;
   /** Servers whose files are inside; null when the manifest could not be read. */
   servers: { total: number; withFiles: number } | null;
 }
 
 export interface AppBackupProgress { running: boolean; message: string | null; percent: number | null; error: string | null }
 
-const NAME = new RegExp(`^${APP_BACKUP_PREFIX}[0-9T-]{1,30}(-config)?\\.zip$`);
+const NAME = new RegExp(`^${APP_BACKUP_PREFIX}[0-9T-]{1,30}(-config)?\\.(zip|cpbackup)$`);
 
 /** Application backups: the panel's database and settings, optionally with every server's files, as one file. */
 export class AppBackupService {
   private current: AppBackupProgress = { running: false, message: null, percent: null, error: null };
+  readonly passphrases: BackupPassphrases;
 
   constructor(
     private database: DatabaseHandle,
@@ -37,7 +45,7 @@ export class AppBackupService {
     private activity: ActivityService,
     private settings: SettingsService,
     private config: AppConfig,
-  ) {}
+  ) { this.passphrases = new BackupPassphrases(config.layout.root); }
 
   progress(): AppBackupProgress { return { ...this.current }; }
 
@@ -58,12 +66,23 @@ export class AppBackupService {
       if (!stat?.isFile()) continue;
       let servers: AppBackupInfo["servers"] = null;
       let scheduleId: string | null = null;
+      let encrypted = false;
+      let history: number | null = null;
       try {
-        const manifest = appBackupManifestSchema.parse(JSON.parse((await readZipEntry(path.join(dir, filename), "manifest.json"))!.toString("utf8")));
-        servers = { total: manifest.servers.length, withFiles: manifest.servers.filter((s) => s.archive).length };
-        scheduleId = manifest.scheduleId ?? null;
+        const envelope = await encryptedBackupHeader(path.join(dir, filename));
+        if (envelope) {
+          encrypted = true;
+          servers = envelope.header.servers;
+          scheduleId = envelope.header.scheduleId;
+          history = envelope.header.history;
+        } else {
+          const manifest = appBackupManifestSchema.parse(JSON.parse((await readZipEntry(path.join(dir, filename), "manifest.json"))!.toString("utf8")));
+          servers = { total: manifest.servers.length, withFiles: manifest.servers.filter((s) => s.archive).length };
+          scheduleId = manifest.scheduleId ?? null;
+          history = manifest.backups?.length ?? 0;
+        }
       } catch { /* an unreadable manifest is shown without details */ }
-      out.push({ filename, size: stat.size, createdAt: stat.mtimeMs, servers, scheduleId });
+      out.push({ filename, size: stat.size, createdAt: stat.mtimeMs, servers, scheduleId, encrypted, history });
     }
     return out.sort((a, b) => b.createdAt - a.createdAt);
   }
@@ -86,21 +105,23 @@ export class AppBackupService {
   }
 
   /** Starts the backup and returns at once; `progress()` shows how far it is. */
-  start(includeServers: boolean, actor: Actor): void {
-    void this.run(includeServers, actor).catch(() => undefined);
+  start(includeServers: boolean, actor: Actor, options: AppBackupOptions = {}): void {
+    void this.run(includeServers, actor, undefined, options).catch(() => undefined);
   }
 
   /** Holds the same lock for manual and scheduled backups, including retention. */
-  run(includeServers: boolean, actor: Actor, schedule?: { id: string; keep: number }): Promise<string> {
+  run(includeServers: boolean, actor: Actor, schedule?: { id: string; keep: number }, options: AppBackupOptions = {}): Promise<string> {
     if (this.current.running) throw conflict("An application backup is already running");
     this.current = { running: true, message: "Preparing", percent: null, error: null };
-    return this.complete(includeServers, actor, schedule);
+    return this.complete(includeServers, actor, schedule, options);
   }
 
-  private async complete(includeServers: boolean, actor: Actor, schedule?: { id: string; keep: number }): Promise<string> {
+  private async complete(includeServers: boolean, actor: Actor, schedule: { id: string; keep: number } | undefined, options: AppBackupOptions): Promise<string> {
     try {
+      const passphrase = options.passphrase ?? (schedule && options.encrypted ? await this.passphrases.get(schedule.id) : undefined);
+      if (options.encrypted && !passphrase) throw new Error("Set a passphrase for this application-backup schedule on this computer");
       const dir = await this.directory();
-      const filename = await this.create(dir, includeServers, actor, schedule?.id);
+      const filename = await this.create(dir, includeServers, actor, schedule?.id, { ...options, passphrase });
       if (schedule) {
         const older = (await this.listIn(dir)).filter((b) => b.scheduleId === schedule.id && b.filename !== filename);
         for (const backup of older.slice(schedule.keep - 1)) await this.removeFile(path.join(dir, backup.filename), backup.filename, actor);
@@ -117,13 +138,14 @@ export class AppBackupService {
 
   private say(message: string, percent: number | null = null) { this.current = { ...this.current, message, percent }; }
 
-  private async create(dir: string, includeServers: boolean, actor: Actor, scheduleId?: string): Promise<string> {
+  private async create(dir: string, includeServers: boolean, actor: Actor, scheduleId: string | undefined, options: AppBackupOptions): Promise<string> {
     await fsp.mkdir(dir, { recursive: true, mode: 0o700 });
     const disk = await freeDiskSpace(dir);
     if (disk && disk.free < 512 * 1024 ** 2) throw new Error("Less than 512 MB free at the backup destination");
     const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 23);
-    const filename = `${APP_BACKUP_PREFIX}${stamp}${includeServers ? "" : "-config"}.zip`;
-    const staging = path.join(this.config.layout.tmp, `app-backup-${crypto.randomBytes(6).toString("hex")}`);
+    const filename = `${APP_BACKUP_PREFIX}${stamp}${includeServers ? "" : "-config"}.${options.passphrase ? "cpbackup" : "zip"}`;
+    const work = path.join(this.config.layout.tmp, `app-backup-${crypto.randomBytes(6).toString("hex")}`);
+    const staging = path.join(work, "content");
     await fsp.mkdir(path.join(staging, "servers"), { recursive: true, mode: 0o700 });
     const temporary: string[] = []; // server backups made for this archive, removed afterwards
     try {
@@ -143,6 +165,26 @@ export class AppBackupService {
         ...(scheduleId ? { scheduleId } : {}),
         servers: [],
       };
+
+      if (options.includeBackupHistory) {
+        manifest.backups = [];
+        const snapshot = new DatabaseSync(database, { readOnly: true });
+        let history;
+        try { history = snapshot.prepare("SELECT id, server_id AS serverId, filename, storage, storage_key AS storageKey, sha256 FROM backups WHERE status = 'completed'").all() as { id: string; serverId: string; filename: string; storage: string; storageKey: string; sha256: string | null }[]; }
+        finally { snapshot.close(); }
+        if (history.length > 10000) throw new Error("The backup history exceeds 10,000 files");
+        if (history.length) await fsp.mkdir(path.join(staging, "history"));
+        for (const row of history) {
+          if (row.storage !== "local" || !/^[A-Za-z0-9_-]{1,64}$/.test(row.id)) throw new Error("Unsupported server backup history entry");
+          this.say("Copying earlier server backups");
+          const source = await this.backups.filePath(await this.backups.get(row.id));
+          const target = path.join(staging, "history", `${row.id}.zip`);
+          await fsp.link(source, target).catch(() => fsp.copyFile(source, target));
+          const hash = await sha256File(target);
+          if (row.sha256 && hash !== row.sha256) throw new Error(`Earlier backup ${row.filename} is damaged`);
+          manifest.backups.push({ id: row.id, serverId: row.serverId, archive: `history/${row.id}.zip`, sha256: hash });
+        }
+      }
 
       await fsp.mkdir(path.join(staging, "config"));
       const env = formatEnvironment(process.env);
@@ -180,14 +222,20 @@ export class AppBackupService {
 
       this.say("Writing the archive", 90);
       const destination = path.join(dir, filename);
-      await createZip({ sourceDir: staging, destination });
+      if (options.passphrase) {
+        const plain = path.join(work, "archive.zip");
+        await createZip({ sourceDir: staging, destination: plain });
+        this.say("Encrypting the archive", 95);
+        await encryptApplicationBackup(plain, destination, options.passphrase, { scheduleId: scheduleId ?? null,
+          servers: { total: manifest.servers.length, withFiles: manifest.servers.filter((s) => s.archive).length }, history: manifest.backups?.length ?? 0 });
+      } else await createZip({ sourceDir: staging, destination });
       await fsp.chmod(destination, 0o600);
       await this.activity.event(null, "app-backup.created", `Application backup created (${filename}${includeServers ? ", with server files" : ""})`, { actor });
-      await this.activity.audit(actor, "app-backup.create", null, { filename, includeServers });
+      await this.activity.audit(actor, "app-backup.create", null, { filename, includeServers, encrypted: !!options.passphrase, includeBackupHistory: !!options.includeBackupHistory });
       return filename;
     } finally {
       for (const id of temporary) await this.backups.discard(id).catch(() => undefined);
-      await fsp.rm(staging, { recursive: true, force: true });
+      await fsp.rm(work, { recursive: true, force: true });
     }
   }
 }

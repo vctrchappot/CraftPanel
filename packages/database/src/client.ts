@@ -12,6 +12,8 @@ export interface DatabaseHandle {
   db: Database;
   raw: DatabaseSync;
   close(): void;
+  /** Reopen the same file after a first-run restore; existing Drizzle service references stay valid. */
+  reopen(): void;
 }
 
 type SqlValue = null | number | bigint | string | Uint8Array;
@@ -22,8 +24,15 @@ type SqlValue = null | number | bigint | string | Uint8Array;
  */
 export function openDatabase(file: string): DatabaseHandle {
   if (file !== ":memory:") fs.mkdirSync(path.dirname(file), { recursive: true });
-  const raw = new DatabaseSync(file);
-  raw.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL;");
+  const connect = () => {
+    const connection = new DatabaseSync(file);
+    try {
+      connection.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL;");
+      return connection;
+    } catch (error) { connection.close(); throw error; }
+  };
+  let raw = connect();
+  let closed = false;
 
   const db = drizzle(
     async (sql, params, method) => {
@@ -64,7 +73,16 @@ export function openDatabase(file: string): DatabaseHandle {
     { schema },
   );
 
-  return { db, raw, close: () => raw.close() };
+  return {
+    db,
+    get raw() { return raw; },
+    close() { if (!closed) { raw.close(); closed = true; } },
+    reopen() {
+      if (!closed) throw new Error("Close the database before reopening it");
+      raw = connect();
+      closed = false;
+    },
+  };
 }
 
 export function defaultMigrationsFolder(): string {

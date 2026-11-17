@@ -7,6 +7,8 @@ import { z } from "zod";
  *   config/environment.env           the CRAFTPANEL_* settings the dashboard was started with
  *   config/tls-cert.pem, tls-key.pem built-in HTTPS certificate and key, when configured
  *   servers/<id>.zip                 each server's files and worlds (same format as a server backup)
+ *   history/<backup-id>.zip          optional earlier completed server backups
+ * The whole ZIP may be wrapped in the authenticated .cpbackup encryption envelope.
  * It holds secrets (password hashes, API keys, the TLS key), so it is as sensitive as the data directory.
  */
 export const APP_BACKUP_FORMAT = 1;
@@ -25,6 +27,12 @@ export const appBackupManifestSchema = z.object({
   tls: z.boolean(),
   /** Only archives made by this schedule count towards its retention. Absent on older/manual backups. */
   scheduleId: z.string().uuid().optional(),
+  backups: z.array(z.object({
+    id: serverId,
+    serverId,
+    archive: z.string().regex(/^history\/[A-Za-z0-9_-]{1,64}\.zip$/),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  })).max(10000).optional(),
   servers: z.array(z.object({
     id: serverId,
     name: z.string().max(200),

@@ -8,6 +8,7 @@ import { api, ApiError, errorMessage, setCsrfToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Logo } from "./logo";
 import { TwoFactorEnrollment } from "./account-security";
+import { SetupRestore } from "./setup-restore";
 
 function AuthLayout({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
@@ -179,6 +180,7 @@ export function SetupForm() {
   const [token, setToken] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [restoring, setRestoring] = React.useState(false);
 
   const submitted = React.useRef(false);
   React.useEffect(() => {
@@ -186,6 +188,7 @@ export function SetupForm() {
   }, [state, router]);
 
   const mismatch = confirm.length > 0 && confirm !== password;
+  if (restoring) return <AuthLayout title="Restore CraftPanel" subtitle="Bring your accounts, servers and worlds to this computer"><SetupRestore needsToken={!!state?.setupTokenRequired} setupToken={token} onTokenChange={setToken} onBack={() => { submitted.current = false; setRestoring(false); }} /></AuthLayout>;
   return (
     <AuthLayout title="Welcome to CraftPanel" subtitle="Create the owner account for this installation">
       <form
@@ -234,6 +237,7 @@ export function SetupForm() {
         </Button>
         <p className="text-center text-xs text-muted-foreground">No account with any third party is created. Everything stays on this machine.</p>
       </form>
+      <div className="space-y-3 border-t border-border pt-5 text-center"><p className="text-xs text-muted-foreground">Moving from another computer or recovering an installation?</p><Button variant="secondary" className="w-full" onClick={() => { submitted.current = true; setRestoring(true); }}>Restore a backup instead</Button></div>
     </AuthLayout>
   );
 }

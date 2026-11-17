@@ -1,4 +1,4 @@
-// A scheduled application backup from a standalone host, imported into a fresh installed service.
+// An encrypted scheduled application backup, restored through first-run setup into an installed service.
 // Linux/root: node app-migration-service.mjs FIXTURES craftpanel-ops-move
 // Windows/elevated dashboard owner: node app-migration-service.mjs FIXTURES
 // Each run owns its source processes and a new service/task; existing installations are untouched.
@@ -38,6 +38,7 @@ const freePort = async () => {
 const portA = await freePort(), portB = await freePort();
 const a = client(`http://127.0.0.1:${portA}`), b = client(`http://127.0.0.1:${portB}`);
 const credentials = ["migration-owner", "throwaway-migration-test-1"];
+const passphrase = "throwaway-encrypted-migration-1";
 const targetEnv = { ...env, CRAFTPANEL_INSTALL_DIR: install, CRAFTPANEL_DATA_DIR: data, CRAFTPANEL_TASK_NAME: task,
   CRAFTPANEL_PORT: String(portB), CRAFTPANEL_GAME_ACCOUNTS: "2", CP_RUNTIME: runtime, CP_TASK: task,
   CP_INSTALLER: path.join(fixtures, "install.ps1"), CRAFTPANEL_ARCHIVE: path.join(fixtures, "craftpanel-v99.0.0.tar.gz") };
@@ -94,8 +95,10 @@ try {
   await a.command(id, "setblock 0 100 0 minecraft:gold_block");
   await a.command(id, "save-all flush");
   await a.sleep(2000);
+  await a.call("POST", `/api/servers/${id}/backups`, { note: "Before the move" });
+  const earlier = await wait(async () => (await a.call("GET", `/api/backups?serverId=${id}`)).find((backup) => backup.status === "completed" && backup.note === "Before the move"));
   // The actual cron callback, followed by two manual runs of that same schedule, exercises retention.
-  const schedule = await a.call("POST", "/api/schedules", { name: "Migration backup", cron: "* * * * * *", action: "application-backup", payload: { includeServers: true, keep: 2 }, enabled: true });
+  const schedule = await a.call("POST", "/api/schedules", { name: "Migration backup", cron: "* * * * * *", action: "application-backup", payload: { includeServers: true, includeBackupHistory: true, encrypted: true, keep: 2 }, backupPassphrase: passphrase, enabled: true });
   await wait(async () => (await a.call("GET", `/api/schedules/${schedule.id}/runs`)).some((r) => r.status === "success"), 300_000);
   await a.call("PUT", `/api/schedules/${schedule.id}`, { ...schedule, enabled: false });
   await wait(async () => !(await a.call("GET", "/api/app-backups")).progress.running, 300_000);
@@ -110,32 +113,46 @@ try {
   }
   const listing = await a.call("GET", "/api/app-backups");
   assert.equal(listing.backups.length, 2);
-  assert(listing.backups.every((f) => f.scheduleId === schedule.id && f.servers.withFiles === 1));
+  assert(listing.backups.every((f) => f.scheduleId === schedule.id && f.servers.withFiles === 1 && f.encrypted && f.history === 1));
   assert.equal((await a.server(id)).status, "running");
-  record("cron-and-retention-with-a-running-paper-server", { kept: listing.backups.length });
-  const transfer = path.join(root, "transfer.zip");
+  record("encrypted-cron-and-retention-with-a-running-paper-server-and-earlier-backup", { kept: listing.backups.length });
+  const transfer = path.join(root, "transfer.cpbackup");
   await fs.copyFile(path.join(source, "backups/application", listing.backups[0].filename), transfer);
   await a.stop(id);
   await stopSource();
 
-  // Install the target first, then import under the dashboard account while both services are stopped.
+  // Exercise the real encrypted CLI entry point too, without a passphrase in argv or environment.
+  const phraseFile = path.join(root, "passphrase.txt");
+  await fs.writeFile(phraseFile, passphrase + "\n", { mode: 0o600 });
+  const offline = path.join(root, "offline");
+  const imported = await run(process.execPath, [path.join(dist, "index.js"), "import-backup", transfer, "--passphrase-file", phraseFile], {
+    env: { ...env, CRAFTPANEL_DATA_DIR: offline }, timeout: 300_000, windowsHide: true,
+  });
+  assert.match(imported.stdout, /Restored 1 server\(s\), 1 with their files and worlds/);
+  await fs.access(path.join(offline, "backups", id, `imported-${earlier.id}.zip`));
+  await fs.rm(phraseFile);
+  record("encrypted-offline-cli-import-with-a-passphrase-file");
+
+  // Restore while the fresh installed dashboard and runtime are running; no owner is created first.
   installed = true; // A partially failed install must be cleaned up too.
   if (windows) {
     await ps("& powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File $env:CP_INSTALLER; exit $LASTEXITCODE");
   } else await run("bash", [path.join(fixtures, "install.sh"), "--archive", targetEnv.CRAFTPANEL_ARCHIVE, "--port", String(portB)], { env: targetEnv, timeout: 300_000, maxBuffer: 4 * 1024 * 1024 });
   await ready(portB);
-  if (windows) {
-    await ps("Stop-ScheduledTask -TaskName $env:CP_TASK; Stop-Service -Name $env:CP_RUNTIME");
-    await wait(async () => (await ps("(Get-ScheduledTask -TaskName $env:CP_TASK).State")) !== "Running");
-  } else await run("systemctl", ["stop", instance, `${instance}-runtime`]);
-  const targetArchive = path.join(data, "transfer.zip");
-  await fs.copyFile(transfer, targetArchive);
-  if (!windows) { await run("chown", [`${instance}:${instance}`, targetArchive]); await fs.chmod(targetArchive, 0o600); }
-  const args = [path.join(install, "apps/api/dist/index.js"), "import-backup", targetArchive];
-  const result = windows
-    ? await run(process.execPath, args, { env: targetEnv, timeout: 300_000, windowsHide: true })
-    : await run("runuser", ["-u", instance, "--", "env", `CRAFTPANEL_DATA_DIR=${data}`, process.execPath, ...args], { timeout: 300_000 });
-  assert.match(result.stdout, /Restored 1 server\(s\), 1 with their files and worlds/);
+  const setupToken = await fs.readFile(path.join(data, "setup-token.txt"), "utf8").then((s) => s.trim()).catch(() => "");
+  const form = new FormData();
+  form.append("passphrase", passphrase);
+  form.append("file", new Blob([await fs.readFile(transfer)]), "transfer.cpbackup");
+  const response = await fetch(`http://127.0.0.1:${portB}/api/auth/restore`, { method: "POST", headers: { "x-setup-token": setupToken }, body: form });
+  assert.equal(response.status, 202, await response.clone().text());
+  const { token } = await response.json();
+  const result = await wait(async () => {
+    const state = await (await fetch(`http://127.0.0.1:${portB}/api/auth/restore/status`, { headers: { "x-restore-token": token } })).json();
+    if (state.error) throw new Error(state.error);
+    return !state.running && state.result;
+  }, 300_000);
+  assert.equal(result.servers, 1);
+  assert.equal(result.backups, 1);
   const directory = path.join(data, "servers", id);
   await fs.access(path.join(directory, "world/level.dat"));
   if (!windows) {
@@ -143,11 +160,15 @@ try {
     assert.equal((await fs.stat(path.join(data, "craftpanel.db"))).uid, uid);
     assert.equal((await fs.stat(path.join(directory, "world/level.dat"))).uid, uid);
   }
-  record("import-runs-as-the-dashboard-account-while-services-are-stopped");
-  if (windows) await ps("Start-Service -Name $env:CP_RUNTIME; Start-ScheduledTask -TaskName $env:CP_TASK");
-  else await run("systemctl", ["start", `${instance}-runtime`, instance]);
+  record("first-run-upload-restores-as-the-installed-dashboard-account");
   await ready(portB);
   await b.signIn(...credentials);
+  assert.equal((await b.call("POST", `/api/backups/${earlier.id}/verify`)).ok, true);
+  const movedSchedule = (await b.call("GET", "/api/schedules")).find((s) => s.id === schedule.id);
+  assert.equal(movedSchedule.enabled, false);
+  await assert.rejects(b.call("PUT", `/api/schedules/${schedule.id}`, { ...movedSchedule, enabled: true }), /passphrase again/);
+  await assert.rejects(fs.access(path.join(data, "application-backup-passphrases.json")), { code: "ENOENT" });
+  record("earlier-backup-is-readable-and-encrypted-schedules-need-a-new-host-passphrase");
   const moved = await b.waitStatus(id, "running", 15 * 60_000);
   assert.equal(moved.directory, directory);
   assert.equal(moved.installState, "installed");

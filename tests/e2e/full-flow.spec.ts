@@ -1,4 +1,9 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import net from "node:net";
+import { spawn } from "node:child_process";
 
 const tab = (page: import("@playwright/test").Page, name: string) => page.getByRole("navigation", { name: "Server sections" }).getByRole("link", { name: new RegExp("^" + name) });
 const shot = (name: string) => ({ path: `test-results/screens/${name}.png`, fullPage: true });
@@ -159,7 +164,11 @@ test("application backup schedules can be created, run, paused and removed", asy
   await editor.getByRole("button", { name: "Every 6 hours", exact: true }).click();
   await expect(editor.getByLabel("Schedule", { exact: true })).toHaveValue("0 */6 * * *");
   await editor.getByLabel("Backups to keep", { exact: true }).fill("2");
-  await editor.getByRole("switch").click(); // Settings-only keeps this UI scenario quick.
+  await editor.getByRole("switch", { name: "Include server files and worlds in scheduled backups", exact: true }).click(); // Settings-only keeps this UI scenario quick.
+  await editor.getByRole("switch", { name: "Include earlier server backups in this schedule", exact: true }).click();
+  await editor.getByRole("switch", { name: "Encrypt scheduled application backups", exact: true }).click();
+  await editor.getByLabel("Schedule passphrase", { exact: true }).fill("e2e-schedule-passphrase-1");
+  await editor.getByLabel("Confirm passphrase", { exact: true }).fill("e2e-schedule-passphrase-1");
   await editor.getByRole("button", { name: "Save schedule", exact: true }).click();
   await expect(editor).not.toBeVisible();
   await expect(page.getByText("E2E application backup", { exact: true })).toBeVisible();
@@ -172,6 +181,7 @@ test("application backup schedules can be created, run, paused and removed", asy
   await page.getByRole("switch", { name: "Enable E2E application backup", exact: true }).click();
   await expect(page.getByRole("switch", { name: "Enable E2E application backup", exact: true })).not.toBeChecked();
   await page.getByRole("button", { name: "Edit E2E application backup", exact: true }).click();
+  await expect(editor.getByLabel("Schedule passphrase", { exact: true })).toHaveValue("");
   await editor.getByLabel("Name", { exact: true }).fill("E2E weekly application backup");
   await editor.getByRole("button", { name: "Sundays at 03:00", exact: true }).click();
   await editor.getByRole("button", { name: "Save schedule", exact: true }).click();
@@ -197,4 +207,71 @@ test("application backup schedules can be created, run, paused and removed", asy
   await expect(page.getByText("E2E weekly application backup", { exact: true })).not.toBeVisible();
   await expect(page.getByText("Scheduled", { exact: true }).first()).toBeVisible(); // Deleting the schedule keeps its backup.
   expect(errors).toEqual([]);
+});
+
+test("an encrypted backup restores through first-run setup and signs in with the old account", async ({ page, browser }) => {
+  const phrase = "e2e-archive-passphrase-123";
+  const state = await (await page.request.get("/api/auth/state")).json();
+  const login = await page.request.post(state.setupRequired ? "/api/auth/setup" : "/api/auth/login", { data: { username: "owner", password: "e2e-password-123" } });
+  expect(login.ok()).toBe(true);
+  await page.goto("/settings/?tab=backups");
+  await page.getByRole("switch", { name: "Include server files and worlds", exact: true }).click();
+  await page.getByRole("switch", { name: "Encrypt this application backup", exact: true }).click();
+  await page.getByLabel("Backup passphrase", { exact: true }).fill(phrase);
+  await page.getByLabel("Confirm passphrase", { exact: true }).fill(phrase);
+  await page.getByRole("button", { name: "Create backup", exact: true }).click();
+  const archive = page.getByText(/craftpanel-app-.*\.cpbackup$/).locator("../..");
+  await expect(archive.getByText("Encrypted", { exact: true })).toBeVisible({ timeout: 60_000 });
+  const downloaded = page.waitForEvent("download");
+  await archive.getByRole("button", { name: "Download", exact: true }).click();
+  const download = await downloaded;
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "cp-browser-restore-"));
+  const file = path.join(root, "transfer.cpbackup");
+  await download.saveAs(file);
+  const listener = net.createServer();
+  await new Promise<void>((resolve) => listener.listen(0, "127.0.0.1", resolve));
+  const port = (listener.address() as net.AddressInfo).port;
+  await new Promise<void>((resolve) => listener.close(() => resolve()));
+  const data = path.join(root, "data");
+  const log = await fs.open(path.join(root, "target.log"), "a");
+  const env = { ...process.env, CRAFTPANEL_DATA_DIR: data, CRAFTPANEL_PORT: String(port), CRAFTPANEL_HOST: "127.0.0.1", CRAFTPANEL_UPDATE_CHECK: "false" };
+  const children = ["runtime.js", "index.js"].map((entry) => spawn(process.execPath, [path.resolve("apps/api/dist", entry)], { env, stdio: ["ignore", log.fd, log.fd], windowsHide: true }));
+  const context = await browser.newContext({ baseURL: `http://127.0.0.1:${port}` });
+  const target = await context.newPage();
+  const errors: string[] = [];
+  target.on("pageerror", (error) => errors.push(error.message));
+  try {
+    await expect.poll(async () => fetch(`http://127.0.0.1:${port}/api/ready`).then((r) => r.status, () => 0), { timeout: 60_000 }).toBe(200);
+    await target.goto("/");
+    await target.getByRole("button", { name: "Restore a backup instead", exact: true }).click();
+    await target.getByLabel("Application backup", { exact: true }).setInputFiles(file);
+    await target.getByLabel("Backup passphrase (if encrypted)").fill("wrong-passphrase-123");
+    await target.getByRole("button", { name: "Restore backup", exact: true }).click();
+    await expect(target.getByText("Incorrect passphrase or damaged encrypted backup", { exact: true })).toBeVisible();
+    for (const [width, theme] of [[1440, "dark"], [390, "light"]] as const) {
+      await target.setViewportSize({ width, height: 900 });
+      await target.evaluate((value) => document.documentElement.classList.toggle("dark", value === "dark"), theme);
+      expect(await target.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+      await target.screenshot(shot(`18-first-run-restore-${theme}-${width}`));
+    }
+    await target.getByLabel("Backup passphrase (if encrypted)").fill(phrase);
+    await target.getByRole("button", { name: "Restore backup", exact: true }).click();
+    await expect(target.getByText("CraftPanel restored", { exact: true })).toBeVisible({ timeout: 60_000 });
+    await target.screenshot(shot("19-first-run-restored"));
+    await target.getByRole("button", { name: "Sign in with the restored account", exact: true }).click();
+    await target.getByLabel("Username", { exact: true }).fill("owner");
+    await target.getByLabel("Password", { exact: true }).fill("e2e-password-123");
+    await target.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(target).toHaveURL(`http://127.0.0.1:${port}/`);
+    expect(errors).toEqual([]);
+  } finally {
+    await context.close();
+    for (const child of children) {
+      if (child.exitCode !== null || child.signalCode !== null) continue;
+      await new Promise<void>((resolve) => { child.once("exit", () => resolve()); child.kill("SIGTERM"); });
+    }
+    await log.close();
+    if (path.dirname(root) !== os.tmpdir() || !path.basename(root).startsWith("cp-browser-restore-")) throw new Error("Unexpected test directory");
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5 });
+  }
 });

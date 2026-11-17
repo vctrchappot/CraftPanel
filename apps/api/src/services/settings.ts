@@ -73,6 +73,7 @@ const DEFAULTS: AppSettings = {
 export class SettingsService {
   private cache: AppSettings | null = null;
   constructor(private db: Database) {}
+  invalidate() { this.cache = null; }
 
   async get(): Promise<AppSettings> {
     if (this.cache) return this.cache;

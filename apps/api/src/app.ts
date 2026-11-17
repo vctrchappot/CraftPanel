@@ -64,6 +64,8 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
   const deniedLogged = new Map<string, number>();
   app.addHook("onRequest", async (req, reply) => {
     const route = req.url.split("?")[0];
+    if (ctx.setup.activating && !["/api/auth/restore/status", "/api/health", "/api/control/shutdown"].includes(route))
+      throw new AppError(503, "restoring", "CraftPanel is activating a restored backup. Try again shortly.");
     // Installers must be able to check/stop the internal listener, including behind HTTPS.
     const maintenance = isHostPeer(req.socket.remoteAddress ?? "") &&
       ["/api/health", "/api/ready", "/api/control/shutdown"].includes(route);
@@ -76,6 +78,8 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
     const publicClient = !isPrivateAddress(req.ip);
     if ((!isSecureRequest(req, ctx.config) && (ctx.config.secureCookies || publicClient)) || (publicClient && !ctx.config.secureCookies))
       throw new AppError(403, "https_required", "HTTPS and Secure cookies are required for this connection", "Use the HTTPS dashboard address, or configure a trusted HTTPS reverse proxy.");
+    // Restore status has its own unguessable capability and must work while SQLite is closed.
+    if (ctx.setup.activating && route === "/api/auth/restore/status") return;
     const { dashboardAccess, allowedNetworks } = await ctx.settings.get();
     if (isClientAllowed(req.ip, dashboardAccess, allowedNetworks)) return;
     const now = Date.now();
@@ -102,7 +106,7 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
     reply.header("Referrer-Policy", "same-origin");
     if (!req.url.startsWith("/api/")) return;
     reply.header("Cache-Control", "no-store");
-    req.user = await ctx.sessions.resolve(req.cookies[SESSION_COOKIE], { ip: req.ip });
+    if (!ctx.setup.activating) req.user = await ctx.sessions.resolve(req.cookies[SESSION_COOKIE], { ip: req.ip });
 
     if (req.url.split("?")[0] === "/api/ws" && !isRequestOriginAllowed(req, ctx.config))
       throw new AppError(403, "bad_origin", "WebSocket origin rejected");

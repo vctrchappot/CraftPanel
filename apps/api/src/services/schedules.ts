@@ -79,6 +79,7 @@ export class ScheduleService {
     const serverActions = ["start", "restart", "stop", "backup", "announce", "command", "prune-backups", "cleanup-logs"];
     if (serverActions.includes(input.action) && !input.serverId) throw badRequest("This action needs a server");
     if (input.action === "application-backup" && input.serverId) throw badRequest("An application backup must be a global schedule");
+    if (input.backupPassphrase && (input.action !== "application-backup" || !input.payload.encrypted)) throw badRequest("A backup passphrase needs an encrypted application-backup schedule");
     if (input.action === "announce" && !input.payload.message?.trim()) throw badRequest("Announcement text is required");
     if (input.action === "command" && !input.payload.command?.trim()) throw badRequest("Command is required");
     if (input.payload.command && /[\r\n]/.test(input.payload.command)) throw badRequest("Command must be a single line");
@@ -89,6 +90,10 @@ export class ScheduleService {
     this.validate(input);
     if (input.serverId) await this.servers.row(input.serverId);
     const id = crypto.randomUUID();
+    if (input.action === "application-backup" && input.payload.encrypted) {
+      if (input.enabled && !input.backupPassphrase) throw badRequest("Enter a passphrase to encrypt this backup schedule");
+      if (input.backupPassphrase) await this.appBackups.passphrases.set(id, input.backupPassphrase);
+    }
     const [row] = await this.db
       .insert(schedules)
       .values({ id, serverId: input.serverId ?? null, name: input.name, cron: input.cron, action: input.action, payload: JSON.stringify(input.payload), enabled: input.enabled, createdAt: Date.now() })
@@ -100,6 +105,11 @@ export class ScheduleService {
 
   async update(id: string, input: z.output<typeof scheduleSchema>, actor: Actor) {
     this.validate(input);
+    await this.get(id);
+    if (input.action === "application-backup" && input.payload.encrypted) {
+      if (input.enabled && !input.backupPassphrase && !await this.appBackups.passphrases.get(id)) throw badRequest("Enter this backup schedule's passphrase again on this computer");
+      if (input.backupPassphrase) await this.appBackups.passphrases.set(id, input.backupPassphrase);
+    }
     if (input.serverId) await this.servers.row(input.serverId);
     const [row] = await this.db
       .update(schedules)
@@ -107,6 +117,7 @@ export class ScheduleService {
       .where(eq(schedules.id, id))
       .returning();
     if (!row) throw notFound("Schedule");
+    if (row.action !== "application-backup" || !input.payload.encrypted) await this.appBackups.passphrases.set(id, null);
     if (row.enabled) this.scheduler.register(id, row.cron);
     else this.scheduler.unregister(id);
     await this.activity.audit(actor, "schedule.update", id);
@@ -117,6 +128,7 @@ export class ScheduleService {
     this.scheduler.unregister(id);
     await this.db.delete(scheduleRuns).where(eq(scheduleRuns.scheduleId, id));
     await this.db.delete(schedules).where(eq(schedules.id, id));
+    await this.appBackups.passphrases.set(id, null);
     await this.activity.audit(actor, "schedule.delete", id);
   }
 
@@ -190,13 +202,13 @@ export class ScheduleService {
   }
 
   private async execute(row: Row): Promise<string | void> {
-    const payload = JSON.parse(row.payload) as { message?: string; command?: string; keep?: number; includeServers?: boolean; olderThanDays?: number; warnSeconds?: number };
+    const payload = JSON.parse(row.payload) as { message?: string; command?: string; keep?: number; includeServers?: boolean; encrypted?: boolean; includeBackupHistory?: boolean; olderThanDays?: number; warnSeconds?: number };
     const sid = row.serverId!;
     const running = () => this.servers.agent.isRunning(sid);
     switch (row.action) {
       case "application-backup":
         if (this.appBackups.progress().running) return "SKIP:another application backup is already running";
-        return `Created ${await this.appBackups.run(payload.includeServers ?? true, SCHEDULER_ACTOR, { id: row.id, keep: payload.keep ?? 7 })}`;
+        return `Created ${await this.appBackups.run(payload.includeServers ?? true, SCHEDULER_ACTOR, { id: row.id, keep: payload.keep ?? 7 }, { encrypted: payload.encrypted, includeBackupHistory: payload.includeBackupHistory })}`;
       case "start":
         if (running()) return "SKIP:already running";
         await this.servers.start(sid, SCHEDULER_ACTOR);

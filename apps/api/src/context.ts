@@ -20,6 +20,7 @@ import type { ProxyService } from "./services/proxy";
 import type { NotificationService } from "./services/notifications";
 import type { MapService } from "./services/map";
 import type { AssistantService } from "./services/assistant/service";
+import type { SetupRestoreService } from "./services/setup-restore";
 
 export interface AppContext {
   config: AppConfig;
@@ -42,6 +43,7 @@ export interface AppContext {
   notifications: NotificationService;
   java: JavaManager;
   assistant: AssistantService;
+  setup: SetupRestoreService;
   /** One-time token required to create the first account on non-loopback installs. */
   setupToken: string | null;
 }

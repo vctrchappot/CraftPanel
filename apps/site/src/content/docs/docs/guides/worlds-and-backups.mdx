@@ -42,4 +42,6 @@ Keep a copy of your backups on another disk or machine. A backup on the same dis
 
 Server backups cover Minecraft. **Settings → Backups → Application backup** covers the panel itself: one file with the database (accounts, settings, schedules, rules), the `CRAFTPANEL_*` settings CraftPanel was started with, the HTTPS certificate and key if configured and, with **Include server files and worlds**, every server. It is made while everything runs (running servers are flushed to disk first). The file holds password hashes and API keys, so store it as carefully as the data directory.
 
-To move to another computer, or to start over after a disk failure, see [moving CraftPanel](/docs/administration/maintenance/#moving-craftpanel-to-another-computer).
+Turn on **Include earlier server backups** to carry the completed server backup history as well. **Encrypt with a passphrase** writes an encrypted `.cpbackup` instead of a ZIP. Use a strong passphrase and keep it separately: CraftPanel does not store the passphrase of a manual backup and cannot recover it for you. An unencrypted ZIP remains readable by anyone who has the file.
+
+To move to another computer, or to start over after a disk failure, choose **Restore a backup instead** on the new installation's welcome screen. See [moving CraftPanel](/docs/administration/maintenance/#moving-craftpanel-to-another-computer) for the upload and offline-import steps.

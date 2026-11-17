@@ -62,14 +62,19 @@ async function main() {
   if (process.argv[2] === "import-backup") {
     const archive = process.argv[3];
     if (!archive || archive.startsWith("--")) {
-      console.error("Usage (CraftPanel and its runtime stopped): node index.js import-backup <craftpanel-app-….zip> [--replace]");
+      console.error("Usage (CraftPanel and its runtime stopped): node index.js import-backup <backup.zip|backup.cpbackup> [--replace] [--passphrase-file FILE]");
       process.exitCode = 2;
       return;
     }
     try {
-      const result = await importApplicationBackup(config.layout, archive, { replace: process.argv.includes("--replace"), log: (m) => console.log(m) });
+      const passwordAt = process.argv.indexOf("--passphrase-file");
+      if (passwordAt >= 0 && (!process.argv[passwordAt + 1] || process.argv[passwordAt + 1]!.startsWith("--"))) throw new Error("--passphrase-file needs a file path");
+      const passphrase = passwordAt >= 0 ? fs.readFileSync(process.argv[passwordAt + 1]!, "utf8").replace(/\r?\n$/, "") : undefined;
+      if (passphrase && passphrase.length > 1024) throw new Error("Passphrase exceeds 1,024 characters");
+      const result = await importApplicationBackup(config.layout, archive, { replace: process.argv.includes("--replace"), passphrase, log: (m) => console.log(m) });
       console.log(`\nRestored ${result.servers} server(s), ${result.withFiles} with their files and worlds, into ${config.layout.root}.`);
       for (const note of result.notes) console.log(`  - ${note}`);
+      if (result.backups) console.log(`Restored ${result.backups} earlier server backup(s).`);
       console.log("\nStart CraftPanel and sign in with the account from the old computer. The game files of every server are downloaded again at the first start.");
     } catch (err) {
       console.error(`Import failed: ${(err as Error).message}`);
@@ -102,6 +107,7 @@ async function main() {
   ctx.maps.start();
   await ctx.rules.start();
   const housekeeping = setInterval(() => {
+    if (ctx.setup.activating) return;
     void ctx.sessions.purgeExpired();
     void ctx.activity.prune();
   }, 3600_000);

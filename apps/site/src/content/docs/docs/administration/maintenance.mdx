@@ -50,8 +50,16 @@ Copying only the database file while CraftPanel runs can miss recent changes.
 ## Moving CraftPanel to another computer
 
 1. On the old computer, create an application backup **with server files and worlds** (Settings → Backups) and download it.
-2. Install CraftPanel on the new computer. Don't create an account. Stop the dashboard **and** the runtime.
-3. Copy the file there and import it as the account CraftPanel runs under, with the same settings as the service (`--env-file` or the service's environment):
+2. Install CraftPanel on the new computer. On its welcome screen, choose **Restore a backup instead**, upload the file and enter its passphrase if encrypted. A network installation also asks for the setup token from the log or `setup-token.txt`.
+3. Wait for restoration, then choose **Sign in with the restored account**. Use your old account and two-factor sign-in. Servers download their game files again and start if they had automatic start.
+
+Choose **Include earlier server backups** when creating the archive if you want to carry the server backup history too. Only completed backups with available local files are included. Without that option the earlier-backup list starts empty. **Encrypt with a passphrase** protects the archive; keep that passphrase separately, since it cannot be recovered. Encrypted backup schedules are paused after a move: edit each schedule and enter its passphrase again before enabling it.
+
+The browser accepts files up to **2 GB** and requires a fresh installation with no accounts or game servers. It checks the archive before changing the installation. An activation failure rolls back; if recovery cannot finish, keep the recovery files and restart CraftPanel.
+
+### Offline import
+
+For larger files or an existing installation, stop the dashboard **and** the runtime. Copy the file there and import it as the account CraftPanel runs under, with the same settings as the service (`--env-file` or the service's environment):
 
 <Tabs syncKey="os">
   <TabItem label="Linux">
@@ -76,9 +84,11 @@ Use the installation's actual task name and data directory (`install.json`) if y
   </TabItem>
 </Tabs>
 
-4. Start CraftPanel and sign in with your old account. Every server downloads its game files again (the backup carries worlds and configuration, not the Minecraft jar) and starts if it had automatic start.
+For an encrypted `.cpbackup` file, add `--passphrase-file /path/to/private-file`. Put only the passphrase in that UTF-8 file (one trailing newline is accepted), make it readable only by the dashboard's account and remove it afterwards. Avoid putting the passphrase in the command line or an environment variable.
 
-What changes on the way: sessions end (sign in again), server folders live in the new data directory, the Java path and a bind address of the old computer are cleared, the list of earlier server backups starts empty, and a custom backup folder has to be chosen again. The old `CRAFTPANEL_*` settings and certificate are saved in `import/` in the data directory for you to apply (they hold paths of the old computer). Importing into a data directory that already has an account needs `--replace`, which moves the current database and server folders aside instead of deleting them. A backup from a newer CraftPanel than the one installed is refused: update first.
+Start CraftPanel and sign in with your old account. Every server downloads its game files again (the backup carries worlds and configuration, not the Minecraft jar) and starts if it had automatic start.
+
+What changes on the way: sessions end (sign in again), server folders live in the new data directory, the Java path and a bind address of the old computer are cleared, and a custom backup folder has to be chosen again. First-run restoration keeps the new host's dashboard access policy. The old `CRAFTPANEL_*` settings and certificate are saved in `import/` in the data directory for you to apply (they hold paths of the old computer). Offline import into a data directory that already has an account needs `--replace`, which moves the current database and server folders aside instead of deleting them. A backup from a newer CraftPanel than the one installed is refused: update first.
 
 <Aside type="note">
 Updates keep their own recovery points (database snapshot and startup files) under the installation folder and restore them if an update fails. They don't include worlds and are not a replacement for backups.

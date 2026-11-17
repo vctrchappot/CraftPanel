@@ -195,11 +195,14 @@ export const scheduleSchema = z.object({
       command: z.string().max(1000).optional(),
       keep: z.number().int().min(1).max(1000).optional(),
       includeServers: z.boolean().optional(),
+      includeBackupHistory: z.boolean().optional(),
+      encrypted: z.boolean().optional(),
       olderThanDays: z.number().int().min(1).max(3650).optional(),
       warnSeconds: z.number().int().min(0).max(600).optional(),
     })
     .default({}),
   enabled: z.boolean().default(true),
+  backupPassphrase: z.string().min(10).max(1024).optional(),
 });
 
 export const appSettingsSchema = z.object({

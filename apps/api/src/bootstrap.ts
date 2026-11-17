@@ -23,11 +23,14 @@ import { NotificationService } from "./services/notifications";
 import { runtimeAccess } from "./services/runtime-access";
 import { AssistantService } from "./services/assistant/service";
 import { MapService } from "./services/map";
+import { SetupRestoreService } from "./services/setup-restore";
+import { recoverSetupRestores } from "./setup-restore-transaction";
 
 /** Wire up persistence, runtime and services. Does not start listening. */
 export async function createContext(config: AppConfig, opts: { migrationsFolder?: string; installRoot?: string; agent?: RuntimeAgent; assistantFetch?: typeof fetch } = {}): Promise<AppContext> {
   const L = config.layout;
   for (const dir of [L.root, L.servers, L.backups, L.java, L.cache, L.logs, L.tmp]) await fsp.mkdir(dir, { recursive: true });
+  await recoverSetupRestores(L);
   // Clear leftovers from interrupted uploads/exports.
   for (const f of await fsp.readdir(L.tmp)) await fsp.rm(path.join(L.tmp, f), { recursive: true, force: true });
 
@@ -68,5 +71,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
     await fsp.writeFile(tokenFile, setupToken + "\n", { mode: 0o600 });
   } else await fsp.rm(tokenFile, { force: true });
 
-  return { config, database, agent, hub, sessions, activity, servers, backups, appBackups, schedules, rules, game, pregen, maps, proxies, settings, updates, notifications, java, assistant, setupToken };
+  const ctx = { config, database, agent, hub, sessions, activity, servers, backups, appBackups, schedules, rules, game, pregen, maps, proxies, settings, updates, notifications, java, assistant, setupToken } as AppContext;
+  ctx.setup = new SetupRestoreService(ctx, opts.migrationsFolder);
+  return ctx;
 }
