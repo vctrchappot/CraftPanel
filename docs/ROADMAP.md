@@ -4,9 +4,9 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 **Goal:** clone or download CraftPanel, run it on a second PC, a Raspberry Pi or a VPS, and create and manage Minecraft servers across platforms and versions from a browser, without needing to know Docker, Java or networking.
 
-## Current state (2026-11-16)
+## Current state (2026-11-17)
 
-**CraftPanel 1.0.0 is the first stable release.** Everything below "Done" and every ticked item ships in it, including the independent runtime service (games survive dashboard restarts, crashes and updates). Releases v0.1.0–v0.3.0 and v1.0.0 are on GitHub; 0.x installs update with the commands in the changelog. No known small issues are open.
+**CraftPanel 1.0.0 is the first stable release.** It includes the independent runtime service (games survive dashboard restarts, crashes and updates). Work completed since that release, including the isolation and application-backup stages below, is on `main` for the next release and listed under "Unreleased" in the changelog. Releases v0.1.0–v0.3.0 and v1.0.0 are on GitHub; 0.x installs update with the commands in the changelog. No known small issues are open.
 
 - **Open verification gaps** (not blockers, listed honestly in STATUS.md): an actual Windows host shutdown on a disposable VM; dashboard-triggered updates and concurrent installers on Windows; the `curl | sudo bash` / `irm | iex` path on a physical Pi and a small VPS.
 - **Application backup and host moves: stages 1 and 2 done (2026-11-16)**: complete archives, scheduled application backups with retention and failure alerts, and imports into installed Linux/Windows services. Next is stage 3: first-run restore, passphrase encryption and optional server-backup history.
