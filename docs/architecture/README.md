@@ -51,10 +51,13 @@ Browser ──HTTP/WS──▶ Control API ──▶ RuntimeClient ──local I
   runtime/              private IPC token, endpoint and launch/auto-start registry
   servers/<slug-id>/     one directory per server (marker file .craftpanel)
   backups/<server-id>/   zip archives (or a configured destination)
+  backups/application/   application ZIPs or encrypted .cpbackup archives
   runtimes/java/         Temurin runtimes downloaded by CraftPanel
   cache/                 version jars for gamerule detection, gamerule cache
   tmp/                   uploads/exports in progress (cleared on start)
   setup-token.txt        only until the first account exists (non-loopback installs)
+  application-backup-passphrases.json  private host-local schedule secrets, excluded from archives
+  setup-restore-<random>/ staging and recovery journal, removed after successful activation/recovery
 ```
 
 ## Real-time protocol

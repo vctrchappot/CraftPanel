@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { servers } from "@craftpanel/database";
@@ -202,6 +203,40 @@ describe("encrypted application archives and first-run restore", () => {
 });
 
 describe("first-run restore crash recovery", () => {
+  it("discards the imported database's abandoned WAL before restoring the original", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cp-restore-wal-"));
+    const layout = dataLayout(root);
+    const work = await createRestoreWorkspace(layout);
+    const from = path.join(work, "staged", "craftpanel.db");
+    await fs.mkdir(path.dirname(from), { recursive: true });
+    await fs.mkdir(path.join(work, "previous"));
+    for (const [file, value] of [[layout.database, "original"], [from, "restored"]]) {
+      const db = new DatabaseSync(file!);
+      db.exec("CREATE TABLE probe (value TEXT)");
+      db.prepare("INSERT INTO probe VALUES (?)").run(value!);
+      db.close();
+    }
+    await writeRestoreJournal(work, [{ from, to: layout.database, replace: true }], "activating");
+    const child = spawnSync(process.execPath, ["-e", `
+      const fs = require('node:fs'), path = require('node:path'), { DatabaseSync } = require('node:sqlite');
+      const [work, from, target] = process.argv.slice(1);
+      fs.writeFileSync(path.join(work, 'owner.json'), JSON.stringify({pid:process.pid}));
+      fs.renameSync(target, path.join(work, 'previous', '0'));
+      fs.renameSync(from, target);
+      const db = new DatabaseSync(target);
+      db.exec("PRAGMA journal_mode=WAL; INSERT INTO probe VALUES ('written before activation commit')");
+      process.kill(process.pid, 'SIGKILL');
+    `, work, from, layout.database], { windowsHide: true, timeout: 10_000 });
+    expect(child.error).toBeUndefined();
+    expect((await fs.stat(layout.database + "-wal")).size).toBeGreaterThan(0);
+    await recoverSetupRestores(layout);
+    const recovered = new DatabaseSync(layout.database);
+    try { expect(recovered.prepare("SELECT value FROM probe").all()).toEqual([{ value: "original" }]); }
+    finally { recovered.close(); }
+    expect(await fs.readdir(root)).toEqual(["craftpanel.db"]);
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
   it.each(["old-moved", "new-moved", "committed"])("recovers a dead process at %s", async (phase) => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "cp-restore-crash-"));
     const layout = dataLayout(root);

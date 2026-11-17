@@ -24,7 +24,11 @@ export async function writeRestoreJournal(work: string, transfers: RestoreTransf
 }
 
 /** Infer completed atomic renames from a write-ahead plan, including a crash between two renames. */
-export async function rollbackRestore(work: string, transfers: RestoreTransfer[]) {
+export async function rollbackRestore(work: string, transfers: RestoreTransfer[], database: string) {
+  // These sidecars belong to the newly opened database, never to the saved original.
+  // A killed process may leave committed writes there before activation is marked committed.
+  if (transfers.some((move) => move.to === database))
+    for (const suffix of ["-wal", "-shm"]) await fsp.rm(database + suffix, { force: true });
   const errors: unknown[] = [];
   for (let index = transfers.length - 1; index >= 0; index--) {
     const move = transfers[index]!;
@@ -61,7 +65,7 @@ export async function recoverSetupRestores(layout: DataLayout) {
             !(move.to === layout.database || move.to === path.join(layout.root, "import") || within(layout.servers, move.to) || within(layout.backups, move.to)))
           throw new Error("Unsafe setup restore journal; recovery files were kept");
       }
-      if (journal.phase === "activating") await rollbackRestore(work, journal.transfers);
+      if (journal.phase === "activating") await rollbackRestore(work, journal.transfers, layout.database);
     }
     await fsp.rm(work, { recursive: true, force: true });
   }

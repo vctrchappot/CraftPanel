@@ -111,7 +111,7 @@ export class SetupRestoreService {
     } catch (error) {
       try {
         if (!closed) { ctx.database.close(); closed = true; }
-        await rollbackRestore(work, transfers);
+        await rollbackRestore(work, transfers, target.database);
         ctx.database.reopen();
         closed = false;
         ctx.settings.invalidate();
