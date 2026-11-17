@@ -219,8 +219,16 @@ test("an encrypted backup restores through first-run setup and signs in with the
   await page.getByRole("switch", { name: "Encrypt this application backup", exact: true }).click();
   await page.getByLabel("Backup passphrase", { exact: true }).fill(phrase);
   await page.getByLabel("Confirm passphrase", { exact: true }).fill(phrase);
+  const previous = new Set((await (await page.request.get("/api/app-backups")).json()).backups.map((backup: { filename: string }) => backup.filename));
   await page.getByRole("button", { name: "Create backup", exact: true }).click();
-  const archive = page.getByText(/craftpanel-app-.*\.cpbackup$/).locator("../..");
+  let filename = "";
+  await expect.poll(async () => {
+    const backups = await (await page.request.get("/api/app-backups")).json();
+    expect(backups.progress.error).toBeNull();
+    filename = backups.backups.find((backup: { filename: string }) => !previous.has(backup.filename))?.filename ?? "";
+    return !backups.progress.running && !!filename;
+  }, { timeout: 60_000 }).toBe(true);
+  const archive = page.getByText(filename, { exact: true }).locator("../..");
   await expect(archive.getByText("Encrypted", { exact: true })).toBeVisible({ timeout: 60_000 });
   const downloaded = page.waitForEvent("download");
   await archive.getByRole("button", { name: "Download", exact: true }).click();
