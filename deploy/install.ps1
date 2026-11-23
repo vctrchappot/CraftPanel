@@ -457,12 +457,20 @@ exit `$exitCode
       if (-not $version) {
         Step "Looking up the latest release..."
         try {
-          $release = Invoke-RestMethod -UseBasicParsing -Headers @{ "User-Agent" = "CraftPanel-installer" } "https://api.github.com/repos/$Repo/releases/latest"
+          $release = Invoke-WebRequest -UseBasicParsing -Method Head -TimeoutSec 30 "https://github.com/$Repo/releases/latest"
         } catch {
           if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 404) { Fail "No CraftPanel release has been published yet." }
-          Fail "Could not reach GitHub: $($_.Exception.Message)" "Check the internet connection and try again."
+          Fail "Could not look up the latest CraftPanel release: $($_.Exception.Message)" "Check https://github.com/$Repo/releases or set CRAFTPANEL_INSTALL_VERSION to a published version."
         }
-        $version = "$($release.tag_name)".TrimStart("v")
+        $releaseUri = if ($PSVersionTable.PSVersion.Major -ge 6) {
+          $release.BaseResponse.RequestMessage.RequestUri
+        } else {
+          $release.BaseResponse.ResponseUri
+        }
+        if ($releaseUri.AbsoluteUri -notmatch "^https://github\.com/$Repo/releases/tag/v([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)$") {
+          Fail "GitHub did not return a CraftPanel release tag." "Check https://github.com/$Repo/releases or set CRAFTPANEL_INSTALL_VERSION to a published version."
+        }
+        $version = $Matches[1]
       }
       Step "Downloading CraftPanel v$version..."
       $base = "https://github.com/$Repo/releases/download/v$version"

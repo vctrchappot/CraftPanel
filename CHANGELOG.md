@@ -72,6 +72,7 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 - Documentation: the end of each page was redone in the site's frame language. A hairline separates the edit link and the date, which are quiet mono captions; previous and next are square cards without a shadow, with a mono caption over the page title and the arrow in a small box that moves in its own direction and turns green on hover (the card gets a green rim and tint, keyboard focus a ring). They sit side by side from 36 rem and stack more compactly on phones; a lone "next" stays on the right.
 
 ### Fixed
+- Windows release installs resolve the latest tag through GitHub's public release redirect, so GitHub API rate limits no longer block downloads.
 - Importing an application backup into a freshly installed Windows service after stopping its dashboard task now removes the empty database's leftover SQLite WAL before activation. It can no longer overwrite the imported accounts at the next start.
 - A file the dashboard could not read during a backup, world export or folder download crashed the whole dashboard; the backup now fails with the error instead. World exports of a running server pause autosave like backups do, so the archive is consistent.
 - A paused world map (or one that reached its disk limit) no longer prints `bluemap stop` and "Render-Threads are already stopped" into the server console every minute: CraftPanel sends the command once per server run, when the map is paused, the limit is hit or the server has started again.
