@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "ignore": ["docs/**", "**/*.md", "!CHANGELOG.md"],
+  "critical": [".github/**", "package.json", "pnpm-lock.yaml", "package-lock.json", "yarn.lock"],
+  "verifyOnly": [],
+  "suites": {
+    "verify": ["**"],
+    "ui": ["**"],
+    "backend": ["**"]
+  }
+}

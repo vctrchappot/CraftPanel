@@ -58,3 +58,12 @@ pnpm --filter @craftpanel/site dev              # website + user docs (Astro/Sta
 - Parallel work: give a subagent its own git worktree and branch, let it commit there (not push), then merge into `main` yourself and resolve conflicts (CHANGELOG, STATUS, ROADMAP usually conflict).
 - Unfinished work that must survive a device switch goes to a pushed `wip/<topic>` branch, never to `main`.
 - Edits through a shell on Windows (Git Bash, `node -e`, heredocs) can silently drop regex backslashes: use the Edit/Write tools, or write a transform script to a file first, and grep changed regexes afterwards. In such scripts use `s.replace(a, () => b)`, since `$'`, `` $` `` and `$&` in a replacement string are special.
+
+<!-- ci:begin (vctrchappot/ci scripts/onboard.sh) -->
+
+## CI
+
+CraftPanel's existing workflow still runs its cross-platform, installer, deployment, browser and site checks. The shared CI onboarding script generated `.github/ci.json` and kept `.github/workflows/ci.yml` in place. A future migration should carry over the existing jobs, including `test:deployment`, `test:e2e` and `test:site`.
+
+Run the project's checks locally before pushing. Push once per goal. Open pull requests as drafts and mark them ready when the work is done.
+<!-- ci:end -->
