@@ -6,6 +6,8 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 
 ## Unreleased
 
+## 1.1.0 – 2026-11-23
+
 ### Added
 - Restore an application backup directly from the first-run welcome screen of a fresh installation (uploads up to 2 GB). The original accounts and two-factor sign-in are preserved; files are checked in a staging directory before activation, with rollback and restart recovery for an interrupted activation. Larger archives and existing installations can still use offline `import-backup`.
 - Optional passphrase encryption for manual and scheduled application backups (AES-256-GCM with scrypt, `.cpbackup`). Manual passphrases are not stored. Schedule passphrases stay in a private host-local file outside the database and archives; after a move encrypted schedules are paused until the passphrase is entered again. Offline import accepts `--passphrase-file FILE`; existing unencrypted ZIP archives still work.
