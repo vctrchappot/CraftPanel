@@ -17,6 +17,13 @@ describe("compareVersions", () => {
     expect(compareVersions("1.0.0-rc.1", "1.0.0")).toBe(-1);
     expect(compareVersions("1.0.0", "1.0.0-rc.1")).toBe(1);
   });
+
+  it("compares release candidates numerically, like SemVer", () => {
+    expect(compareVersions("1.2.0-rc.10", "1.2.0-rc.2")).toBe(1);
+    expect(compareVersions("1.2.0-rc.2", "1.2.0-rc.2")).toBe(0);
+    expect(compareVersions("1.2.0-rc.1", "1.1.9")).toBe(1);
+    expect(compareVersions("1.2.0-rc", "1.2.0-rc.1")).toBe(-1);
+  });
 });
 
 describe("detectInstall", () => {

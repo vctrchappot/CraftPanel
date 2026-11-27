@@ -31,7 +31,8 @@ function compareVersions(a: string, b: string): number {
  * release, so show it instead of an outdated tag.
  */
 export function shownRelease(latest: RepoFacts["release"], version: string): NonNullable<RepoFacts["release"]> {
-  if (latest && compareVersions(latest.tag, version) >= 0) return latest;
+  // The site advertises stable releases only; a release candidate on main is not one (docs/RELEASING.md).
+  if (latest && (version.includes("-") || compareVersions(latest.tag, version) >= 0)) return latest;
   return { tag: `v${version}`, date: "", url: `https://github.com/${REPO}/releases/tag/v${version}` };
 }
 

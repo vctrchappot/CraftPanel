@@ -20,6 +20,10 @@ describe("release shown on the website", () => {
     expect(shownRelease(latest("v1.10.0"), "1.9.0").tag).toBe("v1.10.0");
   });
 
+  it("keeps showing the stable release while main carries a release candidate", () => {
+    expect(shownRelease(latest("v1.1.0"), "1.2.0-rc.1")).toEqual(latest("v1.1.0"));
+  });
+
   it("falls back to this build's version when GitHub could not be reached", () => {
     expect(shownRelease(null, "2.3.4").tag).toBe("v2.3.4");
   });

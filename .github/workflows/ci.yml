@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # release/x.y.x: maintenance branches for patch releases of an older line (docs/RELEASING.md).
+    branches: [main, "release/**"]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -53,6 +54,9 @@ jobs:
             workflow_dispatch) if [ -z "$AREAS" ] || [ "$AREAS" = all ]; then node scripts/ci-changes.mjs --all; else node scripts/ci-changes.mjs --areas "$AREAS"; fi ;;
             *) node scripts/ci-changes.mjs --all ;;
           esac
+      # One version in every manifest, a well-formed changelog, a tag for the current version (docs/RELEASING.md).
+      - name: Version and changelog are consistent
+        run: node scripts/release.mjs check
 
   # Typecheck, unit/integration tests and a production build on every OS.
   test:

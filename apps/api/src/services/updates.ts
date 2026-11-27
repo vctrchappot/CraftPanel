@@ -68,11 +68,16 @@ const SUCCESS_TTL_MS = 6 * 3600_000;
 const FAILURE_TTL_MS = 3600_000;
 const ARCHIVE_RE = /^craftpanel-v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)\.tar\.gz$/;
 
-/** Compares x.y.z[-pre] versions; a pre-release sorts before its release. */
+/**
+ * Compares x.y.z[-pre] versions by SemVer precedence: a pre-release sorts before its release, and pre-release
+ * identifiers compare numerically where they are numbers (rc.10 after rc.2).
+ */
 export function compareVersions(a: string, b: string): number {
   const parse = (v: string) => {
-    const [core, pre] = v.replace(/^v/, "").split("-", 2);
-    return { nums: core!.split(".").map((n) => Number.parseInt(n, 10) || 0), pre: pre ?? null };
+    const plain = v.replace(/^v/, "").split("+", 1)[0]!;
+    const dash = plain.indexOf("-");
+    const core = dash < 0 ? plain : plain.slice(0, dash);
+    return { nums: core.split(".").map((n) => Number.parseInt(n, 10) || 0), pre: dash < 0 ? null : plain.slice(dash + 1).split(".") };
   };
   const x = parse(a);
   const y = parse(b);
@@ -80,10 +85,18 @@ export function compareVersions(a: string, b: string): number {
     const d = (x.nums[i] ?? 0) - (y.nums[i] ?? 0);
     if (d) return Math.sign(d);
   }
-  if (x.pre === y.pre) return 0;
-  if (x.pre === null) return 1;
-  if (y.pre === null) return -1;
-  return x.pre < y.pre ? -1 : 1;
+  if (!x.pre || !y.pre) return x.pre === y.pre ? 0 : x.pre ? -1 : 1;
+  for (let i = 0; i < Math.max(x.pre.length, y.pre.length); i++) {
+    const [p, q] = [x.pre[i], y.pre[i]];
+    if (p === undefined) return -1;
+    if (q === undefined) return 1;
+    if (p === q) continue;
+    const [m, n] = [/^\d+$/.test(p), /^\d+$/.test(q)];
+    if (m && n) return Math.sign(Number(p) - Number(q));
+    if (m !== n) return m ? -1 : 1;
+    return p < q ? -1 : 1;
+  }
+  return 0;
 }
 
 function parseSelfUpdate(v: unknown): SelfUpdate | null {

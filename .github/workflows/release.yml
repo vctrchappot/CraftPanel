@@ -1,27 +1,56 @@
 name: Release
 
-# Publishes a GitHub release when a version tag is pushed:
-#   node scripts/release.mjs bump 0.2.0 && git push --follow-tags
+# Publishes a GitHub release when a version tag is pushed (policy: docs/RELEASING.md):
+#   node scripts/release.mjs bump 1.2.0 && git push --follow-tags
 on:
   push:
     tags: ["v*"]
 
 permissions:
   contents: write
+  actions: read
+
+# One publication per tag; a second push of the same tag waits instead of racing it.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Version, changelog and tag are consistent
+        run: node scripts/release.mjs check --tag "$GITHUB_REF_NAME"
+      # The bump commit changes every workspace manifest, so its CI run covers the app, the installers, the service
+      # scenarios and the website. Publish only after that run of exactly this commit has passed.
+      - name: The tagged commit passed CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse "$GITHUB_REF_NAME^{commit}")
+          for i in $(seq 1 200); do
+            run=$(gh run list --workflow ci.yml --commit "$sha" --event push --limit 1 --json databaseId,status,conclusion --jq '.[0] | select(.) | "\(.databaseId) \(.status) \(.conclusion)"')
+            set -- $run
+            if [ "${2:-}" = completed ]; then
+              [ "$3" = success ] && { echo "CI run $1 passed for $sha"; exit 0; }
+              echo "::error::CI run $1 for $sha ended with $3. Fix it (or re-run it) and re-run this workflow; nothing was published."
+              exit 1
+            fi
+            echo "Waiting for CI on $sha (${run:-not started})"
+            sleep 60
+          done
+          echo "::error::No finished CI run for $sha after 200 minutes"
+          exit 1
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Tag matches package.json
-        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build

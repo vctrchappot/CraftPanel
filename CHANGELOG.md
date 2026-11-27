@@ -1,8 +1,8 @@
 # Changelog
 
-All notable changes to CraftPanel. Versions follow [semantic versioning](https://semver.org): from 1.0.0 on, minor and patch releases keep existing installs, data and settings working, and changes that need manual steps come only with a new major version. (Before 1.0, minor versions could change behaviour.)
+All notable changes to CraftPanel, in the style of [Keep a Changelog](https://keepachangelog.com). Versions follow [semantic versioning](https://semver.org): from 1.0.0 on, minor and patch releases keep existing installs, data and settings working, and changes that need manual steps come only with a new major version. (Before 1.0, minor versions could change behaviour.) The rules for entries and versions are in [docs/RELEASING.md](docs/RELEASING.md).
 
-`scripts/release.mjs <version>` turns the "Unreleased" section into the release notes for that version.
+`node scripts/release.mjs bump <version>` turns the "Unreleased" section into the release notes for that version.
 
 ## Unreleased
 
