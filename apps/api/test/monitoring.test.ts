@@ -91,6 +91,25 @@ describe("monitoring", () => {
     expect(watched.has(id)).toBe(true);
   });
 
+  it("survives a lost runtime connection and syncs again when it returns", () => {
+    // RuntimeClient's reads throw while disconnected; an exception in an event listener would end the process.
+    const connected = vi.spyOn(ctx.agent, "connected", "get").mockReturnValue(false);
+    const ids = vi.spyOn(ctx.agent, "serverIds").mockImplementation(() => { throw new Error("runtime_disconnected"); });
+    const alive = vi.spyOn(ctx.agent, "isRunning").mockImplementation(() => { throw new Error("runtime_disconnected"); });
+    expect(() => ctx.agent.emit("connection", false)).not.toThrow();
+    expect(() => ctx.agent.emit("status", id, "unknown")).not.toThrow();
+    expect(watched.has(id)).toBe(true);
+    connected.mockRestore();
+    ids.mockImplementation(() => [id]);
+    alive.mockImplementation(() => running);
+    running = false;
+    ctx.agent.emit("connection", true);
+    expect(watched.has(id)).toBe(false);
+    running = true;
+    ctx.agent.emit("connection", true);
+    expect(watched.has(id)).toBe(true);
+  });
+
   it("checks the range and lets viewers read it", async () => {
     expect((await history("2y")).status).toBe(400);
     const recent = await history("1h");

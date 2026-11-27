@@ -93,8 +93,8 @@ export class MonitoringService {
   private lastPrune = 0;
   private writing: Promise<void> = Promise.resolve();
   private readonly onMetrics = (id: string, m: ServerMetrics) => this.record(id, m);
-  private readonly onStatus = (id: string, _status: ServerStatus) => this.sync(id);
-  private readonly onConnection = () => this.syncAll();
+  private readonly onStatus = (id: string, _status: ServerStatus) => { try { this.sync(id); } catch { /* next event syncs */ } };
+  private readonly onConnection = () => { try { this.syncAll(); } catch { /* next event syncs */ } };
 
   constructor(
     private db: Database,
@@ -133,11 +133,16 @@ export class MonitoringService {
     await this.flush(true);
   }
 
+  // While the runtime is disconnected its state is unknown and its reads throw: the watches stay (the client
+  // renews them on reconnect) and the next connection event syncs again. These run inside event listeners,
+  // where an exception would end the dashboard process.
   private syncAll() {
+    if (!this.servers.agent.connected) return;
     for (const id of new Set([...this.servers.agent.serverIds(), ...this.watching.keys()])) this.sync(id);
   }
 
   private sync(id: string) {
+    if (!this.servers.agent.connected) return;
     const want = this.servers.agent.isRunning(id);
     if (want && !this.watching.has(id)) this.watching.set(id, this.servers.agent.watch(id));
     else if (!want) this.unwatch(id);
