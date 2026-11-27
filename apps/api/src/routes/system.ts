@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { appSettingsSchema, backupCreateSchema, badRequest, canAccess, CRAFTPANEL_VERSION, scheduleSchema, SOFTWARE_INFO, type ConnectAddress, type ScheduleInfo } from "@craftpanel/shared";
+import { appSettingsSchema, backupCreateSchema, badRequest, canAccess, notFound, CRAFTPANEL_VERSION, scheduleSchema, SOFTWARE_INFO, type ConnectAddress, type ScheduleInfo } from "@craftpanel/shared";
 import { nextRuns, validateCron } from "@craftpanel/scheduler";
 import { getProvider, log4shellMitigation, PROVIDERS } from "@craftpanel/minecraft-providers";
 import { SETTING_GROUPS, SETTINGS } from "@craftpanel/config";
@@ -290,6 +290,17 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
       limit: Number(req.query.limit ?? 100),
       before: req.query.before ? Number(req.query.before) : undefined,
     });
+  });
+  // Long operations: running ones first, then the newest. Application-wide jobs (application backups) are for owners.
+  app.get<{ Querystring: { serverId?: string; limit?: string } }>("/api/jobs", async (req) => {
+    const me = requirePermission(req, "server.view", req.query.serverId || undefined);
+    return ctx.jobs.list({ serverId: req.query.serverId || undefined, onlyServers: visibleServerIds(me), app: canAccess(me, "app.configure"), limit: Number(req.query.limit ?? 50) || 50 });
+  });
+  app.get<{ Params: { id: string } }>("/api/jobs/:id", async (req) => {
+    const me = requirePermission(req, "server.view");
+    const job = await ctx.jobs.get(req.params.id);
+    if (!job || (job.serverId ? !canSee(me, job.serverId) : !canAccess(me, "app.configure"))) throw notFound("Job");
+    return job;
   });
   app.get("/api/audit", async (req) => {
     requirePermission(req, "audit.view");

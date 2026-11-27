@@ -31,6 +31,16 @@ sudo systemctl restart craftpanel        # restart the dashboard; games keep run
 
 Restarting the dashboard never stops Minecraft. Restarting the **runtime** saves and stops all servers; those with **Start with CraftPanel** come back automatically.
 
+## Tasks after a restart
+
+**Activity → Tasks** lists the long operations: installations (also after a software or version change), server backups, restores and application backups. Each shows its progress while it runs and its result afterwards. Owners also see application backups there; other users see tasks of the servers they can see. Tasks are kept for 30 days.
+
+If the dashboard stops while a task runs (an update, a crash, a reboot), the task resumes or ends cleanly when it starts again:
+
+- An **installation** resumes on its own, once, and is marked **Resumed after a restart**. If it is cut short a second time, it is marked interrupted; retry it from the server's page.
+- A **server backup** or an **application backup** is marked interrupted. Its unfinished file is removed; start it again.
+- A **restore** is marked interrupted. The server's files may be incomplete, so restore the same backup again, or the safety copy taken just before it (**pre-restore** under Backups), before starting the server.
+
 ## Stopping everything
 
 **Settings → Security & about → Stop all servers for maintenance** saves and stops every server, for example before maintenance on the machine. Auto-start settings stay as they are for the next boot. On a normal shutdown or reboot, the runtime does this by itself.

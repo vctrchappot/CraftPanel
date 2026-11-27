@@ -15,6 +15,7 @@ import { AppBackupService } from "./services/app-backup";
 import { ScheduleService } from "./services/schedules";
 import { RuleService } from "./services/rules";
 import { MonitoringService } from "./services/monitoring";
+import { JobService } from "./services/jobs";
 import { GameService } from "./services/game";
 import { SettingsService } from "./services/settings";
 import { UpdateService } from "./services/updates";
@@ -49,9 +50,11 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
     approvalFile: path.join(L.root, "runtime", "update-approval.json"),
   } : undefined);
   const sessions = new SessionStore(db, config.sessionTtlMs, async () => (await settings.get()).twoFactorRoles);
-  const servers = new ServerService(db, agent, hub, activity, java, config, settings, runtimeAccess(opts.installRoot, agent));
-  const backups = new BackupService(db, servers, hub, activity, settings, config);
-  const appBackups = new AppBackupService(database, servers, backups, activity, settings, config);
+  const jobs = new JobService(db, hub);
+  const servers = new ServerService(db, agent, hub, activity, java, config, settings, jobs, runtimeAccess(opts.installRoot, agent));
+  servers.hooks.deleted.push((id) => jobs.forgetServer(id));
+  const backups = new BackupService(db, servers, hub, activity, settings, config, jobs);
+  const appBackups = new AppBackupService(database, servers, backups, activity, settings, config, jobs);
   const schedules = new ScheduleService(db, servers, backups, activity, settings, appBackups);
   const game = new GameService(db, servers, activity, config);
   const pregen = new PregenService(servers, game);
@@ -73,7 +76,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
     await fsp.writeFile(tokenFile, setupToken + "\n", { mode: 0o600 });
   } else await fsp.rm(tokenFile, { force: true });
 
-  const ctx = { config, database, agent, hub, sessions, activity, servers, backups, appBackups, schedules, rules, monitoring, game, pregen, maps, proxies, settings, updates, notifications, java, assistant, setupToken } as AppContext;
+  const ctx = { config, database, agent, hub, sessions, activity, servers, backups, appBackups, schedules, rules, monitoring, jobs, game, pregen, maps, proxies, settings, updates, notifications, java, assistant, setupToken } as AppContext;
   ctx.setup = new SetupRestoreService(ctx, opts.migrationsFolder);
   return ctx;
 }

@@ -10,6 +10,17 @@ import type { AppConfig } from "../config";
 import type { ActivityService, Actor } from "./activity";
 import type { ServerRow, ServerService } from "./servers";
 import type { SettingsService } from "./settings";
+import type { JobService } from "./jobs";
+
+/** How a backup that wasn't asked for directly is named in its job's title. */
+const KIND_LABEL: Partial<Record<BackupInfo["kind"], string>> = {
+  scheduled: "scheduled",
+  "pre-restore": "safety copy before a restore",
+  "pre-update": "before an update",
+  "pre-migration": "before a migration",
+  "pre-delete": "before deletion",
+  application: "for an application backup",
+};
 
 type BackupRow = typeof backups.$inferSelect;
 
@@ -34,7 +45,13 @@ export class BackupService {
     private activity: ActivityService,
     private settings: SettingsService,
     private config: AppConfig,
-  ) {}
+    private jobs: JobService,
+  ) {
+    jobs.onInterrupted("server.backup", { hint: "The unfinished archive was removed. Start the backup again." });
+    jobs.onInterrupted("server.restore", {
+      hint: "The restore stopped partway, so the server's files may be incomplete. Restore the same backup again, or the safety copy taken just before it (\"pre-restore\" in Backups), before starting the server.",
+    });
+  }
 
   private async storage() {
     const s = await this.settings.get();
@@ -90,54 +107,60 @@ export class BackupService {
     const now = Date.now();
     await this.db.insert(backups).values({ id, serverId, filename, storageKey, kind, status: "running", note: note ?? null, createdAt: now });
     this.running.add(serverId);
-    const emit = (status: string, percent?: number | null, message?: string) => this.hub.broadcast({ type: "backup", serverId, backupId: id, status, percent, message });
-    emit("running", 0, "Preparing backup");
+    const title = kind === "manual" ? `Back up ${server.name}` : `Back up ${server.name} (${KIND_LABEL[kind] ?? kind})`;
+    return this.jobs.run({ kind: "server.backup", serverId, title, actor }, async (job) => {
+      const emit = (status: string, percent?: number | null, message?: string) => {
+        this.hub.broadcast({ type: "backup", serverId, backupId: id, status, percent, message });
+        if (status === "running" && message) job.progress(message, percent ?? null);
+      };
+      emit("running", 0, "Preparing backup");
 
-    // A proxy has no world to flush.
-    try {
-      const storage = await this.storage();
-      const dest = storage.stagingPath(storageKey);
-      await fsp.mkdir(path.dirname(dest), { recursive: true });
-      const disk = await freeDiskSpace(path.dirname(dest));
-      if (disk && disk.free < 512 * 1024 ** 2) throw new Error("Less than 512 MB free at the backup destination");
+      // A proxy has no world to flush.
+      try {
+        const storage = await this.storage();
+        const dest = storage.stagingPath(storageKey);
+        await fsp.mkdir(path.dirname(dest), { recursive: true });
+        const disk = await freeDiskSpace(path.dirname(dest));
+        if (disk && disk.free < 512 * 1024 ** 2) throw new Error("Less than 512 MB free at the backup destination");
 
-      if (live) {
-        emit("running", 0, "Flushing world data to disk");
-        await this.servers.agent.query(serverId, "save-off", /Automatic saving is now disabled|Saving is already turned off/i, { timeoutMs: 10000 });
-        const saved = await this.servers.agent.query(serverId, "save-all flush", /^Saved the (game|world)/i, { timeoutMs: 120000, swallow: /^Saving the game|^Saving\.\.\.|^ThreadedAnvilChunkStorage/i });
-        if (!saved) throw new Error("The server did not confirm the world save in time");
-      }
-      // Saving is off now, so nothing writes new private files while the archive runs.
-      await this.servers.shareFiles(server);
-      const result = await createZip({
-        sourceDir: server.directory,
-        destination: dest,
-        exclude: (rel) => isExcluded(rel),
-        onProgress: (p) => emit("running", p.totalBytes ? Math.round((p.bytesProcessed / p.totalBytes) * 100) : null, p.currentFile ? `Archiving ${p.currentFile}` : "Archiving"),
-      });
-      if (!this.servers.agent.connected) throw new Error("Runtime connection lost during backup; world consistency cannot be confirmed");
-      await storage.commit(storageKey);
-      await this.db.update(backups).set({ status: "completed", size: result.size, sha256: result.sha256, completedAt: Date.now() }).where(eq(backups.id, id));
-      emit("completed", 100, "Backup complete");
-      await this.activity.event(serverId, "backup.completed", `Backup created (${(result.size / 1024 / 1024).toFixed(1)} MB, ${kind})`, { actor });
-    } catch (err) {
-      const message = (err as Error).message;
-      await this.db.update(backups).set({ status: "failed", error: message, completedAt: Date.now() }).where(eq(backups.id, id));
-      emit("failed", null, message);
-      await this.activity.event(serverId, "backup.failed", `Backup failed: ${message}`, { level: "error", actor });
-      throw err;
-    } finally {
-      if (live) {
-        try {
-          if (this.servers.agent.isRunning(serverId)) await this.servers.agent.send(serverId, "save-on");
-        } catch {
-          /* stopped meanwhile */
+        if (live) {
+          emit("running", 0, "Flushing world data to disk");
+          await this.servers.agent.query(serverId, "save-off", /Automatic saving is now disabled|Saving is already turned off/i, { timeoutMs: 10000 });
+          const saved = await this.servers.agent.query(serverId, "save-all flush", /^Saved the (game|world)/i, { timeoutMs: 120000, swallow: /^Saving the game|^Saving\.\.\.|^ThreadedAnvilChunkStorage/i });
+          if (!saved) throw new Error("The server did not confirm the world save in time");
         }
+        // Saving is off now, so nothing writes new private files while the archive runs.
+        await this.servers.shareFiles(server);
+        const result = await createZip({
+          sourceDir: server.directory,
+          destination: dest,
+          exclude: (rel) => isExcluded(rel),
+          onProgress: (p) => emit("running", p.totalBytes ? Math.round((p.bytesProcessed / p.totalBytes) * 100) : null, p.currentFile ? `Archiving ${p.currentFile}` : "Archiving"),
+        });
+        if (!this.servers.agent.connected) throw new Error("Runtime connection lost during backup; world consistency cannot be confirmed");
+        await storage.commit(storageKey);
+        await this.db.update(backups).set({ status: "completed", size: result.size, sha256: result.sha256, completedAt: Date.now() }).where(eq(backups.id, id));
+        emit("completed", 100, "Backup complete");
+        await this.activity.event(serverId, "backup.completed", `Backup created (${(result.size / 1024 / 1024).toFixed(1)} MB, ${kind})`, { actor });
+      } catch (err) {
+        const message = (err as Error).message;
+        await this.db.update(backups).set({ status: "failed", error: message, completedAt: Date.now() }).where(eq(backups.id, id));
+        emit("failed", null, message);
+        await this.activity.event(serverId, "backup.failed", `Backup failed: ${message}`, { level: "error", actor });
+        throw err;
+      } finally {
+        if (live) {
+          try {
+            if (this.servers.agent.isRunning(serverId)) await this.servers.agent.send(serverId, "save-on");
+          } catch {
+            /* stopped meanwhile */
+          }
+        }
+        this.running.delete(serverId);
       }
-      this.running.delete(serverId);
-    }
-    if (kind === "scheduled" || kind === "manual") void this.applyRetention(serverId).catch(() => undefined);
-    return this.toInfo(await this.get(id));
+      if (kind === "scheduled" || kind === "manual") void this.applyRetention(serverId).catch(() => undefined);
+      return this.toInfo(await this.get(id));
+    });
   }
 
   async verify(id: string) {
@@ -157,8 +180,12 @@ export class BackupService {
     const server = await this.servers.row(row.serverId);
     if (this.servers.agent.isRunning(server.id) || this.servers.status(server) === "orphaned") throw conflict("Stop the server before restoring a backup");
 
-    await this.servers.withLock(server.id, "restore", async () => {
-      const emit = (status: string, percent?: number | null, message?: string) => this.hub.broadcast({ type: "backup", serverId: server.id, backupId: id, status, percent, message });
+    const title = `Restore ${server.name} from the backup of ${new Date(row.createdAt).toLocaleString(APP_LOCALE, { dateStyle: "medium", timeStyle: "short" })}`;
+    await this.jobs.run({ kind: "server.restore", serverId: server.id, title, actor }, (job) => this.servers.withLock(server.id, "restore", async () => {
+      const emit = (status: string, percent?: number | null, message?: string) => {
+        this.hub.broadcast({ type: "backup", serverId: server.id, backupId: id, status, percent, message });
+        if (status === "restoring" && message) job.progress(message, percent ?? null);
+      };
       emit("restoring", null, "Verifying backup integrity");
       const file = await this.filePath(row);
       const check = await verifyZip(file, row.sha256);
@@ -188,7 +215,7 @@ export class BackupService {
       emit("restored", 100, "Restore complete");
       await this.activity.event(server.id, "backup.restored", `Restored backup from ${new Date(row.createdAt).toLocaleString(APP_LOCALE, { dateStyle: "medium", timeStyle: "short" })}`, { actor, level: "warn" });
       await this.activity.audit(actor, "backup.restore", id, { serverId: server.id });
-    });
+    }));
   }
 
   /** Pre-restore backup without re-acquiring the server lock. */
@@ -234,6 +261,14 @@ export class BackupService {
     for (const r of rows) {
       await fsp.rm((await storage.localPath(r.storageKey)) + ".partial", { force: true });
       await this.db.update(backups).set({ status: "failed", error: "Interrupted by an application restart" }).where(eq(backups.id, r.id));
+    }
+    // A restore cut short leaves its staging folder next to the server's folder.
+    for (const server of await this.servers.rows()) {
+      const parent = path.dirname(server.directory);
+      const prefix = `.restore-${server.id.slice(0, 8)}-`;
+      for (const name of await fsp.readdir(parent).catch(() => [] as string[])) {
+        if (name.startsWith(prefix) && /^\d+$/.test(name.slice(prefix.length))) await fsp.rm(path.join(parent, name), { recursive: true, force: true }).catch(() => undefined);
+      }
     }
   }
 }

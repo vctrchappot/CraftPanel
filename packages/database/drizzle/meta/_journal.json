@@ -43,6 +43,13 @@
       "when": 1795769070983,
       "tag": "0005_spooky_gravity",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1795771872957,
+      "tag": "0006_flaky_mister_sinister",
+      "breakpoints": true
     }
   ]
 }

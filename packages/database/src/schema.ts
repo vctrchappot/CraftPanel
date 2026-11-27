@@ -234,6 +234,28 @@ export const metricBuckets = sqliteTable(
   (t) => [primaryKey({ columns: [t.serverId, t.resolution, t.ts] }), index("metric_buckets_age_idx").on(t.resolution, t.ts)],
 );
 
+/** Long operations (apps/api/src/services/jobs.ts): what ran, for whom, how far it got and how it ended. */
+export const jobs = sqliteTable(
+  "jobs",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind").notNull(),
+    serverId: text("server_id"),
+    title: text("title").notNull(),
+    actor: text("actor"),
+    state: text("state", { enum: ["running", "succeeded", "failed", "interrupted"] }).notNull(),
+    stage: text("stage"),
+    percent: integer("percent"),
+    error: text("error"),
+    hint: text("hint"),
+    attempt: integer("attempt").notNull().default(1),
+    startedAt: integer("started_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+    finishedAt: integer("finished_at"),
+  },
+  (t) => [index("jobs_state_idx").on(t.state), index("jobs_server_idx").on(t.serverId, t.startedAt), index("jobs_started_idx").on(t.startedAt)],
+);
+
 export const appSettings = sqliteTable("app_settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),

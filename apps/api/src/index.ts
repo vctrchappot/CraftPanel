@@ -101,6 +101,7 @@ async function main() {
 
   await ctx.backups.recover();
   await ctx.servers.recover();
+  await ctx.jobs.recover();
   await ctx.schedules.boot();
   await ctx.updates.recordStartup(async (kind, message, level) => void (await ctx.activity.event(null, kind, message, { level }))).catch(() => undefined);
   ctx.notifications.start();
@@ -111,6 +112,7 @@ async function main() {
     if (ctx.setup.activating) return;
     void ctx.sessions.purgeExpired();
     void ctx.activity.prune();
+    void ctx.jobs.prune().catch(() => undefined);
   }, 3600_000);
 
   await app.listen({ host: config.host, port: config.port });

@@ -8,7 +8,7 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 **CraftPanel 1.1.0 is released** (2026-11-23): per-server isolation and resource limits, application backups with host moves, player profiles and actions, rules and sleeping servers, the AI assistant. Releases v0.1.0–v0.3.0, v1.0.0 and v1.1.0 are on GitHub. No known small issues are open.
 
-- **Current phase: persistent monitoring and recoverable background jobs** (section below), the foundation for remote agents and several hosts. Step 1, the stored performance history, is done (2026-11-27, unreleased); recoverable background jobs come next.
+- **Current phase: persistent monitoring and recoverable background jobs** (section below), the foundation for remote agents and several hosts. The stored performance history and recoverable jobs are done (2026-11-27, unreleased); host history, history-based alerts and then remote agents come next.
 
 - **Open verification gaps** (not blockers, listed honestly in STATUS.md): an actual Windows host shutdown on a disposable VM; dashboard-triggered updates and concurrent installers on Windows; the `curl | sudo bash` / `irm | iex` path on a physical Pi and a small VPS.
 - **Application backup and host moves: all three stages done (2026-11-17).** Complete and scheduled archives, retention/failure alerts, optional passphrase encryption and server-backup history, and first-run upload restoration. Verified with real Paper into installed Linux x64/ARM64 and Windows services; browser tests pass on both Linux architectures. Later: S3/USB destinations and pull-based moves. See STATUS.md.
@@ -107,7 +107,7 @@ User outcome: how a server ran over the last days is visible after any restart, 
 
 - [x] Stored performance history (2026-11-27): the API watches every running server (no dashboard needed) and folds the runtime's samples into minute and hour buckets in `metric_buckets` (sums, counts and extremes merged by upsert, minutes kept 26 h, hours 31 days, deleted with the server, part of application backups). The Performance tab has 24 h / 7 d / 30 d ranges; `GET /api/servers/:id/metrics?range=`. Verified with `performance-tab.mjs` on real Paper.
 - [ ] Host history: machine CPU, memory and disk over the same ranges, and a dashboard-wide overview of all servers.
-- [ ] A job table for long operations (install, software switch, modpack install, server and application backups, restores, pre-generation): state, progress, actor, result; a job list in the dashboard; after a restart of the dashboard, interrupted jobs are resumed where that is safe and otherwise marked as interrupted with what to do.
+- [x] Jobs (2026-11-27): installs (with software switches and modpacks), server backups, restores and application backups run as jobs in a `jobs` table with stage, progress, actor and result; Activity → Tasks shows them live. After a dashboard restart an install resumes once; the others are marked interrupted with a hint and their unfinished files removed. Pre-generation stays in Minecraft (Chunky) and is not a job.
 - [ ] Notifications and rules that use the history (for example "TPS below 18 for more than 10 % of the last day").
 
 Later in this phase: authenticated remote agents (`RuntimeAgent` over the network) and several hosts in one dashboard.
