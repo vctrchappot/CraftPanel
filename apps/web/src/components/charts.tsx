@@ -2,15 +2,17 @@
 
 import * as React from "react";
 import { Panel, cn } from "@craftpanel/ui";
-import { formatClock } from "@/lib/format";
+import { formatClock, formatDay } from "@/lib/format";
 
 export interface Point {
   ts: number;
   v: number | null;
 }
 
-/** Sampling pauses when nobody has the dashboard open; a hole this long breaks the line instead of bridging it. */
+/** Samples arrive every few seconds while a server runs; a hole this long (a stopped server) breaks the line instead of bridging it. */
 const GAP_MS = 45_000;
+/** Beyond this span the time axis names days instead of clock times. */
+const DAYS_FROM_MS = 36 * 3_600_000;
 
 interface Reference {
   value: number;
@@ -45,6 +47,7 @@ export function MetricChart({
   empty,
   className,
   stat,
+  gapMs = GAP_MS,
 }: {
   title: string;
   points: Point[];
@@ -59,6 +62,8 @@ export function MetricChart({
   empty: string;
   className?: string;
   stat?: { value: React.ReactNode; detail: string; hint: string; icon: React.ReactNode };
+  /** Points further apart than this are not joined: the sampling interval or bucket width with some slack. */
+  gapMs?: number;
 }) {
   const box = React.useRef<HTMLDivElement>(null);
   // url(#id) cannot contain the colons React puts in useId.
@@ -68,6 +73,9 @@ export function MetricChart({
   const visible = React.useMemo(() => points.filter((p) => p.ts >= from && p.ts <= to), [points, from, to]);
   const known = visible.filter((p): p is Point & { v: number } => p.v !== null);
   const span = Math.max(1, to - from);
+  const days = span > DAYS_FROM_MS;
+  const axisTime = (ts: number) => (days ? formatDay(ts) : formatClock(ts));
+  const pointTime = (ts: number) => (days ? `${formatDay(ts)} ${formatClock(ts)}` : formatClock(ts, span <= 2 * 3_600_000));
   const x = (ts: number) => ((ts - from) / span) * 100;
   const y = (v: number) => 100 - (clamp(v, 0, max) / max) * 100;
 
@@ -84,13 +92,13 @@ export function MetricChart({
       run = [];
     };
     for (const p of visible) {
-      if (p.v === null || (run.length && p.ts - run[run.length - 1].ts > GAP_MS)) flush();
+      if (p.v === null || (run.length && p.ts - run[run.length - 1].ts > gapMs)) flush();
       if (p.v !== null) run.push(p as Point & { v: number });
     }
     flush();
     return { line: lines.join(" "), area: areas.join(" ") };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, from, to, max]);
+  }, [visible, from, to, max, gapMs]);
 
   const latest = known[known.length - 1];
   const breached = alert ? known.filter((p) => (alert.below ? p.v < alert.value : p.v > alert.value)).length : 0;
@@ -116,7 +124,7 @@ export function MetricChart({
             {shown && shown.v !== null ? (
               <>
                 <span className="font-medium text-foreground">{format(shown.v)}</span>
-                {hover && <> · {formatClock(hover.ts, true)}</>}
+                {hover && <> · {pointTime(hover.ts)}</>}
               </>
             ) : (
               "—"
@@ -185,13 +193,13 @@ export function MetricChart({
       {stat && (
         <>
           <div className="mt-2.5 flex justify-between gap-2 font-mono text-[10px] text-muted-foreground">
-            <span>{formatClock(from)}</span>
-            {span >= 120_000 && <span>{formatClock(from + span / 2)}</span>}
-            <span>{formatClock(to)}</span>
+            <span>{axisTime(from)}</span>
+            {span >= 120_000 && <span>{axisTime(from + span / 2)}</span>}
+            <span>{axisTime(to)}</span>
           </div>
           <p className="mt-4 border-t border-border pt-3 text-xs tabular-nums text-muted-foreground" aria-live="off">
             {hover?.v != null ? (
-              `${format(hover.v)} at ${formatClock(hover.ts, true)}`
+              `${format(hover.v)} at ${pointTime(hover.ts)}`
             ) : (
               <>
                 {stat.detail}

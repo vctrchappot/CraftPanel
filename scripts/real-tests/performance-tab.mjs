@@ -1,5 +1,6 @@
-// The Performance tab's data on a real server: metric history from the live sampling, its reset on restart, and
-// the settings the tab edits (memory, JVM flags, the performance group of server.properties).
+// The Performance tab's data on a real server: metric history sampled without a dashboard, the stored minute and hour
+// buckets, the reset of the raw series on restart, and the settings the tab edits (memory, JVM flags, the performance
+// group of server.properties).
 // usage: node performance-tab.mjs <base> [mcVersion] [mcPort]   (KEEP_RUNNING=1 leaves the server up for a browser check)
 import { client } from "./client.mjs";
 
@@ -15,7 +16,20 @@ const s = await c.create({ name: "perf-tab", software: "paper", mcVersion, port:
 await c.waitInstalled(s.id);
 await c.start(s.id);
 
-// Sampling only runs while a dashboard is subscribed, exactly like the browser does it.
+// Sampling runs for every running server, without a dashboard: no WebSocket is open yet.
+const t0 = Date.now();
+let hist = { samples: [] };
+while (Date.now() - t0 < 60_000) {
+  await c.sleep(5000);
+  hist = await c.call("GET", `/api/servers/${s.id}/metrics`);
+  if (hist.samples.some((m) => m.tps !== null && m.cpuPercent !== null && m.memoryBytes !== null)) break;
+}
+let last = hist.samples[hist.samples.length - 1];
+console.log("last sample:", JSON.stringify(last));
+ok(hist.range === "1h" && hist.samples.length >= 2 && hist.samples.every((m, i, a) => i === 0 || m.ts >= a[i - 1].ts), `sampled without a dashboard: ${hist.samples.length} ordered samples`);
+ok(last.tps > 0 && last.tps <= 20 && last.mspt > 0 && last.cpuPercent >= 0 && last.memoryBytes > 100e6, `tps ${last.tps}, mspt ${last.mspt}, cpu ${last.cpuPercent}%, rss ${(last.memoryBytes / 1e6).toFixed(0)} MB`);
+
+// A dashboard gets the same samples live.
 const { cookie } = c.session();
 const ws = new WebSocket(base.replace(/^http/, "ws") + "/api/ws", { headers: { cookie, origin: base } });
 const live = [];
@@ -25,19 +39,27 @@ ws.onmessage = (ev) => {
 };
 await new Promise((resolve, reject) => ((ws.onopen = resolve), (ws.onerror = () => reject(new Error("websocket failed")))));
 ws.send(JSON.stringify({ type: "subscribe", serverId: s.id }));
+await c.sleep(12_000);
+hist = await c.call("GET", `/api/servers/${s.id}/metrics`);
+last = hist.samples[hist.samples.length - 1];
+const kept = new Set(hist.samples.map((m) => m.ts));
+ok(live.length >= 2 && live.every((m) => kept.has(m.ts)), `the live stream delivered samples the history also has (${live.length})`);
 
-const t0 = Date.now();
-let hist = { samples: [] };
-while (Date.now() - t0 < 60_000) {
-  await c.sleep(5000);
-  hist = await c.call("GET", `/api/servers/${s.id}/metrics`);
-  if (hist.samples.some((m) => m.tps !== null && m.cpuPercent !== null && m.memoryBytes !== null)) break;
+// Stored history: minute buckets for a day, hour buckets beyond. Wait until a finished minute was written.
+const ranged = await c.call("GET", `/api/servers/${s.id}/metrics?range=2y`).then(() => false, (e) => e.status === 400);
+ok(ranged, "an unknown range is refused");
+let day = { buckets: [] };
+const t1 = Date.now();
+while (Date.now() - t1 < 150_000) {
+  day = await c.call("GET", `/api/servers/${s.id}/metrics?range=24h`);
+  if (day.buckets.filter((b) => b.tpsAvg !== null && b.cpuAvg !== null && b.memoryAvg !== null).length >= 2) break;
+  await c.sleep(10_000);
 }
-const last = hist.samples[hist.samples.length - 1];
-console.log("last sample:", JSON.stringify(last));
-ok(hist.samples.length >= 2 && hist.samples.every((m, i, a) => i === 0 || m.ts >= a[i - 1].ts), `history has ${hist.samples.length} ordered samples`);
-ok(last.tps > 0 && last.tps <= 20 && last.mspt > 0 && last.cpuPercent >= 0 && last.memoryBytes > 100e6, `tps ${last.tps}, mspt ${last.mspt}, cpu ${last.cpuPercent}%, rss ${(last.memoryBytes / 1e6).toFixed(0)} MB`);
-ok(live.length >= hist.samples.length - 1, `the live stream delivered the same samples (${live.length})`);
+const full = day.buckets.filter((b) => b.tpsAvg !== null && b.cpuAvg !== null && b.memoryAvg !== null);
+console.log("minute bucket:", JSON.stringify(full[0]));
+ok(day.resolutionMs === 60_000 && full.length >= 2 && full.every((b) => b.ts % 60_000 === 0 && b.tpsMin <= b.tpsAvg && b.cpuMax >= b.cpuAvg && b.memoryMax >= b.memoryAvg), `24 h: ${day.buckets.length} minute buckets with averages and extremes`);
+const week = await c.call("GET", `/api/servers/${s.id}/metrics?range=7d`);
+ok(week.resolutionMs === 3_600_000 && week.buckets.length >= 1 && week.buckets.length <= 2 && week.buckets.every((b) => b.ts % 3_600_000 === 0 && b.cpuAvg !== null), `7 d: ${week.buckets.length} hour bucket(s)`);
 
 // The settings behind the tab.
 const perf = await c.call("GET", `/api/servers/${s.id}/performance`);
@@ -51,6 +73,8 @@ const rejected = await c.call("PUT", `/api/servers/${s.id}/properties`, { values
 ok(rejected, "an out-of-range distance is refused");
 
 // A restart starts a new series.
+hist = await c.call("GET", `/api/servers/${s.id}/metrics`);
+last = hist.samples[hist.samples.length - 1];
 const before = hist.samples.length;
 await c.call("POST", `/api/servers/${s.id}/restart`);
 await c.sleep(4000);

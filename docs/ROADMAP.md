@@ -4,15 +4,17 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 **Goal:** clone or download CraftPanel, run it on a second PC, a Raspberry Pi or a VPS, and create and manage Minecraft servers across platforms and versions from a browser, without needing to know Docker, Java or networking.
 
-## Current state (2026-11-17)
+## Current state (2026-11-27)
 
-**CraftPanel 1.0.0 is the first stable release.** It includes the independent runtime service (games survive dashboard restarts, crashes and updates). Work completed since that release, including the isolation and application-backup stages below, is on `main` for the next release and listed under "Unreleased" in the changelog. Releases v0.1.0–v0.3.0 and v1.0.0 are on GitHub; 0.x installs update with the commands in the changelog. No known small issues are open.
+**CraftPanel 1.1.0 is released** (2026-11-23): per-server isolation and resource limits, application backups with host moves, player profiles and actions, rules and sleeping servers, the AI assistant. Releases v0.1.0–v0.3.0, v1.0.0 and v1.1.0 are on GitHub. No known small issues are open.
+
+- **Current phase: persistent monitoring and recoverable background jobs** (section below), the foundation for remote agents and several hosts. Step 1, the stored performance history, is done (2026-11-27, unreleased); recoverable background jobs come next.
 
 - **Open verification gaps** (not blockers, listed honestly in STATUS.md): an actual Windows host shutdown on a disposable VM; dashboard-triggered updates and concurrent installers on Windows; the `curl | sudo bash` / `irm | iex` path on a physical Pi and a small VPS.
 - **Application backup and host moves: all three stages done (2026-11-17).** Complete and scheduled archives, retention/failure alerts, optional passphrase encryption and server-backup history, and first-run upload restoration. Verified with real Paper into installed Linux x64/ARM64 and Windows services; browser tests pass on both Linux architectures. Later: S3/USB destinations and pull-based moves. See STATUS.md.
 - **Per-server isolation and resource limits: done (2026-11-16)**, with one accepted gap (section below). Order: Linux isolation (done 2026-11-12) and Linux limits (done 2026-11-13), both verified on an installed Ubuntu service, and Windows limits (done 2026-11-13, verified with a dev-style runtime) and Windows isolation (done 2026-11-15, restricted token per server); the Linux real evidence and the upgrade from 1.0.0 are done (2026-11-16, in CI on x64 and ARM64); the Windows follow-ups and the installed-service evidence followed the same day. The application-backup stages below are complete too. Running the installers on a physical Pi and a small VPS and announcing (step 1) needs hardware and can happen in parallel. Bedrock, Pi/VPS measurements and the Velocity open points (step 4) remain planned.
-- **AI assistant** (unreleased): optional bring-your-own-key assistant with approvals and per-user permissions, verified on Paper with a scripted model; a run against real providers (Claude, OpenAI, Ollama) is still open. Ideas: streaming answers, more tools (worlds, network, pre-generation), conversation export.
-- **Player profiles** (unreleased): every player has a profile (Overview, Inventory, Statistics, Activity) built from CraftPanel's session log and Minecraft's per-player files; verified on Paper 1.21.4 and Vanilla 26.1 (`scripts/real-tests/player-profile.mjs`). Ideas not done: shulker box contents, per-world statistics, a server-wide leaderboard. **Player actions** (unreleased): an Actions view in every profile (manage, fun, access and player data) with a shared action catalog; verified on Paper, Vanilla and Fabric 1.21.4 (`scripts/real-tests/player-actions.mjs`). Ideas not done: reading scores of the scoreboard, plugin-specific lookups (EssentialsX, LuckPerms) from their commands, more pranks, a bulk action on several players.
+- **AI assistant** (1.1.0): optional bring-your-own-key assistant with approvals and per-user permissions, verified on Paper with a scripted model; a run against real providers (Claude, OpenAI, Ollama) is still open. Ideas: streaming answers, more tools (worlds, network, pre-generation), conversation export.
+- **Player profiles** (1.1.0): every player has a profile (Overview, Inventory, Statistics, Activity) built from CraftPanel's session log and Minecraft's per-player files; verified on Paper 1.21.4 and Vanilla 26.1 (`scripts/real-tests/player-profile.mjs`). Ideas not done: shulker box contents, per-world statistics, a server-wide leaderboard. **Player actions** (1.1.0): an Actions view in every profile (manage, fun, access and player data) with a shared action catalog; verified on Paper, Vanilla and Fabric 1.21.4 (`scripts/real-tests/player-actions.mjs`). Ideas not done: reading scores of the scoreboard, plugin-specific lookups (EssentialsX, LuckPerms) from their commands, more pranks, a bulk action on several players.
 - **Real-server test scenarios** used for the ✅ entries live in `scripts/real-tests/` (see its README).
 - **Design and polish:** dashboard, website and docs share Inter, Mona Sans and Mona Sans Mono and the Signal/Amber/Ember/Ash palette. The website (home page and the Pi, Windows and friends guides) was redesigned on 2026-11-14 as one framed grid with the dashboard rebuilt in the hero and night-lit isometric scenes, and polished on 2026-11-15 (server software as voxel scenes, numbered sections, chapters with their facts beside a sticky drawing, hardware at one scale, an install terminal that plays when it scrolls into view); locale, adapter labels, activity icons and console spacing are verified on a throwaway Paper instance. Rules and evidence: [design/README.md](design/README.md), [STATUS.md](STATUS.md).
 - **Panel design-system reference:** a dedicated six-chapter docs section documents foundations, shared component APIs, responsive layouts, data presentation, states, accessibility review and implementation. Colour tables read the actual shared tokens; theme-aware examples accompany the reference. Existing design-system bookmarks remain valid.
@@ -94,10 +96,21 @@ Not in scope: Java runtimes (downloaded again), Minecraft jars and libraries (do
 - [x] Add per-server OS isolation and resource limits (done 2026-11-16, see the section above).
 - [x] Application backup and host migration, first stage (2026-11-16, see "Application backup and host moves" below).
 - [x] Application backups on a schedule with retention and failure notifications, installed-service restore evidence (stage 2).
-- [ ] Restore from the first-run screen and a passphrase for the archive (stage 3).
-- [ ] Add persistent monitoring and recoverable background jobs, then authenticated remote agents and multiple hosts.
+- [x] Restore from the first-run screen and a passphrase for the archive (stage 3).
+- [ ] Add persistent monitoring and recoverable background jobs (in progress, see the next section), then authenticated remote agents and multiple hosts.
 
 Database recovery is a foundation for failed-update handling, not full world rollback or a general downgrade mechanism. Existing TOTP, per-server roles and session controls remain in place; SSO and scoped automation credentials can follow the runtime and recovery work.
+
+### Persistent monitoring and recoverable background jobs (in progress)
+
+User outcome: how a server ran over the last days is visible after any restart, and long operations (installs, switches, backups, imports, pre-generation) show their state, survive a dashboard restart or end with a clear result instead of vanishing. Both are needed before remote agents can run work on other hosts.
+
+- [x] Stored performance history (2026-11-27): the API watches every running server (no dashboard needed) and folds the runtime's samples into minute and hour buckets in `metric_buckets` (sums, counts and extremes merged by upsert, minutes kept 26 h, hours 31 days, deleted with the server, part of application backups). The Performance tab has 24 h / 7 d / 30 d ranges; `GET /api/servers/:id/metrics?range=`. Verified with `performance-tab.mjs` on real Paper.
+- [ ] Host history: machine CPU, memory and disk over the same ranges, and a dashboard-wide overview of all servers.
+- [ ] A job table for long operations (install, software switch, modpack install, server and application backups, restores, pre-generation): state, progress, actor, result; a job list in the dashboard; after a restart of the dashboard, interrupted jobs are resumed where that is safe and otherwise marked as interrupted with what to do.
+- [ ] Notifications and rules that use the history (for example "TPS below 18 for more than 10 % of the last day").
+
+Later in this phase: authenticated remote agents (`RuntimeAgent` over the network) and several hosts in one dashboard.
 
 ### 1. Release packages and one-line installers (finish Phase 1)
 The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target machine (a Next.js build on a Pi 4 is slow and memory-hungry).
@@ -143,7 +156,7 @@ The biggest step for "run it on a Pi or VPS": no pnpm, no build on the target ma
 ### 5. Comfort and optimisation (Phase 4)
 - [x] Measure first: `scripts/measure.mjs` (startup, idle CPU/RAM, API latency, bundle sizes); first fixes from it: minified API bundle, precompressed dashboard with long-lived caching, cached host info in `/api/system` (numbers in STATUS.md).
 - [ ] Run `scripts/measure.mjs` on a Pi and a small VPS; add backup duration and database growth over weeks of activity.
-- [x] Performance presets for Pi and small VPS (JVM flags, view/simulation distance) with a recommendation per machine, and chunk pre-generation with Chunky. A Performance tab per server with insights, live charts and all tuning in one place (history in memory; persistent monitoring stays under "Professional deployments").
+- [x] Performance presets for Pi and small VPS (JVM flags, view/simulation distance) with a recommendation per machine, and chunk pre-generation with Chunky. A Performance tab per server with insights, live charts and all tuning in one place (stored history of 30 days since 2026-11-27, see "Persistent monitoring").
 - [ ] Incremental/deduplicated backups and destinations such as USB drives or S3-compatible storage.
 - [ ] German UI (i18n) and a checked mobile layout.
 - [ ] Test on a physical Raspberry Pi 4/5.

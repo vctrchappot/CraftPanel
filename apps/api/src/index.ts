@@ -106,6 +106,7 @@ async function main() {
   ctx.notifications.start();
   ctx.maps.start();
   await ctx.rules.start();
+  ctx.monitoring.start();
   const housekeeping = setInterval(() => {
     if (ctx.setup.activating) return;
     void ctx.sessions.purgeExpired();
@@ -137,6 +138,7 @@ async function main() {
     ctx.notifications.stop();
     ctx.maps.stop();
     await ctx.rules.stop();
+    await ctx.monitoring.stop();
     ctx.updates.stop();
     await ctx.agent.disconnect();
     await app.close();

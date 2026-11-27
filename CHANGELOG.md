@@ -6,6 +6,9 @@ All notable changes to CraftPanel. Versions follow [semantic versioning](https:/
 
 ## Unreleased
 
+### Added
+- Performance history: CraftPanel now samples every running server all the time, also when no dashboard is open, and keeps minute averages for a day and hourly averages for a month in its database. The Performance tab has new ranges of 24 hours, 7 days and 30 days next to 15 minutes and 1 hour (the 5-minute range was removed). They show TPS, tick time, CPU, memory and the most players online, with the lowest TPS and the peaks of the range, and they survive restarts of CraftPanel and of the server. The history is part of application backups and is deleted with its server. API: `GET /api/servers/:id/metrics?range=1h|24h|7d|30d` (`1h`, the default, returns the samples as before).
+
 ## 1.1.0 – 2026-11-23
 
 ### Added

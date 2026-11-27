@@ -132,6 +132,33 @@ export interface ServerMetrics {
   playersOnline: number;
 }
 
+/** Time ranges of the stored metric history: the last hour comes from the raw samples, longer ones from buckets. */
+export const METRIC_RANGES = ["1h", "24h", "7d", "30d"] as const;
+export type MetricRange = (typeof METRIC_RANGES)[number];
+/** Bucket width per range: one minute for a day, one hour beyond. */
+export const METRIC_RESOLUTION_MS: Record<Exclude<MetricRange, "1h">, number> = { "24h": 60_000, "7d": 3_600_000, "30d": 3_600_000 };
+export const METRIC_RANGE_MS: Record<MetricRange, number> = { "1h": 3_600_000, "24h": 86_400_000, "7d": 7 * 86_400_000, "30d": 30 * 86_400_000 };
+
+/** Metrics of a running server folded into one minute or hour; a field is null when no sample in the bucket had it. */
+export interface MetricBucket {
+  /** Start of the bucket. */
+  ts: number;
+  cpuAvg: number | null;
+  cpuMax: number | null;
+  memoryAvg: number | null;
+  memoryMax: number | null;
+  tpsAvg: number | null;
+  tpsMin: number | null;
+  msptAvg: number | null;
+  msptMax: number | null;
+  playersAvg: number | null;
+  playersMax: number | null;
+}
+
+export type MetricHistory =
+  | { range: "1h"; samples: ServerMetrics[] }
+  | { range: Exclude<MetricRange, "1h">; resolutionMs: number; buckets: MetricBucket[] };
+
 export interface InstallProgress {
   serverId: string;
   stage: string;

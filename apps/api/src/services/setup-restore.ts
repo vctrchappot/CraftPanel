@@ -89,6 +89,7 @@ export class SetupRestoreService {
       ctx.notifications.stop();
       ctx.maps.stop();
       await ctx.rules.stop();
+      await ctx.monitoring.stop();
       // No other setup request can run while this reservation is held.
       if (ctx.database.raw.prepare("SELECT 1 FROM users LIMIT 1").get()) throw conflict("CraftPanel is already set up");
       ctx.database.close();
@@ -125,6 +126,7 @@ export class SetupRestoreService {
         ctx.notifications.start();
         ctx.maps.start();
         await ctx.rules.start().catch((error) => result.notes.push(`Automation could not start: ${error.message}`));
+        ctx.monitoring.start();
       }
     }
     ctx.setupToken = null;
