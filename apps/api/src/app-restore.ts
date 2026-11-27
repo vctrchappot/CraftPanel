@@ -134,6 +134,8 @@ async function importPlainApplicationBackup(layout: DataLayout, archive: string,
         if (tableExists(db, "sessions")) db.exec("DELETE FROM sessions");
         // A scheduled application backup snapshots its own unfinished run. It cannot resume on this host.
         if (tableExists(db, "schedule_runs")) db.prepare("UPDATE schedule_runs SET status = 'failed', finished_at = ?, output = 'Interrupted by application backup import' WHERE status = 'running'").run(Date.now());
+        // Jobs that ran on the old computer (at least the application backup itself) end there; none resumes here.
+        if (tableExists(db, "jobs")) db.exec("DELETE FROM jobs WHERE state = 'running'");
         if (tableExists(db, "backups")) {
           const n = (db.prepare("SELECT COUNT(*) AS n FROM backups").get() as { n: number }).n;
           const saved = db.prepare("SELECT id, server_id, filename, status FROM backups").all() as { id: string; server_id: string; filename: string; status: string }[];

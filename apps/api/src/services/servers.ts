@@ -19,6 +19,7 @@ import {
   serializeRotation,
   SOFTWARE_INFO,
   type InstallProgress,
+  type JobInfo,
   type MotdRotation,
   type MotdRotationState,
   type ServerDetail,
@@ -41,6 +42,7 @@ import { checkIcon, ICON_FILE } from "./server-icon";
 import { mergeSplitDimensions, separateDimensionLayout } from "./software-switch";
 import { MODPACK_RECORD, ModpackStaging, PENDING_MODPACK } from "./modpacks";
 import type { SettingsService } from "./settings";
+import type { JobHandle, JobService } from "./jobs";
 
 export type ServerRow = typeof servers.$inferSelect;
 const MARKER = ".craftpanel";
@@ -52,6 +54,8 @@ export class ServerService {
   readonly restartRequired = new Set<string>();
   private locks = new Map<string, string>();
   private installs = new Map<string, AbortController>();
+  /** The job of each running installation, which also receives its progress. */
+  private installJobs = new Map<string, JobHandle>();
   /** Sampled metrics of the current or last run; sampling only happens while a dashboard is open, so this can have gaps. */
   private metricSeries = new Map<string, ServerMetrics[]>();
   /** When each server's icon file was last seen to change, kept for a few seconds so list polling doesn't touch the disk every time. */
@@ -74,10 +78,21 @@ export class ServerService {
     readonly java: JavaManager,
     private config: AppConfig,
     private settings: SettingsService,
+    private jobs: JobService,
     private prepareRuntimeAccess: (directory: string, javaPath: string) => Promise<void> = async () => undefined,
   ) {
     this.modpacks = new ModpackStaging(config.layout.tmp);
     this.wireAgent();
+    // Installing only downloads and verifies files, so an installation the dashboard's stop cut short starts again.
+    jobs.onInterrupted("server.install", {
+      hint: "Retry the installation from the server's page.",
+      resume: async (job) => {
+        const row = job.serverId ? await this.row(job.serverId).catch(() => null) : null;
+        if (!row || row.installState === "installed" || this.installs.has(row.id)) return false;
+        void this.install(row.id, { id: null, username: job.actor ?? "system" }, { resume: job });
+        return true;
+      },
+    });
   }
 
   // ---- locking ------------------------------------------------------------
@@ -377,42 +392,48 @@ export class ServerService {
 
   private progress(p: InstallProgress) {
     this.hub.broadcast({ type: "install", progress: p });
+    if (!p.done) this.installJobs.get(p.serverId)?.progress(p.stage, p.percent);
   }
 
   /** Download server software and a compatible Java runtime. Safe to retry. */
-  async install(id: string, actor: Actor = SYSTEM_ACTOR): Promise<void> {
+  async install(id: string, actor: Actor = SYSTEM_ACTOR, opts: { resume?: JobInfo } = {}): Promise<void> {
     if (this.installs.has(id)) return;
     const ac = new AbortController();
     this.installs.set(id, ac);
     try {
-      await this.withLock(id, "install", async () => {
-        const row = await this.row(id);
-        await this.db.update(servers).set({ installState: "installing", installError: null, updatedAt: Date.now() }).where(eq(servers.id, id));
-        this.hub.broadcast({ type: "status", serverId: id, status: "installing" });
-        const report = (stage: string, p: { received: number; total: number | null } | null) =>
-          this.progress({ serverId: id, stage, message: stage, percent: p && p.total ? Math.round((p.received / p.total) * 100) : null });
+      const target = await this.row(id);
+      const title = `Install ${getProvider(target.software).label} ${target.mcVersion}${target.build ? ` build ${target.build}` : ""}`;
+      await this.jobs.run({ kind: "server.install", serverId: id, title, actor, resume: opts.resume }, (job) => {
+        this.installJobs.set(id, job);
+        return this.withLock(id, "install", async () => {
+          const row = await this.row(id);
+          await this.db.update(servers).set({ installState: "installing", installError: null, updatedAt: Date.now() }).where(eq(servers.id, id));
+          this.hub.broadcast({ type: "status", serverId: id, status: "installing" });
+          const report = (stage: string, p: { received: number; total: number | null } | null) =>
+            this.progress({ serverId: id, stage, message: stage, percent: p && p.total ? Math.round((p.received / p.total) * 100) : null });
 
-        const provider = getProvider(row.software);
-        // Java first: installers such as NeoForge's run on it.
-        report("Checking Java runtime", null);
-        const javaPath = await this.ensureJava(row.javaMajor, row.javaPath, report, ac.signal);
-        const result = await provider.install({ directory: row.directory, version: row.mcVersion, build: row.build, javaPath, onProgress: report, signal: ac.signal });
-        const log4j = this.log4shell(row);
-        if (log4j?.configFile) {
-          report("Downloading Log4Shell protection", null);
-          await ensureLog4jConfig(row.directory, log4j.configFile, ac.signal);
-        }
-        await this.installPendingModpack(row, actor, ac.signal);
-        // Publish installation completion only after the process owner has accepted its boot policy.
-        // Otherwise the Start button can race the still-held install lock during Java inspection/IPC.
-        if (this.agent.connected) await this.registerRuntime({ ...row, installState: "installed", jarFile: result.jarFile, javaPath }, javaPath);
-        await this.db
-          .update(servers)
-          .set({ installState: "installed", jarFile: result.jarFile, jarSha: result.sha, build: result.build, javaPath, installError: null, lastStatus: "stopped", updatedAt: Date.now() })
-          .where(eq(servers.id, id));
-        this.progress({ serverId: id, stage: "Installed", message: "Installation complete", percent: 100, done: true });
-        this.hub.broadcast({ type: "status", serverId: id, status: "stopped" });
-        await this.activity.event(id, "server.installed", `Installed ${provider.label} ${row.mcVersion}${result.build ? ` build ${result.build}` : ""}`, { actor });
+          const provider = getProvider(row.software);
+          // Java first: installers such as NeoForge's run on it.
+          report("Checking Java runtime", null);
+          const javaPath = await this.ensureJava(row.javaMajor, row.javaPath, report, ac.signal);
+          const result = await provider.install({ directory: row.directory, version: row.mcVersion, build: row.build, javaPath, onProgress: report, signal: ac.signal });
+          const log4j = this.log4shell(row);
+          if (log4j?.configFile) {
+            report("Downloading Log4Shell protection", null);
+            await ensureLog4jConfig(row.directory, log4j.configFile, ac.signal);
+          }
+          await this.installPendingModpack(row, actor, ac.signal);
+          // Publish installation completion only after the process owner has accepted its boot policy.
+          // Otherwise the Start button can race the still-held install lock during Java inspection/IPC.
+          if (this.agent.connected) await this.registerRuntime({ ...row, installState: "installed", jarFile: result.jarFile, javaPath }, javaPath);
+          await this.db
+            .update(servers)
+            .set({ installState: "installed", jarFile: result.jarFile, jarSha: result.sha, build: result.build, javaPath, installError: null, lastStatus: "stopped", updatedAt: Date.now() })
+            .where(eq(servers.id, id));
+          this.progress({ serverId: id, stage: "Installed", message: "Installation complete", percent: 100, done: true });
+          this.hub.broadcast({ type: "status", serverId: id, status: "stopped" });
+          await this.activity.event(id, "server.installed", `Installed ${provider.label} ${row.mcVersion}${result.build ? ` build ${result.build}` : ""}`, { actor });
+        });
       });
     } catch (err) {
       const message = (err as Error).message;
@@ -422,6 +443,7 @@ export class ServerService {
       await this.activity.event(id, "server.install_failed", `Installation failed: ${message}`, { level: "error", actor });
     } finally {
       this.installs.delete(id);
+      this.installJobs.delete(id);
     }
   }
 
@@ -848,6 +870,7 @@ export class ServerService {
     for (const row of await this.rows()) {
       if (row.installState === "installing" || row.installState === "pending") {
         if (this.installs.has(row.id)) continue; // A transport reconnect did not interrupt this dashboard's installation.
+        // The installation's job starts it again (JobService.recover) unless it was already resumed once.
         await this.db.update(servers).set({ installState: "failed", installError: "Installation was interrupted. Retry the installation." }).where(eq(servers.id, row.id));
         continue;
       }

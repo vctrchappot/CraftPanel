@@ -13,6 +13,7 @@ import type { ActivityService, Actor } from "./activity";
 import type { BackupService } from "./backups";
 import type { ServerService } from "./servers";
 import type { SettingsService } from "./settings";
+import type { JobHandle, JobService } from "./jobs";
 import { encryptedBackupHeader, encryptApplicationBackup } from "../app-backup-crypto";
 import { BackupPassphrases } from "./backup-passphrases";
 
@@ -37,6 +38,7 @@ const NAME = new RegExp(`^${APP_BACKUP_PREFIX}[0-9T-]{1,30}(-config)?\\.(zip|cpb
 export class AppBackupService {
   private current: AppBackupProgress = { running: false, message: null, percent: null, error: null };
   readonly passphrases: BackupPassphrases;
+  private job: JobHandle | null = null;
 
   constructor(
     private database: DatabaseHandle,
@@ -45,7 +47,23 @@ export class AppBackupService {
     private activity: ActivityService,
     private settings: SettingsService,
     private config: AppConfig,
-  ) { this.passphrases = new BackupPassphrases(config.layout.root); }
+    private jobs: JobService,
+  ) {
+    this.passphrases = new BackupPassphrases(config.layout.root);
+    jobs.onInterrupted("app.backup", {
+      hint: "No archive was written. Create the application backup again.",
+      // The unfinished archive (`.partial`, see createZip) and the staging folder of the backup that stopped.
+      cleanup: async () => {
+        const dir = await this.directory();
+        for (const name of await fsp.readdir(dir).catch(() => [] as string[])) {
+          if (name.startsWith(APP_BACKUP_PREFIX) && name.endsWith(".partial")) await fsp.rm(path.join(dir, name), { force: true });
+        }
+        for (const name of await fsp.readdir(this.config.layout.tmp).catch(() => [] as string[])) {
+          if (/^app-backup-[0-9a-f]{12}$/.test(name)) await fsp.rm(path.join(this.config.layout.tmp, name), { recursive: true, force: true });
+        }
+      },
+    });
+  }
 
   progress(): AppBackupProgress { return { ...this.current }; }
 
@@ -113,7 +131,12 @@ export class AppBackupService {
   run(includeServers: boolean, actor: Actor, schedule?: { id: string; keep: number }, options: AppBackupOptions = {}): Promise<string> {
     if (this.current.running) throw conflict("An application backup is already running");
     this.current = { running: true, message: "Preparing", percent: null, error: null };
-    return this.complete(includeServers, actor, schedule, options);
+    const title = `Application backup${includeServers ? " with server files" : " (settings only)"}${schedule ? ", scheduled" : ""}`;
+    return this.jobs.run({ kind: "app.backup", serverId: null, title, actor }, async (job) => {
+      this.job = job;
+      try { return await this.complete(includeServers, actor, schedule, options); }
+      finally { this.job = null; }
+    });
   }
 
   private async complete(includeServers: boolean, actor: Actor, schedule: { id: string; keep: number } | undefined, options: AppBackupOptions): Promise<string> {
@@ -136,7 +159,10 @@ export class AppBackupService {
     }
   }
 
-  private say(message: string, percent: number | null = null) { this.current = { ...this.current, message, percent }; }
+  private say(message: string, percent: number | null = null) {
+    this.current = { ...this.current, message, percent };
+    this.job?.progress(message, percent);
+  }
 
   private async create(dir: string, includeServers: boolean, actor: Actor, scheduleId: string | undefined, options: AppBackupOptions): Promise<string> {
     await fsp.mkdir(dir, { recursive: true, mode: 0o700 });

@@ -168,6 +168,32 @@ export interface InstallProgress {
   error?: string;
 }
 
+/** Long operations the dashboard tracks as jobs (apps/api/src/services/jobs.ts). */
+export const JOB_KINDS = ["server.install", "server.backup", "server.restore", "app.backup"] as const;
+export type JobKind = (typeof JOB_KINDS)[number];
+/** `interrupted`: the dashboard stopped while the job ran and it could not be resumed. */
+export type JobState = "running" | "succeeded" | "failed" | "interrupted";
+
+export interface JobInfo {
+  id: string;
+  kind: JobKind;
+  /** null for application-wide jobs (application backups), which only owners see. */
+  serverId: string | null;
+  title: string;
+  actor: string | null;
+  state: JobState;
+  stage: string | null;
+  percent: number | null;
+  error: string | null;
+  /** What to do after a failure or interruption. */
+  hint: string | null;
+  /** 2 and up: resumed automatically after a restart of the dashboard. */
+  attempt: number;
+  startedAt: number;
+  updatedAt: number;
+  finishedAt: number | null;
+}
+
 /** Messages pushed from API to browser over the WebSocket. */
 export type WsServerMessage =
   | { type: "hello"; user: { id: string; username: string; role: Role } }
@@ -178,6 +204,7 @@ export type WsServerMessage =
   | { type: "install"; progress: InstallProgress }
   | { type: "backup"; serverId: string; backupId: string; status: string; percent?: number | null; message?: string }
   | { type: "event"; event: ActivityEvent }
+  | { type: "job"; serverId: string | null; job: JobInfo }
   | { type: "error"; message: string }
   /** A conversation with the AI assistant changed (sent only to the user it belongs to). */
   | { type: "assistant"; conversation: AssistantConversationView };

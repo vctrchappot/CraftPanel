@@ -41,6 +41,7 @@ import { api } from "@/lib/api";
 import { eventStyle, type EventIcon, type EventTone } from "@/lib/activity";
 import { formatDateTime, timeAgo } from "@/lib/format";
 import { useServers } from "@/lib/queries";
+import { JobList } from "./jobs";
 
 const EVENT_ICONS: Record<EventIcon, LucideIcon> = {
   online: CircleCheck,
@@ -147,6 +148,14 @@ export function ActivityView() {
           </NativeSelect>
         }
       />
+      <section aria-labelledby="tasks" className="space-y-3">
+        <div className="space-y-1">
+          <h2 id="tasks" className="text-sm font-medium">Tasks</h2>
+          <p className="text-[13px] text-muted-foreground">Installs, backups and restores with their progress. A task that a restart of CraftPanel cut short says what to do next.</p>
+        </div>
+        <JobList serverId={serverId || undefined} showServer={!serverId} />
+      </section>
+      <h2 className="text-sm font-medium">Events</h2>
       {q.isLoading ? (
         <Skeleton className="h-64 rounded-lg" />
       ) : events.length ? (

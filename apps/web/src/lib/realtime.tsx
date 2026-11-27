@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ConsoleLine, InstallProgress, OnlinePlayer, ServerDetail, ServerMetrics, ServerSummary, WsClientMessage, WsServerMessage } from "@craftpanel/shared";
+import type { ConsoleLine, InstallProgress, JobInfo, OnlinePlayer, ServerDetail, ServerMetrics, ServerSummary, WsClientMessage, WsServerMessage } from "@craftpanel/shared";
 import { wsUrl } from "./api";
 
 type Listener = (msg: WsServerMessage) => void;
@@ -142,6 +142,15 @@ export function RealtimeProvider({ children, enabled }: { children: React.ReactN
       } else if (msg.type === "install" && msg.progress.done) {
         void qc.invalidateQueries({ queryKey: ["servers"] });
         void qc.invalidateQueries({ queryKey: ["server", msg.progress.serverId] });
+      } else if (msg.type === "job") {
+        // Job lists are keyed ["jobs", serverId | "all"] (components/jobs.tsx): put the job into each list it belongs to.
+        for (const [key, list] of qc.getQueriesData<JobInfo[]>({ queryKey: ["jobs"] })) {
+          const scope = key[1];
+          if (!list || (scope !== "all" && scope !== msg.job.serverId)) continue;
+          const next = [msg.job, ...list.filter((j) => j.id !== msg.job.id)];
+          next.sort((a, b) => Number(b.state === "running") - Number(a.state === "running") || b.startedAt - a.startedAt);
+          qc.setQueryData(key, next);
+        }
       }
     });
     // Signed out elsewhere (4001) or access changed (4002): reload what the user may see.
@@ -152,6 +161,7 @@ export function RealtimeProvider({ children, enabled }: { children: React.ReactN
       if (state === "open") {
         void qc.invalidateQueries({ queryKey: ["servers"] });
         void qc.invalidateQueries({ queryKey: ["server"] });
+        void qc.invalidateQueries({ queryKey: ["jobs"] });
       } else {
         qc.setQueryData<ServerSummary[]>(["servers"], (rows) => rows?.map((s) => ({ ...s, status: "unknown" })));
         qc.setQueriesData<ServerDetail>({ queryKey: ["server"] }, (s) => s ? { ...s, status: "unknown", players: [], playersOnline: 0, pid: null } : s);

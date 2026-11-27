@@ -13,6 +13,7 @@ import type { AppBackupService } from "./services/app-backup";
 import type { ScheduleService } from "./services/schedules";
 import type { RuleService } from "./services/rules";
 import type { MonitoringService } from "./services/monitoring";
+import type { JobService } from "./services/jobs";
 import type { GameService } from "./services/game";
 import type { SettingsService } from "./services/settings";
 import type { UpdateService } from "./services/updates";
@@ -36,6 +37,7 @@ export interface AppContext {
   schedules: ScheduleService;
   rules: RuleService;
   monitoring: MonitoringService;
+  jobs: JobService;
   game: GameService;
   pregen: PregenService;
   maps: MapService;
