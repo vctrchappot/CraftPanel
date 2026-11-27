@@ -6,6 +6,8 @@ All notable changes to CraftPanel, in the style of [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.2.0 – 2026-11-27
+
 ### Added
 - Tasks: installations (also after a software or version change), server backups, restores and application backups are now recorded as tasks. **Activity → Tasks** shows each one live with its stage and progress, and afterwards whether it finished, failed or was interrupted, for 30 days. If CraftPanel's dashboard stops while a task runs (an update, a crash, a reboot), an installation resumes on its own once it starts again; a backup, restore or application backup is marked interrupted, its unfinished files are removed, and the task says what to do (for a restore: restore again or use the safety copy). Owners also see application backups; other users see the tasks of servers they can see. API: `GET /api/jobs[?serverId=]`, `GET /api/jobs/:id`, WebSocket message `job`.
 - Performance history: CraftPanel now samples every running server all the time, also when no dashboard is open, and keeps minute averages for a day and hourly averages for a month in its database. The Performance tab has new ranges of 24 hours, 7 days and 30 days next to 15 minutes and 1 hour (the 5-minute range was removed). They show TPS, tick time, CPU, memory and the most players online, with the lowest TPS and the peaks of the range, and they survive restarts of CraftPanel and of the server. The history is part of application backups and is deleted with its server. API: `GET /api/servers/:id/metrics?range=1h|24h|7d|30d` (`1h`, the default, returns the samples as before).
