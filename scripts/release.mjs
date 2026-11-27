@@ -260,7 +260,15 @@ function pack() {
   console.log(`Packed ${path.join(out, archive)}`);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+const sameFile = (a, b) => {
+  try {
+    return fs.realpathSync(a) === fs.realpathSync(b);
+  } catch {
+    return path.resolve(a) === path.resolve(b);
+  }
+};
+
+if (process.argv[1] && sameFile(process.argv[1], fileURLToPath(import.meta.url))) {
   const [command, ...args] = process.argv.slice(2);
   if (command === "check") check(args);
   else if (command === "bump") bump(args[0]);
