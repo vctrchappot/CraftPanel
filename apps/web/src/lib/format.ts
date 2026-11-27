@@ -53,6 +53,11 @@ export function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString(APP_LOCALE, { hour12: false });
 }
 
+/** Day and month ("27 Nov"), for the axis of charts over several days. */
+export function formatDay(ts: number): string {
+  return new Date(ts).toLocaleDateString(APP_LOCALE, { day: "numeric", month: "short" });
+}
+
 /** Hours and minutes (and seconds on request) on the 24-hour clock, for chart axes and hover readings. */
 export function formatClock(ts: number, seconds = false): string {
   return new Date(ts).toLocaleTimeString(APP_LOCALE, { hour: "2-digit", minute: "2-digit", ...(seconds ? { second: "2-digit" } : {}), hour12: false });

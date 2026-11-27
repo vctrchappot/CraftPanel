@@ -9,6 +9,7 @@ import {
   applyPresetFlags,
   PRESET_INFO,
   SOFTWARE_INFO,
+  METRIC_RANGE_MS,
   summarize,
   type HostFit,
   type Insight,
@@ -16,6 +17,8 @@ import {
   type InsightLevel,
   type PerformancePreset,
   type ServerDetail,
+  type MetricBucket,
+  type MetricHistory,
   type ServerMetrics,
 } from "@craftpanel/shared";
 import { api, ApiError } from "@/lib/api";
@@ -45,11 +48,19 @@ interface PregenStatus {
 }
 
 const ICONS: Record<PerformancePreset, React.ReactNode> = { "low-power": <Cpu />, balanced: <Gauge />, performance: <Zap /> };
+/** Short ranges draw every sample since the last start; long ones the stored minute or hour buckets. */
 const RANGES = [
-  ["5 min", 5],
-  ["15 min", 15],
-  ["1 hour", 60],
+  ["15 min", "15m"],
+  ["1 h", "1h"],
+  ["24 h", "24h"],
+  ["7 d", "7d"],
+  ["30 d", "30d"],
 ] as const;
+type ChartRange = (typeof RANGES)[number][1];
+type StoredRange = Exclude<ChartRange, "15m" | "1h">;
+const RAW_MINUTES: Record<"15m" | "1h", number> = { "15m": 15, "1h": 60 };
+const isStored = (r: ChartRange): r is StoredRange => r !== "15m" && r !== "1h";
+const RANGE_TEXT: Record<StoredRange, string> = { "24h": "Minute averages over the last 24 hours", "7d": "Hourly averages over the last 7 days", "30d": "Hourly averages over the last 30 days" };
 const MAX_LIVE = 1000;
 const ms = (v: number) => v.toFixed(1);
 const pct = (v: number) => `${v.toFixed(1)}%`;
@@ -60,7 +71,7 @@ const gb = (mb: number) => `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB`;
 /** The metric history the API kept, followed by whatever the live stream delivered since. */
 function useSamples(s: ServerDetail, stream: Stream): ServerMetrics[] {
   // gcTime 0: a cached history from an earlier visit would hide everything sampled while this tab was closed.
-  const hist = useQuery({ queryKey: ["metrics", s.id, s.startedAt], queryFn: () => api.get<{ samples: ServerMetrics[] }>(`/api/servers/${s.id}/metrics`), gcTime: 0, refetchOnWindowFocus: false });
+  const hist = useQuery({ queryKey: ["metrics", s.id, s.startedAt], queryFn: () => api.get<{ samples: ServerMetrics[] }>(`/api/servers/${s.id}/metrics?range=1h`), gcTime: 0, refetchOnWindowFocus: false });
   const [live, setLive] = React.useState<ServerMetrics[]>([]);
   const m = stream.metrics;
   React.useEffect(() => setLive([]), [s.id, s.startedAt]);
@@ -74,21 +85,66 @@ function useSamples(s: ServerDetail, stream: Stream): ServerMetrics[] {
   }, [hist.data, live]);
 }
 
+type MetricKey = "tps" | "mspt" | "cpu" | "memory" | "players";
+type View = { series: Record<MetricKey, { ts: number; v: number | null }[]>; stats: Record<MetricKey, { avg: number | null; min: number | null; max: number | null }> };
+
+/** Stored buckets as chart points (in the middle of each bucket) and range statistics: averages, the lowest TPS and the peaks. */
+function fromBuckets(buckets: MetricBucket[], width: number): View {
+  const line = (pick: (b: MetricBucket) => number | null) => buckets.map((b) => ({ ts: b.ts + width / 2, v: pick(b) }));
+  const known = (pick: (b: MetricBucket) => number | null) => buckets.map(pick).filter((v): v is number => v !== null);
+  const stat = (avg: (b: MetricBucket) => number | null, low: (b: MetricBucket) => number | null, peak: (b: MetricBucket) => number | null) => {
+    const a = known(avg), l = known(low), p = known(peak);
+    return { avg: a.length ? a.reduce((x, y) => x + y, 0) / a.length : null, min: l.length ? Math.min(...l) : null, max: p.length ? Math.max(...p) : null };
+  };
+  return {
+    series: { tps: line((b) => b.tpsAvg), mspt: line((b) => b.msptAvg), cpu: line((b) => b.cpuAvg), memory: line((b) => b.memoryAvg), players: line((b) => b.playersMax) },
+    stats: {
+      tps: stat((b) => b.tpsAvg, (b) => b.tpsMin, (b) => b.tpsAvg),
+      mspt: stat((b) => b.msptAvg, (b) => b.msptAvg, (b) => b.msptMax),
+      cpu: stat((b) => b.cpuAvg, (b) => b.cpuAvg, (b) => b.cpuMax),
+      memory: stat((b) => b.memoryAvg, (b) => b.memoryAvg, (b) => b.memoryMax),
+      players: stat((b) => b.playersAvg, (b) => b.playersMax, (b) => b.playersMax),
+    },
+  };
+}
+
 export function PerformanceTab({ server: s, stream }: { server: ServerDetail; stream: Stream }) {
   const proxy = SOFTWARE_INFO[s.software].proxy;
   const running = s.status === "running";
-  const [range, setRange] = React.useState<number>(15);
+  const [range, setRange] = React.useState<ChartRange>("15m");
   const samples = useSamples(s, stream);
+  const long = isStored(range);
+  const stored = useQuery({
+    queryKey: ["metrics", s.id, range],
+    queryFn: () => api.get<MetricHistory>(`/api/servers/${s.id}/metrics?range=${range}`),
+    enabled: long,
+    refetchInterval: running ? 60_000 : false,
+  });
   const perf = useQuery({ queryKey: ["performance", s.id, s.memoryMb, s.jvmArgs], queryFn: () => api.get<PerformanceInfo>(`/api/servers/${s.id}/performance`) });
   const pregen = useQuery({ queryKey: ["pregen", s.id, s.status], queryFn: () => api.get<PregenStatus>(`/api/servers/${s.id}/pregen`), enabled: !proxy, refetchInterval: (q) => (q.state.data?.task?.state === "running" ? 3000 : false) });
 
-  // Charts end at the newest sample: sampling only runs while a dashboard is open, so "now" can be a while ago.
-  const to = samples.length ? samples[samples.length - 1].ts : Date.now();
-  // A window longer than the data would squeeze the line against the right edge; start at the first sample instead.
-  const firstTs = samples.length ? samples[0].ts : to;
-  const from = Math.max(to - range * 60_000, Math.min(firstTs, to - 60_000));
+  // Short ranges end at the newest sample (a stopped server's last run). A window longer than the data would squeeze
+  // the line against the right edge, so it starts at the first sample instead.
+  const lastTs = samples.length ? samples[samples.length - 1].ts : Date.now();
+  const firstTs = samples.length ? samples[0].ts : lastTs;
+  // Long ranges end at the time of the fetch, so the time a server was off shows as the gap it is.
+  const to = long ? stored.dataUpdatedAt || Date.now() : lastTs;
+  const from = long ? to - METRIC_RANGE_MS[range] : Math.max(to - RAW_MINUTES[range] * 60_000, Math.min(firstTs, to - 60_000));
   const windowed = React.useMemo(() => samples.filter((m) => m.ts >= from), [samples, from]);
-  const recent = React.useMemo(() => samples.filter((m) => m.ts >= to - 5 * 60_000), [samples, to]);
+  const recent = React.useMemo(() => samples.filter((m) => m.ts >= lastTs - 5 * 60_000), [samples, lastTs]);
+  const history = stored.data && stored.data.range !== "1h" ? stored.data : null;
+  const width = history?.resolutionMs ?? 60_000;
+  const view = React.useMemo<View>(() => {
+    if (long) return fromBuckets(history?.buckets ?? [], width);
+    const pts = (pick: (m: ServerMetrics) => number | null) => samples.map((m) => ({ ts: m.ts, v: pick(m) }));
+    const sum = (pick: (m: ServerMetrics) => number | null) => summarize(windowed, pick);
+    return {
+      series: { tps: pts((m) => m.tps), mspt: pts((m) => m.mspt), cpu: pts((m) => m.cpuPercent), memory: pts((m) => m.memoryBytes), players: pts((m) => m.playersOnline) },
+      stats: { tps: sum((m) => m.tps), mspt: sum((m) => m.mspt), cpu: sum((m) => m.cpuPercent), memory: sum((m) => m.memoryBytes), players: sum((m) => m.playersOnline) },
+    };
+  }, [long, history, width, samples, windowed]);
+  // A missing bucket or two is a hiccup; a longer hole is a stopped server.
+  const gapMs = long ? width * 2.5 : undefined;
 
   const d = perf.data;
   const insights = React.useMemo(
@@ -109,14 +165,11 @@ export function PerformanceTab({ server: s, stream }: { server: ServerDetail; st
     [d, running, s.software, s.memoryMb, s.jvmArgs, recent, pregen.data],
   );
 
-  const tps = summarize(windowed, (m) => m.tps);
-  const mspt = summarize(windowed, (m) => m.mspt);
-  const cpu = summarize(windowed, (m) => m.cpuPercent);
-  const memory = summarize(windowed, (m) => m.memoryBytes);
-  const players = summarize(windowed, (m) => m.playersOnline);
+  const { tps, mspt, cpu, memory, players } = view.stats;
   const heap = s.memoryMb * 1024 * 1024;
-  const pts = (pick: (m: ServerMetrics) => number | null) => samples.map((m) => ({ ts: m.ts, v: pick(m) }));
-  const empty = running ? "Collecting data…" : "Start the server to collect data";
+  const empty = long
+    ? stored.isPending ? "Loading history…" : stored.isError ? "History could not be loaded" : "No history in this range yet"
+    : running ? "Collecting data…" : "Start the server to collect data";
   const unavailable = <Unavailable reason={running ? "Waiting for the next sample" : "Server is not running"} />;
   const live = running ? stream.metrics : null;
   const avgLow = (x: typeof tps, f: (v: number) => string) => (x.avg === null ? undefined : `avg ${f(x.avg)} · low ${f(x.min!)}`);
@@ -138,12 +191,16 @@ export function PerformanceTab({ server: s, stream }: { server: ServerDetail; st
               </Badge>
             </div>
             <p className="text-[13px] text-muted-foreground">
-              {!running && samples.length ? "The server is offline. Charts show its last recorded run." : "Live readings with up to an hour of history. Hover or touch a chart to inspect."}
+              {long
+                ? `${RANGE_TEXT[range]}; gaps are times the server was off. Hover or touch a chart to inspect.`
+                : !running && samples.length
+                  ? "The server is offline. Charts show its last recorded run."
+                  : "Live readings since the last start. Hover or touch a chart to inspect."}
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-3">
             <span className="text-xs text-muted-foreground">Chart range</span>
-            <SegmentedControl aria-label="Time range" value={range} onValueChange={setRange} options={RANGES.map(([label, minutes]) => ({ value: minutes, label }))} />
+            <SegmentedControl aria-label="Time range" value={range} onValueChange={setRange} options={RANGES.map(([label, value]) => ({ value, label }))} />
           </div>
         </div>
 
@@ -152,12 +209,12 @@ export function PerformanceTab({ server: s, stream }: { server: ServerDetail; st
             <MetricChart
               title="TPS"
               stat={metric(live?.tps != null ? live.tps.toFixed(1) : unavailable, avgLow(tps, (v) => v.toFixed(1)), "20 ticks per second is the target", <Gauge />)}
-              points={pts((m) => m.tps)} from={from} to={to} max={20} alert={{ value: 18, below: true, label: "below 18 TPS" }} format={(v) => v.toFixed(1)} empty={empty}
+              points={view.series.tps} from={from} to={to} gapMs={gapMs} max={20} alert={{ value: 18, below: true, label: "below 18 TPS" }} format={(v) => v.toFixed(1)} empty={empty}
             />
             <MetricChart
               title="Tick time"
               stat={metric(live?.mspt != null ? `${ms(live.mspt)} ms` : unavailable, avgPeak(mspt, (v) => `${ms(v)} ms`), "Stay below the 50 ms tick budget", <Timer />)}
-              points={pts((m) => m.mspt)} from={from} to={to}
+              points={view.series.mspt} from={from} to={to} gapMs={gapMs}
               max={Math.max(60, Math.ceil((mspt.max ?? 0) / 10) * 10)} reference={{ value: 50, label: "50 ms budget" }} alert={{ value: 50, label: "over the budget" }} format={(v) => `${ms(v)} ms`} axisFormat={(v) => `${Math.round(v)} ms`} empty={empty}
             />
           </div>
@@ -166,25 +223,25 @@ export function PerformanceTab({ server: s, stream }: { server: ServerDetail; st
           <MetricChart
             title="CPU"
             stat={metric(live?.cpuPercent != null ? pct(live.cpuPercent) : unavailable, avgPeak(cpu, pct), "100% equals one fully used core", <Cpu />)}
-            points={pts((m) => m.cpuPercent)} from={from} to={to}
+            points={view.series.cpu} from={from} to={to} gapMs={gapMs}
             max={Math.max(100, Math.ceil((cpu.max ?? 0) / 50) * 50)} reference={{ value: 100, label: "one core" }} format={pct} axisFormat={(v) => `${Math.round(v)}%`} empty={empty}
           />
           <MetricChart
             title="Memory"
             stat={metric(live?.memoryBytes != null ? mem(live.memoryBytes) : unavailable, memory.max === null ? undefined : `peak ${mem(memory.max)}`, `${gb(s.memoryMb)} configured Java heap · process memory shown`, <MemoryStick />)}
-            points={pts((m) => m.memoryBytes)} from={from} to={to} max={Math.max(heap, memory.max ?? 0)}
+            points={view.series.memory} from={from} to={to} gapMs={gapMs} max={Math.max(heap, memory.max ?? 0)}
             reference={{ value: heap, label: "configured heap" }} format={mem} axisFormat={(v) => formatBytes(v)} empty={empty}
           />
           <MetricChart
             title="Players"
             className="md:col-span-2 xl:col-span-1"
             stat={metric(live ? `${live.playersOnline} / ${s.maxPlayers}` : unavailable, players.max === null ? undefined : `peak ${players.max} online`, "Connected players over time", <Users />)}
-            points={pts((m) => m.playersOnline)} from={from} to={to} max={Math.max(4, players.max ?? 0)} format={(v) => v.toFixed(0)} empty={empty}
+            points={view.series.players} from={from} to={to} gapMs={gapMs} max={Math.max(4, players.max ?? 0)} format={(v) => v.toFixed(0)} empty={empty}
           />
         </div>
         <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
           <Info className="mt-0.5 size-3.5 shrink-0" />
-          Values show the current reading; averages and peaks follow the selected chart range. Samples are collected every few seconds while a dashboard is open.
+          Values show the current reading; averages and peaks follow the selected chart range. CraftPanel samples every running server every few seconds, also when no dashboard is open, and keeps minute averages for a day and hourly averages for 30 days. From 24 hours on, the players chart shows the most players online at once.
         </p>
       </section>
 

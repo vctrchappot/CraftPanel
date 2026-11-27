@@ -17,6 +17,7 @@ import {
   gameruleUpdateSchema,
   ipBanSchema,
   levelNameSchema,
+  METRIC_RANGES,
   notFound,
   PERFORMANCE_PRESETS,
   playerActionSchema,
@@ -34,6 +35,7 @@ import {
   updateServerSchema,
   worldCreateSchema,
   type ConnectAddress,
+  type MetricRange,
 } from "@craftpanel/shared";
 import { eq, servers as serversTable } from "@craftpanel/database";
 import { detectHost, directorySize, freeDiskSpace } from "@craftpanel/server-runtime";
@@ -272,11 +274,13 @@ export async function serverRoutes(app: FastifyInstance, ctx: AppContext) {
   });
   // ---- performance ---------------------------------------------------------------
 
-  // Metrics sampled since the last start. Sampling runs while a dashboard has the server open.
-  app.get<IdParams>("/api/servers/:id/metrics", async (req) => {
+  // The last hour: every sample since the last start. 24h/7d/30d: stored minute or hour buckets.
+  app.get<IdParams & { Querystring: { range?: string } }>("/api/servers/:id/metrics", async (req) => {
     requirePermission(req, "server.view");
     const r = await row(req.params.id);
-    return { samples: servers.metricsHistory(r.id) };
+    const range = req.query.range ?? "1h";
+    if (!(METRIC_RANGES as readonly string[]).includes(range)) throw badRequest(`range must be one of ${METRIC_RANGES.join(", ")}`);
+    return ctx.monitoring.history(r.id, range as MetricRange);
   });
   app.get<IdParams>("/api/servers/:id/performance", async (req) => {
     requirePermission(req, "server.view");

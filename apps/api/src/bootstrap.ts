@@ -14,6 +14,7 @@ import { BackupService } from "./services/backups";
 import { AppBackupService } from "./services/app-backup";
 import { ScheduleService } from "./services/schedules";
 import { RuleService } from "./services/rules";
+import { MonitoringService } from "./services/monitoring";
 import { GameService } from "./services/game";
 import { SettingsService } from "./services/settings";
 import { UpdateService } from "./services/updates";
@@ -58,6 +59,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const proxies = new ProxyService(servers, game, activity);
   const notifications = new NotificationService(settings, updates);
   const rules = new RuleService(db, servers, backups, maps, notifications, activity);
+  const monitoring = new MonitoringService(db, servers);
   activity.listen((event, serverName) => notifications.onEvent(event, serverName));
   const assistant = new AssistantService({ settings, sessions, servers, game, backups, schedules, activity, hub }, opts.assistantFetch);
 
@@ -71,7 +73,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
     await fsp.writeFile(tokenFile, setupToken + "\n", { mode: 0o600 });
   } else await fsp.rm(tokenFile, { force: true });
 
-  const ctx = { config, database, agent, hub, sessions, activity, servers, backups, appBackups, schedules, rules, game, pregen, maps, proxies, settings, updates, notifications, java, assistant, setupToken } as AppContext;
+  const ctx = { config, database, agent, hub, sessions, activity, servers, backups, appBackups, schedules, rules, monitoring, game, pregen, maps, proxies, settings, updates, notifications, java, assistant, setupToken } as AppContext;
   ctx.setup = new SetupRestoreService(ctx, opts.migrationsFolder);
   return ctx;
 }

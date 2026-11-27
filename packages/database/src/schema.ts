@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index, uniqueIndex, primaryKey } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable(
   "users",
@@ -203,6 +203,35 @@ export const playerSessions = sqliteTable(
     leftAt: integer("left_at"),
   },
   (t) => [index("player_sessions_server_idx").on(t.serverId, t.joinedAt)],
+);
+
+/**
+ * Stored performance history (apps/api/src/services/monitoring.ts): sums, counts and extremes per minute
+ * (resolution 60000) and per hour (3600000), so a partial bucket written twice merges instead of overwriting.
+ */
+export const metricBuckets = sqliteTable(
+  "metric_buckets",
+  {
+    serverId: text("server_id").notNull(),
+    resolution: integer("resolution").notNull(),
+    ts: integer("ts").notNull(),
+    cpuSum: real("cpu_sum").notNull().default(0),
+    cpuN: integer("cpu_n").notNull().default(0),
+    cpuMax: real("cpu_max"),
+    memorySum: real("memory_sum").notNull().default(0),
+    memoryN: integer("memory_n").notNull().default(0),
+    memoryMax: real("memory_max"),
+    tpsSum: real("tps_sum").notNull().default(0),
+    tpsN: integer("tps_n").notNull().default(0),
+    tpsMin: real("tps_min"),
+    msptSum: real("mspt_sum").notNull().default(0),
+    msptN: integer("mspt_n").notNull().default(0),
+    msptMax: real("mspt_max"),
+    playersSum: real("players_sum").notNull().default(0),
+    playersN: integer("players_n").notNull().default(0),
+    playersMax: integer("players_max"),
+  },
+  (t) => [primaryKey({ columns: [t.serverId, t.resolution, t.ts] }), index("metric_buckets_age_idx").on(t.resolution, t.ts)],
 );
 
 export const appSettings = sqliteTable("app_settings", {
