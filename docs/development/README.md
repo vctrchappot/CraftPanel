@@ -41,7 +41,7 @@ In development the dashboard calls the API cross-origin (`NEXT_PUBLIC_API_URL`),
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on pushes to `main`, pull requests, manually and once a week. A change only runs the jobs of the areas it touches; `scripts/ci-changes.mjs` holds the rules and `scripts/ci-changes.test.ts` tries them (`node scripts/ci-changes.mjs --files <paths>` shows what a change would run).
+`.github/workflows/ci.yml` runs on pushes to `main` and `release/**`, pull requests, manually and once a week. Its first job also runs `node scripts/release.mjs check` (versions and changelog, see [RELEASING.md](../RELEASING.md)). A change only runs the jobs of the areas it touches; `scripts/ci-changes.mjs` holds the rules and `scripts/ci-changes.test.ts` tries them (`node scripts/ci-changes.mjs --files <paths>` shows what a change would run).
 
 | Area | Runs when these change | Jobs |
 | --- | --- | --- |
@@ -52,6 +52,10 @@ In development the dashboard calls the API cross-origin (`NEXT_PUBLIC_API_URL`),
 | `plugin` | `plugins/craftpanel-info`, `apps/api/assets/CraftPanelInfo.jar`, `scripts/build-info-plugin.mjs` | The committed jar matches its source |
 
 Docs and other text (`docs/`, `*.md`) run nothing. Changes to `ci.yml` or `ci-changes.mjs`, the weekly run and a manual run without a choice and a push without a base to compare with run everything. Skipped jobs count as passing; `CI result` is the one check to require in branch protection, because a skipped matrix job reports without its operating system. A manual run (Actions → CI → Run workflow) can pick areas, for example `service`, to try one job on a branch without a pull request. When a new folder belongs to an area, add it to `AREAS` in `ci-changes.mjs` and to the test.
+
+## Releases
+
+Versioning, the changelog and the release steps are in [docs/RELEASING.md](../RELEASING.md). `.github/workflows/release.yml` publishes a pushed `v*` tag after CI passed on its commit.
 
 ## Conventions
 

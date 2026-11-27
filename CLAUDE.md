@@ -6,6 +6,7 @@ Self-hosted Minecraft (Java) server manager: Fastify API + Next.js dashboard in 
 - **What's next:** `docs/ROADMAP.md` (work through "Next" in order unless told otherwise; tick items off as you finish them)
 - Architecture, security, deployment, development, design system: `docs/*/README.md` (contributor docs; tokens and type rules in `docs/design/README.md`). User docs live on the website: `apps/site/src/content/docs/` → https://craftpanel.vctr.site/docs/; keep both in step when behaviour changes.
 - `apps/web/AGENTS.md`: this Next.js version differs from older ones; read its bundled docs before changing web code.
+- **Versions, changelog and releases:** `docs/RELEASING.md` is the authoritative policy; follow it for every change that touches the shipped product.
 
 ## Working agreements
 - The owner writes in German; answer in German. Code, comments, commits and docs are in English.
@@ -28,7 +29,8 @@ pnpm db:generate      # after changing packages/database/src/schema.ts; commit t
 node scripts/build-info-plugin.mjs [--check]   # rebuild the /craftpanel plugin jar (needs JDK 17+, JAVA_HOME)
 node scripts/release.mjs pack                   # release/ archive + installers + SHA256SUMS (after pnpm build)
 node scripts/measure.mjs [--idle 60] [--json]   # startup, idle CPU/RAM, API latency, bundle sizes of the build (own port, temp data)
-node scripts/release.mjs bump X.Y.Z && git push --follow-tags   # release: GitHub Actions publishes it
+node scripts/release.mjs check                  # versions, changelog and tags consistent (CI runs it)
+node scripts/release.mjs bump X.Y.Z && git push --follow-tags   # release, only with the owner's go-ahead (docs/RELEASING.md)
 pnpm --filter @craftpanel/site dev              # website + user docs (Astro/Starlight) on :4321; Vercel deploys main
 ```
 
@@ -38,7 +40,7 @@ pnpm --filter @craftpanel/site dev              # website + user docs (Astro/Sta
 - Errors: `AppError(status, code, message, hint)`; the UI shows message and hint.
 - Never use a shell for processes (`spawn` with argv); never interpolate user input into commands.
 - Filesystem access to server directories goes through `ServerSandbox`.
-- The version lives only in the root `package.json` (read by `packages/shared/src/meta.ts`); author in `meta.ts`. Add user-facing changes to `CHANGELOG.md` under "Unreleased".
+- The product version is the root `package.json` (read by `packages/shared/src/meta.ts`); the workspace manifests mirror it and only `release.mjs bump` changes them. Author in `meta.ts`. Add user-facing changes to `CHANGELOG.md` under "Unreleased" in the same change; website-only, docs, test and CI changes get no entry. Merging is not releasing: never bump, tag or publish without the owner's explicit go-ahead (`docs/RELEASING.md`).
 - Installers: `deploy/install.sh` (Linux) and `deploy/install.ps1` (Windows) install release archives; test them with `--archive` / `CRAFTPANEL_ARCHIVE` and, on Windows, `CRAFTPANEL_INSTALL_DIR`, `CRAFTPANEL_DATA_DIR`, `CRAFTPANEL_TASK_NAME`, `CRAFTPANEL_PORT` so a real install isn't touched.
 - The plugin jar `apps/api/assets/CraftPanelInfo.jar` is committed and must match `plugins/craftpanel-info` (CI checks it).
 - `.gitattributes` forces LF (CRLF for `*.cmd`/`*.ps1`); executable scripts need the git exec bit (`git update-index --chmod=+x`).
