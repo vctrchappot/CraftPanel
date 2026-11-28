@@ -50,6 +50,13 @@
       "when": 1795771872957,
       "tag": "0006_flaky_mister_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1795872048832,
+      "tag": "0007_quiet_toad",
+      "breakpoints": true
     }
   ]
 }

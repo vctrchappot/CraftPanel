@@ -6,6 +6,9 @@ All notable changes to CraftPanel, in the style of [Keep a Changelog](https://ke
 
 ## Unreleased
 
+### Added
+- Host history and server overview: CraftPanel now continuously samples the host machine's CPU, memory and data-directory disk usage (even when no server is running or dashboard is open) and stores minute averages for 26 hours and hourly averages for 31 days. The Overview page shows **Host history** charts over 15 minutes, 1 hour, 24 hours, 7 days and 30 days alongside an **All servers at a glance** resource breakdown (status, players, CPU, memory and TPS for every visible server). Application-backup imports clear the old host's machine metrics. API: `GET /api/system/metrics?range=1h|24h|7d|30d`.
+
 ## 1.2.0 – 2026-11-27
 
 ### Added

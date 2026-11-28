@@ -234,6 +234,30 @@ export const metricBuckets = sqliteTable(
   (t) => [primaryKey({ columns: [t.serverId, t.resolution, t.ts] }), index("metric_buckets_age_idx").on(t.resolution, t.ts)],
 );
 
+/**
+ * Stored host performance history (apps/api/src/services/monitoring.ts): machine CPU, memory and data-directory
+ * disk usage folded into minute (60000) and hour (3600000) buckets with the same upsert-merge semantics.
+ */
+export const hostMetricBuckets = sqliteTable(
+  "host_metric_buckets",
+  {
+    resolution: integer("resolution").notNull(),
+    ts: integer("ts").notNull(),
+    cpuSum: real("cpu_sum").notNull().default(0),
+    cpuN: integer("cpu_n").notNull().default(0),
+    cpuMax: real("cpu_max"),
+    memoryUsedSum: real("memory_used_sum").notNull().default(0),
+    memoryUsedN: integer("memory_used_n").notNull().default(0),
+    memoryUsedMax: real("memory_used_max"),
+    memoryTotal: real("memory_total"),
+    diskUsedSum: real("disk_used_sum").notNull().default(0),
+    diskUsedN: integer("disk_used_n").notNull().default(0),
+    diskUsedMax: real("disk_used_max"),
+    diskTotal: real("disk_total"),
+  },
+  (t) => [primaryKey({ columns: [t.resolution, t.ts] })],
+);
+
 /** Long operations (apps/api/src/services/jobs.ts): what ran, for whom, how far it got and how it ended. */
 export const jobs = sqliteTable(
   "jobs",

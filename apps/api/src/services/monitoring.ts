@@ -1,5 +1,18 @@
-import { and, eq, gte, lt, metricBuckets, sql, type Database } from "@craftpanel/database";
-import { METRIC_RANGE_MS, METRIC_RESOLUTION_MS, type MetricBucket, type MetricHistory, type MetricRange, type ServerMetrics, type ServerStatus } from "@craftpanel/shared";
+import os from "node:os";
+import { and, eq, gte, hostMetricBuckets, lt, metricBuckets, sql, type Database } from "@craftpanel/database";
+import { detectHost, freeDiskSpace } from "@craftpanel/server-runtime";
+import {
+  METRIC_RANGE_MS,
+  METRIC_RESOLUTION_MS,
+  type HostMetricBucket,
+  type HostMetricHistory,
+  type HostMetrics,
+  type MetricBucket,
+  type MetricHistory,
+  type MetricRange,
+  type ServerMetrics,
+  type ServerStatus,
+} from "@craftpanel/shared";
 import type { ServerService } from "./servers";
 
 export const MINUTE = 60_000;
@@ -8,6 +21,9 @@ export const HOUR = 3_600_000;
 export const MINUTE_RETENTION_MS = 26 * HOUR;
 export const HOUR_RETENTION_MS = 31 * 24 * HOUR;
 const FLUSH_MS = 30_000;
+const HOST_SAMPLE_MS = 15_000;
+/** Keep an hour of raw 15-second host samples in memory for the 15 min / 1 h views. */
+const HOST_RAW_MAX = 260;
 
 /** Sums, counts and extremes of the samples in one bucket, in the shape of a `metric_buckets` row. */
 export interface Totals {
@@ -19,12 +35,29 @@ export interface Totals {
 }
 interface Pending extends Totals { serverId: string; ts: number }
 
+/** Sums, counts and extremes of host samples in one bucket, in the shape of a `host_metric_buckets` row. */
+export interface HostTotals {
+  cpuSum: number; cpuN: number; cpuMax: number | null;
+  memoryUsedSum: number; memoryUsedN: number; memoryUsedMax: number | null;
+  memoryTotal: number | null;
+  diskUsedSum: number; diskUsedN: number; diskUsedMax: number | null;
+  diskTotal: number | null;
+}
+interface HostPending extends HostTotals { ts: number }
+
 const empty = (): Totals => ({
   cpuSum: 0, cpuN: 0, cpuMax: null,
   memorySum: 0, memoryN: 0, memoryMax: null,
   tpsSum: 0, tpsN: 0, tpsMin: null,
   msptSum: 0, msptN: 0, msptMax: null,
   playersSum: 0, playersN: 0, playersMax: null,
+});
+const emptyHost = (): HostTotals => ({
+  cpuSum: 0, cpuN: 0, cpuMax: null,
+  memoryUsedSum: 0, memoryUsedN: 0, memoryUsedMax: null,
+  memoryTotal: null,
+  diskUsedSum: 0, diskUsedN: 0, diskUsedMax: null,
+  diskTotal: null,
 });
 const hi = (a: number | null, b: number | null) => (a === null ? b : b === null ? a : Math.max(a, b));
 const lo = (a: number | null, b: number | null) => (a === null ? b : b === null ? a : Math.min(a, b));
@@ -60,8 +93,41 @@ export function toBucket(ts: number, t: Totals): MetricBucket {
   };
 }
 
+export function addHostSample(t: HostTotals, m: HostMetrics): void {
+  if (ok(m.cpuPercent)) { t.cpuSum += m.cpuPercent; t.cpuN++; t.cpuMax = hi(t.cpuMax, m.cpuPercent); }
+  if (ok(m.memoryUsedBytes)) { t.memoryUsedSum += m.memoryUsedBytes; t.memoryUsedN++; t.memoryUsedMax = hi(t.memoryUsedMax, m.memoryUsedBytes); }
+  if (ok(m.memoryTotalBytes)) t.memoryTotal = hi(t.memoryTotal, m.memoryTotalBytes);
+  if (ok(m.diskUsedBytes)) { t.diskUsedSum += m.diskUsedBytes; t.diskUsedN++; t.diskUsedMax = hi(t.diskUsedMax, m.diskUsedBytes); }
+  if (ok(m.diskTotalBytes)) t.diskTotal = hi(t.diskTotal, m.diskTotalBytes);
+}
+
+export function combineHost(a: HostTotals, b: HostTotals): void {
+  a.cpuSum += b.cpuSum; a.cpuN += b.cpuN; a.cpuMax = hi(a.cpuMax, b.cpuMax);
+  a.memoryUsedSum += b.memoryUsedSum; a.memoryUsedN += b.memoryUsedN; a.memoryUsedMax = hi(a.memoryUsedMax, b.memoryUsedMax);
+  a.memoryTotal = hi(a.memoryTotal, b.memoryTotal);
+  a.diskUsedSum += b.diskUsedSum; a.diskUsedN += b.diskUsedN; a.diskUsedMax = hi(a.diskUsedMax, b.diskUsedMax);
+  a.diskTotal = hi(a.diskTotal, b.diskTotal);
+}
+
+export function toHostBucket(ts: number, t: HostTotals): HostMetricBucket {
+  const avg = (sum: number, n: number) => (n ? sum / n : null);
+  return {
+    ts,
+    cpuAvg: avg(t.cpuSum, t.cpuN), cpuMax: t.cpuMax,
+    memoryUsedAvg: avg(t.memoryUsedSum, t.memoryUsedN), memoryUsedMax: t.memoryUsedMax,
+    memoryTotalBytes: t.memoryTotal,
+    diskUsedAvg: avg(t.diskUsedSum, t.diskUsedN), diskUsedMax: t.diskUsedMax,
+    diskTotalBytes: t.diskTotal,
+  };
+}
+
 const totalsOf = (row: typeof metricBuckets.$inferSelect): Totals => {
   const { serverId: _s, resolution: _r, ts: _t, ...t } = row;
+  return t;
+};
+
+const hostTotalsOf = (row: typeof hostMetricBuckets.$inferSelect): HostTotals => {
+  const { resolution: _r, ts: _t, ...t } = row;
   return t;
 };
 
@@ -76,20 +142,46 @@ const MERGE = {
   msptSum: add("mspt_sum"), msptN: add("mspt_n"), msptMax: keep("max", "mspt_max"),
   playersSum: add("players_sum"), playersN: add("players_n"), playersMax: keep("max", "players_max"),
 };
+const MERGE_HOST = {
+  cpuSum: add("cpu_sum"), cpuN: add("cpu_n"), cpuMax: keep("max", "cpu_max"),
+  memoryUsedSum: add("memory_used_sum"), memoryUsedN: add("memory_used_n"), memoryUsedMax: keep("max", "memory_used_max"),
+  memoryTotal: keep("max", "memory_total"),
+  diskUsedSum: add("disk_used_sum"), diskUsedN: add("disk_used_n"), diskUsedMax: keep("max", "disk_used_max"),
+  diskTotal: keep("max", "disk_total"),
+};
+
+function cpuTotals() {
+  let idle = 0;
+  let total = 0;
+  for (const cpu of os.cpus()) {
+    const t = cpu.times;
+    idle += t.idle;
+    total += t.user + t.nice + t.sys + t.idle + t.irq;
+  }
+  return { idle, total };
+}
 
 /**
- * Keeps a performance history of every running server, whether or not a dashboard is open: it holds a metrics
- * watch on each running server (the runtime samples resources every 5 s and ticks every 15 s), folds the samples
+ * Keeps a performance history of every running server and of the host machine itself, whether or not a dashboard
+ * is open: holds a metrics watch on each running server, samples host CPU/memory/disk periodically, folds samples
  * into minute buckets and writes each finished minute into its minute and hour row. Buckets are pruned after
- * {@link MINUTE_RETENTION_MS} and {@link HOUR_RETENTION_MS}. The last hour at full detail stays in ServerService.
+ * {@link MINUTE_RETENTION_MS} and {@link HOUR_RETENTION_MS}. The last hour at full detail stays in memory.
  */
 export class MonitoringService {
   /** The minute being collected per server. */
   private current = new Map<string, Pending>();
-  /** Finished minutes not written yet. */
+  /** Finished server minutes not written yet. */
   private ready: Pending[] = [];
+  /** Raw host samples from the last hour. */
+  private hostSamples: HostMetrics[] = [];
+  /** The host minute being collected. */
+  private currentHost: HostPending | null = null;
+  /** Finished host minutes not written yet. */
+  private readyHost: HostPending[] = [];
+  private prevCpu: { idle: number; total: number } | null = null;
   private watching = new Map<string, () => void>();
   private timer: NodeJS.Timeout | null = null;
+  private hostTimer: NodeJS.Timeout | null = null;
   private lastPrune = 0;
   private writing: Promise<void> = Promise.resolve();
   private readonly onMetrics = (id: string, m: ServerMetrics) => this.record(id, m);
@@ -99,6 +191,7 @@ export class MonitoringService {
   constructor(
     private db: Database,
     private servers: ServerService,
+    private dataDir: string = process.cwd(),
     private now: () => number = Date.now,
   ) {
     servers.hooks.deleted.push(async (id) => {
@@ -117,6 +210,10 @@ export class MonitoringService {
     agent.on("status", this.onStatus);
     agent.on("connection", this.onConnection);
     this.syncAll();
+    this.prevCpu = cpuTotals();
+    void this.sampleHost().catch(() => undefined);
+    this.hostTimer = setInterval(() => void this.sampleHost().catch(() => undefined), HOST_SAMPLE_MS);
+    this.hostTimer.unref();
     this.timer = setInterval(() => void this.tick().catch(() => undefined), FLUSH_MS);
     this.timer.unref();
   }
@@ -127,6 +224,8 @@ export class MonitoringService {
     agent.off("metrics", this.onMetrics);
     agent.off("status", this.onStatus);
     agent.off("connection", this.onConnection);
+    if (this.hostTimer) clearInterval(this.hostTimer);
+    this.hostTimer = null;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     for (const id of [...this.watching.keys()]) this.unwatch(id);
@@ -167,6 +266,44 @@ export class MonitoringService {
     addSample(bucket, m);
   }
 
+  recordHost(m: HostMetrics) {
+    this.hostSamples.push(m);
+    if (this.hostSamples.length > HOST_RAW_MAX) this.hostSamples.splice(0, this.hostSamples.length - HOST_RAW_MAX);
+    const ts = Math.floor(m.ts / MINUTE) * MINUTE;
+    if (this.currentHost && this.currentHost.ts !== ts) {
+      this.readyHost.push(this.currentHost);
+      this.currentHost = null;
+    }
+    if (!this.currentHost) this.currentHost = { ts, ...emptyHost() };
+    addHostSample(this.currentHost, m);
+  }
+
+  async sampleHost(): Promise<HostMetrics> {
+    const cur = cpuTotals();
+    let cpuPercent: number | null = null;
+    if (this.prevCpu) {
+      const totalDelta = cur.total - this.prevCpu.total;
+      const idleDelta = cur.idle - this.prevCpu.idle;
+      if (totalDelta > 0) cpuPercent = Math.max(0, Math.min(100, Math.round(((totalDelta - idleDelta) / totalDelta) * 1000) / 10));
+    }
+    this.prevCpu = cur;
+    const host = detectHost();
+    const memoryTotalBytes = host.memoryBytes;
+    const memoryFreeBytes = Math.min(os.freemem(), memoryTotalBytes);
+    const memoryUsedBytes = Math.max(0, memoryTotalBytes - memoryFreeBytes);
+    const disk = await freeDiskSpace(this.dataDir).catch(() => null);
+    const m: HostMetrics = {
+      ts: this.now(),
+      cpuPercent,
+      memoryUsedBytes,
+      memoryTotalBytes,
+      diskUsedBytes: disk ? Math.max(0, disk.total - disk.free) : null,
+      diskTotalBytes: disk?.total ?? null,
+    };
+    this.recordHost(m);
+    return m;
+  }
+
   async tick() {
     await this.flush(false);
     const now = this.now();
@@ -185,11 +322,18 @@ export class MonitoringService {
         this.current.delete(id);
       }
     }
+    if (this.currentHost && (all || this.currentHost.ts < minute)) {
+      this.readyHost.push(this.currentHost);
+      this.currentHost = null;
+    }
     const batch = this.ready;
     this.ready = [];
+    const hostBatch = this.readyHost;
+    this.readyHost = [];
     // Writes run one after another, so a shutdown flush waits for a timer flush that is still running.
     this.writing = this.writing.then(async () => {
       for (const p of batch) await this.write(p).catch(() => undefined);
+      for (const h of hostBatch) await this.writeHost(h).catch(() => undefined);
     });
     return this.writing;
   }
@@ -204,9 +348,21 @@ export class MonitoringService {
     }
   }
 
+  private async writeHost(p: HostPending) {
+    const { ts, ...totals } = p;
+    for (const resolution of [MINUTE, HOUR]) {
+      await this.db
+        .insert(hostMetricBuckets)
+        .values({ resolution, ts: Math.floor(ts / resolution) * resolution, ...totals })
+        .onConflictDoUpdate({ target: [hostMetricBuckets.resolution, hostMetricBuckets.ts], set: MERGE_HOST });
+    }
+  }
+
   async prune(now = this.now()) {
     await this.db.delete(metricBuckets).where(and(eq(metricBuckets.resolution, MINUTE), lt(metricBuckets.ts, now - MINUTE_RETENTION_MS)));
     await this.db.delete(metricBuckets).where(and(eq(metricBuckets.resolution, HOUR), lt(metricBuckets.ts, now - HOUR_RETENTION_MS)));
+    await this.db.delete(hostMetricBuckets).where(and(eq(hostMetricBuckets.resolution, MINUTE), lt(hostMetricBuckets.ts, now - MINUTE_RETENTION_MS)));
+    await this.db.delete(hostMetricBuckets).where(and(eq(hostMetricBuckets.resolution, HOUR), lt(hostMetricBuckets.ts, now - HOUR_RETENTION_MS)));
   }
 
   /** History of a server for a range: raw samples for the last hour, buckets (including what isn't written yet) beyond. */
@@ -231,6 +387,34 @@ export class MonitoringService {
       else byTs.set(ts, { ...totals });
     }
     const buckets = [...byTs].sort(([a], [b]) => a - b).map(([ts, t]) => toBucket(ts, t));
+    return { range, resolutionMs, buckets };
+  }
+
+  /** History of the host machine for a range: raw samples for the last hour, buckets beyond. */
+  async hostHistory(range: MetricRange): Promise<HostMetricHistory> {
+    if (range === "1h") {
+      const cutoff = this.now() - HOUR;
+      return { range, samples: this.hostSamples.filter((s) => s.ts >= cutoff) };
+    }
+    const resolutionMs = METRIC_RESOLUTION_MS[range];
+    const from = Math.floor((this.now() - METRIC_RANGE_MS[range]) / resolutionMs) * resolutionMs;
+    await this.writing;
+    const rows = await this.db
+      .select()
+      .from(hostMetricBuckets)
+      .where(and(eq(hostMetricBuckets.resolution, resolutionMs), gte(hostMetricBuckets.ts, from)))
+      .orderBy(hostMetricBuckets.ts);
+    const byTs = new Map<number, HostTotals>(rows.map((r) => [r.ts, hostTotalsOf(r)]));
+    const unwritten = [...this.readyHost, ...(this.currentHost ? [this.currentHost] : [])];
+    for (const p of unwritten) {
+      const ts = Math.floor(p.ts / resolutionMs) * resolutionMs;
+      if (ts < from) continue;
+      const { ts: _t, ...totals } = p;
+      const into = byTs.get(ts);
+      if (into) combineHost(into, totals);
+      else byTs.set(ts, { ...totals });
+    }
+    const buckets = [...byTs].sort(([a], [b]) => a - b).map(([ts, t]) => toHostBucket(ts, t));
     return { range, resolutionMs, buckets };
   }
 }
