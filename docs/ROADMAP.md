@@ -4,11 +4,11 @@ Where CraftPanel stands and what comes next. For what is implemented and how it 
 
 **Goal:** clone or download CraftPanel, run it on a second PC, a Raspberry Pi or a VPS, and create and manage Minecraft servers across platforms and versions from a browser, without needing to know Docker, Java or networking.
 
-## Current state (2026-11-27)
+## Current state (2026-11-28)
 
-**CraftPanel 1.1.0 is released** (2026-11-23): per-server isolation and resource limits, application backups with host moves, player profiles and actions, rules and sleeping servers, the AI assistant. Releases v0.1.0–v0.3.0, v1.0.0 and v1.1.0 are on GitHub. No known small issues are open.
+**CraftPanel 1.2.0 is released** (2026-11-27): stored performance history (24 h / 7 d / 30 d ranges, sampled without an open dashboard) and recoverable background jobs (Activity → Tasks with restart resume/cleanup), building on 1.1.0's per-server isolation, resource limits, application backups with host moves, player profiles/actions, rules, sleeping servers and AI assistant. Releases v0.1.0–v0.3.0, v1.0.0, v1.1.0 and v1.2.0 are on GitHub; versioning and release governance are formalized in [RELEASING.md](RELEASING.md). No known small issues are open.
 
-- **Current phase: persistent monitoring and recoverable background jobs** (section below), the foundation for remote agents and several hosts. The stored performance history and recoverable jobs are done (2026-11-27, unreleased); host history, history-based alerts and then remote agents come next.
+- **Current phase: persistent monitoring and recoverable background jobs** (section below), the foundation for remote agents and several hosts. The stored performance history and recoverable jobs shipped in 1.2.0; host history, history-based alerts and then remote agents come next.
 
 - **Open verification gaps** (not blockers, listed honestly in STATUS.md): an actual Windows host shutdown on a disposable VM; dashboard-triggered updates and concurrent installers on Windows; the `curl | sudo bash` / `irm | iex` path on a physical Pi and a small VPS.
 - **Application backup and host moves: all three stages done (2026-11-17).** Complete and scheduled archives, retention/failure alerts, optional passphrase encryption and server-backup history, and first-run upload restoration. Verified with real Paper into installed Linux x64/ARM64 and Windows services; browser tests pass on both Linux architectures. Later: S3/USB destinations and pull-based moves. See STATUS.md.
