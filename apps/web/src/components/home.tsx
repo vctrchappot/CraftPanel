@@ -12,6 +12,7 @@ import { formatBytes } from "@/lib/format";
 import { StatusBadge } from "./status";
 import { ServerIcon } from "./server-icon";
 import { EventList } from "./activity";
+import { HostMonitoringSection } from "./host-monitoring";
 
 export interface SystemInfo {
   version: string;
@@ -146,6 +147,8 @@ export function HomeView() {
           />
         )}
       </Section>
+
+      <HostMonitoringSection system={s} />
 
       <div className="grid gap-10 lg:grid-cols-3">
         <Section title="Recent activity" className="flex min-h-0 flex-col lg:col-span-2" actions={<Link href="/activity/" className="flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground">View all <ArrowRight className="size-3.5" /></Link>}>

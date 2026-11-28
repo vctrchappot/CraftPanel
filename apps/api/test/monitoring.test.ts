@@ -4,16 +4,43 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { eq, metricBuckets, servers } from "@craftpanel/database";
+import { eq, hostMetricBuckets, metricBuckets, servers } from "@craftpanel/database";
 import { dataLayout } from "@craftpanel/server-runtime";
-import type { MetricHistory, ServerMetrics } from "@craftpanel/shared";
+import type { HostMetrics, MetricHistory, ServerMetrics, SystemMetricsResponse } from "@craftpanel/shared";
 import { createContext } from "../src/bootstrap";
 import { buildApp } from "../src/app";
 import type { AppContext } from "../src/context";
-import { addSample, combine, HOUR, HOUR_RETENTION_MS, MINUTE, MINUTE_RETENTION_MS, toBucket, type Totals } from "../src/services/monitoring";
+import {
+  addHostSample,
+  addSample,
+  combine,
+  combineHost,
+  HOUR,
+  HOUR_RETENTION_MS,
+  MINUTE,
+  MINUTE_RETENTION_MS,
+  toBucket,
+  toHostBucket,
+  type HostTotals,
+  type Totals,
+} from "../src/services/monitoring";
 
 const sample = (ts: number, over: Partial<ServerMetrics> = {}): ServerMetrics => ({ ts, cpuPercent: 10, memoryBytes: 1000, tps: 20, mspt: 5, uptimeMs: 1, playersOnline: 1, ...over });
 const blank = (): Totals => ({ cpuSum: 0, cpuN: 0, cpuMax: null, memorySum: 0, memoryN: 0, memoryMax: null, tpsSum: 0, tpsN: 0, tpsMin: null, msptSum: 0, msptN: 0, msptMax: null, playersSum: 0, playersN: 0, playersMax: null });
+const hostSample = (ts: number, over: Partial<HostMetrics> = {}): HostMetrics => ({
+  ts,
+  cpuPercent: 25,
+  memoryUsedBytes: 4_000_000_000,
+  memoryTotalBytes: 16_000_000_000,
+  diskUsedBytes: 100_000_000_000,
+  diskTotalBytes: 500_000_000_000,
+  ...over,
+});
+const blankHost = (): HostTotals => ({
+  cpuSum: 0, cpuN: 0, cpuMax: null,
+  memoryUsedSum: 0, memoryUsedN: 0, memoryUsedMax: null, memoryTotal: null,
+  diskUsedSum: 0, diskUsedN: 0, diskUsedMax: null, diskTotal: null,
+});
 
 describe("metric buckets", () => {
   it("average only the samples that have a metric and keep the extremes", () => {
@@ -32,6 +59,26 @@ describe("metric buckets", () => {
     addSample(b, sample(0, { cpuPercent: 50, tps: 15 }));
     combine(a, b);
     expect(toBucket(0, a)).toMatchObject({ cpuAvg: 30, cpuMax: 50, tpsAvg: 15, tpsMin: 15 });
+  });
+
+  it("folds and merges host samples with missing fields", () => {
+    const a = blankHost();
+    addHostSample(a, hostSample(0, { cpuPercent: null, diskUsedBytes: null, diskTotalBytes: null }));
+    addHostSample(a, hostSample(0, { cpuPercent: 20, memoryUsedBytes: 6_000_000_000 }));
+    const b = blankHost();
+    addHostSample(b, hostSample(0, { cpuPercent: 60, diskUsedBytes: 120_000_000_000, diskTotalBytes: 500_000_000_000 }));
+    combineHost(a, b);
+    expect(toHostBucket(60_000, a)).toEqual({
+      ts: 60_000,
+      cpuAvg: 40,
+      cpuMax: 60,
+      memoryUsedAvg: 4_666_666_666.666667,
+      memoryUsedMax: 6_000_000_000,
+      memoryTotalBytes: 16_000_000_000,
+      diskUsedAvg: 110_000_000_000,
+      diskUsedMax: 120_000_000_000,
+      diskTotalBytes: 500_000_000_000,
+    });
   });
 });
 
@@ -163,5 +210,70 @@ describe("monitoring", () => {
     expect((await ctx.database.db.select().from(metricBuckets)).length).toBe(2);
     for (const hook of ctx.servers.hooks.deleted) await hook(id);
     expect(await ctx.database.db.select().from(metricBuckets)).toEqual([]);
+  });
+
+  it("stores host history, merges partial minutes, prunes old buckets and scopes server overview", async () => {
+    const owner = session(await app.inject({ method: "POST", url: "/api/auth/login", payload: { username: "owner", password: "owner-password-1" } }));
+    await app.inject({
+      method: "POST",
+      url: "/api/users",
+      payload: { username: "limited", password: "limited-password-1", role: "viewer", serverScope: "selected", serverRoles: {} },
+      headers: { cookie: owner.cookie, "x-csrf-token": owner.csrf },
+    });
+    const limited = session(await app.inject({ method: "POST", url: "/api/auth/login", payload: { username: "limited", password: "limited-password-1" } }));
+
+    // Reset host buckets from startup sampling so assertions are deterministic.
+    await ctx.monitoring.flush(true);
+    await ctx.database.db.delete(hostMetricBuckets);
+
+    const t0 = now - (now % HOUR) + 2 * HOUR;
+    now = t0;
+    ctx.monitoring.recordHost(hostSample(t0, { cpuPercent: 20, memoryUsedBytes: 4_000_000_000, diskUsedBytes: 100_000_000_000 }));
+    ctx.monitoring.recordHost(hostSample(t0 + 15_000, { cpuPercent: 40, memoryUsedBytes: 6_000_000_000, diskUsedBytes: 110_000_000_000 }));
+    ctx.monitoring.recordHost(hostSample(t0 + MINUTE + 5_000, { cpuPercent: 70, memoryUsedBytes: 8_000_000_000, diskUsedBytes: 120_000_000_000 }));
+    now = t0 + MINUTE + 10_000;
+    await ctx.monitoring.tick();
+
+    expect((await app.inject({ method: "GET", url: "/api/system/metrics?range=5y", headers: { cookie: viewer.cookie } })).statusCode).toBe(400);
+
+    const dayRes = await app.inject({ method: "GET", url: "/api/system/metrics?range=24h", headers: { cookie: viewer.cookie } });
+    expect(dayRes.statusCode).toBe(200);
+    const day = dayRes.json() as SystemMetricsResponse;
+    expect(day.host.range).toBe("24h");
+    if (day.host.range === "1h") throw new Error("unreachable");
+    expect(day.host.buckets).toEqual([
+      {
+        ts: t0,
+        cpuAvg: 30,
+        cpuMax: 40,
+        memoryUsedAvg: 5_000_000_000,
+        memoryUsedMax: 6_000_000_000,
+        memoryTotalBytes: 16_000_000_000,
+        diskUsedAvg: 105_000_000_000,
+        diskUsedMax: 110_000_000_000,
+        diskTotalBytes: 500_000_000_000,
+      },
+      expect.objectContaining({ ts: t0 + MINUTE, cpuAvg: 70, cpuMax: 70 }),
+    ]);
+
+    // Restricted viewer sees host metrics but no servers outside their scope.
+    const limitedRes = await app.inject({ method: "GET", url: "/api/system/metrics?range=1h", headers: { cookie: limited.cookie } });
+    expect(limitedRes.statusCode).toBe(200);
+    const limitedBody = limitedRes.json() as SystemMetricsResponse;
+    expect(limitedBody.host.range).toBe("1h");
+    expect(limitedBody.servers).toEqual([]);
+
+    // Partial minute written in two flushes merges instead of overwriting.
+    await ctx.monitoring.flush(true);
+    ctx.monitoring.recordHost(hostSample(t0 + MINUTE + 30_000, { cpuPercent: 90 }));
+    await ctx.monitoring.flush(true);
+    const [minuteRow] = await ctx.database.db.select().from(hostMetricBuckets).where(eq(hostMetricBuckets.ts, t0 + MINUTE));
+    expect(minuteRow).toMatchObject({ resolution: MINUTE, cpuN: 2, cpuSum: 160, cpuMax: 90 });
+
+    // Retention pruning clears host minute buckets after 26 h and hour buckets after 31 days.
+    await ctx.monitoring.prune(t0 + MINUTE_RETENTION_MS + HOUR);
+    expect((await ctx.database.db.select().from(hostMetricBuckets)).map((r) => r.resolution)).toEqual([HOUR]);
+    await ctx.monitoring.prune(t0 + HOUR_RETENTION_MS + 2 * HOUR);
+    expect(await ctx.database.db.select().from(hostMetricBuckets)).toEqual([]);
   });
 });

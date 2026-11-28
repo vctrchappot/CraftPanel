@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { appSettingsSchema, backupCreateSchema, badRequest, canAccess, notFound, CRAFTPANEL_VERSION, scheduleSchema, SOFTWARE_INFO, type ConnectAddress, type ScheduleInfo } from "@craftpanel/shared";
+import { appSettingsSchema, backupCreateSchema, badRequest, canAccess, METRIC_RANGES, notFound, CRAFTPANEL_VERSION, scheduleSchema, SOFTWARE_INFO, type ConnectAddress, type MetricRange, type ScheduleInfo, type ServerOverviewMetrics, type SystemMetricsResponse } from "@craftpanel/shared";
 import { nextRuns, validateCron } from "@craftpanel/scheduler";
 import { getProvider, log4shellMitigation, PROVIDERS } from "@craftpanel/minecraft-providers";
 import { SETTING_GROUPS, SETTINGS } from "@craftpanel/config";
@@ -187,6 +187,34 @@ export async function systemRoutes(app: FastifyInstance, ctx: AppContext) {
       lanAddresses: addresses.map((a): ConnectAddress => ({ address: a.address, kind: a.kind, label: a.label, interface: a.interface })),
       servers: { total: rows.length, running: running.length },
     };
+  });
+
+  app.get<{ Querystring: { range?: string } }>("/api/system/metrics", async (req): Promise<SystemMetricsResponse> => {
+    const me = requireUser(req);
+    const raw = req.query.range ?? "1h";
+    if (!(METRIC_RANGES as readonly string[]).includes(raw)) throw badRequest(`Unknown range: ${raw}`, `Use one of: ${METRIC_RANGES.join(", ")}.`);
+    const host = await ctx.monitoring.hostHistory(raw as MetricRange);
+    const rows = (await ctx.servers.rows()).filter((r) => canSee(me, r.id));
+    const servers: ServerOverviewMetrics[] = rows.map((r) => {
+      const summary = ctx.servers.summary(r);
+      const live = summary.status === "running" && ctx.agent.connected ? ctx.agent.latestMetrics(r.id) : null;
+      return {
+        id: summary.id,
+        name: summary.name,
+        software: summary.software,
+        mcVersion: summary.mcVersion,
+        status: summary.status,
+        playersOnline: summary.playersOnline,
+        maxPlayers: summary.maxPlayers,
+        memoryMb: summary.memoryMb,
+        cpuPercent: live?.cpuPercent ?? null,
+        memoryBytes: live?.memoryBytes ?? null,
+        tps: live?.tps ?? null,
+        mspt: live?.mspt ?? null,
+        iconVersion: summary.iconVersion,
+      };
+    });
+    return { host, servers };
   });
 
   app.get("/api/system/diagnostics", async (req) => {

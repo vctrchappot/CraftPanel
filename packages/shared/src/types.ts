@@ -159,6 +159,55 @@ export type MetricHistory =
   | { range: "1h"; samples: ServerMetrics[] }
   | { range: Exclude<MetricRange, "1h">; resolutionMs: number; buckets: MetricBucket[] };
 
+/** One point-in-time reading of the host machine (CPU, memory and data-directory disk usage). */
+export interface HostMetrics {
+  ts: number;
+  cpuPercent: number | null;
+  memoryUsedBytes: number | null;
+  memoryTotalBytes: number;
+  diskUsedBytes: number | null;
+  diskTotalBytes: number | null;
+}
+
+/** Host metrics folded into one minute or hour; a field is null when no sample in the bucket had it. */
+export interface HostMetricBucket {
+  ts: number;
+  cpuAvg: number | null;
+  cpuMax: number | null;
+  memoryUsedAvg: number | null;
+  memoryUsedMax: number | null;
+  memoryTotalBytes: number | null;
+  diskUsedAvg: number | null;
+  diskUsedMax: number | null;
+  diskTotalBytes: number | null;
+}
+
+export type HostMetricHistory =
+  | { range: "1h"; samples: HostMetrics[] }
+  | { range: Exclude<MetricRange, "1h">; resolutionMs: number; buckets: HostMetricBucket[] };
+
+/** One visible server's current resource usage in the dashboard-wide overview. */
+export interface ServerOverviewMetrics {
+  id: string;
+  name: string;
+  software: ServerSoftware;
+  mcVersion: string;
+  status: ServerStatus;
+  playersOnline: number;
+  maxPlayers: number;
+  memoryMb: number;
+  cpuPercent: number | null;
+  memoryBytes: number | null;
+  tps: number | null;
+  mspt: number | null;
+  iconVersion: number | null;
+}
+
+export interface SystemMetricsResponse {
+  host: HostMetricHistory;
+  servers: ServerOverviewMetrics[];
+}
+
 export interface InstallProgress {
   serverId: string;
   stage: string;

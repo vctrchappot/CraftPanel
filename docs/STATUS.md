@@ -1,5 +1,11 @@
 # Implementation status
 
+## Host history and server overview (2026-11-28)
+
+- `MonitoringService` now also samples the host machine every 15 s (CPU delta via `os.cpus()`, used/total memory respecting cgroup limits via `detectHost()`, and data-directory disk usage via `freeDiskSpace()`), keeps the last hour in memory, and folds finished minutes into `host_metric_buckets` (migration 0007) at minute (26 h) and hour (31 days) resolutions with the same upsert-merge semantics as `metric_buckets`. Application-backup imports clear `host_metric_buckets` so an old machine's readings are not carried onto a new host. `GET /api/system/metrics?range=1h|24h|7d|30d` returns the host history (including the unwritten current minute) and live resource snapshots for every visible server (`canSee`). The Overview page shows **Host history** charts (CPU, memory, disk over 15 min / 1 h / 24 h / 7 d / 30 d) and an **All servers at a glance** breakdown linking to each server's Performance tab.
+- 🧪 `apps/api/test/monitoring.test.ts` (11 cases): host bucket folding/merging with missing fields, `GET /api/system/metrics` range validation, raw `1h` and stored `24h` buckets including unwritten minutes, two-part partial-minute upsert merges, retention pruning and `selected`-scope server filtering. Full suite: 560 passed, 10 skipped; typecheck and production build clean.
+- 🟡 Browser layout (dark desktop / light mobile) and multi-day host history on Linux/Raspberry Pi not yet verified in Chromium or on hardware.
+
 ## Recoverable jobs (2026-11-27)
 
 - `JobService` records installs (with software switches and modpacks), server backups, restores and application backups in a `jobs` table (migration 0006) with stage, percent, actor, result and a hint; progress reaches dashboards over the WebSocket (`job`, server jobs to everyone who sees the server, application jobs to owners only). Activity → Tasks lists running and recent jobs live. At startup, jobs the previous process left running are resumed (installs, once) or marked interrupted with what to do; an interrupted application backup's `.partial` archive and staging folder are removed, a restore's staging folder too. An application-backup import drops jobs that ran on the old host. Jobs are kept 30 days and deleted with their server. API: `GET /api/jobs[?serverId=]`, `GET /api/jobs/:id`.

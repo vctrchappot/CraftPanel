@@ -62,7 +62,7 @@ export async function createContext(config: AppConfig, opts: { migrationsFolder?
   const proxies = new ProxyService(servers, game, activity);
   const notifications = new NotificationService(settings, updates);
   const rules = new RuleService(db, servers, backups, maps, notifications, activity);
-  const monitoring = new MonitoringService(db, servers);
+  const monitoring = new MonitoringService(db, servers, L.root);
   activity.listen((event, serverName) => notifications.onEvent(event, serverName));
   const assistant = new AssistantService({ settings, sessions, servers, game, backups, schedules, activity, hub }, opts.assistantFetch);
 
